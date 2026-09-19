@@ -287,6 +287,7 @@ window.storage = {
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 if (window.pdfjsLib) {
@@ -371,10 +372,9 @@ let state = {
     pin: '1234', pinLoading:true,
     finalGrades: null, finalGradesUnidade: 'I Unidade',
     bloco: { turmaId:'', selectedCodes:[] },
-    livros: [], livrosLoading: true, newLivroArea:'', newLivroComponente:'', newLivroColecao:'', newLivroCodigo:'', livroUploading:{}, livroUploadError:{},
-    leitura2: { livro:null, pdfDoc:null, pageNum:1, numPages:0, loading:false, error:'' },
     manualGradePrefill: null,
-    livros: [], livrosLoading: true,
+    livros: [], livrosLoading: true, bancoLivroSelectedId: null,
+    painel: null,
     leitura: { loading:false, error:'', review:null, assessment:null, studentName:'' },
     unlockRequests: [], unlockRequestsLoading: true,
     periodos: {}, periodosLoading: true,
@@ -416,7 +416,7 @@ function computeAssessmentTitle(a){
   return a.unidade ? `${instrumentoBaseTitle(a.instrumento)} - ${a.unidade}` : instrumentoBaseTitle(a.instrumento);
 }
 function freshQuestion(type){
-  const base = { id: cryptoId(), type, text:'', points:1, image:null, annulled:false };
+  const base = { id: cryptoId(), type, text:'', points:1, image:null, annulled:false, descritorSaeb:'', conteudo:'' };
   if(type==='mc') return {...base, options:[{id:cryptoId(),text:''},{id:cryptoId(),text:''}], correctOptionId:null};
   if(type==='vf') return {...base, correctBool:null};
   return {...base, modelAnswer:''};
@@ -524,6 +524,7 @@ function renderProfessor(){
       <button class="pill-btn ${p.subview==='bloco'?'active':''}" data-action="sub-view" data-sub="bloco">Bloco de Provas</button>
       <button class="pill-btn ${p.subview==='leitura'?'active':''}" data-action="sub-view" data-sub="leitura">Leitura de Gabaritos</button>
       <button class="pill-btn ${p.subview==='livros'?'active':''}" data-action="sub-view" data-sub="livros">Livro Didático</button>
+      <button class="pill-btn ${p.subview==='painel'?'active':''}" data-action="sub-view" data-sub="painel">Meu Painel</button>
     </div>
   `;
   let content;
@@ -535,6 +536,7 @@ function renderProfessor(){
   else if(p.subview==='bloco') content = renderBlocoProvas(p.assessments.filter(a => !a.professorId || a.professorId===p.session.id));
   else if(p.subview==='leitura') content = renderLeituraGabaritos();
   else if(p.subview==='livros') content = renderLivrosDidaticos(false);
+  else if(p.subview==='painel') content = renderProfessorPainel();
   else content = p.mode==='new' ? renderNewAssessment() : p.mode==='results' ? renderResults() : renderProfessorList();
   return nav + content;
 }
@@ -665,7 +667,7 @@ function renderLivrosDidaticos(canUpload){
           ${l.downloadUrl && !embedUrl && !l.editingLink ? '<p class="err" style="font-size:.78rem; margin-top:6px;">Esse link não parece ser do Google Drive — pode baixar em vez de abrir na tela.</p>' : ''}
         </div>
         <div class="row" style="flex:0 0 auto; gap:8px; align-items:center;">
-          ${(l.downloadUrl && !l.editingLink) ? `<button class="btn btn-primary btn-sm" data-action="toggle-livro-view" data-id="${l.id}">${l.viewing?'Fechar livro':'Abrir livro'}</button>` : (!canUpload && !l.downloadUrl ? '<span class="muted">Ainda não disponível</span>' : '')}
+          ${(l.downloadUrl && !l.editingLink) ? `<button class="btn btn-primary btn-sm" data-action="toggle-livro-view" data-id="${l.id}">${l.viewing?'Fechar livro':'Abrir livro'}</button><a href="${l.downloadUrl}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">Abrir no Drive (copiar texto)</a>` : (!canUpload && !l.downloadUrl ? '<span class="muted">Ainda não disponível</span>' : '')}
           ${canUpload && !l.editingLink ? `
             ${l.downloadUrl ? `<button class="btn btn-danger btn-sm" data-action="remove-livro-file" data-id="${l.id}">Remover</button>` : ''}
             <button class="btn btn-ghost btn-sm" data-action="edit-livro-link" data-id="${l.id}">${l.downloadUrl?'Trocar link':'Colar link'}</button>
@@ -855,6 +857,10 @@ function renderQuestionEditor(q, idx, showRemove){
         </div>
       </div>
       <textarea data-action="q-text" data-qid="${q.id}" placeholder="Enunciado da questão">${esc(q.text)}</textarea>
+      <div class="row">
+        <input type="text" data-action="q-descritor" data-qid="${q.id}" value="${esc(q.descritorSaeb||'')}" placeholder="Descritor SAEB (ex: D19)">
+        <input type="text" data-action="q-conteudo" data-qid="${q.id}" value="${esc(q.conteudo||'')}" placeholder="Conteúdo (ex: Frações)">
+      </div>
       ${imageBlock}
       ${extra}
     </div>
@@ -1068,6 +1074,9 @@ function renderBanco(){
     return renderBookImport();
   }
   if(p.newBankQuestion){
+    const livrosDisponiveis = (p.livros||[]).filter(l=>l.downloadUrl);
+    const selectedLivro = livrosDisponiveis.find(l=>l.id===p.bancoLivroSelectedId);
+    const embedUrl = selectedLivro ? driveEmbedUrl(selectedLivro.downloadUrl) : null;
     return `
       <div class="card">
         <h2>${p.editingBankId ? 'Editar questão' : 'Nova questão do banco'}</h2>
@@ -1077,6 +1086,16 @@ function renderBanco(){
           <button class="btn btn-ghost" data-action="cancel-bank-question">Cancelar</button>
           <button class="btn btn-primary" data-action="save-bank-question">Salvar no banco</button>
         </div>
+        <hr style="margin:20px 0; border:none; border-top:1px solid var(--paper-line);">
+        <h3>📖 Consultar livro didático</h3>
+        <p class="muted" style="font-size:.85rem;">Abra o livro aqui do lado para procurar uma questão ou trecho e digitar acima.</p>
+        ${livrosDisponiveis.length===0 ? '<p class="muted">Nenhum livro disponível ainda — peça à coordenação para anexar na aba "Livro Didático".</p>' : `
+          <select id="banco-livro-select">
+            <option value="">Selecione um livro...</option>
+            ${livrosDisponiveis.map(l => `<option value="${l.id}" ${p.bancoLivroSelectedId===l.id?'selected':''}>${esc(l.componente)} — ${esc(l.colecao)}</option>`).join('')}
+          </select>
+          ${embedUrl ? `<iframe src="${embedUrl}" style="width:100%; height:60vh; border:1px solid var(--paper-line); border-radius:8px; margin-top:10px;" allow="autoplay"></iframe>` : ''}
+        `}
       </div>
     `;
   }
@@ -1089,7 +1108,7 @@ function renderBanco(){
     body = p.bank.map(q => `
       <div class="list-item">
         <div>
-          <span class="q-tag">${questionTagLabel(q.type)} · ${q.points} pt(s)</span><br>
+          <span class="q-tag">${questionTagLabel(q.type)} · ${q.points} pt(s)${q.descritorSaeb?' · '+esc(q.descritorSaeb):''}${q.conteudo?' · '+esc(q.conteudo):''}</span><br>
           ${esc(q.text).slice(0,90)}${q.text.length>90?'…':''}
         </div>
         <div class="row" style="flex:0 0 auto; gap:6px;">
@@ -1335,6 +1354,9 @@ function renderTurmas(){
         <input type="text" id="turma-name-input" value="${esc(p.newTurmaName)}" placeholder="Ex: 2º Eletromecânica A">
         <label>Alunos (um por linha — pode incluir a matrícula depois de uma vírgula)</label>
         <textarea id="turma-students-input" placeholder="Ana Souza, 20231001&#10;Bruno Lima, 20231002&#10;Carla Reis">${esc(p.newTurmaStudentsText)}</textarea>
+        <label style="margin-top:8px;">Ou importe de um arquivo (.csv, .xlsx)</label>
+        <input type="file" id="new-turma-roster-file" accept=".csv,.xlsx,.xls">
+        <p class="muted" style="font-size:.8rem;">A primeira coluna deve ser o nome do aluno, a segunda (opcional) a matrícula. Isso substitui o texto acima.</p>
         <div id="turma-err"></div>
         <div class="row" style="margin-top:14px;">
           <button class="btn btn-ghost" data-action="cancel-new-turma">Cancelar</button>
@@ -1384,6 +1406,7 @@ function renderTurmaDetail(t){
           <span>${esc(s.name)}${s.matricula?' <span class="muted">· mat. '+esc(s.matricula)+'</span>':' <span class="muted">· sem matrícula</span>'}${s.passwordHash?' <span class="muted">· acesso ativo</span>':''}</span>
           <div class="row" style="flex:0 0 auto; gap:6px;">
             <button class="btn btn-ghost btn-sm" data-action="set-student-matricula" data-tid="${t.id}" data-sid="${s.id}">${s.matricula?'Editar matrícula':'Definir matrícula'}</button>
+            ${s.passwordHash ? `<button class="btn btn-ghost btn-sm" data-action="reset-student-password" data-tid="${t.id}" data-sid="${s.id}">Redefinir senha</button>` : ''}
             <button class="btn btn-danger btn-sm" data-action="remove-student" data-tid="${t.id}" data-sid="${s.id}">✕</button>
           </div>
         </div>
@@ -1393,6 +1416,9 @@ function renderTurmaDetail(t){
         <input type="text" id="new-student-matricula-input" placeholder="Matrícula" style="max-width:140px;">
         <button class="btn btn-ghost" data-action="add-student" data-tid="${t.id}" style="flex:0 0 auto;">Adicionar</button>
       </div>
+      <label style="margin-top:12px;">Ou importe vários de uma vez (.csv, .xlsx)</label>
+      <input type="file" id="turma-roster-file-${t.id}" data-action="import-turma-roster-file" data-tid="${t.id}" accept=".csv,.xlsx,.xls">
+      <p class="muted" style="font-size:.8rem;">Primeira coluna: nome. Segunda coluna (opcional): matrícula. É adicionado à lista já existente.</p>
 
       <h3 style="margin-top:24px;">Nota final do bimestre</h3>
       ${p.session ? `
@@ -1421,7 +1447,10 @@ function renderFinalGradesTable(t){
   if(fg.loading) return '<div class="spinner"></div>';
   const pesos = state.professor.pesos;
   return `
-    <p class="muted" style="margin-top:10px;">NP1 é o Simulado/Avaliação (${pesos.avaliacao} pts). NP2 não é uma nota separada — é a soma de Diagnóstica (${pesos.diagnostica}) + Exercícios (${pesos.exercicios}) + Autoavaliação (${pesos.autoavaliacao}). Nota Final = NP1 + NP2.</p>
+    <div class="row" style="justify-content:space-between; align-items:center;">
+      <p class="muted" style="margin-top:10px;">NP1 é o Simulado/Avaliação (${pesos.avaliacao} pts). NP2 não é uma nota separada — é a soma de Diagnóstica (${pesos.diagnostica}) + Exercícios (${pesos.exercicios}) + Autoavaliação (${pesos.autoavaliacao}). Nota Final = NP1 + NP2.</p>
+      <button class="btn btn-ghost btn-sm" style="flex:0 0 auto;" data-action="export-final-grades-xlsx" data-tid="${t.id}">Exportar .xlsx</button>
+    </div>
     ${renderFinalGradesChart(fg)}
     <table>
       <tr>
@@ -1565,6 +1594,140 @@ function generateBlocoGabaritos(){
     pages += buildCombinedGabaritoPage(assessments, s.name, turma.name);
   });
   printPages(pages);
+}
+
+/* ---------------- PAINEL DO PROFESSOR ---------------- */
+
+async function calcProfessorPainel(){
+  const p = state.professor;
+  p.painel = { loading:true };
+  render();
+  const myAssessments = p.assessments.filter(a => !a.professorId || a.professorId===p.session.id);
+  const turmaStats = {}, disciplinaStats = {}, conteudoStats = {}, descritorStats = {}, alunoStats = {};
+  const ausentesMap = {}; // key: turmaName + '|' + studentName -> {turmaName, studentName, count}
+
+  for(const a of myAssessments){
+    const max = a.questions.reduce((s,q)=>s+q.points,0);
+    let responses = [];
+    try{ const r = await window.storage.get(`responses:${a.code}`, true); responses = JSON.parse(r.value); }catch(e){}
+    const turmas = assessmentTurmas(a);
+
+    responses.forEach(resp => {
+      if(max>0){
+        const pct = (resp.total/max)*100;
+        let turma = turmas.length===1 ? turmas[0] : turmas.find(t=>t.students.some(s=>s.name===resp.studentName));
+        if(turma){
+          if(!turmaStats[turma.name]) turmaStats[turma.name] = {sum:0,count:0};
+          turmaStats[turma.name].sum += pct; turmaStats[turma.name].count++;
+        }
+        if(a.disciplinaName){
+          if(!disciplinaStats[a.disciplinaName]) disciplinaStats[a.disciplinaName] = {sum:0,count:0};
+          disciplinaStats[a.disciplinaName].sum += pct; disciplinaStats[a.disciplinaName].count++;
+        }
+        if(!alunoStats[resp.studentName]) alunoStats[resp.studentName] = {sum:0,count:0};
+        alunoStats[resp.studentName].sum += pct; alunoStats[resp.studentName].count++;
+      }
+      (resp.details||[]).forEach(d => {
+        const q = a.questions.find(x=>x.id===d.questionId);
+        if(!q || !q.points || q.annulled) return;
+        const pct = (d.score/q.points)*100;
+        if(q.conteudo && q.conteudo.trim()){
+          const key = q.conteudo.trim();
+          if(!conteudoStats[key]) conteudoStats[key] = {sum:0,count:0};
+          conteudoStats[key].sum += pct; conteudoStats[key].count++;
+        }
+        if(q.descritorSaeb && q.descritorSaeb.trim()){
+          const key = q.descritorSaeb.trim();
+          if(!descritorStats[key]) descritorStats[key] = {sum:0,count:0};
+          descritorStats[key].sum += pct; descritorStats[key].count++;
+        }
+      });
+    });
+
+    const status = assessmentWindowStatus(a);
+    if(status==='depois'){
+      turmas.forEach(turma => {
+        turma.students.forEach(s => {
+          const answered = responses.some(r=>r.studentName===s.name);
+          if(!answered){
+            const key = turma.name+'|'+s.name;
+            if(!ausentesMap[key]) ausentesMap[key] = { turmaName: turma.name, studentName: s.name, count:0 };
+            ausentesMap[key].count++;
+          }
+        });
+      });
+    }
+  }
+
+  const toSortedArray = (obj, order) => {
+    const arr = Object.keys(obj).map(name => ({ name, avg: obj[name].sum/obj[name].count, count: obj[name].count }));
+    arr.sort((x,y) => order==='asc' ? x.avg-y.avg : y.avg-x.avg);
+    return arr;
+  };
+
+  p.painel = {
+    loading:false,
+    porTurma: toSortedArray(turmaStats, 'desc'),
+    porDisciplina: toSortedArray(disciplinaStats, 'desc'),
+    porConteudo: toSortedArray(conteudoStats, 'asc'),
+    porDescritor: toSortedArray(descritorStats, 'asc'),
+    porAluno: toSortedArray(alunoStats, 'asc'),
+    ausentes: Object.values(ausentesMap).sort((x,y)=>y.count-x.count)
+  };
+  render();
+}
+
+function renderPainelBar(item){
+  const color = item.avg>=70 ? 'var(--green)' : item.avg>=50 ? 'var(--yellow-dark)' : 'var(--red)';
+  return `
+    <div style="margin-bottom:10px;">
+      <div class="row" style="justify-content:space-between; font-size:.85rem;">
+        <span>${esc(item.name)}</span>
+        <span class="muted">${item.avg.toFixed(0)}% · ${item.count} registro(s)</span>
+      </div>
+      <div class="chart-track"><div class="chart-fill" style="width:${Math.round(item.avg)}%; background:${color};"></div></div>
+    </div>
+  `;
+}
+
+function renderProfessorPainel(){
+  const p = state.professor;
+  if(!p.painel || p.painel.loading){
+    return `<div class="card"><h2>Meu Painel</h2><div class="spinner"></div></div>`;
+  }
+  const pn = p.painel;
+  const section = (title, items, emptyMsg) => `
+    <h3 style="margin-top:22px;">${title}</h3>
+    ${items.length===0 ? `<p class="muted">${emptyMsg}</p>` : items.map(renderPainelBar).join('')}
+  `;
+  return `
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <h2>Meu Painel</h2>
+        <button class="btn btn-ghost btn-sm" data-action="refresh-professor-painel">Atualizar</button>
+      </div>
+      <p class="muted">Análise com base em todas as suas avaliações e respostas já lançadas.</p>
+      ${section('Desempenho por turma', pn.porTurma, 'Sem dados ainda.')}
+      ${section('Desempenho por disciplina', pn.porDisciplina, 'Sem dados ainda.')}
+      ${section('Desempenho por conteúdo', pn.porConteudo, 'Preencha o campo "Conteúdo" nas questões para ver essa análise.')}
+      ${section('Desempenho por descritor SAEB', pn.porDescritor, 'Preencha o campo "Descritor SAEB" nas questões para ver essa análise.')}
+      <h3 style="margin-top:22px;">Desempenho por aluno</h3>
+      ${pn.porAluno.length===0 ? '<p class="muted">Sem dados ainda.</p>' : `
+        <table>
+          <tr><th>Aluno</th><th>Média</th><th>Avaliações</th></tr>
+          ${pn.porAluno.map(a => `<tr><td>${esc(a.name)}</td><td>${a.avg.toFixed(1)}%</td><td>${a.count}</td></tr>`).join('')}
+        </table>
+      `}
+      <h3 style="margin-top:22px;">Alunos ausentes</h3>
+      <p class="muted" style="font-size:.82rem; margin-top:-6px;">Alunos matriculados na turma que não responderam a uma avaliação já encerrada.</p>
+      ${pn.ausentes.length===0 ? '<p class="muted">Nenhuma ausência registrada.</p>' : `
+        <table>
+          <tr><th>Aluno</th><th>Turma</th><th>Ausências</th></tr>
+          ${pn.ausentes.map(a => `<tr><td>${esc(a.studentName)}</td><td>${esc(a.turmaName)}</td><td>${a.count}</td></tr>`).join('')}
+        </table>
+      `}
+    </div>
+  `;
 }
 
 function renderLeituraGabaritos(){
@@ -1831,7 +1994,10 @@ function renderCoordDashboard(){
     <div class="card">
       <div class="row" style="align-items:center; justify-content:space-between;">
         <h2>Painel executivo</h2>
-        <button class="btn btn-ghost btn-sm" data-action="coord-refresh-dashboard">Atualizar</button>
+        <div class="row" style="flex:0 0 auto; gap:8px;">
+          <button class="btn btn-ghost btn-sm" data-action="download-backup">Baixar backup completo</button>
+          <button class="btn btn-ghost btn-sm" data-action="coord-refresh-dashboard">Atualizar</button>
+        </div>
       </div>
       <p class="muted">Visão geral da escola — atualizada sob demanda.</p>
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);">
@@ -2028,6 +2194,9 @@ function renderCoordNotas(){
     resultBlock = '<div class="spinner"></div>';
   } else if(c.notasColunas.length>0){
     resultBlock = `
+      <div style="text-align:right; margin-bottom:8px;">
+        <button class="btn btn-ghost btn-sm" data-action="export-coord-notas-xlsx">Exportar .xlsx</button>
+      </div>
       <table>
         <tr>
           <th>Aluno</th>
@@ -2149,6 +2318,53 @@ async function saveCoordPeriodos(){
   state.coordenador.periodosDraft = null;
   render();
   alert('Períodos salvos.');
+}
+
+async function downloadFullBackup(btn){
+  if(btn){ btn.disabled = true; btn.textContent = 'Gerando backup...'; }
+  const backup = { _meta: { exportedAt: new Date().toISOString(), version: 1 } };
+  const simpleKeys = ['turmas','professores','pin-liberacao','unlock-requests','periodos-avaliacao','livros-didaticos'];
+  for(const k of simpleKeys){
+    try{ const r = await window.storage.get(k, true); backup[k] = JSON.parse(r.value); }catch(e){ backup[k] = null; }
+  }
+  try{ const r = await window.storage.get('coordenador-senha', true); backup['coordenador-senha'] = r.value; }catch(e){ backup['coordenador-senha'] = null; }
+
+  backup['assessments'] = {};
+  try{
+    const list = await window.storage.list('assessment:', true);
+    for(const k of (list.keys||[])){
+      try{ const r = await window.storage.get(k, true); backup['assessments'][k] = JSON.parse(r.value); }catch(e){}
+    }
+  }catch(e){}
+
+  backup['responses'] = {};
+  try{
+    const list = await window.storage.list('responses:', true);
+    for(const k of (list.keys||[])){
+      try{ const r = await window.storage.get(k, true); backup['responses'][k] = JSON.parse(r.value); }catch(e){}
+    }
+  }catch(e){}
+
+  backup['disciplinas'] = {};
+  backup['questionBanks'] = {};
+  backup['pesosInstrumentos'] = {};
+  const professores = backup['professores'] || [];
+  for(const prof of professores){
+    try{ const r = await window.storage.get(`disciplinas:${prof.id}`, true); backup['disciplinas'][prof.id] = JSON.parse(r.value); }catch(e){}
+    try{ const r = await window.storage.get(`question-bank:${prof.id}`, true); backup['questionBanks'][prof.id] = JSON.parse(r.value); }catch(e){}
+    try{ const r = await window.storage.get(`pesos-instrumentos:${prof.id}`, true); backup['pesosInstrumentos'][prof.id] = JSON.parse(r.value); }catch(e){}
+  }
+
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `backup-sala-avaliacoes-${new Date().toISOString().slice(0,10)}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  if(btn){ btn.disabled = false; btn.textContent = 'Baixar backup completo'; }
 }
 
 async function calcExecDashboard(){
@@ -2323,6 +2539,18 @@ async function clearCoordNote(profId){
   render();
 }
 
+function exportCoordNotasXlsx(){
+  const c = state.coordenador;
+  const t = state.professor.turmas.find(x=>x.id===c.notasTurmaId);
+  if(!c.notasColunas.length || !c.notasRows.length){ alert('Calcule as notas antes de exportar.'); return; }
+  const header = ['Aluno', ...c.notasColunas.map(col => `${col.disciplinaName} (${col.professorName||''}) /${col.total}`)];
+  const rows = c.notasRows.map(r => [r.name, ...c.notasColunas.map(col => { const g = col.grades[r.name]; return g!==undefined ? g : ''; })]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Notas Finais');
+  const turmaName = t ? t.name.replace(/[^a-z0-9]+/gi,'-') : 'turma';
+  XLSX.writeFile(wb, `notas-finais-${turmaName}-${c.notasUnidade.replace(/\s+/g,'-')}.xlsx`);
+}
 async function calcCoordNotas(){
   const c = state.coordenador;
   const turmaId = document.getElementById('coord-notas-turma-select').value;
@@ -2390,7 +2618,6 @@ function renderAluno(){
   const al = state.aluno;
   if(al.stage==='entrada') return renderEntrada();
   if(al.stage==='matricula-login') return renderMatriculaLogin();
-  if(al.stage==='turma-login') return renderTurmaLogin();
   if(al.stage==='dashboard') return renderStudentDashboard();
   if(al.stage==='aluno-livros') return renderAlunoLivros();
   if(al.stage==='code') return renderCode();
@@ -2409,7 +2636,6 @@ function renderEntrada(){
       <h2>Área do aluno</h2>
       <p class="muted">Entre com sua matrícula para ver suas provas realizadas e as que estão agendadas.</p>
       <button class="btn btn-primary btn-block" data-action="goto-matricula-login">Entrar com matrícula</button>
-      <button class="btn btn-ghost btn-block" style="margin-top:10px;" data-action="goto-turma-login">Entrar com minha turma (sem senha)</button>
       <button class="btn btn-ghost btn-block" style="margin-top:10px;" data-action="goto-code-entry">Tenho um código de avaliação</button>
     </div>
   `;
@@ -2461,37 +2687,6 @@ function renderMatriculaLogin(){
       <div class="row" style="margin-top:14px;">
         <button class="btn btn-ghost" data-action="back-to-entrada">← Voltar</button>
         <button class="btn btn-primary" data-action="matricula-lookup-submit">Continuar</button>
-      </div>
-    </div>
-  `;
-}
-
-function renderTurmaLogin(){
-  const al = state.aluno;
-  if(state.professor.turmasLoading){
-    return `<div class="card"><h2>Entrar com minha turma</h2><div class="spinner"></div></div>`;
-  }
-  const turmaOptions = state.professor.turmas.map(t => `<option value="${t.id}" ${al.loginTurmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
-  const turma = state.professor.turmas.find(t=>t.id===al.loginTurmaId);
-  return `
-    <div class="card">
-      <h2>Entrar com minha turma</h2>
-      <label>Turma</label>
-      <select id="student-turma-select" data-action="student-select-turma">
-        <option value="">Selecione sua turma...</option>
-        ${turmaOptions}
-      </select>
-      ${turma ? `
-        <label>Seu nome</label>
-        <select id="student-name-select">
-          <option value="">Selecione seu nome...</option>
-          ${turma.students.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('')}
-        </select>
-      ` : ''}
-      ${al.error ? `<p class="err">${esc(al.error)}</p>` : ''}
-      <div class="row" style="margin-top:14px;">
-        <button class="btn btn-ghost" data-action="back-to-entrada">← Voltar</button>
-        ${turma ? '<button class="btn btn-primary" data-action="student-turma-login">Entrar</button>' : ''}
       </div>
     </div>
   `;
@@ -2780,6 +2975,45 @@ async function loadTurmas(){
   catch(e){ p.turmas = []; }
   p.turmasLoading = false;
   render();
+}
+function parseNameMatriculaRows(rows){
+  // rows: array of arrays (cada linha = [coluna1, coluna2, ...])
+  const lines = [];
+  rows.forEach(row => {
+    if(!row || row.length===0) return;
+    const name = (row[0]!==undefined && row[0]!==null) ? String(row[0]).trim() : '';
+    const matricula = (row[1]!==undefined && row[1]!==null) ? String(row[1]).trim() : '';
+    if(!name) return;
+    if(/^nome$/i.test(name)) return; // pula linha de cabeçalho
+    lines.push(matricula ? `${name}, ${matricula}` : name);
+  });
+  return lines.join('\n');
+}
+function readRosterFile(file){
+  return new Promise((resolve, reject) => {
+    const isCsv = /\.csv$/i.test(file.name) || file.type==='text/csv';
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Falha ao ler o arquivo.'));
+    if(isCsv){
+      reader.onload = () => {
+        const text = reader.result;
+        const sep = text.indexOf(';') > -1 && text.indexOf(';') < (text.indexOf(',')===-1?Infinity:text.indexOf(',')) ? ';' : ',';
+        const rows = text.split(/\r?\n/).filter(l=>l.trim()!=='').map(line => line.split(sep).map(c=>c.trim().replace(/^"|"$/g,'')));
+        resolve(parseNameMatriculaRows(rows));
+      };
+      reader.readAsText(file, 'utf-8');
+    } else {
+      reader.onload = () => {
+        try{
+          const wb = XLSX.read(reader.result, { type:'binary' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header:1, raw:false, defval:'' });
+          resolve(parseNameMatriculaRows(rows));
+        }catch(e){ reject(e); }
+      };
+      reader.readAsBinaryString(file);
+    }
+  });
 }
 async function saveTurmasToStorage(){
   await window.storage.set('turmas', JSON.stringify(state.professor.turmas), true);
@@ -4006,6 +4240,28 @@ async function addStudent(tid){
   await saveTurmasToStorage();
   render();
 }
+async function importTurmaRoster(tid, file){
+  const p = state.professor;
+  const t = p.turmas.find(x=>x.id===tid);
+  if(!t) return;
+  let text;
+  try{ text = await readRosterFile(file); }
+  catch(e){ alert('Não foi possível ler esse arquivo. Confira se é um .csv ou .xlsx válido.'); return; }
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  if(lines.length===0){ alert('Não encontrei nenhum nome nesse arquivo.'); return; }
+  let added = 0;
+  lines.forEach(line => {
+    const parts = line.split(',');
+    const name = parts[0].trim();
+    const matricula = parts[1] ? parts[1].trim() : null;
+    if(!name) return;
+    t.students.push({id:cryptoId(), name, matricula, passwordHash:null, activatedAt:null});
+    added++;
+  });
+  await saveTurmasToStorage();
+  render();
+  alert(`${added} aluno(s) importado(s) para a turma ${t.name}.`);
+}
 async function setStudentMatricula(tid, sid){
   const p = state.professor;
   const t = p.turmas.find(x=>x.id===tid);
@@ -4013,6 +4269,17 @@ async function setStudentMatricula(tid, sid){
   const val = prompt('Matrícula do aluno:', s.matricula || '');
   if(val===null) return;
   s.matricula = val.trim() || null;
+  await saveTurmasToStorage();
+  render();
+}
+async function resetStudentPassword(tid, sid){
+  const p = state.professor;
+  const t = p.turmas.find(x=>x.id===tid);
+  const s = t.students.find(x=>x.id===sid);
+  if(!s) return;
+  if(!confirm(`Redefinir a senha de ${s.name}? Ele(a) vai precisar cadastrar uma senha nova no próximo acesso pela matrícula.`)) return;
+  s.passwordHash = null;
+  s.activatedAt = null;
   await saveTurmasToStorage();
   render();
 }
@@ -4089,6 +4356,18 @@ async function calcFinalGrades(tid){
 
   p.finalGrades = { turmaId: tid, unidade, loading:false, rows, total };
   render();
+}
+function exportFinalGradesXlsx(tid){
+  const p = state.professor;
+  const t = p.turmas.find(x=>x.id===tid);
+  const fg = p.finalGrades;
+  if(!t || !fg || fg.rows.length===0){ alert('Calcule as notas finais dessa turma antes de exportar.'); return; }
+  const header = ['Aluno','NP1 (Simulado)','Diagnóstica','Exercícios','Autoavaliação','NP2','Nota Final', `de ${fg.total}`];
+  const rows = fg.rows.map(r => [r.name, r.np1, r.diag, r.exerc, r.auto, r.np2, r.final, '']);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Notas Finais');
+  XLSX.writeFile(wb, `notas-finais-${t.name.replace(/[^a-z0-9]+/gi,'-')}-${fg.unidade.replace(/\s+/g,'-')}.xlsx`);
 }
 
 async function deleteTurma(tid){
@@ -4270,21 +4549,6 @@ async function matriculaPasswordSubmit(){
   await loadStudentDashboard();
 }
 
-async function studentTurmaLogin(){
-  const al = state.aluno;
-  const turmaId = document.getElementById('student-turma-select').value;
-  if(!turmaId){ al.error = 'Selecione sua turma.'; render(); return; }
-  const nameSel = document.getElementById('student-name-select');
-  const studentName = nameSel ? nameSel.value : '';
-  if(!studentName){ al.error = 'Selecione seu nome.'; render(); return; }
-  const turma = state.professor.turmas.find(t=>t.id===turmaId);
-  al.turma = turma;
-  al.name = studentName;
-  al.studentLoggedIn = true;
-  al.error = '';
-  await loadStudentDashboard();
-}
-
 async function loadStudentDashboard(){
   const al = state.aluno;
   al.dashboardLoading = true;
@@ -4433,6 +4697,7 @@ document.addEventListener('click', (e) => {
     render();
   }
   else if(act==='coord-refresh-dashboard'){ calcExecDashboard(); }
+  else if(act==='download-backup'){ downloadFullBackup(btn); }
   else if(act==='coord-save-periodos'){ saveCoordPeriodos(); }
   else if(act==='coord-add-professor'){ addProfessor(); }
   else if(act==='coord-remove-professor'){ removeProfessor(btn.dataset.id); }
@@ -4449,8 +4714,10 @@ document.addEventListener('click', (e) => {
       loadUnlockRequests();
       liberacoesPollInterval = setInterval(loadUnlockRequests, 5000);
     }
+    if(p.subview==='painel' && !p.painel){ calcProfessorPainel(); }
     render();
   }
+  else if(act==='refresh-professor-painel'){ calcProfessorPainel(); }
   else if(act==='refresh-liberacoes'){ loadUnlockRequests(); }
   else if(act==='release-student'){ releaseStudent(btn.dataset.id); }
 
@@ -4502,7 +4769,7 @@ document.addEventListener('click', (e) => {
   // banco
   else if(act==='new-bank-question'){ p.newBankQuestion = freshQuestion(btn.dataset.qtype); p.editingBankId = null; render(); }
   else if(act==='edit-bank-question'){ const q = p.bank.find(x=>x.id===btn.dataset.qid); p.newBankQuestion = JSON.parse(JSON.stringify(q)); p.editingBankId = q.id; render(); }
-  else if(act==='cancel-bank-question'){ p.newBankQuestion = null; p.editingBankId = null; render(); }
+  else if(act==='cancel-bank-question'){ p.newBankQuestion = null; p.editingBankId = null; p.bancoLivroSelectedId = null; render(); }
   else if(act==='save-bank-question'){ saveBankQuestion(); }
   else if(act==='delete-bank-question'){ if(confirm('Excluir esta questão do banco?')){ p.bank = p.bank.filter(x=>x.id!==btn.dataset.qid); saveBankToStorage(); render(); } }
   else if(act==='open-ai-gen'){ p.aiGen = { open:true, tema:'', quantidade:5, dificuldade:'médio', tipos:['mc','vf'], loading:false, results:null, selected:[], error:'' }; render(); }
@@ -4552,10 +4819,13 @@ document.addEventListener('click', (e) => {
   else if(act==='back-to-turmas'){ p.viewingTurmaId = null; render(); }
   else if(act==='add-student'){ addStudent(btn.dataset.tid); }
   else if(act==='set-student-matricula'){ setStudentMatricula(btn.dataset.tid, btn.dataset.sid); }
+  else if(act==='reset-student-password'){ resetStudentPassword(btn.dataset.tid, btn.dataset.sid); }
   else if(act==='remove-student'){ removeStudent(btn.dataset.tid, btn.dataset.sid); }
   else if(act==='delete-turma'){ deleteTurma(btn.dataset.tid); }
   else if(act==='print-signature-list'){ printTurmaSignatureList(btn.dataset.tid); }
   else if(act==='calc-final-grades'){ calcFinalGrades(btn.dataset.tid); }
+  else if(act==='export-final-grades-xlsx'){ exportFinalGradesXlsx(btn.dataset.tid); }
+  else if(act==='export-coord-notas-xlsx'){ exportCoordNotasXlsx(); }
 
   // disciplinas
   else if(act==='open-new-disciplina'){ p.newDisciplinaOpen = true; p.newDisciplinaName=''; render(); }
@@ -4568,14 +4838,12 @@ document.addEventListener('click', (e) => {
 
   // aluno
   // aluno
-  else if(act==='goto-turma-login'){ al.stage='turma-login'; al.error=''; if(state.professor.turmas.length===0 && state.professor.turmasLoading){ loadTurmas(); } render(); }
   else if(act==='goto-matricula-login'){ al.stage='matricula-login'; al.matriculaStage='input'; al.error=''; if(state.professor.turmas.length===0 && state.professor.turmasLoading){ loadTurmas(); } render(); }
   else if(act==='matricula-lookup-submit'){ matriculaLookup(); }
   else if(act==='matricula-setup-submit'){ matriculaSetupSubmit(); }
   else if(act==='matricula-password-submit'){ matriculaPasswordSubmit(); }
   else if(act==='goto-code-entry'){ al.stage='code'; al.error=''; render(); }
   else if(act==='back-to-entrada'){ al.stage='entrada'; al.error=''; al.matriculaStage='input'; render(); }
-  else if(act==='student-turma-login'){ studentTurmaLogin(); }
   else if(act==='student-logout'){ al.turma=null; al.name=''; al.studentLoggedIn=false; al.loginTurmaId=''; al.matriculaStage='input'; al.matriculaTurmaId=null; al.matriculaStudentId=null; al.matriculaName=''; al.stage='entrada'; render(); }
   else if(act==='goto-aluno-livros'){ al.stage='aluno-livros'; if(state.professor.livrosLoading){ loadLivros(); } render(); }
   else if(act==='back-to-student-dashboard'){ loadStudentDashboard(); }
@@ -4598,8 +4866,17 @@ document.addEventListener('input', (e) => {
   else if(el.id==='name-input'){ al.name = el.value; }
   else if(el.id==='turma-name-input'){ p.newTurmaName = el.value; }
   else if(el.id==='turma-students-input'){ p.newTurmaStudentsText = el.value; }
+  else if(el.id==='new-turma-roster-file'){
+    if(el.files[0]){
+      readRosterFile(el.files[0]).then(text => {
+        p.newTurmaStudentsText = text;
+        render();
+      }).catch(() => { alert('Não foi possível ler esse arquivo. Confira se é um .csv ou .xlsx válido.'); });
+    }
+  }
   else if(el.id==='disciplina-name-input'){ p.newDisciplinaName = el.value; }
   else if(el.id==='new-student-input'){ p.newStudentName = el.value; }
+  else if(act==='import-turma-roster-file'){ if(el.files[0]) importTurmaRoster(el.dataset.tid, el.files[0]); }
   else if(el.id==='start-input'){ p.newAssessment.startAt = el.value; }
   else if(el.id==='end-input'){ p.newAssessment.endAt = el.value; }
   else if(el.id==='release-at-input'){ p.newAssessment.resultRelease.releaseAt = el.value; }
@@ -4608,6 +4885,8 @@ document.addEventListener('input', (e) => {
   else if(el.id==='paste-text-input'){ p.pasteImport.text = el.value; }
   else if(el.id==='book-page-text'){ p.book.viewingText = el.value; }
   else if(act==='q-text'){ const q = findQuestionRef(el.dataset.qid); q.text = el.value; }
+  else if(act==='q-descritor'){ const q = findQuestionRef(el.dataset.qid); q.descritorSaeb = el.value; }
+  else if(act==='q-conteudo'){ const q = findQuestionRef(el.dataset.qid); q.conteudo = el.value; }
   else if(act==='q-points'){ const q = findQuestionRef(el.dataset.qid); q.points = parseFloat(el.value)||1; }
   else if(act==='opt-text'){ const q = findQuestionRef(el.dataset.qid); const o = q.options.find(o=>o.id===el.dataset.oid); o.text = el.value; }
   else if(act==='model-answer'){ const q = findQuestionRef(el.dataset.qid); q.modelAnswer = el.value; }
@@ -4619,8 +4898,8 @@ document.addEventListener('change', (e) => {
   const act = el.dataset ? el.dataset.action : null;
   const p = state.professor, al = state.aluno, c = state.coordenador;
   if(el.id==='coord-filter-professor'){ c.filterProfessorId = el.value; render(); return; }
-  if(el.id==='student-turma-select'){ al.loginTurmaId = el.value; al.error=''; render(); return; }
   if(el.id==='bloco-turma-select'){ p.bloco.turmaId = el.value; p.bloco.selectedCodes = []; render(); return; }
+  if(el.id==='banco-livro-select'){ p.bancoLivroSelectedId = el.value || null; render(); return; }
   if(el.id==='coord-filter-disciplina'){ c.filterDisciplina = el.value; render(); return; }
   if(act==='answer-mc'){ al.answers[el.dataset.qid] = el.value; }
   else if(act==='answer-vf'){ al.answers[el.dataset.qid] = el.value==='true'; }
