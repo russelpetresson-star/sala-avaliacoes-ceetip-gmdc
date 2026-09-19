@@ -192,6 +192,10 @@
   .pv-gab-title{ font-size:1.1rem; font-weight:700; margin-bottom:10px; }
   .pv-gab-row{ font-size:.92rem; margin-bottom:8px; display:flex; align-items:center; gap:10px; }
   .pv-cartao-meta{ font-size:.85rem; margin-bottom:16px; }
+  .pv-qr-header{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:10px; }
+  .pv-qr-box{ text-align:center; flex:0 0 auto; }
+  .pv-qr-box img{ width:96px; height:96px; display:block; }
+  .pv-qr-box span{ display:block; font-size:.62rem; color:#555; max-width:96px; margin-top:2px; }
   .pv-cartao-meta div{ margin-bottom:8px; border-bottom:1px solid #999; padding-bottom:4px; width:80%; }
   .pv-bubble-grid{ column-count:2; column-gap:30px; }
   .pv-bubble-row{ display:flex; align-items:center; gap:8px; margin-bottom:12px; break-inside:avoid; font-size:.82rem; }
@@ -200,6 +204,18 @@
   .pv-bubble-filled{ background:#000; color:#fff; }
   .pv-sign-table{ width:100%; border-collapse:collapse; }
   .pv-sign-table th, .pv-sign-table td{ border:1px solid #000; padding:7px 8px; font-size:.88rem; text-align:left; }
+
+  /* -------- Cartão-resposta calibrado (leitura assistida por foto) -------- */
+  .omr-wrap{ position:relative; min-height:250mm; color:#000; font-family:'Source Sans 3', sans-serif; }
+  .omr-qr{ position:absolute; left:0; top:0; }
+  .omr-header-text{ position:absolute; left:30mm; top:0; width:150mm; font-size:9.5pt; line-height:1.5; }
+  .omr-note{ position:absolute; left:0; top:27mm; width:190mm; font-size:8pt; font-style:italic; color:#444; }
+  .omr-qnum{ position:absolute; left:0; font-size:9pt; font-weight:700; width:12mm; }
+  .omr-bubble{
+    position:absolute; border:0.4mm solid #000; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:7pt; color:#000; box-sizing:border-box;
+  }
   .pv-sign-table td.pv-sign-col{ width:35%; }
   .pv-sign-table th.pv-num-col, .pv-sign-table td.pv-num-col{ width:36px; text-align:center; }
 </style>
@@ -263,6 +279,8 @@ window.storage = {
 };
 </script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 if (window.pdfjsLib) {
@@ -295,6 +313,9 @@ let state = {
     pesos: {...DEFAULT_PESOS}, pesosLoading:true, pesosDraft:null,
     pin: '1234', pinLoading:true,
     finalGrades: null, finalGradesUnidade: 'I Unidade',
+    bloco: { turmaId:'', selectedCodes:[] },
+    manualGradePrefill: null,
+    leitura: { loading:false, error:'', review:null, assessment:null, studentName:'' },
     unlockRequests: [], unlockRequestsLoading: true,
     periodos: {}, periodosLoading: true,
     pickerOpen:false, pickerSelected:[]
@@ -310,7 +331,7 @@ let state = {
     dashboard: { loading:true, stats:null },
     periodosDraft: null
   },
-  aluno: { stage:'code', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null }
+  aluno: { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null }
 };
 
 
@@ -428,6 +449,8 @@ function renderProfessor(){
       <button class="pill-btn ${p.subview==='disciplinas'?'active':''}" data-action="sub-view" data-sub="disciplinas">Disciplinas</button>
       <button class="pill-btn ${p.subview==='pesos'?'active':''}" data-action="sub-view" data-sub="pesos">Pesos das notas</button>
       <button class="pill-btn ${p.subview==='liberacoes'?'active':''}" data-action="sub-view" data-sub="liberacoes">Liberações${p.unlockRequests.filter(r=>!r.released).length>0?' ('+p.unlockRequests.filter(r=>!r.released).length+')':''}</button>
+      <button class="pill-btn ${p.subview==='bloco'?'active':''}" data-action="sub-view" data-sub="bloco">Bloco de Provas</button>
+      <button class="pill-btn ${p.subview==='leitura'?'active':''}" data-action="sub-view" data-sub="leitura">Leitura de Gabaritos</button>
     </div>
   `;
   let content;
@@ -436,6 +459,8 @@ function renderProfessor(){
   else if(p.subview==='disciplinas') content = renderDisciplinas();
   else if(p.subview==='pesos') content = renderPesos();
   else if(p.subview==='liberacoes') content = renderLiberacoes();
+  else if(p.subview==='bloco') content = renderBlocoProvas(p.assessments.filter(a => !a.professorId || a.professorId===p.session.id));
+  else if(p.subview==='leitura') content = renderLeituraGabaritos();
   else content = p.mode==='new' ? renderNewAssessment() : p.mode==='results' ? renderResults() : renderProfessorList();
   return nav + content;
 }
@@ -513,6 +538,7 @@ function renderProfessorList(){
           <span class="pill">${a.code}</span>
           <button class="btn btn-ghost btn-sm" data-action="edit-assessment" data-code="${a.code}">Editar</button>
           <button class="btn btn-ghost btn-sm" data-action="export-pdf" data-code="${a.code}">Imprimir / PDF</button>
+          ${a.turmaId ? `<button class="btn btn-ghost btn-sm" data-action="print-personal-gabaritos" data-code="${a.code}">Gabaritos por aluno</button>` : ''}
           <button class="btn btn-ghost btn-sm" data-action="open-results" data-code="${a.code}">Resultados</button>
         </div>
       </div>
@@ -771,15 +797,17 @@ function renderResults(){
   }
   const maxPoints = a.questions.reduce((s,q)=>s+q.points,0);
   const turma = a.turmaId ? state.professor.turmas.find(t=>t.id===a.turmaId) : null;
+  const prefill = state.professor.manualGradePrefill || '';
   const manualStudentField = turma ? `
     <select id="manual-grade-student-select">
       <option value="">Selecione o aluno...</option>
-      ${turma.students.map(s=>`<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('')}
+      ${turma.students.map(s=>`<option value="${esc(s.name)}" ${s.name===prefill?'selected':''}>${esc(s.name)}</option>`).join('')}
     </select>
-  ` : `<input type="text" id="manual-grade-student-input" placeholder="Nome do aluno">`;
+  ` : `<input type="text" id="manual-grade-student-input" placeholder="Nome do aluno" value="${esc(prefill)}">`;
   const manualForm = `
     <h3 style="margin-top:24px;">Lançar nota manualmente</h3>
     <p class="muted" style="margin-top:-4px; font-size:.85rem;">Use para registrar a nota de um aluno que respondeu em papel, ou para adicionar/ajustar um lançamento. Vale de 0 a ${maxPoints}.</p>
+    ${prefill ? `<p class="muted" style="font-size:.82rem;">Aluno identificado pelo QR code do gabarito — confirme o nome e digite a nota.</p>` : ''}
     <div class="row" style="align-items:flex-end;">
       <div>${manualStudentField}</div>
       <div style="flex:0 0 100px;">
@@ -1173,8 +1201,8 @@ function renderTurmas(){
         <h2>Nova turma</h2>
         <label>Nome da turma</label>
         <input type="text" id="turma-name-input" value="${esc(p.newTurmaName)}" placeholder="Ex: 2º Eletromecânica A">
-        <label>Alunos (um nome por linha)</label>
-        <textarea id="turma-students-input" placeholder="Ana Souza&#10;Bruno Lima&#10;Carla Reis">${esc(p.newTurmaStudentsText)}</textarea>
+        <label>Alunos (um por linha — pode incluir a matrícula depois de uma vírgula)</label>
+        <textarea id="turma-students-input" placeholder="Ana Souza, 20231001&#10;Bruno Lima, 20231002&#10;Carla Reis">${esc(p.newTurmaStudentsText)}</textarea>
         <div id="turma-err"></div>
         <div class="row" style="margin-top:14px;">
           <button class="btn btn-ghost" data-action="cancel-new-turma">Cancelar</button>
@@ -1221,12 +1249,16 @@ function renderTurmaDetail(t){
       </div>
       ${t.students.length===0 ? '<p class="muted">Nenhum aluno ainda.</p>' : t.students.map(s => `
         <div class="student-chip">
-          ${esc(s.name)}
-          <button class="btn btn-danger btn-sm" data-action="remove-student" data-tid="${t.id}" data-sid="${s.id}">✕</button>
+          <span>${esc(s.name)}${s.matricula?' <span class="muted">· mat. '+esc(s.matricula)+'</span>':' <span class="muted">· sem matrícula</span>'}${s.passwordHash?' <span class="muted">· acesso ativo</span>':''}</span>
+          <div class="row" style="flex:0 0 auto; gap:6px;">
+            <button class="btn btn-ghost btn-sm" data-action="set-student-matricula" data-tid="${t.id}" data-sid="${s.id}">${s.matricula?'Editar matrícula':'Definir matrícula'}</button>
+            <button class="btn btn-danger btn-sm" data-action="remove-student" data-tid="${t.id}" data-sid="${s.id}">✕</button>
+          </div>
         </div>
       `).join('')}
       <div class="row" style="margin-top:12px;">
         <input type="text" id="new-student-input" placeholder="Nome do aluno" value="${esc(p.newStudentName)}">
+        <input type="text" id="new-student-matricula-input" placeholder="Matrícula" style="max-width:140px;">
         <button class="btn btn-ghost" data-action="add-student" data-tid="${t.id}" style="flex:0 0 auto;">Adicionar</button>
       </div>
 
@@ -1359,6 +1391,104 @@ function renderDisciplinas(){
 
 /* ---------------- PESOS DAS NOTAS ---------------- */
 
+/* ---------------- BLOCO DE PROVAS ---------------- */
+
+function renderBlocoProvas(pool){
+  const b = state.professor.bloco;
+  const turmaOptions = state.professor.turmas.map(t => `<option value="${t.id}" ${b.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
+  const matching = b.turmaId ? pool.filter(a => a.turmaId===b.turmaId) : [];
+  return `
+    <div class="card">
+      <h2>Bloco de provas</h2>
+      <p class="muted">Escolha a turma e marque quantas avaliações quiser. Vai gerar, de uma vez, um cartão-resposta individual (já com o nome de cada aluno) para cada avaliação marcada.</p>
+      <label>Turma</label>
+      <select id="bloco-turma-select" data-action="bloco-set-turma">
+        <option value="">Selecione...</option>
+        ${turmaOptions}
+      </select>
+      ${b.turmaId ? (matching.length===0 ? '<p class="muted" style="margin-top:12px;">Nenhuma avaliação encontrada para essa turma.</p>' : `
+        <div class="picker" style="margin-top:12px;">
+          ${matching.map(a => `
+            <label class="picker-item">
+              <input type="checkbox" data-action="bloco-toggle" data-code="${a.code}" ${b.selectedCodes.includes(a.code)?'checked':''}>
+              <span>${esc(a.title)}${a.disciplinaName?' · '+esc(a.disciplinaName):''} · ${a.questions.length} questão(ões)</span>
+            </label>
+          `).join('')}
+        </div>
+      `) : ''}
+      <button class="btn btn-primary" style="margin-top:14px;" data-action="bloco-generate" ${b.selectedCodes.length===0?'disabled':''}>Gerar gabaritos do bloco (${b.selectedCodes.length})</button>
+    </div>
+  `;
+}
+
+function generateBlocoGabaritos(){
+  const b = state.professor.bloco;
+  const turma = state.professor.turmas.find(t=>t.id===b.turmaId);
+  if(!turma || b.selectedCodes.length===0) return;
+  if(turma.students.length===0){ alert('Essa turma não tem alunos cadastrados.'); return; }
+  let pages = '';
+  b.selectedCodes.forEach(code => {
+    const a = findAssessmentByCode(code);
+    if(!a) return;
+    turma.students.forEach(s => { pages += buildPersonalAnswerCardPage(a, s.name, turma.name); });
+  });
+  printPages(pages);
+}
+
+function renderLeituraGabaritos(){
+  const p = state.professor;
+  const l = p.leitura;
+  if(l.loading){
+    return `<div class="card"><h2>Leitura de Gabaritos</h2><div class="spinner"></div><p class="muted center">Processando a imagem...</p></div>`;
+  }
+  if(l.review){
+    const a = l.assessment;
+    let qIndex = 0;
+    const rows = a.questions.map((q, fullIdx) => {
+      if(q.type==='dissertativa') return '';
+      const r = l.review[qIndex];
+      const letters = q.type==='mc' ? q.options.map((o,i)=>OPT_LETTERS[i]) : ['V','F'];
+      const html = `
+        <div class="q-card">
+          <div class="q-tag">Questão ${fullIdx+1}${r.detectedIndex===null?' — <span style="color:var(--red);">não identificada, confira manualmente</span>':''}</div>
+          <div class="row" style="margin-top:6px;">
+            ${letters.map((letter,j) => `
+              <label style="display:flex;align-items:center;gap:5px;font-weight:400;text-transform:none;flex:0 0 auto;">
+                <input type="radio" name="scan-q-${qIndex}" value="${j}" ${r.detectedIndex===j?'checked':''}> ${letter}
+              </label>
+            `).join('')}
+            <label style="display:flex;align-items:center;gap:5px;font-weight:400;text-transform:none;flex:0 0 auto;">
+              <input type="radio" name="scan-q-${qIndex}" value="" ${r.detectedIndex===null?'checked':''}> em branco
+            </label>
+          </div>
+        </div>
+      `;
+      qIndex++;
+      return html;
+    }).join('');
+    return `
+      <div class="card">
+        <h2>Confirme as respostas</h2>
+        <p class="muted">Aluno identificado: <strong>${esc(l.studentName)}</strong> · ${esc(a.title)}</p>
+        <p class="muted" style="font-size:.85rem;">Revise questão por questão — o que veio marcado é só uma sugestão da leitura da foto. Corrija o que estiver errado antes de confirmar.</p>
+        ${rows}
+        <div class="row" style="margin-top:14px;">
+          <button class="btn btn-ghost" data-action="scan-cancel">Cancelar</button>
+          <button class="btn btn-primary" data-action="scan-confirm">Confirmar e lançar nota</button>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="card">
+      <h2>Leitura de Gabaritos</h2>
+      <p class="muted">Tire uma foto (ou envie uma já tirada) do cartão-resposta preenchido pelo aluno. O cartão precisa ser um dos gerados em "Gabaritos por aluno" ou "Bloco de Provas", com o QR code visível e a folha o mais reta e bem iluminada possível.</p>
+      <input type="file" id="scan-file-input" accept="image/*" capture="environment">
+      ${l.error ? `<p class="err">${esc(l.error)}</p>` : ''}
+    </div>
+  `;
+}
+
 function renderPesos(){
   const p = state.professor;
   if(p.pesosLoading){
@@ -1444,6 +1574,7 @@ function renderCoordenador(){
       <button class="pill-btn ${c.subview==='notas'?'active':''}" data-action="coord-sub-view" data-sub="notas">Notas finais</button>
       <button class="pill-btn ${c.subview==='pesosprof'?'active':''}" data-action="coord-sub-view" data-sub="pesosprof">Pesos dos professores</button>
       <button class="pill-btn ${c.subview==='periodos'?'active':''}" data-action="coord-sub-view" data-sub="periodos">Períodos</button>
+      <button class="pill-btn ${c.subview==='bloco'?'active':''}" data-action="coord-sub-view" data-sub="bloco">Bloco de Provas</button>
     </div>
   `;
   let content;
@@ -1453,6 +1584,7 @@ function renderCoordenador(){
   else if(c.subview==='notas') content = renderCoordNotas();
   else if(c.subview==='pesosprof') content = renderCoordPesosProf();
   else if(c.subview==='periodos') content = renderCoordPeriodos();
+  else if(c.subview==='bloco') content = renderBlocoProvas(c.assessments);
   else content = c.mode==='results' ? renderCoordResults() : renderCoordAssessments();
   return nav + content;
 }
@@ -1681,6 +1813,7 @@ function renderCoordAssessments(){
         </div>
         <div class="row" style="flex:0 0 auto; gap:8px;">
           <span class="pill">${a.code}</span>
+          ${a.turmaId ? `<button class="btn btn-ghost btn-sm" data-action="print-personal-gabaritos" data-code="${a.code}">Gabaritos por aluno</button>` : ''}
           <button class="btn btn-ghost btn-sm" data-action="coord-open-results" data-code="${a.code}">Resultados</button>
         </div>
       </div>
@@ -2114,6 +2247,10 @@ async function openCoordResults(code){
 
 function renderAluno(){
   const al = state.aluno;
+  if(al.stage==='entrada') return renderEntrada();
+  if(al.stage==='matricula-login') return renderMatriculaLogin();
+  if(al.stage==='turma-login') return renderTurmaLogin();
+  if(al.stage==='dashboard') return renderStudentDashboard();
   if(al.stage==='code') return renderCode();
   if(al.stage==='fechada') return renderFechada();
   if(al.stage==='nome') return renderNome();
@@ -2122,6 +2259,149 @@ function renderAluno(){
   if(al.stage==='corrigindo') return `<div class="card"><h2>Corrigindo...</h2><div class="spinner"></div><p class="muted center">Só um instante, estamos avaliando suas respostas.</p></div>`;
   if(al.stage==='enviado') return renderEnviado();
   if(al.stage==='resultado') return renderResultadoAluno();
+}
+
+function renderEntrada(){
+  return `
+    <div class="card">
+      <h2>Área do aluno</h2>
+      <p class="muted">Entre com sua matrícula para ver suas provas realizadas e as que estão agendadas.</p>
+      <button class="btn btn-primary btn-block" data-action="goto-matricula-login">Entrar com matrícula</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:10px;" data-action="goto-turma-login">Entrar com minha turma (sem senha)</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:10px;" data-action="goto-code-entry">Tenho um código de avaliação</button>
+    </div>
+  `;
+}
+
+function renderMatriculaLogin(){
+  const al = state.aluno;
+  if(state.professor.turmasLoading){
+    return `<div class="card"><h2>Entrar com matrícula</h2><div class="spinner"></div></div>`;
+  }
+  if(al.matriculaStage==='setup'){
+    return `
+      <div class="card">
+        <h2>Primeiro acesso</h2>
+        <p class="muted">Olá, ${esc(al.matriculaName)}! Crie uma senha para usar sempre que entrar com sua matrícula.</p>
+        <label>Crie uma senha</label>
+        <input type="password" id="matricula-password-input" placeholder="Mínimo 4 caracteres">
+        <label>Confirme a senha</label>
+        <input type="password" id="matricula-password2-input" placeholder="Repita a senha">
+        ${al.error ? `<p class="err">${esc(al.error)}</p>` : ''}
+        <div class="row" style="margin-top:14px;">
+          <button class="btn btn-ghost" data-action="back-to-entrada">← Voltar</button>
+          <button class="btn btn-primary" data-action="matricula-setup-submit">Criar acesso</button>
+        </div>
+      </div>
+    `;
+  }
+  if(al.matriculaStage==='senha'){
+    return `
+      <div class="card">
+        <h2>Entrar</h2>
+        <p class="muted">Olá, ${esc(al.matriculaName)}!</p>
+        <label>Senha</label>
+        <input type="password" id="matricula-password-login-input" placeholder="Sua senha">
+        ${al.error ? `<p class="err">${esc(al.error)}</p>` : ''}
+        <div class="row" style="margin-top:14px;">
+          <button class="btn btn-ghost" data-action="back-to-entrada">← Voltar</button>
+          <button class="btn btn-primary" data-action="matricula-password-submit">Entrar</button>
+        </div>
+      </div>
+    `;
+  }
+  return `
+    <div class="card">
+      <h2>Entrar com matrícula</h2>
+      <label>Matrícula</label>
+      <input type="text" id="matricula-input" placeholder="Digite sua matrícula">
+      ${al.error ? `<p class="err">${esc(al.error)}</p>` : ''}
+      <div class="row" style="margin-top:14px;">
+        <button class="btn btn-ghost" data-action="back-to-entrada">← Voltar</button>
+        <button class="btn btn-primary" data-action="matricula-lookup-submit">Continuar</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderTurmaLogin(){
+  const al = state.aluno;
+  if(state.professor.turmasLoading){
+    return `<div class="card"><h2>Entrar com minha turma</h2><div class="spinner"></div></div>`;
+  }
+  const turmaOptions = state.professor.turmas.map(t => `<option value="${t.id}" ${al.loginTurmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
+  const turma = state.professor.turmas.find(t=>t.id===al.loginTurmaId);
+  return `
+    <div class="card">
+      <h2>Entrar com minha turma</h2>
+      <label>Turma</label>
+      <select id="student-turma-select" data-action="student-select-turma">
+        <option value="">Selecione sua turma...</option>
+        ${turmaOptions}
+      </select>
+      ${turma ? `
+        <label>Seu nome</label>
+        <select id="student-name-select">
+          <option value="">Selecione seu nome...</option>
+          ${turma.students.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('')}
+        </select>
+      ` : ''}
+      ${al.error ? `<p class="err">${esc(al.error)}</p>` : ''}
+      <div class="row" style="margin-top:14px;">
+        <button class="btn btn-ghost" data-action="back-to-entrada">← Voltar</button>
+        ${turma ? '<button class="btn btn-primary" data-action="student-turma-login">Entrar</button>' : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderStudentDashboard(){
+  const al = state.aluno;
+  if(al.dashboardLoading){
+    return `<div class="card"><h2>Minhas provas</h2><div class="spinner"></div></div>`;
+  }
+  const pendentes = al.dashboardPendentes || [];
+  const realizadas = al.dashboardRealizadas || [];
+  return `
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <h2>Minhas provas</h2>
+        <button class="btn btn-ghost btn-sm" data-action="student-logout">Sair</button>
+      </div>
+      <p class="muted">${esc(al.name)} · ${esc(al.turma.name)}</p>
+
+      <h3 style="margin-top:20px;">Agendadas / disponíveis</h3>
+      ${pendentes.length===0 ? '<p class="muted">Nenhuma prova pendente no momento.</p>' : pendentes.map(p => {
+        const a = p.assessment;
+        const aberta = p.status==='aberta';
+        return `
+          <div class="list-item">
+            <div>
+              <strong>${esc(a.title)}</strong><br>
+              <span class="muted">${a.disciplinaName?esc(a.disciplinaName)+' · ':''}${aberta ? 'disponível agora' + (a.endAt?' · encerra em '+formatDateTime(a.endAt):'') : 'abre em '+formatDateTime(a.startAt)}</span>
+            </div>
+            ${aberta ? `<button class="btn btn-primary btn-sm" data-action="dashboard-start-exam" data-code="${a.code}">Responder</button>` : '<span class="muted">Aguardando</span>'}
+          </div>
+        `;
+      }).join('')}
+
+      <h3 style="margin-top:20px;">Realizadas</h3>
+      ${realizadas.length===0 ? '<p class="muted">Você ainda não respondeu nenhuma prova.</p>' : realizadas.map(r => {
+        const a = r.assessment;
+        const rel = resultReleased(a);
+        return `
+          <div class="list-item">
+            <div>
+              <strong>${esc(a.title)}</strong><br>
+              <span class="muted">${a.disciplinaName?esc(a.disciplinaName)+' · ':''}enviada em ${new Date(r.response.submittedAt).toLocaleDateString('pt-BR')}</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" data-action="dashboard-view-result" data-code="${a.code}">${rel ? 'Ver resultado' : 'Ver status'}</button>
+          </div>
+        `;
+      }).join('')}
+      ${al.error ? `<p class="err" style="margin-top:10px;">${esc(al.error)}</p>` : ''}
+    </div>
+  `;
 }
 
 function renderExamLocked(){
@@ -2142,6 +2422,12 @@ function renderExamLocked(){
   `;
 }
 
+function backButtonHtml(label){
+  label = label || '← Voltar';
+  if(state.aluno.studentLoggedIn) return `<button class="btn btn-ghost btn-block" style="margin-top:10px;" data-action="back-to-student-dashboard">${label}</button>`;
+  return `<button class="btn btn-ghost btn-block" style="margin-top:10px;" data-action="reset-aluno">${label}</button>`;
+}
+
 function renderEnviado(){
   const al = state.aluno;
   const a = al.assessment;
@@ -2155,7 +2441,7 @@ function renderEnviado(){
       <p class="center muted">Recebemos as respostas de ${esc(al.name)}.</p>
       <p class="center" style="margin-top:10px;">${msg}</p>
       ${rr.mode==='agendado' ? `<button class="btn btn-ghost btn-block" style="margin-top:12px;" data-action="check-release">Verificar se já foi liberado</button>` : ''}
-      <button class="btn btn-ghost btn-block" style="margin-top:10px;" data-action="reset-aluno">← Voltar</button>
+      ${backButtonHtml()}
     </div>
   `;
 }
@@ -2170,7 +2456,7 @@ function renderFechada(){
     <div class="card">
       <h2>${esc(a.title)}</h2>
       <p>${msg}</p>
-      <button class="btn btn-ghost btn-block" style="margin-top:10px;" data-action="reset-aluno">← Voltar</button>
+      ${backButtonHtml()}
     </div>
   `;
 }
@@ -2184,6 +2470,7 @@ function renderCode(){
       <input type="text" id="code-input" value="${esc(al.code)}" placeholder="Ex: 7K2P9X" style="text-transform:uppercase;">
       ${al.error ? `<p class="err">${esc(al.error)}</p>` : ''}
       <button class="btn btn-primary btn-block" style="margin-top:16px;" data-action="find-assessment">Buscar</button>
+      <button class="btn btn-ghost btn-block" style="margin-top:8px;" data-action="back-to-entrada">← Voltar</button>
     </div>
   `;
 }
@@ -2294,7 +2581,7 @@ function renderResultadoAluno(){
       <div class="score-big">${r.total} / ${max}</div>
       <p class="score-sub">Resultado de ${esc(r.studentName)}</p>
       ${details}
-      <button class="btn btn-ghost btn-block" style="margin-top:6px;" data-action="reset-aluno">Responder outra avaliação</button>
+      ${backButtonHtml('Responder outra avaliação')}
     </div>
   `;
 }
@@ -2565,6 +2852,18 @@ async function submitLoginEmail(){
   p.loginStage = rec.passwordHash ? 'password' : 'setup';
   render();
 }
+async function handlePostLoginRedirect(){
+  if(window.pendingGradeDeepLink){
+    const dl = window.pendingGradeDeepLink;
+    window.pendingGradeDeepLink = null;
+    await loadAssessmentsList();
+    state.professor.manualGradePrefill = dl.student;
+    openResults(dl.code);
+  } else {
+    ensureProfessorDataLoaded();
+  }
+}
+
 async function submitLoginPassword(){
   const p = state.professor;
   const pass = document.getElementById('login-password-input').value;
@@ -2576,7 +2875,7 @@ async function submitLoginPassword(){
   p.session = { id: rec.id, email: rec.email, displayName: rec.displayName, disciplina: rec.disciplina, coordNote: rec.coordNote||null, coordNoteDismissed:false };
   p.loginError = '';
   render();
-  ensureProfessorDataLoaded();
+  handlePostLoginRedirect();
 }
 async function submitLoginSetup(){
   const p = state.professor;
@@ -2596,7 +2895,7 @@ async function submitLoginSetup(){
   p.session = { id: rec.id, email: rec.email, displayName: name, disciplina: rec.disciplina, coordNote: rec.coordNote||null, coordNoteDismissed:false };
   p.loginError = '';
   render();
-  ensureProfessorDataLoaded();
+  handlePostLoginRedirect();
 }
 function logoutProfessor(){
   const p = state.professor;
@@ -2785,6 +3084,219 @@ function buildAnswerCardPage(a){
   `;
 }
 
+function loadImageFile(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => { resolve(img); };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+function mmToPixel(xmm, ymm, basis){
+  const fx = xmm / OMR_LAYOUT.qrSize;
+  const fy = ymm / OMR_LAYOUT.qrSize;
+  return {
+    x: basis.origin.x + fx*basis.right.x + fy*basis.down.x,
+    y: basis.origin.y + fx*basis.right.y + fy*basis.down.y
+  };
+}
+
+function sampleDarkness(imageData, cx, cy, radiusPx){
+  const { data, width, height } = imageData;
+  let sum = 0, count = 0;
+  const r = Math.max(2, Math.round(radiusPx));
+  for(let dy=-r; dy<=r; dy+=2){
+    for(let dx=-r; dx<=r; dx+=2){
+      if(dx*dx + dy*dy > r*r) continue;
+      const x = Math.round(cx+dx), y = Math.round(cy+dy);
+      if(x<0 || y<0 || x>=width || y>=height) continue;
+      const i = (y*width + x) * 4;
+      const lum = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+      sum += lum; count++;
+    }
+  }
+  return count>0 ? sum/count : 255;
+}
+
+async function scanAnswerSheet(file){
+  const p = state.professor;
+  p.leitura.error = '';
+  p.leitura.loading = true;
+  p.leitura.review = null;
+  render();
+  try{
+    const img = await loadImageFile(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const qr = jsQR(imageData.data, canvas.width, canvas.height);
+    if(!qr){
+      p.leitura.error = 'QR code não encontrado na imagem. Tire a foto com o cartão inteiro visível, bem iluminado e o mais reto possível.';
+      p.leitura.loading = false;
+      render();
+      return;
+    }
+    let code, studentName;
+    try{
+      const url = new URL(qr.data);
+      code = url.searchParams.get('prof_grade_code');
+      studentName = url.searchParams.get('prof_grade_student');
+    }catch(e){}
+    if(!code || !studentName){
+      p.leitura.error = 'O QR code encontrado não é de um cartão-resposta desta plataforma.';
+      p.leitura.loading = false;
+      render();
+      return;
+    }
+    let a = findAssessmentByCode(code);
+    if(!a){
+      try{ const r = await window.storage.get(`assessment:${code}`, true); a = JSON.parse(r.value); }catch(e){}
+    }
+    if(!a){
+      p.leitura.error = 'Avaliação do QR code não foi encontrada no sistema.';
+      p.leitura.loading = false;
+      render();
+      return;
+    }
+    const loc = qr.location;
+    const basis = {
+      origin: loc.topLeftCorner,
+      right: { x: loc.topRightCorner.x - loc.topLeftCorner.x, y: loc.topRightCorner.y - loc.topLeftCorner.y },
+      down: { x: loc.bottomLeftCorner.x - loc.topLeftCorner.x, y: loc.bottomLeftCorner.y - loc.topLeftCorner.y }
+    };
+    const scale = (Math.hypot(basis.right.x, basis.right.y) + Math.hypot(basis.down.x, basis.down.y)) / (2*OMR_LAYOUT.qrSize);
+    const sampleRadius = scale * (OMR_LAYOUT.bubbleSize*0.32);
+
+    const L = OMR_LAYOUT;
+    let qIndex = 0;
+    const detected = [];
+    a.questions.forEach((q) => {
+      if(q.type==='dissertativa') return;
+      const letters = q.type==='mc' ? q.options.map((o,i)=>OPT_LETTERS[i]) : ['V','F'];
+      const rowY = L.gridStartY + qIndex*L.rowHeight;
+      const darknesses = letters.map((letter,j) => {
+        const bx = L.numLabelWidth + j*L.bubbleSpacing + L.bubbleSize/2;
+        const by = rowY + L.bubbleSize/2;
+        const px = mmToPixel(bx, by, basis);
+        return sampleDarkness(imageData, px.x, px.y, sampleRadius);
+      });
+      let minIdx = 0;
+      for(let i=1;i<darknesses.length;i++){ if(darknesses[i]<darknesses[minIdx]) minIdx = i; }
+      const sorted = [...darknesses].sort((x,y)=>x-y);
+      const confident = sorted[0] < 150 && (sorted[1]-sorted[0]) > 25;
+      detected.push({
+        questionId: q.id,
+        type: q.type,
+        optionIds: q.type==='mc' ? q.options.map(o=>o.id) : null,
+        detectedIndex: confident ? minIdx : null
+      });
+      qIndex++;
+    });
+    p.leitura.assessment = a;
+    p.leitura.studentName = studentName;
+    p.leitura.review = detected;
+    p.leitura.loading = false;
+    render();
+  }catch(e){
+    p.leitura.error = 'Não foi possível processar essa imagem. Tente outra foto.';
+    p.leitura.loading = false;
+    render();
+  }
+}
+
+async function confirmScannedGrade(){
+  const p = state.professor;
+  const a = p.leitura.assessment;
+  const details = [];
+  let total = 0;
+  const answers = {};
+  p.leitura.review.forEach((r, idx) => {
+    const el = document.querySelector(`input[name="scan-q-${idx}"]:checked`);
+    const chosenIdx = el ? Number(el.value) : null;
+    const q = a.questions.find(x=>x.id===r.questionId);
+    let score = 0, answerVal = null;
+    if(chosenIdx!==null){
+      if(r.type==='mc'){ answerVal = r.optionIds[chosenIdx]; score = answerVal===q.correctOptionId ? q.points : 0; }
+      else { answerVal = chosenIdx===0; score = answerVal===q.correctBool ? q.points : 0; }
+    }
+    answers[r.questionId] = answerVal;
+    total += score;
+    details.push({ questionId:r.questionId, score, feedback:null });
+  });
+  let existing = [];
+  try{ const rr = await window.storage.get(`responses:${a.code}`, true); existing = JSON.parse(rr.value); }catch(e){}
+  existing = existing.filter(x=>x.studentName!==p.leitura.studentName);
+  existing.push({ studentName:p.leitura.studentName, submittedAt:Date.now(), total, details, answers, tabSwitches:0, fullscreenExits:0, scanned:true });
+  await window.storage.set(`responses:${a.code}`, JSON.stringify(existing), true);
+  alert('Nota lançada a partir da leitura do gabarito.');
+  p.leitura = { loading:false, error:'', review:null, assessment:null, studentName:'' };
+  render();
+}
+
+function generateQrDataUrl(text, size){
+  try{
+    const qr = new QRious({ value: text, size: size||100, level:'M' });
+    return qr.toDataURL();
+  }catch(e){
+    return null;
+  }
+}
+
+const OMR_LAYOUT = {
+  qrSize: 25,          // mm — tamanho do QR impresso
+  gridStartY: 34,      // mm do topo do cartão até a primeira linha de bolinhas
+  rowHeight: 8,         // mm entre uma questão e a próxima
+  numLabelWidth: 14,    // mm reservados para o número da questão
+  bubbleSpacing: 9,     // mm entre o centro de uma bolinha e a próxima
+  bubbleSize: 6,        // mm — diâmetro da bolinha impressa
+};
+
+function buildPersonalAnswerCardPage(a, studentName, turmaName){
+  const objective = a.questions.filter(q=>q.type==='mc'||q.type==='vf');
+  const dissertNote = a.questions.some(q=>q.type==='dissertativa')
+    ? '<div class="pv-note">Questões dissertativas: respondidas por escrito na prova, não neste cartão.</div>' : '';
+  const deepLink = `${location.origin}${location.pathname}?prof_grade_code=${encodeURIComponent(a.code)}&prof_grade_student=${encodeURIComponent(studentName)}`;
+  const qrDataUrl = generateQrDataUrl(deepLink, 200);
+  const L = OMR_LAYOUT;
+
+  let bubblesHtml = '';
+  let qIndex = 0;
+  const rowLabels = a.questions.map((q, fullIdx) => {
+    if(q.type==='dissertativa') return null;
+    const letters = q.type==='mc' ? OPT_LETTERS.slice(0, q.options.length) : ['V','F'];
+    const rowY = L.gridStartY + qIndex*L.rowHeight;
+    const numLabel = `<div class="omr-qnum" style="top:${rowY}mm;">${String(fullIdx+1).padStart(2,'0')}</div>`;
+    const bubbles = letters.map((letter,j) => {
+      const bx = L.numLabelWidth + j*L.bubbleSpacing;
+      return `<div class="omr-bubble" style="left:${bx}mm; top:${rowY}mm; width:${L.bubbleSize}mm; height:${L.bubbleSize}mm;">${letter}</div>`;
+    }).join('');
+    qIndex++;
+    return numLabel + bubbles;
+  }).filter(Boolean).join('');
+
+  return `
+    <div class="pv-page">
+      <div class="omr-wrap">
+        ${qrDataUrl ? `<img class="omr-qr" src="${qrDataUrl}" alt="QR code" style="width:${L.qrSize}mm; height:${L.qrSize}mm;">` : ''}
+        <div class="omr-header-text">
+          <strong>${esc(a.title)}</strong><br>
+          ${a.disciplinaName ? esc(a.disciplinaName)+' · ' : ''}código ${esc(a.code)}<br>
+          <strong>Aluno:</strong> ${esc(studentName)}<br>
+          <strong>Turma:</strong> ${esc(turmaName)}
+        </div>
+        <div class="omr-note">Preencha completamente o círculo correspondente à resposta escolhida.</div>
+        ${objective.length>0 ? rowLabels : '<p class="muted" style="margin-top:32mm;">Esta avaliação não possui questões objetivas.</p>'}
+      </div>
+      ${dissertNote}
+    </div>
+  `;
+}
+
 function buildGabaritoPage(a){
   const rows = a.questions.map((q, idx) => {
     if(q.type==='mc'){
@@ -2846,6 +3358,21 @@ window.addEventListener('afterprint', () => {
   document.body.classList.remove('printing');
 });
 
+function findAssessmentByCode(code){
+  return state.professor.assessments.find(a=>a.code===code) || state.coordenador.assessments.find(a=>a.code===code);
+}
+
+function printPersonalAnswerCards(code){
+  const a = findAssessmentByCode(code);
+  if(!a){ alert('Avaliação não encontrada.'); return; }
+  if(!a.turmaId){ alert('Esta avaliação não está vinculada a uma turma — não é possível gerar gabaritos individuais.'); return; }
+  const turma = state.professor.turmas.find(t=>t.id===a.turmaId);
+  if(!turma || turma.students.length===0){ alert('Turma sem alunos cadastrados.'); return; }
+  let pages = '';
+  turma.students.forEach(s => { pages += buildPersonalAnswerCardPage(a, s.name, turma.name); });
+  printPages(pages);
+}
+
 function exportAssessmentPdf(code){
   const a = (state.professor.assessments.find(x=>x.code===code)) || state.professor.resultsFor;
   if(!a) return;
@@ -2879,6 +3406,7 @@ async function addManualGrade(){
   existing.push({ studentName:name, submittedAt:Date.now(), total:nota, details:[], answers:{}, tabSwitches:0, fullscreenExits:0, manual:true });
   await window.storage.set(`responses:${a.code}`, JSON.stringify(existing), true);
   p.responses = existing;
+  p.manualGradePrefill = null;
   render();
 }
 async function saveCorrectResponse(idx){
@@ -3191,7 +3719,12 @@ async function saveTurma(){
   const p = state.professor;
   const errEl = document.getElementById('turma-err');
   if(!p.newTurmaName.trim()){ errEl.innerHTML = '<p class="err">Dê um nome para a turma.</p>'; return; }
-  const students = p.newTurmaStudentsText.split('\n').map(s=>s.trim()).filter(Boolean).map(name => ({id:cryptoId(), name}));
+  const students = p.newTurmaStudentsText.split('\n').map(s=>s.trim()).filter(Boolean).map(line => {
+    const parts = line.split(',');
+    const name = parts[0].trim();
+    const matricula = parts[1] ? parts[1].trim() : null;
+    return { id:cryptoId(), name, matricula, passwordHash:null, activatedAt:null };
+  });
   const turma = { id: cryptoId(), name: p.newTurmaName.trim(), students, createdAt: Date.now() };
   p.turmas.unshift(turma);
   await saveTurmasToStorage();
@@ -3204,11 +3737,23 @@ async function saveTurma(){
 async function addStudent(tid){
   const p = state.professor;
   const input = document.getElementById('new-student-input');
+  const matriculaInput = document.getElementById('new-student-matricula-input');
   const name = input.value.trim();
+  const matricula = matriculaInput ? matriculaInput.value.trim() : '';
   if(!name) return;
   const t = p.turmas.find(x=>x.id===tid);
-  t.students.push({id:cryptoId(), name});
+  t.students.push({id:cryptoId(), name, matricula: matricula||null, passwordHash:null, activatedAt:null});
   p.newStudentName = '';
+  await saveTurmasToStorage();
+  render();
+}
+async function setStudentMatricula(tid, sid){
+  const p = state.professor;
+  const t = p.turmas.find(x=>x.id===tid);
+  const s = t.students.find(x=>x.id===sid);
+  const val = prompt('Matrícula do aluno:', s.matricula || '');
+  if(val===null) return;
+  s.matricula = val.trim() || null;
   await saveTurmasToStorage();
   render();
 }
@@ -3355,20 +3900,8 @@ async function findAssessment(){
   render();
 }
 
-async function confirmName(){
+async function startExamFlow(){
   const al = state.aluno;
-  if(al.turma && !al.manualName){
-    const sel = document.getElementById('name-select');
-    const sid = sel.value;
-    const student = al.turma.students.find(s=>s.id===sid);
-    if(!student){ al.error = 'Selecione seu nome na lista.'; render(); return; }
-    al.name = student.name;
-  } else {
-    const nameInput = document.getElementById('name-input').value.trim();
-    if(!nameInput){ al.error = 'Informe seu nome.'; render(); return; }
-    al.name = nameInput;
-  }
-  al.error = '';
   const a = al.assessment;
   let existing = null;
   try{
@@ -3388,6 +3921,7 @@ async function confirmName(){
   const now = Date.now();
   if(lock && lock.sessionId!==MY_SESSION_ID && (now - lock.startedAt) < LOCK_TTL_MS){
     al.error = 'Esta avaliação já está sendo respondida em outro dispositivo ou aba com este nome. Se isso for um engano, avise o professor.';
+    al.stage = al.studentLoggedIn ? 'dashboard' : al.stage;
     render();
     return;
   }
@@ -3399,6 +3933,150 @@ async function confirmName(){
   al.fullscreenExits = 0;
   al.shuffledQuestions = shuffleForStudent(a.questions);
   al.stage = 'responder';
+  render();
+}
+
+async function confirmName(){
+  const al = state.aluno;
+  if(al.turma && !al.manualName){
+    const sel = document.getElementById('name-select');
+    const sid = sel.value;
+    const student = al.turma.students.find(s=>s.id===sid);
+    if(!student){ al.error = 'Selecione seu nome na lista.'; render(); return; }
+    al.name = student.name;
+  } else {
+    const nameInput = document.getElementById('name-input').value.trim();
+    if(!nameInput){ al.error = 'Informe seu nome.'; render(); return; }
+    al.name = nameInput;
+  }
+  al.error = '';
+  await startExamFlow();
+}
+
+async function matriculaLookup(){
+  const al = state.aluno;
+  const val = document.getElementById('matricula-input').value.trim();
+  if(!val){ al.error = 'Digite sua matrícula.'; render(); return; }
+  let found = null;
+  for(const t of state.professor.turmas){
+    const s = t.students.find(x => x.matricula && x.matricula===val);
+    if(s){ found = { turma:t, student:s }; break; }
+  }
+  if(!found){
+    al.error = 'Matrícula não encontrada. Procure seu professor ou a coordenação.';
+    render();
+    return;
+  }
+  al.matriculaTurmaId = found.turma.id;
+  al.matriculaStudentId = found.student.id;
+  al.matriculaName = found.student.name;
+  al.error = '';
+  al.matriculaStage = found.student.passwordHash ? 'senha' : 'setup';
+  render();
+}
+async function matriculaSetupSubmit(){
+  const al = state.aluno;
+  const pass = document.getElementById('matricula-password-input').value;
+  const pass2 = document.getElementById('matricula-password2-input').value;
+  if(pass.length<4){ al.error = 'A senha deve ter pelo menos 4 caracteres.'; render(); return; }
+  if(pass!==pass2){ al.error = 'As senhas não coincidem.'; render(); return; }
+  const t = state.professor.turmas.find(x=>x.id===al.matriculaTurmaId);
+  const s = t.students.find(x=>x.id===al.matriculaStudentId);
+  s.passwordHash = await hashText(pass);
+  s.activatedAt = Date.now();
+  await saveTurmasToStorage();
+  al.error = '';
+  al.turma = t;
+  al.name = s.name;
+  al.studentLoggedIn = true;
+  await loadStudentDashboard();
+}
+async function matriculaPasswordSubmit(){
+  const al = state.aluno;
+  const pass = document.getElementById('matricula-password-login-input').value;
+  const t = state.professor.turmas.find(x=>x.id===al.matriculaTurmaId);
+  const s = t.students.find(x=>x.id===al.matriculaStudentId);
+  const hash = await hashText(pass);
+  if(hash !== s.passwordHash){ al.error = 'Senha incorreta.'; render(); return; }
+  al.error = '';
+  al.turma = t;
+  al.name = s.name;
+  al.studentLoggedIn = true;
+  await loadStudentDashboard();
+}
+
+async function studentTurmaLogin(){
+  const al = state.aluno;
+  const turmaId = document.getElementById('student-turma-select').value;
+  if(!turmaId){ al.error = 'Selecione sua turma.'; render(); return; }
+  const nameSel = document.getElementById('student-name-select');
+  const studentName = nameSel ? nameSel.value : '';
+  if(!studentName){ al.error = 'Selecione seu nome.'; render(); return; }
+  const turma = state.professor.turmas.find(t=>t.id===turmaId);
+  al.turma = turma;
+  al.name = studentName;
+  al.studentLoggedIn = true;
+  al.error = '';
+  await loadStudentDashboard();
+}
+
+async function loadStudentDashboard(){
+  const al = state.aluno;
+  al.dashboardLoading = true;
+  al.stage = 'dashboard';
+  render();
+  let allAssessments = [];
+  try{
+    const list = await window.storage.list('assessment:', true);
+    for(const k of (list.keys||[])){ try{ const r = await window.storage.get(k, true); allAssessments.push(JSON.parse(r.value)); }catch(e){} }
+  }catch(e){}
+  const mine = allAssessments.filter(a => a.turmaId === al.turma.id);
+  const realizadas = [];
+  const pendentes = [];
+  for(const a of mine){
+    let responses = [];
+    try{ const r = await window.storage.get(`responses:${a.code}`, true); responses = JSON.parse(r.value); }catch(e){}
+    const mineResp = responses.find(r=>r.studentName===al.name);
+    if(mineResp){
+      realizadas.push({ assessment:a, response:mineResp });
+    } else {
+      const status = assessmentWindowStatus(a);
+      if(status!=='depois'){ pendentes.push({ assessment:a, status }); }
+    }
+  }
+  realizadas.sort((x,y) => y.response.submittedAt - x.response.submittedAt);
+  pendentes.sort((x,y) => (x.assessment.startAt?new Date(x.assessment.startAt).getTime():0) - (y.assessment.startAt?new Date(y.assessment.startAt).getTime():0));
+  al.dashboardRealizadas = realizadas;
+  al.dashboardPendentes = pendentes;
+  al.dashboardLoading = false;
+  render();
+}
+
+async function dashboardStartExam(code){
+  const al = state.aluno;
+  const entry = (al.dashboardPendentes||[]).find(p=>p.assessment.code===code);
+  if(!entry) return;
+  al.code = code;
+  al.assessment = entry.assessment;
+  al.manualName = false;
+  const status = assessmentWindowStatus(entry.assessment);
+  if(status!=='aberta'){
+    al.windowStatus = status;
+    al.stage = 'fechada';
+    render();
+    return;
+  }
+  await startExamFlow();
+}
+
+async function dashboardViewResult(code){
+  const al = state.aluno;
+  const entry = (al.dashboardRealizadas||[]).find(r=>r.assessment.code===code);
+  if(!entry) return;
+  al.assessment = entry.assessment;
+  al.code = code;
+  al.result = entry.response;
+  al.stage = resultReleased(entry.assessment) ? 'resultado' : 'enviado';
   render();
 }
 
@@ -3540,7 +4218,12 @@ document.addEventListener('click', (e) => {
   else if(act==='close-correct-response'){ p.correctingResponseIdx = null; render(); }
   else if(act==='save-correct-response'){ saveCorrectResponse(Number(btn.dataset.idx)); }
   else if(act==='export-pdf'){ exportAssessmentPdf(btn.dataset.code); }
-  else if(act==='back-to-list'){ p.mode='list'; render(); }
+  else if(act==='print-personal-gabaritos'){ printPersonalAnswerCards(btn.dataset.code); }
+  else if(act==='bloco-toggle'){ const code = btn.dataset.code; const b = p.bloco; if(b.selectedCodes.includes(code)) b.selectedCodes = b.selectedCodes.filter(x=>x!==code); else b.selectedCodes.push(code); render(); }
+  else if(act==='bloco-generate'){ generateBlocoGabaritos(); }
+  else if(act==='scan-cancel'){ p.leitura = { loading:false, error:'', review:null, assessment:null, studentName:'' }; render(); }
+  else if(act==='scan-confirm'){ confirmScannedGrade(); }
+  else if(act==='back-to-list'){ p.mode='list'; p.manualGradePrefill=null; render(); }
 
   // banco
   else if(act==='new-bank-question'){ p.newBankQuestion = freshQuestion(btn.dataset.qtype); p.editingBankId = null; render(); }
@@ -3594,6 +4277,7 @@ document.addEventListener('click', (e) => {
   else if(act==='view-turma'){ p.viewingTurmaId = btn.dataset.tid; render(); }
   else if(act==='back-to-turmas'){ p.viewingTurmaId = null; render(); }
   else if(act==='add-student'){ addStudent(btn.dataset.tid); }
+  else if(act==='set-student-matricula'){ setStudentMatricula(btn.dataset.tid, btn.dataset.sid); }
   else if(act==='remove-student'){ removeStudent(btn.dataset.tid, btn.dataset.sid); }
   else if(act==='delete-turma'){ deleteTurma(btn.dataset.tid); }
   else if(act==='print-signature-list'){ printTurmaSignatureList(btn.dataset.tid); }
@@ -3609,12 +4293,25 @@ document.addEventListener('click', (e) => {
   else if(act==='unlock-exam'){ unlockExam(); }
 
   // aluno
+  // aluno
+  else if(act==='goto-turma-login'){ al.stage='turma-login'; al.error=''; if(state.professor.turmas.length===0 && state.professor.turmasLoading){ loadTurmas(); } render(); }
+  else if(act==='goto-matricula-login'){ al.stage='matricula-login'; al.matriculaStage='input'; al.error=''; if(state.professor.turmas.length===0 && state.professor.turmasLoading){ loadTurmas(); } render(); }
+  else if(act==='matricula-lookup-submit'){ matriculaLookup(); }
+  else if(act==='matricula-setup-submit'){ matriculaSetupSubmit(); }
+  else if(act==='matricula-password-submit'){ matriculaPasswordSubmit(); }
+  else if(act==='goto-code-entry'){ al.stage='code'; al.error=''; render(); }
+  else if(act==='back-to-entrada'){ al.stage='entrada'; al.error=''; al.matriculaStage='input'; render(); }
+  else if(act==='student-turma-login'){ studentTurmaLogin(); }
+  else if(act==='student-logout'){ al.turma=null; al.name=''; al.studentLoggedIn=false; al.loginTurmaId=''; al.matriculaStage='input'; al.matriculaTurmaId=null; al.matriculaStudentId=null; al.matriculaName=''; al.stage='entrada'; render(); }
+  else if(act==='back-to-student-dashboard'){ loadStudentDashboard(); }
+  else if(act==='dashboard-start-exam'){ requestFullscreenSafe(); dashboardStartExam(btn.dataset.code); }
+  else if(act==='dashboard-view-result'){ dashboardViewResult(btn.dataset.code); }
   else if(act==='find-assessment'){ findAssessment(); }
   else if(act==='use-manual-name'){ al.manualName = true; render(); }
   else if(act==='confirm-name'){ requestFullscreenSafe(); confirmName(); }
   else if(act==='submit-answers'){ submitAnswers(); }
   else if(act==='check-release'){ if(resultReleased(al.assessment)){ al.stage='resultado'; } render(); }
-  else if(act==='reset-aluno'){ exitFullscreenSafe(); stopUnlockPolling(); state.aluno = { stage:'code', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null }; render(); }
+  else if(act==='reset-aluno'){ exitFullscreenSafe(); stopUnlockPolling(); state.aluno = { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null }; render(); }
 });
 
 document.addEventListener('input', (e) => {
@@ -3647,6 +4344,8 @@ document.addEventListener('change', (e) => {
   const act = el.dataset ? el.dataset.action : null;
   const p = state.professor, al = state.aluno, c = state.coordenador;
   if(el.id==='coord-filter-professor'){ c.filterProfessorId = el.value; render(); return; }
+  if(el.id==='student-turma-select'){ al.loginTurmaId = el.value; al.error=''; render(); return; }
+  if(el.id==='bloco-turma-select'){ p.bloco.turmaId = el.value; p.bloco.selectedCodes = []; render(); return; }
   if(el.id==='coord-filter-disciplina'){ c.filterDisciplina = el.value; render(); return; }
   if(act==='answer-mc'){ al.answers[el.dataset.qid] = el.value; }
   else if(act==='answer-vf'){ al.answers[el.dataset.qid] = el.value==='true'; }
@@ -3658,7 +4357,19 @@ document.addEventListener('change', (e) => {
   else if(el.id==='ai-dificuldade-input'){ p.aiGen.dificuldade = el.value; }
   else if(act==='upload-question-image'){ handleImageUpload(el.dataset.qid, el.files[0]); }
   else if(el.id==='book-file-input'){ if(el.files[0]) loadBookPdf(el.files[0]); }
+  else if(el.id==='scan-file-input'){ if(el.files[0]) scanAnswerSheet(el.files[0]); }
 });
+
+(function checkGradeDeepLink(){
+  const params = new URLSearchParams(location.search);
+  const code = params.get('prof_grade_code');
+  const student = params.get('prof_grade_student');
+  if(code && student){
+    window.pendingGradeDeepLink = { code, student };
+    history.replaceState({}, '', location.pathname);
+    state.view = 'professor';
+  }
+})();
 
 render();
 </script>
