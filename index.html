@@ -632,6 +632,12 @@ function renderProfessorList(){
 
 /* ---------------- LIVROS DIDÁTICOS ---------------- */
 
+function driveEmbedUrl(link){
+  if(!link) return null;
+  const m = link.match(/\/d\/([a-zA-Z0-9_-]{10,})/) || link.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  return m ? `https://drive.google.com/file/d/${m[1]}/preview` : null;
+}
+
 function renderLivrosDidaticos(canUpload){
   const p = state.professor;
   if(p.livrosLoading){
@@ -640,35 +646,43 @@ function renderLivrosDidaticos(canUpload){
   const areas = [...new Set(p.livros.map(l=>l.area))];
   const body = areas.map(area => `
     <h3 style="margin-top:22px;">${esc(area)}</h3>
-    ${p.livros.filter(l=>l.area===area).map(l => `
-      <div class="list-item" style="align-items:flex-start;">
+    ${p.livros.filter(l=>l.area===area).map(l => {
+      const embedUrl = driveEmbedUrl(l.downloadUrl);
+      return `
+      <div class="list-item" style="align-items:flex-start; flex-wrap:wrap;">
         <div>
           <strong>${esc(l.componente)}</strong><br>
           <span class="muted">${esc(l.colecao)}</span>
           ${canUpload && l.editingLink ? `
             <div style="margin-top:8px; max-width:420px;">
-              <input type="text" id="livro-link-input-${l.id}" placeholder="Cole aqui o link do GitHub Release (.pdf)" value="${l.downloadUrl?esc(l.downloadUrl):''}">
+              <input type="text" id="livro-link-input-${l.id}" placeholder="Cole aqui o link de compartilhamento do Google Drive" value="${l.downloadUrl?esc(l.downloadUrl):''}">
               <div class="row" style="margin-top:6px;">
                 <button class="btn btn-primary btn-sm" data-action="save-livro-link" data-id="${l.id}">Salvar link</button>
                 <button class="btn btn-ghost btn-sm" data-action="cancel-livro-link" data-id="${l.id}">Cancelar</button>
               </div>
             </div>
           ` : ''}
+          ${l.downloadUrl && !embedUrl && !l.editingLink ? '<p class="err" style="font-size:.78rem; margin-top:6px;">Esse link não parece ser do Google Drive — pode baixar em vez de abrir na tela.</p>' : ''}
         </div>
         <div class="row" style="flex:0 0 auto; gap:8px; align-items:center;">
-          ${(l.downloadUrl && !l.editingLink) ? `<a href="${l.downloadUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-sm">Abrir livro</a>` : (!canUpload && !l.downloadUrl ? '<span class="muted">Ainda não disponível</span>' : '')}
+          ${(l.downloadUrl && !l.editingLink) ? `<button class="btn btn-primary btn-sm" data-action="toggle-livro-view" data-id="${l.id}">${l.viewing?'Fechar livro':'Abrir livro'}</button>` : (!canUpload && !l.downloadUrl ? '<span class="muted">Ainda não disponível</span>' : '')}
           ${canUpload && !l.editingLink ? `
             ${l.downloadUrl ? `<button class="btn btn-danger btn-sm" data-action="remove-livro-file" data-id="${l.id}">Remover</button>` : ''}
             <button class="btn btn-ghost btn-sm" data-action="edit-livro-link" data-id="${l.id}">${l.downloadUrl?'Trocar link':'Colar link'}</button>
           ` : ''}
         </div>
+        ${l.viewing && embedUrl ? `
+          <div style="width:100%; margin-top:10px;">
+            <iframe src="${embedUrl}" style="width:100%; height:70vh; border:1px solid var(--paper-line); border-radius:8px;" allow="autoplay"></iframe>
+          </div>
+        ` : ''}
       </div>
-    `).join('')}
+    `}).join('')}
   `).join('');
   return `
     <div class="card">
       <h2>Livros Didáticos</h2>
-      <p class="muted">${canUpload ? 'Suba o PDF de cada livro em uma "Release" do repositório no GitHub, copie o link do arquivo e cole aqui. Professores e alunos acessam pelo link, sem precisar enviar nada.' : 'Livros didáticos disponibilizados pela coordenação.'}</p>
+      <p class="muted">${canUpload ? 'Suba o PDF de cada livro no Google Drive (compartilhamento "qualquer pessoa com o link"), copie o link e cole aqui. Professores e alunos abrem o livro direto na tela, sem precisar enviar nada.' : 'Livros didáticos disponibilizados pela coordenação.'}</p>
       ${body}
     </div>
   `;
@@ -2863,7 +2877,7 @@ async function saveLivroLink(id){
   if(!item) return;
   const input = document.getElementById('livro-link-input-'+id);
   const url = input ? input.value.trim() : '';
-  if(!url){ alert('Cole o link do GitHub Release antes de salvar.'); return; }
+  if(!url){ alert('Cole o link de compartilhamento do Google Drive antes de salvar.'); return; }
   if(!/^https?:\/\//i.test(url)){ alert('O link precisa começar com http:// ou https://'); return; }
   item.downloadUrl = url;
   item.fileName = url.split('/').pop() || null;
@@ -4476,6 +4490,10 @@ document.addEventListener('click', (e) => {
   else if(act==='scan-cancel'){ p.leitura = { loading:false, error:'', review:null, assessment:null, studentName:'' }; render(); }
   else if(act==='scan-confirm'){ confirmScannedGrade(); }
   else if(act==='remove-livro-file'){ removeLivroFile(btn.dataset.id); }
+  else if(act==='toggle-livro-view'){
+    const item = state.professor.livros.find(l=>l.id===btn.dataset.id);
+    if(item){ item.viewing = !item.viewing; render(); }
+  }
   else if(act==='edit-livro-link'){ editLivroLink(btn.dataset.id); }
   else if(act==='cancel-livro-link'){ cancelLivroLinkEdit(btn.dataset.id); }
   else if(act==='save-livro-link'){ saveLivroLink(btn.dataset.id); }
