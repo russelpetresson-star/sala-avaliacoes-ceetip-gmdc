@@ -2201,6 +2201,8 @@ async function refreshProfessorSlides(){
   const s = state.professor.slides;
   const prevId = s.current ? s.current.id : null;
   const prevIndex = s.current ? s.current.currentIndex : null;
+  const prevEngajamento = JSON.stringify(s.engajamento);
+  const prevImg = s.currentSlideImg;
   s.current = await loadSlidesSessaoAtiva();
   if(s.current){
     s.engajamento = await loadSlidesEngajamento(s.current.turmaId);
@@ -2211,7 +2213,10 @@ async function refreshProfessorSlides(){
     s.engajamento = null;
     s.currentSlideImg = null;
   }
-  render();
+  const newId = s.current ? s.current.id : null;
+  const newIndex = s.current ? s.current.currentIndex : null;
+  const changed = newId !== prevId || newIndex !== prevIndex || JSON.stringify(s.engajamento) !== prevEngajamento || s.currentSlideImg !== prevImg;
+  if(changed) render();
 }
 const SLIDES_MAX_PAGES = 80;
 const SLIDES_MAX_FILE_MB = 40;
