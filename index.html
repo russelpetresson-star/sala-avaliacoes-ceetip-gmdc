@@ -532,6 +532,7 @@ document.addEventListener('DOMContentLoaded', () => { if(navigator.onLine===fals
 
 /* -------- Prompt de instalação do app no primeiro acesso -------- */
 let pwaDeferredEvent = null;
+let lastPwaInstallShown = null;
 function isStandaloneMode(){
   try{
     return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -653,20 +654,22 @@ function renderPwaInstallOverlay(){
   const canPrompt = !!pwaDeferredEvent;
   const ios = isIosDevice();
   return `
-    <div class="tour-overlay">
-      <div class="tour-card">
-        <div class="tour-icon">📲</div>
-        <h3>Instale o app no seu dispositivo</h3>
-        ${canPrompt ? `
-          <p>Instale a Sala de Avaliações como aplicativo para abrir direto da tela inicial, mais rápido e com tela cheia estável nas provas — sem precisar do navegador toda vez.</p>
-        ` : ios ? `
-          <p>Para instalar: toque no ícone de <strong>Compartilhar</strong> (o quadrado com uma seta ⬆️) na barra do Safari e depois em <strong>"Adicionar à Tela de Início"</strong>.</p>
-        ` : `
-          <p>Recomendamos instalar este app no seu dispositivo (procure "Instalar app" ou "Adicionar à tela inicial" no menu do navegador) para uma experiência mais estável, especialmente nas provas.</p>
-        `}
-        <div class="row" style="justify-content:center; gap:8px; margin-top:16px; flex-wrap:wrap;">
-          ${canPrompt ? `<button class="btn btn-primary btn-sm" data-action="pwa-install-now">📲 Instalar agora</button>` : ''}
-          <button class="btn btn-ghost btn-sm" data-action="pwa-install-dismiss">${canPrompt ? 'Agora não' : 'Entendi, continuar'}</button>
+    <div style="position:fixed; left:12px; right:12px; bottom:12px; z-index:400; max-width:420px; margin:0 auto; background:var(--paper); border:1px solid var(--paper-line); border-radius:14px; padding:16px 18px; box-shadow:0 8px 28px rgba(0,0,0,0.25);">
+      <div style="display:flex; gap:10px; align-items:flex-start;">
+        <div style="font-size:1.6rem; line-height:1;">📲</div>
+        <div style="flex:1;">
+          <strong>Instale o app no seu dispositivo</strong>
+          ${canPrompt ? `
+            <p style="margin:6px 0 0; font-size:.85rem; color:var(--ink-soft);">Abra mais rápido, direto da tela inicial, com tela cheia estável nas provas.</p>
+          ` : ios ? `
+            <p style="margin:6px 0 0; font-size:.85rem; color:var(--ink-soft);">Toque em <strong>Compartilhar</strong> (⬆️) na barra do Safari e depois em <strong>"Adicionar à Tela de Início"</strong>.</p>
+          ` : `
+            <p style="margin:6px 0 0; font-size:.85rem; color:var(--ink-soft);">Procure "Instalar app" ou "Adicionar à tela inicial" no menu do navegador.</p>
+          `}
+          <div class="row" style="gap:8px; margin-top:10px; flex-wrap:wrap;">
+            ${canPrompt ? `<button class="btn btn-primary btn-sm" data-action="pwa-install-now">📲 Instalar agora</button>` : ''}
+            <button class="btn btn-ghost btn-sm" data-action="pwa-install-dismiss">${canPrompt ? 'Agora não' : 'Entendi'}</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1096,7 +1099,10 @@ function render(){
   const tourEl = document.getElementById('tour-overlay-root');
   if(tourEl) tourEl.innerHTML = renderTourOverlay();
   const pwaInstallEl = document.getElementById('pwa-install-root');
-  if(pwaInstallEl) pwaInstallEl.innerHTML = renderPwaInstallOverlay();
+  if(pwaInstallEl && state.ui.installPrompt.show !== lastPwaInstallShown){
+    lastPwaInstallShown = state.ui.installPrompt.show;
+    pwaInstallEl.innerHTML = renderPwaInstallOverlay();
+  }
   if(state.view==='landing'){
     root.innerHTML = renderLanding();
     const wrapEl = document.querySelector('.wrap');
@@ -1447,9 +1453,10 @@ async function saveEnqueteAtiva(obj){
 }
 async function refreshProfessorEnquete(){
   const p = state.professor;
+  const prev = JSON.stringify(p.enquete.current);
   const fresh = await loadEnqueteAtiva();
   p.enquete.current = fresh;
-  render();
+  if(JSON.stringify(fresh) !== prev) render();
 }
 async function startEnquete(authorName){
   const p = state.professor;
@@ -1642,8 +1649,11 @@ async function saveQuizAtivo(obj){
   await window.storage.set('quiz-ativo', obj ? JSON.stringify(obj) : JSON.stringify(null), true);
 }
 async function refreshProfessorQuiz(){
-  state.professor.quiz.current = await loadQuizAtivo();
-  render();
+  const q = state.professor.quiz;
+  const prev = JSON.stringify(q.current);
+  const fresh = await loadQuizAtivo();
+  q.current = fresh;
+  if(JSON.stringify(fresh) !== prev) render();
 }
 function freshQuizQuestion(){
   return { id: cryptoId(), text:'', options:['',''], correctIndex:0, durationSeconds:30 };
@@ -2015,8 +2025,11 @@ async function saveRoletaAtiva(obj){
   await window.storage.set('roleta-ativa', obj ? JSON.stringify(obj) : JSON.stringify(null), true);
 }
 async function refreshProfessorRoleta(){
-  state.professor.roleta.current = await loadRoletaAtiva();
-  render();
+  const rs = state.professor.roleta;
+  const prev = JSON.stringify(rs.current);
+  const fresh = await loadRoletaAtiva();
+  rs.current = fresh;
+  if(JSON.stringify(fresh) !== prev) render();
 }
 function girarRoleta(authorName){
   const p = state.professor;
@@ -5217,6 +5230,7 @@ async function submitCoordLogin(){
     render();
     resetIdleLogoutTimer();
     calcExecDashboard();
+    ensureCoordDataLoaded();
     let tourSeen = null;
     try{ const r3 = await window.storage.get('coordenador-tour-visto', true); tourSeen = r3.value; }catch(e){}
     if(!tourSeen) startTour('coordenador');
@@ -6059,10 +6073,11 @@ function stopLiberacoesPoll(){
 async function loadUnlockRequests(){
   const p = state.professor;
   const wasLoading = p.unlockRequestsLoading;
+  const prev = JSON.stringify(p.unlockRequests);
   try{ const r = await window.storage.get('unlock-requests', true); p.unlockRequests = JSON.parse(r.value); }
   catch(e){ p.unlockRequests = []; }
   p.unlockRequestsLoading = false;
-  render();
+  if(wasLoading || JSON.stringify(p.unlockRequests) !== prev) render();
 }
 async function releaseStudent(id){
   const p = state.professor;
@@ -8521,6 +8536,7 @@ document.addEventListener('click', (e) => {
     state.coordenador.subview = btn.dataset.sub;
     state.coordenador.mode='list';
     if(state.coordenador.subview==='pesosprof'){ loadCoordProfessorPesos(); }
+    if(state.coordenador.subview==='periodos' && state.professor.periodosLoading){ loadPeriodos(); }
     if(state.coordenador.subview==='dashboard' && !state.coordenador.dashboard.stats){ calcExecDashboard(); }
     stopEnquetePoll();
     if(state.coordenador.subview==='enquete'){
