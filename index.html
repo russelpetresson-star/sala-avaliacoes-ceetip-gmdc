@@ -807,7 +807,7 @@ let state = {
     dashboard: { loading:true, stats:null },
     periodosDraft: null
   },
-  aluno: { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false }
+  aluno: { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{} }
 };
 
 
@@ -5630,40 +5630,40 @@ function renderNome(){
   `;
 }
 
+function renderQuestionField(q, al){
+  if(q.type==='mc'){
+    return q.options.map(o => `
+      <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;margin:6px 0;">
+        <input type="radio" name="ans-${q.id}" data-action="answer-mc" data-qid="${q.id}" value="${o.id}" ${al.answers[q.id]===o.id?'checked':''}>
+        ${esc(o.text)}
+      </label>
+    `).join('');
+  }
+  if(q.type==='vf'){
+    return `
+      <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;margin:6px 0;">
+        <input type="radio" name="ans-${q.id}" data-action="answer-vf" data-qid="${q.id}" value="true" ${al.answers[q.id]===true?'checked':''}> Verdadeiro
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;margin:6px 0;">
+        <input type="radio" name="ans-${q.id}" data-action="answer-vf" data-qid="${q.id}" value="false" ${al.answers[q.id]===false?'checked':''}> Falso
+      </label>
+    `;
+  }
+  return `<textarea data-action="answer-text" data-qid="${q.id}" placeholder="Escreva sua resposta...">${esc(al.answers[q.id]||'')}</textarea>`;
+}
 function renderResponder(){
   const al = state.aluno;
   const a = al.assessment;
-  const questionsList = (al.shuffledQuestions || a.questions).filter(q => !q.annulled);
-  const qs = questionsList.map((q, idx) => {
-    let field = '';
-    if(q.type==='mc'){
-      field = q.options.map(o => `
-        <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;margin:6px 0;">
-          <input type="radio" name="ans-${q.id}" data-action="answer-mc" data-qid="${q.id}" value="${o.id}" ${al.answers[q.id]===o.id?'checked':''}>
-          ${esc(o.text)}
-        </label>
-      `).join('');
-    } else if(q.type==='vf'){
-      field = `
-        <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;margin:6px 0;">
-          <input type="radio" name="ans-${q.id}" data-action="answer-vf" data-qid="${q.id}" value="true" ${al.answers[q.id]===true?'checked':''}> Verdadeiro
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;margin:6px 0;">
-          <input type="radio" name="ans-${q.id}" data-action="answer-vf" data-qid="${q.id}" value="false" ${al.answers[q.id]===false?'checked':''}> Falso
-        </label>
-      `;
-    } else {
-      field = `<textarea data-action="answer-text" data-qid="${q.id}" placeholder="Escreva sua resposta...">${esc(al.answers[q.id]||'')}</textarea>`;
-    }
-    return `
+  if(isTimedResponder(a)) return renderResponderTimed();
+  const questionsList = getResponderQuestions(al);
+  const qs = questionsList.map((q, idx) => `
       <div class="q-card">
         <div class="q-head"><span class="q-tag">Questão ${idx+1} · ${q.points} pt(s)</span></div>
         <p style="margin-top:0;">${esc(q.text)}</p>
         ${q.image ? `<div class="img-preview"><img src="${q.image}" alt="Imagem da questão"></div>` : ''}
-        ${field}
+        ${renderQuestionField(q, al)}
       </div>
-    `;
-  }).join('');
+    `).join('');
   return `
     <div class="card ${a.securityEnabled!==false ? 'exam-lock' : ''}">
       <div class="exam-sticky-header">
@@ -5674,6 +5674,47 @@ function renderResponder(){
       <div style="margin-top:14px;">${qs}</div>
       ${al.error ? `<p class="err">${esc(al.error)}</p>` : ''}
       <button class="btn btn-primary btn-block" style="margin-top:6px;" data-action="submit-answers">Enviar respostas</button>
+    </div>
+  `;
+}
+function renderResponderTimed(){
+  const al = state.aluno;
+  const a = al.assessment;
+  const questionsList = getResponderQuestions(al);
+  const idx = Math.min(al.responderIdx||0, questionsList.length-1);
+  const q = questionsList[idx];
+  const isLast = idx >= questionsList.length-1;
+  const startedAt = (al.questionTimers && al.questionTimers[q.id]) || Date.now();
+  const elapsedMs = Date.now() - startedAt;
+  const remainingMs = Math.max(0, MIN_MS_PER_QUESTION_NP1 - elapsedMs);
+  const canAdvance = remainingMs<=0;
+  const remainingSec = Math.ceil(remainingMs/1000);
+  const mm = String(Math.floor(remainingSec/60)).padStart(2,'0');
+  const ss = String(remainingSec%60).padStart(2,'0');
+  return `
+    <div class="card ${a.securityEnabled!==false ? 'exam-lock' : ''}">
+      <div class="exam-sticky-header">
+        <h2 style="margin-bottom:2px;">${esc(a.title)}</h2>
+        <p class="muted" style="margin:0; font-size:.85rem;">${a.disciplinaName ? esc(a.disciplinaName)+' · ' : ''}código ${esc(a.code)} · Respondendo como ${esc(al.name)}</p>
+        <p class="muted" style="margin:4px 0 0; font-size:.8rem;">⏱ Questão ${idx+1} de ${questionsList.length} — leia com calma, é preciso permanecer ao menos 3 minutos em cada questão antes de avançar.</p>
+      </div>
+      <div style="margin-top:14px;">
+        <div class="q-card">
+          <div class="q-head"><span class="q-tag">Questão ${idx+1} · ${q.points} pt(s)</span></div>
+          <p style="margin-top:0;">${esc(q.text)}</p>
+          ${q.image ? `<div class="img-preview"><img src="${q.image}" alt="Imagem da questão"></div>` : ''}
+          ${renderQuestionField(q, al)}
+        </div>
+      </div>
+      ${al.error ? `<p class="err">${esc(al.error)}</p>` : ''}
+      <div class="row" style="margin-top:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <button class="btn btn-ghost" data-action="responder-anterior" ${idx===0?'disabled':''}>← Questão anterior</button>
+        ${!canAdvance ? `<span class="pill" style="background:var(--yellow-dark); color:#fff;">⏳ Aguarde ${mm}:${ss} para ${isLast?'enviar':'avançar'}</span>` : ''}
+        ${isLast
+          ? `<button class="btn btn-primary" data-action="submit-answers" ${!canAdvance?'disabled':''}>Enviar respostas</button>`
+          : `<button class="btn btn-primary" data-action="responder-proxima" ${!canAdvance?'disabled':''}>Próxima questão →</button>`
+        }
+      </div>
     </div>
   `;
 }
@@ -6342,8 +6383,48 @@ function lockExamForSecurity(){
   al.examLocked = true;
   al.fullscreenExits = (al.fullscreenExits||0) + 1;
   render();
+  stopResponderTick();
   registerUnlockRequest();
   startUnlockPolling();
+}
+const MIN_MS_PER_QUESTION_NP1 = 3 * 60 * 1000;
+let responderTickInterval = null;
+function getResponderQuestions(al){
+  return (al.shuffledQuestions || (al.assessment ? al.assessment.questions : [])).filter(q=>!q.annulled);
+}
+function isTimedResponder(a){
+  return !!a && a.instrumento==='avaliacao';
+}
+function startResponderTick(){
+  stopResponderTick();
+  responderTickInterval = setInterval(() => {
+    if(state.aluno.stage==='responder' && !state.aluno.examLocked) render();
+    else stopResponderTick();
+  }, 1000);
+}
+function stopResponderTick(){
+  if(responderTickInterval){ clearInterval(responderTickInterval); responderTickInterval = null; }
+}
+function responderProxima(){
+  const al = state.aluno;
+  const a = al.assessment;
+  const questionsList = getResponderQuestions(al);
+  const q = questionsList[al.responderIdx];
+  if(!q) return;
+  if(isTimedResponder(a)){
+    const startedAt = al.questionTimers[q.id] || Date.now();
+    if(Date.now() - startedAt < MIN_MS_PER_QUESTION_NP1) return;
+  }
+  if(al.responderIdx < questionsList.length-1){
+    al.responderIdx++;
+    const nextQ = questionsList[al.responderIdx];
+    if(!al.questionTimers[nextQ.id]) al.questionTimers[nextQ.id] = Date.now();
+    render();
+  }
+}
+function responderAnterior(){
+  const al = state.aluno;
+  if(al.responderIdx>0){ al.responderIdx--; render(); }
 }
 let awayTimer = null;
 function armAwayTimer(){
@@ -6425,6 +6506,7 @@ async function checkUnlockStatus(){
     stopUnlockPolling();
     requestFullscreenSafe();
     render();
+    if(isTimedResponder(al.assessment)) startResponderTick();
   }
 }
 async function markRequestReleased(id){
@@ -7940,8 +8022,13 @@ async function startExamFlow(){
   al.examLocked = false;
   al.fullscreenExits = 0;
   al.shuffledQuestions = shuffleForStudent(a.questions);
+  al.responderIdx = 0;
+  al.questionTimers = {};
+  const firstQ = getResponderQuestions(al)[0];
+  if(firstQ) al.questionTimers[firstQ.id] = Date.now();
   al.stage = 'responder';
   render();
+  if(isTimedResponder(a)) startResponderTick();
 }
 
 async function confirmName(){
@@ -8299,6 +8386,7 @@ async function submitAnswers(){
   if(al.lockKey){ try{ await window.storage.delete(al.lockKey, true); }catch(e){} }
   stopUnlockPolling();
   disarmAwayTimer();
+  stopResponderTick();
   exitFullscreenSafe();
   al.result = result;
   al.stage = resultReleased(a) ? 'resultado' : 'enviado';
@@ -8645,8 +8733,10 @@ document.addEventListener('click', (e) => {
   else if(act==='use-manual-name'){ al.manualName = true; render(); }
   else if(act==='confirm-name'){ if(al.assessment && al.assessment.securityEnabled!==false) requestFullscreenSafe(); confirmName(); }
   else if(act==='submit-answers'){ submitAnswers(); }
+  else if(act==='responder-proxima'){ responderProxima(); }
+  else if(act==='responder-anterior'){ responderAnterior(); }
   else if(act==='check-release'){ if(resultReleased(al.assessment)){ al.stage='resultado'; } render(); }
-  else if(act==='reset-aluno'){ exitFullscreenSafe(); stopUnlockPolling(); disarmAwayTimer(); stopAlunoEnquetePoll(); state.aluno = { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false }; render(); }
+  else if(act==='reset-aluno'){ exitFullscreenSafe(); stopUnlockPolling(); disarmAwayTimer(); stopAlunoEnquetePoll(); state.aluno = { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{} }; render(); }
 });
 
 document.addEventListener('input', (e) => {
