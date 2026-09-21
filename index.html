@@ -840,8 +840,8 @@ let state = {
     finalGrades: null, finalGradesUnidade: 'I Unidade',
     bloco: { turmaId:'', selectedCodes:[], list:[], listLoading:true, mode:'list', current:null,
       imprimirTurmaId:'', imprimirNomesText:'',
-      lancarModo:'manual', lancarNome:'', lancarTurmaId:'', lancarSequencia:'',
-      scanLoading:false, scanError:'', scanReview:null, scanBloco:null, scanStudentName:'', scanTurmaName:'',
+      lancarModo:'manual', lancarNome:'', lancarTurmaId:'', lancarStudentId:'', lancarSequencia:'',
+      scanLoading:false, scanError:'', scanReview:null, scanBloco:null, scanStudentName:'', scanTurmaName:'', scanDuplicateInfo:null,
       lancamentos:[], lancamentosLoading:false },
     manualGradePrefill: null,
     livros: [], livrosLoading: true, bancoLivroSelectedId: null,
@@ -3710,13 +3710,25 @@ function renderNovoBloco(pool){
         ${turmaOptions}
       </select>
       ${b.turmaId ? (matching.length===0 ? '<p class="muted" style="margin-top:12px;">Nenhuma avaliação encontrada para essa turma.</p>' : `
-        <div class="picker" style="margin-top:12px;">
-          ${matching.map(a => `
-            <label class="picker-item">
-              <input type="checkbox" data-action="bloco-toggle" data-code="${a.code}" ${b.selectedCodes.includes(a.code)?'checked':''}>
-              <span>${esc(a.title)}${a.disciplinaName?' · '+esc(a.disciplinaName):''} · ${a.questions.filter(q=>q.type==='mc'||q.type==='vf').length} questão(ões) objetiva(s)</span>
-            </label>
-          `).join('')}
+        <div style="margin-top:12px;">
+          ${(() => {
+            const groups = UNIDADES.map(u => ({ unidade: u, items: matching.filter(a => a.unidade === u) }));
+            const semUnidade = matching.filter(a => !UNIDADES.includes(a.unidade));
+            if(semUnidade.length) groups.push({ unidade: 'Sem unidade definida', items: semUnidade });
+            return groups.filter(g => g.items.length>0).map(g => `
+              <div style="margin-bottom:14px;">
+                <h4 style="margin:0 0 6px; font-size:.85rem; text-transform:uppercase; letter-spacing:.03em; color:var(--muted);">${esc(g.unidade)}</h4>
+                <div class="picker">
+                  ${g.items.map(a => `
+                    <label class="picker-item">
+                      <input type="checkbox" data-action="bloco-toggle" data-code="${a.code}" ${b.selectedCodes.includes(a.code)?'checked':''}>
+                      <span>${esc(a.title)}${a.disciplinaName?' · '+esc(a.disciplinaName):''} · ${a.questions.filter(q=>q.type==='mc'||q.type==='vf').length} questão(ões) objetiva(s)</span>
+                    </label>
+                  `).join('')}
+                </div>
+              </div>
+            `).join('');
+          })()}
         </div>
       `) : ''}
       ${b.selectedCodes.length>0 ? `<p class="muted" style="margin-top:10px;">Total no cartão: <strong>${totalSelecionado} questões</strong></p>` : ''}
@@ -3749,6 +3761,11 @@ function renderBlocoScanReview(){
   return `
     <div>
       <p class="muted">Aluno: <strong>${esc(b.scanStudentName)}</strong>${b.scanTurmaName?' · Turma: '+esc(b.scanTurmaName):''}</p>
+      ${b.scanDuplicateInfo ? `
+        <div style="background:#fdf3e8; border:1px solid var(--yellow-dark); border-radius:10px; padding:10px 14px; margin:8px 0;">
+          ⚠️ <strong>Este aluno já tem nota lançada neste bloco</strong> (${b.scanDuplicateInfo.scanned?'por leitura':'lançamento manual'}, em ${new Date(b.scanDuplicateInfo.submittedAt).toLocaleString('pt-BR')}). Confirmar abaixo vai <strong>substituir</strong> a nota anterior em cada avaliação.
+        </div>
+      ` : ''}
       <p class="muted" style="font-size:.85rem;">Revise questão por questão — o que veio marcado é só uma sugestão da leitura da foto. Corrija o que estiver errado antes de confirmar.</p>
       <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:6px; margin:10px 0;">${rows}</div>
       <div class="row">
@@ -3764,6 +3781,8 @@ function renderDetalheBloco(){
   const b = p.bloco;
   const bloco = b.current;
   const turmas = p.turmas;
+  const blocoTurma = turmas.find(t=>t.id===bloco.turmaId);
+  const alunosDaTurma = blocoTurma ? blocoTurma.students.slice().sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')) : [];
   let scanSection = '';
   if(b.scanLoading){
     scanSection = `<div class="spinner"></div><p class="muted center">Processando a imagem...</p>`;
@@ -3809,13 +3828,12 @@ function renderDetalheBloco(){
         <button class="btn ${b.lancarModo==='scan'?'btn-primary':'btn-ghost'} btn-sm" data-action="bloco-lancar-modo" data-modo="scan">Ler pelo celular</button>
       </div>
       ${b.lancarModo==='manual' ? `
-        <label>Nome do aluno</label>
-        <input type="text" id="bloco-lancar-nome-input" class="input" value="${esc(b.lancarNome)}" placeholder="Nome completo">
-        <label style="margin-top:8px;">Turma (opcional)</label>
-        <select id="bloco-lancar-turma-select" class="input">
-          <option value="">— sem turma —</option>
-          ${turmas.map(t=>`<option value="${t.id}" ${b.lancarTurmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+        <label>Aluno</label>
+        <select id="bloco-lancar-aluno-select" class="input">
+          <option value="">— selecione o aluno —</option>
+          ${alunosDaTurma.map(s=>`<option value="${s.id}" ${b.lancarStudentId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}
         </select>
+        ${alunosDaTurma.length===0 ? `<p class="muted" style="font-size:.82rem;">Essa turma não tem alunos cadastrados.</p>` : ''}
         <label style="margin-top:8px;">Gabarito marcado pelo aluno (${bloco.totalQuestoes} letras/V/F em sequência, use "-" para questão em branco)</label>
         <textarea id="bloco-lancar-sequencia-input" class="input" rows="3" style="font-family:monospace; letter-spacing:1px;" placeholder="ABCDVF...">${esc(b.lancarSequencia)}</textarea>
         <div class="row" style="margin-top:10px;">
@@ -4023,8 +4041,12 @@ async function lancarBlocoManual(){
   const p = state.professor;
   const b = p.bloco;
   const bloco = b.current;
-  const nome = (b.lancarNome||'').trim();
-  if(!nome){ alert('Informe o nome do aluno.'); return; }
+  const turma = p.turmas.find(t=>t.id===bloco.turmaId);
+  const aluno = turma ? turma.students.find(s=>s.id===b.lancarStudentId) : null;
+  if(!aluno){ alert('Selecione o aluno.'); return; }
+  const nome = aluno.name;
+  const jaLancado = (b.lancamentos||[]).find(x => (x.studentName||'').trim().toLowerCase() === nome.toLowerCase());
+  if(jaLancado && !confirm(`Este aluno já tem nota lançada neste bloco (${jaLancado.scanned?'por leitura':'manual'}, em ${new Date(jaLancado.submittedAt).toLocaleString('pt-BR')}). Lançar de novo vai substituir a nota anterior em cada avaliação. Continuar?`)) return;
   const flat = flattenBlocoQuestions(bloco);
   const seq = (b.lancarSequencia||'').trim().toUpperCase().replace(/[^A-Z\-]/g,'');
   if(seq.length !== flat.length){
@@ -4043,10 +4065,10 @@ async function lancarBlocoManual(){
     if(!byCode[item.code]) byCode[item.code] = [];
     byCode[item.code].push({ questionId: item.questionId, type: item.q?item.q.type:null, chosenIdx });
   });
-  const turmaName = (p.turmas.find(t=>t.id===b.lancarTurmaId)||{}).name || '';
+  const turmaName = turma ? turma.name : '';
   await lancarBlocoResultados(bloco, nome, turmaName, byCode, false);
   alert('Nota lançada em cada avaliação.');
-  b.lancarNome=''; b.lancarSequencia='';
+  b.lancarStudentId=''; b.lancarSequencia='';
   render();
 }
 async function scanBlocoSheet(file){
@@ -4089,7 +4111,7 @@ async function scanBlocoSheet(file){
       down: { x: loc.bottomLeftCorner.x - loc.topLeftCorner.x, y: loc.bottomLeftCorner.y - loc.topLeftCorner.y }
     };
     const scale = (Math.hypot(basis.right.x, basis.right.y) + Math.hypot(basis.down.x, basis.down.y)) / (2*OMR_LAYOUT.qrSize);
-    const sampleRadius = scale * (AVULSO_LAYOUT.bubbleSize*0.32);
+    const sampleRadius = scale * (AVULSO_LAYOUT.bubbleSize*0.38);
     const L = AVULSO_LAYOUT;
     const flat = flattenBlocoQuestions(bloco);
     const n = flat.length;
@@ -4108,12 +4130,13 @@ async function scanBlocoSheet(file){
         const px = mmToPixel(bx, by, basis);
         return sampleDarkness(imageData, px.x, px.y, sampleRadius);
       });
-      let minIdx = 0;
-      for(let k=1;k<darknesses.length;k++){ if(darknesses[k]<darknesses[minIdx]) minIdx = k; }
-      const sorted = [...darknesses].sort((x,y)=>x-y);
-      const confident = sorted[0] < 150 && (sorted[1]-sorted[0]) > 25;
-      detected.push({ code: item.code, questionId: item.questionId, type: q?q.type:null, numOptions: letters.length, detectedIndex: confident ? minIdx : null });
+      const pickedIdx = pickConfidentBubble(darknesses);
+      detected.push({ code: item.code, questionId: item.questionId, type: q?q.type:null, numOptions: letters.length, detectedIndex: pickedIdx });
     });
+    let prevLancamentos = [];
+    try{ const r2 = await window.storage.get(`bloco-lancamentos:${bloco.id}`, true); prevLancamentos = JSON.parse(r2.value); }catch(e){}
+    const jaLancado = prevLancamentos.find(x => (x.studentName||'').trim().toLowerCase() === (studentName||'').trim().toLowerCase());
+    b.scanDuplicateInfo = jaLancado || null;
     b.scanBloco = bloco;
     b.scanStudentName = studentName;
     b.scanTurmaName = turmaName;
@@ -4141,7 +4164,7 @@ async function confirmBlocoScan(){
   });
   await lancarBlocoResultados(bloco, b.scanStudentName, b.scanTurmaName, byCode, true);
   alert('Notas lançadas em cada avaliação a partir da leitura do gabarito.');
-  b.scanReview = null; b.scanBloco = null; b.scanStudentName = ''; b.scanTurmaName = ''; b.scanError = '';
+  b.scanReview = null; b.scanBloco = null; b.scanStudentName = ''; b.scanTurmaName = ''; b.scanError = ''; b.scanDuplicateInfo = null;
   render();
 }
 
@@ -7196,6 +7219,21 @@ function sampleDarkness(imageData, cx, cy, radiusPx){
   return count>0 ? sum/count : 255;
 }
 
+// Decide qual bolinha foi marcada numa questão, de forma relativa (compara a bolinha mais escura
+// com a mais clara da MESMA questão) em vez de um limiar fixo — assim se adapta sozinho a fotos
+// mais claras/escuras, com sombra ou iluminação irregular, em vez de exigir um "preto absoluto".
+function pickConfidentBubble(darknesses){
+  const sorted = [...darknesses].sort((x,y)=>x-y);
+  const darkest = sorted[0];
+  const brightest = sorted[sorted.length-1];
+  const gapToNext = sorted.length>1 ? sorted[1]-sorted[0] : 999;
+  const gapToBrightest = brightest - darkest;
+  const confident = gapToBrightest > 35 && gapToNext > 15;
+  let minIdx = 0;
+  for(let k=1;k<darknesses.length;k++){ if(darknesses[k]<darknesses[minIdx]) minIdx = k; }
+  return confident ? minIdx : null;
+}
+
 async function scanAnswerSheet(file){
   const p = state.professor;
   p.leitura.error = '';
@@ -7246,7 +7284,7 @@ async function scanAnswerSheet(file){
       down: { x: loc.bottomLeftCorner.x - loc.topLeftCorner.x, y: loc.bottomLeftCorner.y - loc.topLeftCorner.y }
     };
     const scale = (Math.hypot(basis.right.x, basis.right.y) + Math.hypot(basis.down.x, basis.down.y)) / (2*OMR_LAYOUT.qrSize);
-    const sampleRadius = scale * (OMR_LAYOUT.bubbleSize*0.32);
+    const sampleRadius = scale * (OMR_LAYOUT.bubbleSize*0.38);
 
     const L = OMR_LAYOUT;
     let qIndex = 0;
@@ -7261,15 +7299,12 @@ async function scanAnswerSheet(file){
         const px = mmToPixel(bx, by, basis);
         return sampleDarkness(imageData, px.x, px.y, sampleRadius);
       });
-      let minIdx = 0;
-      for(let i=1;i<darknesses.length;i++){ if(darknesses[i]<darknesses[minIdx]) minIdx = i; }
-      const sorted = [...darknesses].sort((x,y)=>x-y);
-      const confident = sorted[0] < 150 && (sorted[1]-sorted[0]) > 25;
+      const pickedIdx = pickConfidentBubble(darknesses);
       detected.push({
         questionId: q.id,
         type: q.type,
         optionIds: q.type==='mc' ? q.options.map(o=>o.id) : null,
-        detectedIndex: confident ? minIdx : null
+        detectedIndex: pickedIdx
       });
       qIndex++;
     });
@@ -7654,7 +7689,7 @@ async function scanAvulsoSheet(file){
       down: { x: loc.bottomLeftCorner.x - loc.topLeftCorner.x, y: loc.bottomLeftCorner.y - loc.topLeftCorner.y }
     };
     const scale = (Math.hypot(basis.right.x, basis.right.y) + Math.hypot(basis.down.x, basis.down.y)) / (2*OMR_LAYOUT.qrSize);
-    const sampleRadius = scale * (AVULSO_LAYOUT.bubbleSize*0.32);
+    const sampleRadius = scale * (AVULSO_LAYOUT.bubbleSize*0.38);
     const L = AVULSO_LAYOUT;
     const n = gab.numQuestoes;
     const half = Math.ceil(n/2);
@@ -7671,11 +7706,7 @@ async function scanAvulsoSheet(file){
         const px = mmToPixel(bx, by, basis);
         return sampleDarkness(imageData, px.x, px.y, sampleRadius);
       });
-      let minIdx = 0;
-      for(let k=1;k<darknesses.length;k++){ if(darknesses[k]<darknesses[minIdx]) minIdx = k; }
-      const sorted = [...darknesses].sort((x,y)=>x-y);
-      const confident = sorted[0] < 150 && (sorted[1]-sorted[0]) > 25;
-      detected.push({ detectedIndex: confident ? minIdx : null });
+      detected.push({ detectedIndex: pickConfidentBubble(darknesses) });
     }
     av.scanAvulso = gab;
     av.scanStudentName = studentName;
@@ -9160,7 +9191,7 @@ document.addEventListener('click', (e) => {
   else if(act==='bloco-imprimir-cartoes'){ imprimirCartoesBloco(); }
   else if(act==='bloco-lancar-modo'){ p.bloco.lancarModo = btn.dataset.modo; render(); }
   else if(act==='bloco-lancar-manual'){ lancarBlocoManual(); }
-  else if(act==='bloco-scan-cancel'){ p.bloco.scanReview=null; p.bloco.scanBloco=null; p.bloco.scanError=''; render(); }
+  else if(act==='bloco-scan-cancel'){ p.bloco.scanReview=null; p.bloco.scanBloco=null; p.bloco.scanError=''; p.bloco.scanDuplicateInfo=null; render(); }
   else if(act==='bloco-scan-confirm'){ confirmBlocoScan(); }
   else if(act==='scan-cancel'){ p.leitura = { loading:false, error:'', review:null, assessment:null, studentName:'' }; render(); }
   else if(act==='scan-confirm'){ confirmScannedGrade(); }
@@ -9358,6 +9389,7 @@ document.addEventListener('input', (e) => {
   else if(el.id==='bloco-imprimir-nomes-input'){ p.bloco.imprimirNomesText = el.value; }
   else if(el.id==='bloco-lancar-nome-input'){ p.bloco.lancarNome = el.value; }
   else if(el.id==='bloco-lancar-turma-select'){ p.bloco.lancarTurmaId = el.value; }
+  else if(el.id==='bloco-lancar-aluno-select'){ p.bloco.lancarStudentId = el.value; }
   else if(el.id==='bloco-lancar-sequencia-input'){ p.bloco.lancarSequencia = el.value; }
   else if(el.id==='bloco-scan-file-input'){ if(el.files[0]) scanBlocoSheet(el.files[0]); }
   else if(el.id==='avulso-lancar-sequencia-input'){ p.avulso.lancarSequencia = el.value; }
