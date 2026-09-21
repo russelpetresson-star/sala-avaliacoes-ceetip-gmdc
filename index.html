@@ -3777,7 +3777,7 @@ function renderDetalheBloco(){
     `;
   }
   let qStart = 1;
-  const segmentasLine = bloco.segments.map(s => { const line = `${esc(s.title)} (Q${qStart}–${qStart+s.questionIds.length-1})`; qStart += s.questionIds.length; return line; }).join(' · ');
+  const segmentasLine = bloco.segments.map(s => { const label = esc(s.disciplinaName || s.title); const line = `${label} (Q${qStart}–${qStart+s.questionIds.length-1})`; qStart += s.questionIds.length; return line; }).join(' · ');
   const lancamentos = (b.lancamentos||[]).slice().sort((x,y)=>y.submittedAt-x.submittedAt);
   return `
     <div class="card">
@@ -3954,7 +3954,7 @@ function buildBlocoCartaoPage(bloco, studentName, turmaName){
   });
   const blockHeight = L.gridStartY + Math.max(half,1)*L.rowHeight + 6;
   let qStart = 1;
-  const segmentasLine = bloco.segments.map(s => { const line = `${s.title} (Q${qStart}-${qStart+s.questionIds.length-1})`; qStart += s.questionIds.length; return line; }).join(' · ');
+  const segmentasLine = bloco.segments.map(s => { const label = s.disciplinaName || s.title; const line = `${label} (Q${qStart}-${qStart+s.questionIds.length-1})`; qStart += s.questionIds.length; return line; }).join(' · ');
   return `
     <div class="pv-page">
       ${buildPrintHeader({ title: 'Bloco de Provas', subtitle: turmaName })}
