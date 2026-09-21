@@ -388,6 +388,49 @@
   }
   .pv-sign-table td.pv-sign-col{ width:35%; }
   .pv-sign-table th.pv-num-col, .pv-sign-table td.pv-num-col{ width:36px; text-align:center; }
+
+  /* -------- Ajustes gerais para celular -------- */
+  @media (max-width: 680px){
+    body{ padding: 16px 10px 60px; }
+    .wrap, .wrap.wide, .wrap.full{ max-width: 100%; }
+    .card{ padding: 18px 16px 20px; border-radius:14px; }
+    header h1{ font-size: 2.3rem; }
+    header p{ font-size:.85rem; }
+    .school-name-sm{ max-width: 190px; font-size:.6rem; }
+    .school-logo-sm{ width:28px; height:28px; }
+    .tabs{ gap:6px; }
+    .tab-btn{ font-size:1.15rem; padding:5px 14px; }
+    .subnav{ gap:6px; }
+    .pill-btn{ font-size:.78rem; padding:4px 11px; }
+    .greeting-header{ padding:18px 18px 16px; }
+    .greeting-header h2{ font-size:1.6rem; }
+    .greeting-header p{ font-size:.85rem; }
+    .stat-tile{ flex-basis: 100%; padding:13px 14px; }
+    .landing-intro h2{ font-size:1.6rem; }
+    .landing-cards{ flex-direction:column; }
+    .landing-card{ max-width:100%; }
+    h2{ font-size:1.6rem; }
+    .code-box{ font-size:2rem; }
+    .score-big{ font-size:2.6rem; }
+    table{ font-size:.85rem; }
+    th, td{ padding:7px 5px; }
+    .exam-sticky-header{ margin:-18px -16px 0; padding:18px 16px 8px; }
+    .stat-card{ padding:10px 6px; }
+    .stat-value{ font-size:1.4rem; }
+    .dist-chart{ gap:8px; }
+    .chart-label{ flex-basis:90px; font-size:.78rem; }
+  }
+  @media (max-width: 680px){ .stat-grid{ grid-template-columns:repeat(2,1fr); } }
+  @media (max-width: 420px){
+    header h1{ font-size:1.9rem; }
+    .tab-btn{ font-size:1rem; padding:4px 11px; }
+    .btn{ padding:9px 14px; font-size:.9rem; }
+    .code-box{ font-size:1.7rem; }
+    .score-big{ font-size:2.2rem; }
+    .app-main{ margin-left: 60px; }
+    .app-sidebar{ width:48px; }
+    .app-sidebar.expanded, .app-sidebar:hover{ width:210px; }
+  }
 </style>
 </head>
 <body>
@@ -4285,18 +4328,22 @@ function renderProfessorPainel(){
       ${section('Desempenho por descritor SAEB', pn.porDescritor, 'Preencha o campo "Descritor SAEB" nas questões para ver essa análise.')}
       <h3 style="margin-top:22px;">Desempenho por aluno</h3>
       ${pn.porAluno.length===0 ? '<p class="muted">Sem dados ainda.</p>' : `
+        <div class="table-scroll">
         <table>
           <tr><th>Aluno</th><th>Média</th><th>Avaliações</th></tr>
           ${pn.porAluno.map(a => `<tr><td>${esc(a.name)}</td><td>${a.avg.toFixed(1)}%</td><td>${a.count}</td></tr>`).join('')}
         </table>
+        </div>
       `}
       <h3 style="margin-top:22px;">Alunos ausentes</h3>
       <p class="muted" style="font-size:.82rem; margin-top:-6px;">Alunos matriculados na turma que não responderam a uma avaliação já encerrada.</p>
       ${pn.ausentes.length===0 ? '<p class="muted">Nenhuma ausência registrada.</p>' : `
+        <div class="table-scroll">
         <table>
           <tr><th>Aluno</th><th>Turma</th><th>Ausências</th></tr>
           ${pn.ausentes.map(a => `<tr><td>${esc(a.studentName)}</td><td>${esc(a.turmaName)}</td><td>${a.count}</td></tr>`).join('')}
         </table>
+        </div>
       `}
     </div>
   `;
@@ -4869,10 +4916,12 @@ function renderCoordDashboard(){
       ${s.alunosAbaixoDe5.length>0 ? `
       <h3 style="margin-top:22px;">Alunos com média abaixo de 5</h3>
       <p class="muted" style="margin-top:-4px; font-size:.85rem;">Média geral (0 a 10) considerando todas as avaliações objetivas que o aluno respondeu, em qualquer disciplina.</p>
+      <div class="table-scroll">
       <table>
         <tr><th>Aluno</th><th>Média</th></tr>
         ${s.alunosAbaixoDe5.slice(0,20).map(x => `<tr><td>${esc(x.name)}</td><td>${x.media.toFixed(1)}</td></tr>`).join('')}
       </table>
+      </div>
       ${s.alunosAbaixoDe5.length>20 ? `<p class="muted" style="font-size:.82rem;">e mais ${s.alunosAbaixoDe5.length-20} aluno(s)...</p>` : ''}
       ` : ''}
     </div>
