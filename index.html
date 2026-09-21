@@ -4121,7 +4121,8 @@ async function scanBlocoSheet(file){
     b.scanLoading = false;
     render();
   }catch(e){
-    b.scanError = 'Não foi possível processar essa imagem. Tente outra foto.';
+    console.error('scanBlocoSheet error:', e);
+    b.scanError = 'Não foi possível processar essa imagem. Tente outra foto. (detalhe técnico: ' + (e && e.message ? e.message : String(e)) + ')';
     b.scanLoading = false;
     render();
   }
