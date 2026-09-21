@@ -838,7 +838,11 @@ let state = {
     pesos: {...DEFAULT_PESOS}, pesosLoading:true, pesosDraft:null,
     pin: '1234', pinLoading:true,
     finalGrades: null, finalGradesUnidade: 'I Unidade',
-    bloco: { turmaId:'', selectedCodes:[] },
+    bloco: { turmaId:'', selectedCodes:[], list:[], listLoading:true, mode:'list', current:null,
+      imprimirTurmaId:'', imprimirNomesText:'',
+      lancarModo:'manual', lancarNome:'', lancarTurmaId:'', lancarSequencia:'',
+      scanLoading:false, scanError:'', scanReview:null, scanBloco:null, scanStudentName:'', scanTurmaName:'',
+      lancamentos:[], lancamentosLoading:false },
     manualGradePrefill: null,
     livros: [], livrosLoading: true, bancoLivroSelectedId: null,
     painel: null,
@@ -3656,15 +3660,52 @@ function renderDisciplinas(){
 /* ---------------- BLOCO DE PROVAS ---------------- */
 
 function renderBlocoProvas(pool){
-  const b = state.professor.bloco;
-  const turmaOptions = state.professor.turmas.map(t => `<option value="${t.id}" ${b.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
-  const matching = b.turmaId ? pool.filter(a => assessmentTurmaIds(a).includes(b.turmaId)) : [];
+  const p = state.professor;
+  const b = p.bloco;
+  if(b.listLoading) return `<div class="card"><h2>Bloco de Provas</h2><div class="spinner"></div></div>`;
+  if(b.mode==='novo') return renderNovoBloco(pool);
+  if(b.mode==='detalhe' && b.current) return renderDetalheBloco();
+  return renderListaBlocos();
+}
+
+function renderListaBlocos(){
+  const list = state.professor.bloco.list || [];
   return `
     <div class="card">
-      <h2>Bloco de provas</h2>
-      <p class="muted">Escolha a turma e marque quantas avaliações quiser. Gera uma página por aluno, com os cartões-resposta de todas as provas marcadas juntos na mesma folha — economiza impressão.</p>
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <h2 style="margin:0;">Bloco de Provas</h2>
+        <button class="btn btn-primary btn-sm" data-action="bloco-novo">+ Novo bloco</button>
+      </div>
+      <p class="muted">Combine várias avaliações da mesma turma num único cartão-resposta, com um só QR code — o cartão sai com o total de questões somado de todas as provas escolhidas. Ao escanear, cada nota vai automaticamente para a avaliação certa.</p>
+      ${list.length===0 ? '<p class="muted center">Nenhum bloco criado ainda.</p>' : list.slice().sort((a,z)=>z.createdAt-a.createdAt).map(bl => `
+        <div class="list-item">
+          <div>
+            <strong>${esc(bl.turmaName)}</strong> <span class="muted" style="font-size:.82rem;">· ${bl.totalQuestoes} questões</span><br>
+            <span class="muted" style="font-size:.82rem;">${bl.segments.map(s=>esc(s.title)).join(' + ')}</span>
+          </div>
+          <div class="row" style="flex:0 0 auto;">
+            <button class="btn btn-ghost btn-sm" data-action="bloco-abrir" data-id="${bl.id}">Abrir</button>
+            <button class="btn btn-ghost btn-sm" data-action="bloco-excluir" data-id="${bl.id}">Excluir</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function renderNovoBloco(pool){
+  const p = state.professor;
+  const b = p.bloco;
+  const turmaOptions = p.turmas.map(t => `<option value="${t.id}" ${b.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
+  const matching = b.turmaId ? pool.filter(a => assessmentTurmaIds(a).includes(b.turmaId)) : [];
+  const totalSelecionado = b.selectedCodes.reduce((sum,code) => { const a = pool.find(x=>x.code===code); return sum + (a ? a.questions.filter(q=>q.type==='mc'||q.type==='vf').length : 0); }, 0);
+  return `
+    <div class="card">
+      <button class="btn btn-ghost btn-sm" data-action="bloco-cancelar-novo">← Voltar</button>
+      <h2>Novo bloco de provas</h2>
+      <p class="muted">Escolha a turma e marque quantas avaliações quiser. O bloco gera um cartão-resposta único por aluno, com um só QR code e o total de questões somado das provas marcadas (só questões objetivas — múltipla escolha ou V/F — entram no cartão).</p>
       <label>Turma</label>
-      <select id="bloco-turma-select" data-action="bloco-set-turma">
+      <select id="bloco-turma-select">
         <option value="">Selecione...</option>
         ${turmaOptions}
       </select>
@@ -3673,28 +3714,434 @@ function renderBlocoProvas(pool){
           ${matching.map(a => `
             <label class="picker-item">
               <input type="checkbox" data-action="bloco-toggle" data-code="${a.code}" ${b.selectedCodes.includes(a.code)?'checked':''}>
-              <span>${esc(a.title)}${a.disciplinaName?' · '+esc(a.disciplinaName):''} · ${a.questions.length} questão(ões)</span>
+              <span>${esc(a.title)}${a.disciplinaName?' · '+esc(a.disciplinaName):''} · ${a.questions.filter(q=>q.type==='mc'||q.type==='vf').length} questão(ões) objetiva(s)</span>
             </label>
           `).join('')}
         </div>
       `) : ''}
-      <button class="btn btn-primary" style="margin-top:14px;" data-action="bloco-generate" ${b.selectedCodes.length===0?'disabled':''}>Gerar gabaritos do bloco (${b.selectedCodes.length})</button>
+      ${b.selectedCodes.length>0 ? `<p class="muted" style="margin-top:10px;">Total no cartão: <strong>${totalSelecionado} questões</strong></p>` : ''}
+      <button class="btn btn-primary" style="margin-top:14px;" data-action="bloco-salvar" ${b.selectedCodes.length===0?'disabled':''}>Salvar bloco (${b.selectedCodes.length} avaliações)</button>
     </div>
   `;
 }
 
-function generateBlocoGabaritos(){
+function renderBlocoScanReview(){
   const b = state.professor.bloco;
-  const turma = state.professor.turmas.find(t=>t.id===b.turmaId);
+  const review = b.scanReview;
+  const rows = review.map((r, idx) => {
+    const letters = r.type==='vf' ? ['V','F'] : OPT_LETTERS.slice(0, r.numOptions);
+    return `
+    <div class="q-card" style="padding:8px 10px;">
+      <div class="q-tag" style="font-size:.8rem;">Q${idx+1}${r.detectedIndex===null?' <span style="color:var(--red);">?</span>':''}</div>
+      <div class="row" style="margin-top:4px; flex-wrap:wrap; gap:4px;">
+        ${letters.map((letter,j) => `
+          <label style="display:flex;align-items:center;gap:3px;font-weight:400;text-transform:none;flex:0 0 auto;font-size:.82rem;">
+            <input type="radio" name="bloco-scan-q-${idx}" value="${j}" ${r.detectedIndex===j?'checked':''}> ${letter}
+          </label>
+        `).join('')}
+        <label style="display:flex;align-items:center;gap:3px;font-weight:400;text-transform:none;flex:0 0 auto;font-size:.82rem;">
+          <input type="radio" name="bloco-scan-q-${idx}" value="" ${r.detectedIndex===null?'checked':''}> branco
+        </label>
+      </div>
+    </div>
+  `;
+  }).join('');
+  return `
+    <div>
+      <p class="muted">Aluno: <strong>${esc(b.scanStudentName)}</strong>${b.scanTurmaName?' · Turma: '+esc(b.scanTurmaName):''}</p>
+      <p class="muted" style="font-size:.85rem;">Revise questão por questão — o que veio marcado é só uma sugestão da leitura da foto. Corrija o que estiver errado antes de confirmar.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:6px; margin:10px 0;">${rows}</div>
+      <div class="row">
+        <button class="btn btn-ghost" data-action="bloco-scan-cancel">Cancelar</button>
+        <button class="btn btn-primary" data-action="bloco-scan-confirm">Confirmar e lançar notas</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderDetalheBloco(){
+  const p = state.professor;
+  const b = p.bloco;
+  const bloco = b.current;
+  const turmas = p.turmas;
+  let scanSection = '';
+  if(b.scanLoading){
+    scanSection = `<div class="spinner"></div><p class="muted center">Processando a imagem...</p>`;
+  } else if(b.scanReview){
+    scanSection = renderBlocoScanReview();
+  } else {
+    scanSection = `
+      <p class="muted">Envie a foto do cartão-resposta preenchido pelo aluno (gerado em "Imprimir cartões-resposta" abaixo), com o QR code visível, a folha reta e bem iluminada.</p>
+      <input type="file" id="bloco-scan-file-input" accept="image/*" capture="environment">
+      ${b.scanError ? `<p class="err">${esc(b.scanError)}</p>` : ''}
+    `;
+  }
+  let qStart = 1;
+  const segmentasLine = bloco.segments.map(s => { const line = `${esc(s.title)} (Q${qStart}–${qStart+s.questionIds.length-1})`; qStart += s.questionIds.length; return line; }).join(' · ');
+  const lancamentos = (b.lancamentos||[]).slice().sort((x,y)=>y.submittedAt-x.submittedAt);
+  return `
+    <div class="card">
+      <button class="btn btn-ghost btn-sm" data-action="bloco-voltar-lista">← Voltar</button>
+      <h2>Bloco de Provas — ${esc(bloco.turmaName)}</h2>
+      <p class="muted">${bloco.totalQuestoes} questões no total, 1 QR code por aluno. As notas escaneadas ou lançadas aqui vão automaticamente para os resultados de cada avaliação original.</p>
+      <p class="muted" style="font-size:.85rem;">${segmentasLine}</p>
+    </div>
+
+    <div class="card">
+      <h3>Imprimir cartões-resposta</h3>
+      <label>Selecione uma turma</label>
+      <select id="bloco-imprimir-turma-select" class="input">
+        <option value="">— selecionar turma —</option>
+        ${turmas.map(t=>`<option value="${t.id}" ${b.imprimirTurmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+      </select>
+      <p class="muted center" style="margin:8px 0;">ou</p>
+      <label>Digite os nomes dos alunos (um por linha)</label>
+      <textarea id="bloco-imprimir-nomes-input" class="input" rows="4" placeholder="Nome do aluno 1&#10;Nome do aluno 2">${esc(b.imprimirNomesText)}</textarea>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-primary" data-action="bloco-imprimir-cartoes">🖨️ Imprimir cartões</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Lançar respostas de um aluno</h3>
+      <div class="row" style="margin-bottom:10px;">
+        <button class="btn ${b.lancarModo==='manual'?'btn-primary':'btn-ghost'} btn-sm" data-action="bloco-lancar-modo" data-modo="manual">Digitar gabarito do aluno</button>
+        <button class="btn ${b.lancarModo==='scan'?'btn-primary':'btn-ghost'} btn-sm" data-action="bloco-lancar-modo" data-modo="scan">Ler pelo celular</button>
+      </div>
+      ${b.lancarModo==='manual' ? `
+        <label>Nome do aluno</label>
+        <input type="text" id="bloco-lancar-nome-input" class="input" value="${esc(b.lancarNome)}" placeholder="Nome completo">
+        <label style="margin-top:8px;">Turma (opcional)</label>
+        <select id="bloco-lancar-turma-select" class="input">
+          <option value="">— sem turma —</option>
+          ${turmas.map(t=>`<option value="${t.id}" ${b.lancarTurmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+        </select>
+        <label style="margin-top:8px;">Gabarito marcado pelo aluno (${bloco.totalQuestoes} letras/V/F em sequência, use "-" para questão em branco)</label>
+        <textarea id="bloco-lancar-sequencia-input" class="input" rows="3" style="font-family:monospace; letter-spacing:1px;" placeholder="ABCDVF...">${esc(b.lancarSequencia)}</textarea>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-primary" data-action="bloco-lancar-manual">Lançar notas</button>
+        </div>
+      ` : scanSection}
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0;">Lançamentos deste bloco (${lancamentos.length})</h3>
+      <p class="muted" style="font-size:.85rem;">As notas de cada aluno já foram gravadas dentro de cada avaliação — aqui é só um histórico de quem já foi lançado por este bloco.</p>
+      ${lancamentos.length===0 ? '<p class="muted center">Nenhum lançamento ainda.</p>' : lancamentos.map(l => `
+        <div class="list-item">
+          <div>${esc(l.studentName)}${l.turmaName?' · '+esc(l.turmaName):''}</div>
+          <span class="muted" style="font-size:.8rem;">${l.scanned?'leitura':'manual'} · ${new Date(l.submittedAt).toLocaleString('pt-BR')}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function loadBlocos(){
+  const p = state.professor;
+  p.bloco.listLoading = true;
+  try{ const r = await window.storage.get('blocos-provas', true); p.bloco.list = JSON.parse(r.value); }
+  catch(e){ p.bloco.list = []; }
+  p.bloco.listLoading = false;
+  render();
+}
+async function saveBlocosToStorage(){
+  await window.storage.set('blocos-provas', JSON.stringify(state.professor.bloco.list), true);
+}
+function findBlocoById(id){
+  return state.professor.bloco.list.find(bl=>bl.id===id);
+}
+function abrirNovoBloco(){
+  const b = state.professor.bloco;
+  b.turmaId = ''; b.selectedCodes = []; b.mode = 'novo';
+}
+async function salvarBloco(){
+  const p = state.professor;
+  const b = p.bloco;
+  const turma = p.turmas.find(t=>t.id===b.turmaId);
   if(!turma || b.selectedCodes.length===0) return;
-  if(turma.students.length===0){ alert('Essa turma não tem alunos cadastrados.'); return; }
-  const assessments = b.selectedCodes.map(code => findAssessmentByCode(code)).filter(Boolean);
+  const pool = p.assessments.filter(a => !a.professorId || a.professorId===p.session.id);
+  const assessments = b.selectedCodes.map(code => pool.find(x=>x.code===code) || findAssessmentByCode(code)).filter(Boolean);
   if(assessments.length===0) return;
-  let pages = '';
-  turma.students.forEach(s => {
-    pages += buildCombinedGabaritoPage(assessments, s.name, turma.name);
+  const segments = assessments.map(a => ({
+    code: a.code,
+    title: a.title,
+    disciplinaName: a.disciplinaName || '',
+    questionIds: a.questions.filter(q=>q.type==='mc'||q.type==='vf').map(q=>q.id)
+  })).filter(s => s.questionIds.length>0);
+  if(segments.length===0){ alert('Nenhuma das avaliações escolhidas tem questões objetivas (múltipla escolha ou V/F) para gerar o cartão.'); return; }
+  const totalQuestoes = segments.reduce((sum,s)=>sum+s.questionIds.length, 0);
+  const bloco = { id: cryptoId(), turmaId: b.turmaId, turmaName: turma.name, segments, totalQuestoes, createdAt: Date.now() };
+  p.bloco.list.push(bloco);
+  await saveBlocosToStorage();
+  b.turmaId = ''; b.selectedCodes = [];
+  b.mode = 'detalhe'; b.current = bloco;
+  b.imprimirTurmaId = bloco.turmaId; b.imprimirNomesText = '';
+  b.lancamentos = []; b.lancamentosLoading = false;
+  render();
+  loadBlocoLancamentos(bloco.id);
+}
+function abrirBloco(id){
+  const b = state.professor.bloco;
+  const bloco = findBlocoById(id);
+  if(!bloco) return;
+  b.current = bloco;
+  b.mode = 'detalhe';
+  b.imprimirTurmaId = bloco.turmaId; b.imprimirNomesText = '';
+  b.scanReview = null; b.scanBloco = null; b.scanError = '';
+  render();
+  loadBlocoLancamentos(id);
+}
+async function excluirBloco(id){
+  if(!confirm('Excluir esse bloco de provas? Essa ação não pode ser desfeita (não afeta as avaliações originais nem as notas já lançadas).')) return;
+  const p = state.professor;
+  p.bloco.list = p.bloco.list.filter(bl=>bl.id!==id);
+  await saveBlocosToStorage();
+  if(p.bloco.current && p.bloco.current.id===id){ p.bloco.current = null; p.bloco.mode = 'list'; }
+  render();
+}
+function voltarListaBlocos(){
+  const b = state.professor.bloco;
+  b.mode = 'list'; b.current = null;
+  render();
+}
+async function loadBlocoLancamentos(blocoId){
+  const b = state.professor.bloco;
+  b.lancamentosLoading = true;
+  try{ const r = await window.storage.get(`bloco-lancamentos:${blocoId}`, true); b.lancamentos = JSON.parse(r.value); }
+  catch(e){ b.lancamentos = []; }
+  b.lancamentosLoading = false;
+  render();
+}
+async function registerBlocoLancamento(blocoId, studentName, turmaName, scanned){
+  let list = [];
+  try{ const r = await window.storage.get(`bloco-lancamentos:${blocoId}`, true); list = JSON.parse(r.value); }catch(e){}
+  list = list.filter(x=>x.studentName!==studentName);
+  list.push({ studentName, turmaName, submittedAt: Date.now(), scanned: !!scanned });
+  await window.storage.set(`bloco-lancamentos:${blocoId}`, JSON.stringify(list), true);
+}
+function flattenBlocoQuestions(bloco){
+  const flat = [];
+  bloco.segments.forEach(seg => {
+    const a = findAssessmentByCode(seg.code);
+    seg.questionIds.forEach(qid => {
+      const q = a ? a.questions.find(x=>x.id===qid) : null;
+      flat.push({ code: seg.code, questionId: qid, q });
+    });
   });
+  return flat;
+}
+function buildBlocoCartaoPage(bloco, studentName, turmaName){
+  const L = AVULSO_LAYOUT;
+  const flat = flattenBlocoQuestions(bloco);
+  const n = flat.length;
+  const half = Math.ceil(n/2);
+  const deepLink = `${location.origin}${location.pathname}?bloco_code=${encodeURIComponent(bloco.id)}&bloco_student=${encodeURIComponent(studentName)}&bloco_turma=${encodeURIComponent(turmaName||'')}`;
+  const qrDataUrl = generateQrDataUrl(deepLink, 200);
+  let rowsHtml = '';
+  flat.forEach((item, i) => {
+    const q = item.q;
+    const letters = q ? (q.type==='mc' ? OPT_LETTERS.slice(0, q.options.length) : ['V','F']) : ['A','B','C','D'];
+    const col = i < half ? 0 : 1;
+    const row = col===0 ? i : i-half;
+    const rowY = L.gridStartY + row*L.rowHeight;
+    const colX = col===1 ? L.colWidth : 0;
+    rowsHtml += `<div class="omr-qnum" style="top:${rowY}mm; left:${colX}mm;">${String(i+1).padStart(2,'0')}</div>`;
+    rowsHtml += letters.map((letter,j) => {
+      const bx = colX + L.numLabelWidth + j*L.bubbleSpacing;
+      return `<div class="omr-bubble" style="left:${bx}mm; top:${rowY}mm; width:${L.bubbleSize}mm; height:${L.bubbleSize}mm;">${letter}</div>`;
+    }).join('');
+  });
+  const blockHeight = L.gridStartY + Math.max(half,1)*L.rowHeight + 6;
+  let qStart = 1;
+  const segmentasLine = bloco.segments.map(s => { const line = `${s.title} (Q${qStart}-${qStart+s.questionIds.length-1})`; qStart += s.questionIds.length; return line; }).join(' · ');
+  return `
+    <div class="pv-page">
+      ${buildPrintHeader({ title: 'Bloco de Provas', subtitle: turmaName })}
+      <div class="omr-block">
+        <div class="omr-wrap" style="min-height:${blockHeight}mm;">
+          ${qrDataUrl ? `<img class="omr-qr" src="${qrDataUrl}" alt="QR code" style="width:${L.qrSize}mm; height:${L.qrSize}mm;">` : ''}
+          <div class="omr-header-text">
+            <strong>Bloco de Provas</strong><br>
+            <strong>Aluno:</strong> ${esc(studentName)}<br>
+            <strong>Turma:</strong> ${esc(turmaName||'')}
+          </div>
+          <div class="omr-note">Preencha completamente o círculo correspondente à resposta escolhida. ${esc(segmentasLine)}</div>
+          ${rowsHtml}
+        </div>
+      </div>
+    </div>
+  `;
+}
+function imprimirCartoesBloco(){
+  const p = state.professor;
+  const b = p.bloco;
+  const bloco = b.current;
+  let pages = '';
+  if(b.imprimirTurmaId){
+    const t = p.turmas.find(x=>x.id===b.imprimirTurmaId);
+    if(!t || t.students.length===0){ alert('Essa turma não tem alunos cadastrados.'); return; }
+    t.students.forEach(s => { pages += buildBlocoCartaoPage(bloco, s.name, t.name); });
+  } else {
+    const nomes = (b.imprimirNomesText||'').split('\n').map(x=>x.trim()).filter(Boolean);
+    if(nomes.length===0){ alert('Selecione uma turma ou digite ao menos um nome.'); return; }
+    const turmaName = (p.turmas.find(x=>x.id===bloco.turmaId)||{}).name || '';
+    nomes.forEach(nome => { pages += buildBlocoCartaoPage(bloco, nome, turmaName); });
+  }
+  if(!pages){ alert('Nada para imprimir.'); return; }
   printPages(pages);
+}
+async function lancarBlocoResultados(bloco, studentName, turmaName, byCode, scanned){
+  for(const code of Object.keys(byCode)){
+    const a = findAssessmentByCode(code);
+    if(!a) continue;
+    const items = byCode[code];
+    const details = []; let total = 0; const answers = {};
+    items.forEach(item => {
+      const q = a.questions.find(x=>x.id===item.questionId);
+      if(!q) return;
+      let answerVal = null, score = 0;
+      if(item.chosenIdx!==null && item.chosenIdx!==undefined){
+        if(q.type==='mc'){ answerVal = q.options[item.chosenIdx] ? q.options[item.chosenIdx].id : null; score = answerVal===q.correctOptionId ? q.points : 0; }
+        else { answerVal = item.chosenIdx===0; score = answerVal===q.correctBool ? q.points : 0; }
+      }
+      answers[q.id] = answerVal;
+      total += score;
+      details.push({ questionId:q.id, score, feedback:null });
+    });
+    let existing = [];
+    try{ const r = await window.storage.get(`responses:${code}`, true); existing = JSON.parse(r.value); }catch(e){}
+    existing = existing.filter(x=>x.studentName!==studentName);
+    existing.push({ studentName, submittedAt: Date.now(), total, details, answers, tabSwitches:0, fullscreenExits:0, scanned: !!scanned, viaBloco: bloco.id });
+    await window.storage.set(`responses:${code}`, JSON.stringify(existing), true);
+  }
+  await registerBlocoLancamento(bloco.id, studentName, turmaName, scanned);
+  const b = state.professor.bloco;
+  if(b.current && b.current.id===bloco.id) loadBlocoLancamentos(bloco.id);
+}
+async function lancarBlocoManual(){
+  const p = state.professor;
+  const b = p.bloco;
+  const bloco = b.current;
+  const nome = (b.lancarNome||'').trim();
+  if(!nome){ alert('Informe o nome do aluno.'); return; }
+  const flat = flattenBlocoQuestions(bloco);
+  const seq = (b.lancarSequencia||'').trim().toUpperCase().replace(/[^A-Z\-]/g,'');
+  if(seq.length !== flat.length){
+    alert(`Informe exatamente ${flat.length} letras (uma por questão, use "-" para em branco).`);
+    return;
+  }
+  const chars = seq.split('');
+  const byCode = {};
+  flat.forEach((item, idx) => {
+    const ch = chars[idx];
+    let chosenIdx = null;
+    if(ch !== '-'){
+      if(item.q && item.q.type==='vf'){ chosenIdx = ch==='V' ? 0 : (ch==='F' ? 1 : null); }
+      else { const li = OPT_LETTERS.indexOf(ch); chosenIdx = li>=0 ? li : null; }
+    }
+    if(!byCode[item.code]) byCode[item.code] = [];
+    byCode[item.code].push({ questionId: item.questionId, type: item.q?item.q.type:null, chosenIdx });
+  });
+  const turmaName = (p.turmas.find(t=>t.id===b.lancarTurmaId)||{}).name || '';
+  await lancarBlocoResultados(bloco, nome, turmaName, byCode, false);
+  alert('Nota lançada em cada avaliação.');
+  b.lancarNome=''; b.lancarSequencia='';
+  render();
+}
+async function scanBlocoSheet(file){
+  const p = state.professor;
+  const b = p.bloco;
+  b.scanError = ''; b.scanLoading = true; b.scanReview = null;
+  render();
+  try{
+    const img = await loadImageFile(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const qr = jsQR(imageData.data, canvas.width, canvas.height);
+    if(!qr){
+      b.scanError = 'QR code não encontrado na imagem. Tire a foto com o cartão inteiro visível, bem iluminado e o mais reto possível.';
+      b.scanLoading = false; render(); return;
+    }
+    let blocoId, studentName, turmaName;
+    try{
+      const url = new URL(qr.data);
+      blocoId = url.searchParams.get('bloco_code');
+      studentName = url.searchParams.get('bloco_student');
+      turmaName = url.searchParams.get('bloco_turma') || '';
+    }catch(e){}
+    if(!blocoId || !studentName){
+      b.scanError = 'O QR code encontrado não é de um bloco de provas desta plataforma.';
+      b.scanLoading = false; render(); return;
+    }
+    const bloco = findBlocoById(blocoId);
+    if(!bloco){
+      b.scanError = 'Bloco de provas do QR code não foi encontrado no sistema.';
+      b.scanLoading = false; render(); return;
+    }
+    const loc = qr.location;
+    const basis = {
+      origin: loc.topLeftCorner,
+      right: { x: loc.topRightCorner.x - loc.topLeftCorner.x, y: loc.topRightCorner.y - loc.topLeftCorner.y },
+      down: { x: loc.bottomLeftCorner.x - loc.topLeftCorner.x, y: loc.bottomLeftCorner.y - loc.topLeftCorner.y }
+    };
+    const scale = (Math.hypot(basis.right.x, basis.right.y) + Math.hypot(basis.down.x, basis.down.y)) / (2*OMR_LAYOUT.qrSize);
+    const sampleRadius = scale * (AVULSO_LAYOUT.bubbleSize*0.32);
+    const L = AVULSO_LAYOUT;
+    const flat = flattenBlocoQuestions(bloco);
+    const n = flat.length;
+    const half = Math.ceil(n/2);
+    const detected = [];
+    flat.forEach((item, i) => {
+      const q = item.q;
+      const letters = q ? (q.type==='mc' ? q.options.map((o,j)=>OPT_LETTERS[j]) : ['V','F']) : ['A','B','C','D'];
+      const col = i<half ? 0 : 1;
+      const row = col===0 ? i : i-half;
+      const rowY = L.gridStartY + row*L.rowHeight;
+      const colX = col===1 ? L.colWidth : 0;
+      const darknesses = letters.map((letter,j) => {
+        const bx = colX + L.numLabelWidth + j*L.bubbleSpacing + L.bubbleSize/2;
+        const by = rowY + L.bubbleSize/2;
+        const px = mmToPixel(bx, by, basis);
+        return sampleDarkness(imageData, px.x, px.y, sampleRadius);
+      });
+      let minIdx = 0;
+      for(let k=1;k<darknesses.length;k++){ if(darknesses[k]<darknesses[minIdx]) minIdx = k; }
+      const sorted = [...darknesses].sort((x,y)=>x-y);
+      const confident = sorted[0] < 150 && (sorted[1]-sorted[0]) > 25;
+      detected.push({ code: item.code, questionId: item.questionId, type: q?q.type:null, numOptions: letters.length, detectedIndex: confident ? minIdx : null });
+    });
+    b.scanBloco = bloco;
+    b.scanStudentName = studentName;
+    b.scanTurmaName = turmaName;
+    b.scanReview = detected;
+    b.scanLoading = false;
+    render();
+  }catch(e){
+    b.scanError = 'Não foi possível processar essa imagem. Tente outra foto.';
+    b.scanLoading = false;
+    render();
+  }
+}
+async function confirmBlocoScan(){
+  const p = state.professor;
+  const b = p.bloco;
+  const bloco = b.scanBloco;
+  const review = b.scanReview;
+  const byCode = {};
+  review.forEach((r, idx) => {
+    const el = document.querySelector(`input[name="bloco-scan-q-${idx}"]:checked`);
+    const chosenIdx = (el && el.value!=='') ? Number(el.value) : null;
+    if(!byCode[r.code]) byCode[r.code] = [];
+    byCode[r.code].push({ questionId: r.questionId, type: r.type, chosenIdx });
+  });
+  await lancarBlocoResultados(bloco, b.scanStudentName, b.scanTurmaName, byCode, true);
+  alert('Notas lançadas em cada avaliação a partir da leitura do gabarito.');
+  b.scanReview = null; b.scanBloco = null; b.scanStudentName = ''; b.scanTurmaName = ''; b.scanError = '';
+  render();
 }
 
 /* ---------------- PAINEL DO PROFESSOR ---------------- */
@@ -8561,6 +9008,7 @@ document.addEventListener('click', (e) => {
       slidesPollInterval = setInterval(refreshProfessorSlides, 2000);
     }
     if(state.coordenador.subview==='avulso' && state.professor.avulso.listLoading){ loadAvulsos(); }
+    if(state.coordenador.subview==='bloco' && state.professor.bloco.listLoading){ loadBlocos(); }
     if(state.coordenador.subview==='lixeira'){ loadLixeiraUi(); }
     if(state.coordenador.subview==='ia'){ loadCoordIA(); }
     render();
@@ -8611,6 +9059,7 @@ document.addEventListener('click', (e) => {
       slidesPollInterval = setInterval(refreshProfessorSlides, 2000);
     }
     if(p.subview==='avulso' && p.avulso.listLoading){ loadAvulsos(); }
+    if(p.subview==='bloco' && p.bloco.listLoading){ loadBlocos(); }
     if(p.subview==='lixeira'){ loadLixeiraUi(); }
     render();
   }
@@ -8701,7 +9150,17 @@ document.addEventListener('click', (e) => {
   else if(act==='export-pdf'){ exportAssessmentPdf(btn.dataset.code); }
   else if(act==='print-personal-gabaritos'){ printPersonalAnswerCards(btn.dataset.code); }
   else if(act==='bloco-toggle'){ const code = btn.dataset.code; const b = p.bloco; if(b.selectedCodes.includes(code)) b.selectedCodes = b.selectedCodes.filter(x=>x!==code); else b.selectedCodes.push(code); render(); }
-  else if(act==='bloco-generate'){ generateBlocoGabaritos(); }
+  else if(act==='bloco-novo'){ abrirNovoBloco(); render(); }
+  else if(act==='bloco-cancelar-novo'){ p.bloco.mode='list'; render(); }
+  else if(act==='bloco-salvar'){ salvarBloco(); }
+  else if(act==='bloco-abrir'){ abrirBloco(btn.dataset.id); }
+  else if(act==='bloco-excluir'){ excluirBloco(btn.dataset.id); }
+  else if(act==='bloco-voltar-lista'){ voltarListaBlocos(); }
+  else if(act==='bloco-imprimir-cartoes'){ imprimirCartoesBloco(); }
+  else if(act==='bloco-lancar-modo'){ p.bloco.lancarModo = btn.dataset.modo; render(); }
+  else if(act==='bloco-lancar-manual'){ lancarBlocoManual(); }
+  else if(act==='bloco-scan-cancel'){ p.bloco.scanReview=null; p.bloco.scanBloco=null; p.bloco.scanError=''; render(); }
+  else if(act==='bloco-scan-confirm'){ confirmBlocoScan(); }
   else if(act==='scan-cancel'){ p.leitura = { loading:false, error:'', review:null, assessment:null, studentName:'' }; render(); }
   else if(act==='scan-confirm'){ confirmScannedGrade(); }
   else if(act==='avulso-novo'){ abrirNovoAvulso(); }
@@ -8894,6 +9353,12 @@ document.addEventListener('input', (e) => {
   else if(el.id==='avulso-gabarito-input'){ p.avulso.form.gabaritoTexto = el.value; }
   else if(el.id==='avulso-imprimir-nomes-input'){ p.avulso.imprimirNomesText = el.value; }
   else if(el.id==='avulso-lancar-nome-input'){ p.avulso.lancarNome = el.value; }
+  else if(el.id==='bloco-imprimir-turma-select'){ p.bloco.imprimirTurmaId = el.value; }
+  else if(el.id==='bloco-imprimir-nomes-input'){ p.bloco.imprimirNomesText = el.value; }
+  else if(el.id==='bloco-lancar-nome-input'){ p.bloco.lancarNome = el.value; }
+  else if(el.id==='bloco-lancar-turma-select'){ p.bloco.lancarTurmaId = el.value; }
+  else if(el.id==='bloco-lancar-sequencia-input'){ p.bloco.lancarSequencia = el.value; }
+  else if(el.id==='bloco-scan-file-input'){ if(el.files[0]) scanBlocoSheet(el.files[0]); }
   else if(el.id==='avulso-lancar-sequencia-input'){ p.avulso.lancarSequencia = el.value; }
 });
 
