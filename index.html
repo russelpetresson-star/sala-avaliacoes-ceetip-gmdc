@@ -899,7 +899,8 @@ let state = {
       imprimirTurmaId:'', imprimirNomesText:'',
       lancarModo:'manual', lancarNome:'', lancarTurmaId:'', lancarSequencia:'',
       scanLoading:false, scanError:'', scanReview:null, scanAvulso:null, scanStudentName:'', scanTurmaName:'',
-      respostas:[], respostasLoading:false },
+      respostas:[], respostasLoading:false,
+      editandoGabarito:false, gabaritoEditText:'', gabaritoEditError:'' },
     unlockRequests: [], unlockRequestsLoading: true,
     periodos: {}, periodosLoading: true,
     pickerOpen:false, pickerSelected:[]
@@ -1369,6 +1370,7 @@ function renderProfessorList(){
           <button class="btn btn-ghost btn-sm" data-action="export-pdf" data-code="${a.code}">Imprimir / PDF</button>
           ${assessmentTurmaIds(a).length>0 ? `<button class="btn btn-ghost btn-sm" data-action="print-personal-gabaritos" data-code="${a.code}">Gabaritos por aluno</button>` : ''}
           <button class="btn btn-ghost btn-sm" data-action="open-results" data-code="${a.code}">Resultados</button>
+          <button class="btn btn-danger btn-sm" data-action="excluir-avaliacao" data-code="${a.code}">Excluir</button>
         </div>
       </div>
     `}).join('');
@@ -4485,9 +4487,9 @@ function renderNovoAvulso(){
       `).join('')}
       <button class="btn btn-ghost btn-sm" data-action="avulso-disc-adicionar">+ Adicionar disciplina</button>
 
-      <h3 style="margin-top:18px;">Gabarito correto</h3>
-      <p class="muted" style="font-size:.85rem;">Digite a sequência de respostas corretas, uma letra por questão, sem espaços (ex: ABCDE...). Total de ${f.numQuestoes} letras, de A a ${OPT_LETTERS[f.numAlternativas-1]}.</p>
-      <textarea id="avulso-gabarito-input" class="input" rows="3" style="font-family:monospace; letter-spacing:1px;" placeholder="ABCDEABCDE...">${esc(f.gabaritoTexto)}</textarea>
+      <h3 style="margin-top:18px;">Gabarito correto (opcional)</h3>
+      <p class="muted" style="font-size:.85rem;">Digite a sequência de respostas corretas, uma letra por questão, sem espaços (ex: ABCDE...). Total de ${f.numQuestoes} letras, de A a ${OPT_LETTERS[f.numAlternativas-1]}. Pode deixar em branco e imprimir os cartões antes — dá para informar o gabarito depois, a qualquer momento, antes de lançar as notas.</p>
+      <textarea id="avulso-gabarito-input" class="input" rows="3" style="font-family:monospace; letter-spacing:1px;" placeholder="ABCDEABCDE... (opcional, pode deixar em branco por enquanto)">${esc(f.gabaritoTexto)}</textarea>
 
       <div id="avulso-err"></div>
       <div class="row" style="margin-top:14px;">
@@ -4550,12 +4552,33 @@ function renderDetalheAvulso(){
     `;
   }
   const rows = (av.respostas||[]).slice().sort((a,b)=>(a.turmaName||'').localeCompare(b.turmaName||'')||a.studentName.localeCompare(b.studentName));
+  const temGabarito = !!(gab.gabarito && gab.gabarito.length>0);
+  const gabaritoSection = av.editandoGabarito ? `
+      <label>Sequência de respostas corretas (${gab.numQuestoes} letras, de A a ${OPT_LETTERS[gab.numAlternativas-1]}, sem espaços)</label>
+      <textarea id="avulso-gabarito-edit-input" class="input" rows="3" style="font-family:monospace; letter-spacing:1px;" placeholder="ABCDEABCDE...">${esc(av.gabaritoEditText)}</textarea>
+      ${av.gabaritoEditError ? `<p class="err">${esc(av.gabaritoEditError)}</p>` : ''}
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-ghost" data-action="avulso-cancelar-gabarito">Cancelar</button>
+        <button class="btn btn-primary" data-action="avulso-salvar-gabarito">Salvar gabarito correto</button>
+      </div>
+    ` : (temGabarito ? `
+      <p class="muted">Gabarito correto já informado (${gab.gabarito.join('')}).</p>
+      <button class="btn btn-ghost btn-sm" data-action="avulso-editar-gabarito">Editar gabarito correto</button>
+    ` : `
+      <p class="muted">Gabarito correto ainda não informado. Você já pode imprimir os cartões-resposta e aplicar a prova — só é preciso informar o gabarito antes de lançar as notas dos alunos.</p>
+      <button class="btn btn-primary btn-sm" data-action="avulso-editar-gabarito">Informar gabarito correto</button>
+    `);
   return `
     <div class="card">
       <button class="btn btn-ghost btn-sm" data-action="avulso-voltar-lista">← Voltar</button>
       <h2>${esc(gab.titulo)}</h2>
       <p class="muted">${gab.unidade?esc(gab.unidade)+' · ':''}${gab.dataProva?new Date(gab.dataProva+'T00:00:00').toLocaleDateString('pt-BR')+' · ':''}código <strong>${esc(gab.code)}</strong> · ${gab.numQuestoes} questões, ${gab.numAlternativas} alternativas</p>
       <p class="muted" style="font-size:.85rem;">${(gab.disciplinas||[]).map(d=>`${esc(d.nome)} (Q${d.inicio}–${d.fim})`).join(' · ')}</p>
+    </div>
+
+    <div class="card">
+      <h3>Gabarito correto</h3>
+      ${gabaritoSection}
     </div>
 
     <div class="card">
@@ -5029,6 +5052,7 @@ function renderCoordAssessments(){
           <span class="pill">${a.code}</span>
           ${assessmentTurmaIds(a).length>0 ? `<button class="btn btn-ghost btn-sm" data-action="print-personal-gabaritos" data-code="${a.code}">Gabaritos por aluno</button>` : ''}
           <button class="btn btn-ghost btn-sm" data-action="coord-open-results" data-code="${a.code}">Resultados</button>
+          <button class="btn btn-danger btn-sm" data-action="excluir-avaliacao" data-code="${a.code}">Excluir</button>
         </div>
       </div>
     `;
@@ -5367,10 +5391,12 @@ async function calcExecDashboard(){
   c.dashboard = { loading:true, stats:null };
   render();
 
-  // ensure base data is loaded
-  if(c.professoresLoading) await loadCoordProfessores();
-  if(c.assessmentsLoading) await loadCoordAssessments();
-  if(state.professor.turmasLoading) await loadTurmas();
+  // Sempre recarrega do banco (não reaproveita o que já estava em memória), pois professores
+  // podem ter excluído alunos ou avaliações em outra sessão desde a última vez que o painel
+  // foi aberto.
+  await loadCoordProfessores();
+  await loadCoordAssessments();
+  await loadTurmas();
 
   const professoresAtivos = c.professores.filter(p=>p.activatedAt).length;
   const professoresPendentes = c.professores.filter(p=>!p.activatedAt).length;
@@ -5549,8 +5575,27 @@ async function removeFromTrash(id){
   return filtered;
 }
 function kindLabel(kind){
-  const map = { 'gabarito-avulso':'Gabarito avulso', 'avulso-resposta':'Nota de gabarito avulso', 'resposta-avaliacao':'Resposta/nota de avaliação', 'questao-banco':'Questão do banco', 'turma':'Turma', 'disciplina':'Disciplina', 'professor':'Professor' };
+  const map = { 'gabarito-avulso':'Gabarito avulso', 'avulso-resposta':'Nota de gabarito avulso', 'resposta-avaliacao':'Resposta/nota de avaliação', 'questao-banco':'Questão do banco', 'turma':'Turma', 'disciplina':'Disciplina', 'professor':'Professor', 'avaliacao':'Avaliação' };
   return map[kind] || kind;
+}
+async function excluirAvaliacao(code){
+  const a = findAssessmentByCode(code);
+  if(!a){ alert('Avaliação não encontrada (pode já ter sido excluída).'); return; }
+  let responses = [];
+  try{ const r = await window.storage.get(`responses:${code}`, true); responses = JSON.parse(r.value); }catch(e){}
+  const avisoRespostas = responses.length>0 ? ` Já existem ${responses.length} nota(s)/resposta(s) lançada(s) para essa avaliação — elas também serão removidas junto (mas tudo pode ser restaurado pela Lixeira em até 30 dias).` : '';
+  if(!confirm(`Excluir a avaliação "${a.title}"?${avisoRespostas}`)) return;
+  await moveToTrash('avaliacao', a.title || 'Avaliação', { assessment: a, responses });
+  try{ await window.storage.delete(`assessment:${code}`, true); }catch(e){}
+  try{ await window.storage.delete(`responses:${code}`, true); }catch(e){}
+  const p = state.professor, c = state.coordenador;
+  p.assessments = (p.assessments||[]).filter(x=>x.code!==code);
+  c.assessments = (c.assessments||[]).filter(x=>x.code!==code);
+  if(p.resultsFor && p.resultsFor.code===code){ p.mode='list'; p.resultsFor=null; }
+  if(c.resultsFor && c.resultsFor.code===code){ c.mode='list'; c.resultsFor=null; }
+  if(c.dashboard) c.dashboard.stats = null;
+  alert('Avaliação excluída. Ela ficou guardada na Lixeira por 30 dias, caso precise restaurar.');
+  render();
 }
 async function restoreFromTrash(id){
   const list = await loadLixeira();
@@ -5597,6 +5642,15 @@ async function restoreFromTrash(id){
       if(!list2.some(x=>x.id===item.payload.id)) list2.push(item.payload);
       await saveProfessoresListRaw(list2);
       state.coordenador.professores = list2;
+    } else if(item.kind==='avaliacao'){
+      const { assessment, responses } = item.payload;
+      await window.storage.set(`assessment:${assessment.code}`, JSON.stringify(assessment), true);
+      if(responses && responses.length>0){
+        await window.storage.set(`responses:${assessment.code}`, JSON.stringify(responses), true);
+      }
+      if(!state.professor.assessments.some(x=>x.code===assessment.code)) state.professor.assessments.unshift(assessment);
+      if(!state.coordenador.assessments.some(x=>x.code===assessment.code)) state.coordenador.assessments.unshift(assessment);
+      if(state.coordenador.dashboard) state.coordenador.dashboard.stats = null;
     }
     await removeFromTrash(id);
     state.ui.lixeira.items = await loadLixeira();
@@ -7600,13 +7654,16 @@ async function salvarAvulso(){
     if(!ini || !fim || ini<1 || fim>n || ini>fim){ setErr(`Intervalo de questões inválido para "${d.nome}".`); return; }
   }
   const seq = (f.gabaritoTexto||'').trim().toUpperCase().replace(/\s+/g,'');
-  if(seq.length !== n){ setErr(`O gabarito precisa ter exatamente ${n} letras (uma por questão). Você digitou ${seq.length}.`); return; }
   const validLetters = OPT_LETTERS.slice(0, numAlt);
-  const gabaritoArr = [];
-  for(let i=0;i<seq.length;i++){
-    const ch = seq[i];
-    if(!validLetters.includes(ch)){ setErr(`Letra inválida na posição ${i+1}: "${ch}". Use apenas letras de A a ${validLetters[validLetters.length-1]}.`); return; }
-    gabaritoArr.push(ch);
+  let gabaritoArr = null;
+  if(seq.length>0){
+    if(seq.length !== n){ setErr(`O gabarito precisa ter exatamente ${n} letras (uma por questão), ou fique em branco para informar depois. Você digitou ${seq.length}.`); return; }
+    gabaritoArr = [];
+    for(let i=0;i<seq.length;i++){
+      const ch = seq[i];
+      if(!validLetters.includes(ch)){ setErr(`Letra inválida na posição ${i+1}: "${ch}". Use apenas letras de A a ${validLetters[validLetters.length-1]}.`); return; }
+      gabaritoArr.push(ch);
+    }
   }
   const gab = {
     id: cryptoId(), code: genCode(),
@@ -7625,7 +7682,37 @@ async function salvarAvulso(){
   render();
 }
 
-function abrirAvulso(id){
+async function salvarGabaritoCorretoAvulso(){
+  const p = state.professor;
+  const av = p.avulso;
+  const gab = av.current;
+  const setErr = (msg) => { av.gabaritoEditError = msg; render(); };
+  const seq = (av.gabaritoEditText||'').trim().toUpperCase().replace(/\s+/g,'');
+  if(seq.length !== gab.numQuestoes){ setErr(`O gabarito precisa ter exatamente ${gab.numQuestoes} letras (uma por questão). Você digitou ${seq.length}.`); return; }
+  const validLetters = OPT_LETTERS.slice(0, gab.numAlternativas);
+  const gabaritoArr = [];
+  for(let i=0;i<seq.length;i++){
+    const ch = seq[i];
+    if(!validLetters.includes(ch)){ setErr(`Letra inválida na posição ${i+1}: "${ch}". Use apenas letras de A a ${validLetters[validLetters.length-1]}.`); return; }
+    gabaritoArr.push(ch);
+  }
+  gab.gabarito = gabaritoArr;
+  const idx = p.avulso.list.findIndex(x=>x.id===gab.id);
+  if(idx>=0) p.avulso.list[idx] = gab;
+  await saveAvulsosToStorage();
+  // Se já havia respostas lançadas antes de o gabarito correto existir (não deveria acontecer,
+  // já que o lançamento é bloqueado sem gabarito, mas por segurança recalcula se houver).
+  if((av.respostas||[]).length>0){
+    const recalculadas = av.respostas.map(r => ({ ...r, ...gradeAvulsoRespostas(gab, r.respostas) }));
+    av.respostas = recalculadas;
+    await window.storage.set(`avulso-respostas:${gab.code}`, JSON.stringify(recalculadas), true);
+  }
+  av.editandoGabarito = false; av.gabaritoEditText = ''; av.gabaritoEditError = '';
+  alert('Gabarito correto salvo.');
+  render();
+}
+
+async function abrirAvulso(id){
   const p = state.professor;
   const gab = p.avulso.list.find(x=>x.id===id);
   if(!gab) return;
@@ -7634,6 +7721,7 @@ function abrirAvulso(id){
   p.avulso.imprimirTurmaId = ''; p.avulso.imprimirNomesText = '';
   p.avulso.lancarModo = 'manual'; p.avulso.lancarNome = ''; p.avulso.lancarTurmaId = ''; p.avulso.lancarSequencia = '';
   p.avulso.scanLoading = false; p.avulso.scanError = ''; p.avulso.scanReview = null; p.avulso.scanAvulso = null;
+  p.avulso.editandoGabarito = false; p.avulso.gabaritoEditText = ''; p.avulso.gabaritoEditError = '';
   loadAvulsoRespostas(gab.code);
   render();
 }
@@ -7692,6 +7780,7 @@ async function lancarRespostaAvulso(code, studentName, turmaName, respostasArr, 
   const p = state.professor;
   const gab = await findAvulsoByCode(code);
   if(!gab){ alert('Gabarito avulso não encontrado.'); return null; }
+  if(!gab.gabarito || gab.gabarito.length===0){ alert('Este gabarito avulso ainda não tem o gabarito correto informado. Informe-o em "Gabarito correto" antes de lançar notas.'); return null; }
   const resultado = gradeAvulsoRespostas(gab, respostasArr);
   let existing = [];
   try{ const r = await window.storage.get(`avulso-respostas:${code}`, true); existing = JSON.parse(r.value); }catch(e){ existing = []; }
@@ -9094,7 +9183,17 @@ document.addEventListener('click', (e) => {
     state.coordenador.mode='list';
     if(state.coordenador.subview==='pesosprof'){ loadCoordProfessorPesos(); }
     if(state.coordenador.subview==='periodos' && state.professor.periodosLoading){ loadPeriodos(); }
-    if(state.coordenador.subview==='dashboard' && !state.coordenador.dashboard.stats){ calcExecDashboard(); }
+    if(state.coordenador.subview==='dashboard'){ calcExecDashboard(); }
+    // "Todas as avaliações", "Turmas" e "Notas finais" mostram dados que podem ter mudado
+    // em outra sessão (prova excluída por um professor, aluno removido de uma turma etc.) —
+    // por isso recarregam do banco a cada vez que o coordenador entra nessas telas, em vez de
+    // reaproveitar o que já estava em memória.
+    if(state.coordenador.subview==='avaliacoes'){ state.coordenador.assessmentsLoading = true; loadCoordAssessments(); }
+    if(state.coordenador.subview==='turmas'){ state.professor.turmasLoading = true; loadTurmas(); }
+    if(state.coordenador.subview==='notas'){
+      state.coordenador.assessmentsLoading = true; loadCoordAssessments();
+      state.professor.turmasLoading = true; loadTurmas();
+    }
     stopEnquetePoll();
     if(state.coordenador.subview==='enquete'){
       refreshProfessorEnquete();
@@ -9251,6 +9350,7 @@ document.addEventListener('click', (e) => {
   else if(act==='remove-question-image'){ const q = findQuestionRef(btn.dataset.qid); q.image = null; render(); }
   else if(act==='save-assessment'){ saveAssessment(); }
   else if(act==='open-results'){ openResults(btn.dataset.code); }
+  else if(act==='excluir-avaliacao'){ excluirAvaliacao(btn.dataset.code); }
   else if(act==='toggle-annul'){ toggleAnnulQuestion(btn.dataset.qid); }
   else if(act==='add-manual-grade'){ addManualGrade(); }
   else if(act==='delete-response'){ deleteResponse(Number(btn.dataset.idx)); }
@@ -9288,6 +9388,9 @@ document.addEventListener('click', (e) => {
   else if(act==='avulso-scan-confirm'){ confirmAvulsoScan(); }
   else if(act==='avulso-imprimir-lista'){ imprimirListaNotasAvulso(); }
   else if(act==='avulso-excluir-resposta'){ excluirRespostaAvulso(btn.dataset.name); }
+  else if(act==='avulso-editar-gabarito'){ p.avulso.editandoGabarito=true; p.avulso.gabaritoEditText = (p.avulso.current.gabarito||[]).join(''); p.avulso.gabaritoEditError=''; render(); }
+  else if(act==='avulso-cancelar-gabarito'){ p.avulso.editandoGabarito=false; p.avulso.gabaritoEditText=''; p.avulso.gabaritoEditError=''; render(); }
+  else if(act==='avulso-salvar-gabarito'){ salvarGabaritoCorretoAvulso(); }
   else if(act==='remove-livro-file'){ removeLivroFile(btn.dataset.id); }
   else if(act==='toggle-livro-view'){
     const item = state.professor.livros.find(l=>l.id===btn.dataset.id);
@@ -9461,6 +9564,7 @@ document.addEventListener('input', (e) => {
   else if(act==='avulso-disc-inicio'){ const d = p.avulso.form.disciplinas.find(x=>x.id===el.dataset.id); if(d) d.inicio = parseInt(el.value)||1; }
   else if(act==='avulso-disc-fim'){ const d = p.avulso.form.disciplinas.find(x=>x.id===el.dataset.id); if(d) d.fim = parseInt(el.value)||1; }
   else if(el.id==='avulso-gabarito-input'){ p.avulso.form.gabaritoTexto = el.value; }
+  else if(el.id==='avulso-gabarito-edit-input'){ p.avulso.gabaritoEditText = el.value; }
   else if(el.id==='avulso-imprimir-nomes-input'){ p.avulso.imprimirNomesText = el.value; }
   else if(el.id==='avulso-lancar-nome-input'){ p.avulso.lancarNome = el.value; }
   else if(el.id==='bloco-imprimir-turma-select'){ p.bloco.imprimirTurmaId = el.value; }
