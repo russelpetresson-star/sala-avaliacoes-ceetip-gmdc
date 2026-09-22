@@ -437,7 +437,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-09-22-2015</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-09-22-2100</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -3574,6 +3574,9 @@ function calcStatusBip(turma, dataStr, agoraMs){
   return agoraMs > limite.getTime() ? 'atrasado' : 'presente';
 }
 function renderChamada(filtroTurnos, readOnly){
+  return readOnly ? renderChamadaConsulta(filtroTurnos) : renderChamadaBipar(filtroTurnos);
+}
+function renderChamadaBipar(filtroTurnos){
   const { ch, turmas: todasTurmas } = getChamadaCtx();
   const turmas = filtroTurnos ? todasTurmas.filter(t=>filtroTurnos.includes(t.turno)) : todasTurmas;
   const turma = turmas.find(t=>t.id===ch.turmaId);
@@ -3589,21 +3592,29 @@ function renderChamada(filtroTurnos, readOnly){
   } else {
     const presentesIds = new Set(ch.presentes.map(x=>x.studentId));
     const ausentes = turma.students.filter(s=>!presentesIds.has(s.id)).slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
-    const presentesOrdenados = ch.presentes.slice().sort((a,b)=>a.horario-b.horario);
+    const presentesOrdenados = ch.presentes.slice().sort((a,b)=>b.horario-a.horario); // mais recente primeiro
+    const ultimo = presentesOrdenados[0];
     body = `
-      ${readOnly ? '' : `
       <label>Aproxime o leitor de código de barras da carteirinha (ou digite a matrícula e aperte Enter)</label>
       <input type="text" id="chamada-scan-input" class="input" style="font-size:1.1rem; letter-spacing:1px;" placeholder="Escaneie ou digite a matrícula..." autocomplete="off">
-      ${ch.mensagem ? `<p class="${ch.mensagemTipo==='erro'?'err':'muted'}" style="margin-top:6px; font-weight:600;">${esc(ch.mensagem)}</p>` : ''}`}
-      <div class="row" style="margin-top:14px; gap:24px; align-items:flex-start; flex-wrap:wrap;">
+      ${ch.mensagem ? `<p class="${ch.mensagemTipo==='erro'?'err':'muted'}" style="margin-top:6px; font-weight:600;">${esc(ch.mensagem)}</p>` : ''}
+      ${ultimo ? `
+        <div class="card" style="margin-top:14px; text-align:center; background:${ultimo.status==='atrasado'?'#fff3e0':'#e8f7e8'};">
+          <div class="muted" style="font-size:.78rem;">Último registro</div>
+          <div style="font-size:1.4rem; font-weight:700;">${esc(ultimo.name)}</div>
+          <div style="font-size:1.05rem; margin-top:2px;">${ultimo.status==='atrasado'?'⏰ Atrasado':'✅ Presente'} · ${new Date(ultimo.horario).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</div>
+        </div>
+      ` : ''}
+      <p class="muted" style="margin-top:16px; font-size:.82rem;">👀 Os alunos podem conferir aqui, na tela, quem já entrou e o status de cada um (presente ou atrasado).</p>
+      <div class="row" style="margin-top:8px; gap:24px; align-items:flex-start; flex-wrap:wrap;">
         <div style="flex:1; min-width:220px;">
-          <h3>Presentes (${presentesOrdenados.length})</h3>
+          <h3>Quem já entrou (${presentesOrdenados.length})</h3>
           ${presentesOrdenados.length===0 ? '<p class="muted" style="font-size:.85rem;">Nenhum registro ainda.</p>' : presentesOrdenados.map(r => `
             <div class="list-item" style="padding:6px 2px;">
-              <span>${esc(r.name)}${r.matricula?' <span class="muted">· mat. '+esc(r.matricula)+'</span>':''}${r.manual?' <span class="muted">(manual)</span>':''}${r.status==='atrasado'?' <span class="err" style="font-weight:600;">(atrasado)</span>':''}</span>
+              <span>${esc(r.name)}${r.matricula?' <span class="muted">· mat. '+esc(r.matricula)+'</span>':''}${r.manual?' <span class="muted">(manual)</span>':''} <span class="pill" style="font-size:.7rem; padding:1px 8px; ${r.status==='atrasado'?'background:#ffe0b2;':'background:#c8f0c8;'}">${r.status==='atrasado'?'Atrasado':'Presente'}</span></span>
               <div class="row" style="flex:0 0 auto; gap:6px;">
                 <span class="muted" style="font-size:.78rem;">${new Date(r.horario).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>
-                ${readOnly ? '' : `<button class="btn btn-ghost btn-sm" data-action="chamada-remover" data-sid="${r.studentId}">✕</button>`}
+                <button class="btn btn-ghost btn-sm" data-action="chamada-remover" data-sid="${r.studentId}">✕</button>
               </div>
             </div>
           `).join('')}
@@ -3613,7 +3624,7 @@ function renderChamada(filtroTurnos, readOnly){
           ${ausentes.length===0 ? '<p class="muted" style="font-size:.85rem;">Todos os alunos já foram registrados.</p>' : ausentes.map(s => `
             <div class="list-item" style="padding:6px 2px;">
               <span>${esc(s.name)}${s.matricula?' <span class="muted">· mat. '+esc(s.matricula)+'</span>':' <span class="muted">· sem matrícula</span>'}</span>
-              ${readOnly ? '' : `<button class="btn btn-ghost btn-sm" data-action="chamada-marcar-manual" data-sid="${s.id}">Marcar presença</button>`}
+              <button class="btn btn-ghost btn-sm" data-action="chamada-marcar-manual" data-sid="${s.id}">Marcar presença</button>
             </div>
           `).join('')}
         </div>
@@ -3625,8 +3636,8 @@ function renderChamada(filtroTurnos, readOnly){
   }
   return `
     <div class="card">
-      <h2>🪪 ${readOnly?'Frequência (consulta)':'Chamada por código de barras'}</h2>
-      <p class="muted">${readOnly ? 'Consulte quantos alunos foram registrados em qualquer turma e data. A leitura da carteirinha é feita pelos monitores, na área "Controle de Frequência".' : 'Use o mesmo leitor de código de barras da carteirinha dos alunos que já é usado hoje — cada leitura marca a presença automaticamente pela matrícula cadastrada no sistema. Alunos sem matrícula cadastrada podem ser marcados manualmente na lista à direita.'}</p>
+      <h2>🪪 Chamada por código de barras</h2>
+      <p class="muted">Use o mesmo leitor de código de barras da carteirinha dos alunos que já é usado hoje — cada leitura marca a presença automaticamente pela matrícula cadastrada no sistema. Alunos sem matrícula cadastrada podem ser marcados manualmente na lista à direita.</p>
       <div class="row" style="gap:10px;">
         <div style="flex:1;">
           <label>Turma</label>
@@ -3641,6 +3652,65 @@ function renderChamada(filtroTurnos, readOnly){
         </div>
       </div>
       ${body}
+    </div>
+  `;
+}
+function renderChamadaConsulta(filtroTurnos){
+  const { ch, turmas: todasTurmas } = getChamadaCtx();
+  const turmas = filtroTurnos ? todasTurmas.filter(t=>filtroTurnos.includes(t.turno)) : todasTurmas;
+  const turma = turmas.find(t=>t.id===ch.turmaId);
+  if(!ch.dataInicio) ch.dataInicio = ch.data || new Date().toISOString().slice(0,10);
+  if(!ch.dataFim) ch.dataFim = ch.dataInicio;
+  let body = '';
+  if(!ch.turmaId){
+    body = '<p class="muted center">Selecione uma turma e o período para consultar.</p>';
+  } else if(ch.loading){
+    body = '<div class="spinner"></div>';
+  } else if(!turma){
+    body = '<p class="muted center">Turma não encontrada.</p>';
+  } else if(!ch.historico){
+    body = '<p class="muted center">Escolha o período e clique em "Buscar".</p>';
+  } else if(ch.historico.length===0){
+    body = '<p class="muted center">Nenhum dia no período selecionado.</p>';
+  } else {
+    body = ch.historico.map(d => {
+      const presentesIds = new Set((d.presentes||[]).map(x=>x.studentId));
+      const ausentes = turma.students.filter(s=>!presentesIds.has(s.id));
+      return `
+        <div class="list-item" style="align-items:flex-start; flex-direction:column; padding:10px 4px;">
+          <div class="row" style="width:100%; justify-content:space-between;">
+            <strong>${new Date(d.dateStr+'T00:00:00').toLocaleDateString('pt-BR')}</strong>
+            <span class="muted">${d.presentes ? d.presentes.length+' de '+turma.students.length+' presentes' : 'sem registro'}</span>
+          </div>
+          ${d.presentes && ausentes.length>0 ? `<span class="muted" style="font-size:.82rem; margin-top:4px;">Ausentes: ${ausentes.map(s=>esc(s.name)).join(', ')}</span>` : ''}
+        </div>
+      `;
+    }).join('');
+  }
+  return `
+    <div class="card">
+      <h2>🪪 Frequência (consulta)</h2>
+      <p class="muted">Consulte quantos alunos foram registrados em qualquer turma, num único dia ou num período de dias. A leitura da carteirinha é feita pelos monitores, na área "Controle de Frequência".</p>
+      <div class="row" style="gap:10px; flex-wrap:wrap; align-items:flex-end;">
+        <div style="flex:1; min-width:180px;">
+          <label>Turma</label>
+          <select id="chamada-turma-select" class="input">
+            <option value="">Selecione...</option>
+            ${turmas.map(t=>`<option value="${t.id}" ${ch.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div style="flex:1; min-width:140px;">
+          <label>De</label>
+          <input type="date" id="chamada-data-inicio-input" class="input" value="${esc(ch.dataInicio)}">
+        </div>
+        <div style="flex:1; min-width:140px;">
+          <label>Até</label>
+          <input type="date" id="chamada-data-fim-input" class="input" value="${esc(ch.dataFim)}">
+        </div>
+        <button class="btn btn-primary btn-sm" data-action="chamada-buscar-periodo" style="flex:0 0 auto;">Buscar</button>
+      </div>
+      <div style="margin-top:14px;">${body}</div>
+      ${turma && ch.historico ? `<div class="row" style="margin-top:16px;"><button class="btn btn-ghost btn-sm" data-action="chamada-exportar-xlsx-periodo">Exportar para Excel</button></div>` : ''}
     </div>
   `;
 }
@@ -3728,6 +3798,51 @@ function chamadaExportarXlsx(){
   XLSX.utils.book_append_sheet(wb, ws, 'Chamada');
   XLSX.writeFile(wb, `chamada-${turma.name.replace(/[^a-z0-9]+/gi,'-')}-${ch.data}.xlsx`);
 }
+async function loadChamadaHistorico(){
+  const { ch, turmas } = getChamadaCtx();
+  const turma = turmas.find(t=>t.id===ch.turmaId);
+  if(!turma || !ch.dataInicio || !ch.dataFim) return;
+  let inicioStr = ch.dataInicio, fimStr = ch.dataFim;
+  if(inicioStr > fimStr){ const tmp = inicioStr; inicioStr = fimStr; fimStr = tmp; }
+  ch.loading = true; render();
+  const dias = [];
+  const cursor = new Date(inicioStr+'T00:00:00');
+  const fimData = new Date(fimStr+'T00:00:00');
+  while(cursor <= fimData && dias.length < 186){ // limite de ~6 meses para evitar buscas gigantes
+    dias.push(cursor.toISOString().slice(0,10));
+    cursor.setDate(cursor.getDate()+1);
+  }
+  const registros = await Promise.all(dias.map(async dateStr => {
+    try{
+      const r = await window.storage.get(`chamada:${turma.id}:${dateStr}`, true);
+      const parsed = JSON.parse(r.value);
+      return { dateStr, presentes: parsed.presentes || [] };
+    }catch(e){ return { dateStr, presentes: null }; }
+  }));
+  ch.historico = registros.slice().reverse(); // mais recente primeiro
+  ch.loading = false;
+  render();
+}
+function chamadaExportarXlsxPeriodo(){
+  const { ch, turmas } = getChamadaCtx();
+  const turma = turmas.find(t=>t.id===ch.turmaId);
+  if(!turma || !ch.historico) return;
+  const header = ['Data','Matrícula','Nome','Situação','Horário'];
+  const rows = [];
+  ch.historico.slice().reverse().forEach(d => {
+    const presentesMap = {};
+    (d.presentes||[]).forEach(r => { presentesMap[r.studentId] = r; });
+    turma.students.slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).forEach(s => {
+      const r = presentesMap[s.id];
+      const situacao = d.presentes===null ? 'Sem registro' : (r ? (r.status==='atrasado'?'Atrasado':'Presente') : 'Ausente');
+      rows.push([new Date(d.dateStr+'T00:00:00').toLocaleDateString('pt-BR'), s.matricula||'', s.name, situacao, r?new Date(r.horario).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'']);
+    });
+  });
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Frequência');
+  XLSX.writeFile(wb, `frequencia-${turma.name.replace(/[^a-z0-9]+/gi,'-')}-${ch.dataInicio}-a-${ch.dataFim}.xlsx`);
+}
 
 /* ---------------- PAINEL DE FREQUÊNCIA (diária / semanal / mensal / ranking de faltas) ---------------- */
 async function calcFrequenciaStats(turma){
@@ -3773,9 +3888,11 @@ async function calcFrequenciaStats(turma){
   return {
     diaLetivoHoje: isDiaLetivo(hojeStr),
     diaria: (hojeRegistro && hojeRegistro.letivo) ? { presentes: hojeRegistro.presentes?hojeRegistro.presentes.length:0, total: turma.students.length, temRegistro: hojeRegistro.presentes!==null } : null,
+    geralPct: pctPresenca(comData),
     semanalPct: pctPresenca(comDataSemana),
     mensalPct: pctPresenca(comDataMes),
     diasComputadosMes: comDataMes.length,
+    diasComputadosGeral: comData.length,
     ranking,
     faltasPorAlunoId: Object.fromEntries(Object.entries(faltasPorAluno).map(([id,v])=>[id,v]))
   };
@@ -3797,12 +3914,13 @@ function renderFreqPainelBody(turma){
   const s = cache.stats;
   if(!s) return '<p class="muted">Não foi possível calcular a frequência.</p>';
   const pct = v => v===null ? '—' : v+'%';
-  const diariaValor = !s.diaLetivoHoje ? 'não letivo' : (s.diaria && s.diaria.temRegistro ? s.diaria.presentes+'/'+s.diaria.total : 'sem registro');
+  const presentesHojeValor = !s.diaLetivoHoje ? '—' : (s.diaria && s.diaria.temRegistro ? `${s.diaria.presentes}/${s.diaria.total}` : 'sem registro');
   return `
     <div class="stat-row">
-      ${renderStatTile('📅', diariaValor, 'Frequência hoje', 'teal')}
-      ${renderStatTile('📈', pct(s.semanalPct), 'Frequência na semana', 'vinho')}
-      ${renderStatTile('📊', pct(s.mensalPct), 'Frequência no mês', 'coral')}
+      ${renderStatTile('👥', presentesHojeValor, 'Alunos presentes hoje', 'teal')}
+      ${renderStatTile('📊', pct(s.geralPct), 'Média geral de frequência', 'vinho')}
+      ${renderStatTile('📈', pct(s.semanalPct), 'Frequência na semana', 'coral')}
+      ${renderStatTile('📅', pct(s.mensalPct), 'Frequência no mês', 'plum')}
     </div>
     <h3 style="margin-top:18px;">🏅 Ranking de faltas no mês (${s.diasComputadosMes} dia(s) computado(s))</h3>
     ${s.ranking.length===0 ? '<p class="muted">Ainda não há dados suficientes este mês.</p>' : s.ranking.slice(0,15).map((r,i) => `
@@ -10170,6 +10288,8 @@ document.addEventListener('click', (e) => {
   else if(act==='chamada-remover'){ chamadaRemover(btn.dataset.sid); }
   else if(act==='chamada-marcar-manual'){ chamadaMarcarManual(btn.dataset.sid); }
   else if(act==='chamada-exportar-xlsx'){ chamadaExportarXlsx(); }
+  else if(act==='chamada-buscar-periodo'){ loadChamadaHistorico(); }
+  else if(act==='chamada-exportar-xlsx-periodo'){ chamadaExportarXlsxPeriodo(); }
   else if(act==='award-ficha-manual'){ awardFichas(btn.dataset.tid, btn.dataset.sid, 1, 'Participação em sala (professor)').then(()=>render()); }
   else if(act==='delete-turma'){ deleteTurma(btn.dataset.tid); }
   else if(act==='print-signature-list'){ printTurmaSignatureList(btn.dataset.tid); }
@@ -10336,7 +10456,14 @@ document.addEventListener('change', (e) => {
   else if(el.id==='avulso-lancar-turma-select'){ p.avulso.lancarTurmaId = el.value; }
   else if(act==='avulso-gabarito-edit-select'){ p.avulso.gabaritoEditAnswers[parseInt(el.dataset.idx)] = el.value; }
   else if(el.id==='turma-turno-select'){ const t = p.turmas.find(x=>x.id===el.dataset.tid); if(t){ t.turno = el.value; saveTurmasToStorage(); } }
-  else if(el.id==='chamada-turma-select'){ const {ch}=getChamadaCtx(); ch.turmaId = el.value; ch.presentes = []; ch.mensagem=''; if(ch.turmaId) loadChamada(); else render(); }
+  else if(el.id==='chamada-turma-select'){
+    const {ch}=getChamadaCtx();
+    ch.turmaId = el.value;
+    if(state.view==='freqmonitor'){ ch.presentes = []; ch.mensagem=''; if(ch.turmaId) loadChamada(); else render(); }
+    else { ch.historico = null; render(); }
+  }
+  else if(el.id==='chamada-data-inicio-input'){ const {ch}=getChamadaCtx(); ch.dataInicio = el.value; ch.historico = null; render(); }
+  else if(el.id==='chamada-data-fim-input'){ const {ch}=getChamadaCtx(); ch.dataFim = el.value; ch.historico = null; render(); }
   else if(el.id==='freq-painel-turma-select'){ const fp = state.view==='freqmonitor' ? state.freqMonitor.painel : state.professor.freqPainel; fp.turmaId = el.value; render(); }
   else if(el.id==='chamada-data-input'){ const {ch}=getChamadaCtx(); ch.data = el.value; ch.presentes = []; ch.mensagem=''; if(ch.turmaId) loadChamada(); else render(); }
   else if(el.id==='avulso-scan-file-input'){ if(el.files[0]) scanAvulsoSheet(el.files[0]); }
