@@ -878,7 +878,7 @@ let state = {
     subview: 'avaliacoes', // 'avaliacoes' | 'banco' | 'turmas'
     mode:'list', assessments: [], loadingList:true, newAssessment: freshAssessment(), resultsFor:null, responses:[], resultsLoading:false, editingCode:null, editingResponseCount:0, correctingResponseIdx:null,
     bank: [], bankLoading:true, newBankQuestion:null, editingBankId:null,
-    aiGen: { open:false, tema:'', quantidade:5, dificuldade:'médio', tipos:['mc','vf'], loading:false, results:null, selected:[], error:'' },
+    aiGen: { open:false, tema:'', quantidade:5, dificuldade:'médio', tipos:['mc','vf'], provasAntigas:false, loading:false, results:null, selected:[], error:'' },
     pasteImport: { open:false, text:'', loading:false, results:null, selected:[], error:'' },
     book: { open:false, fileName:'', pages:[], loading:false, error:'', searchQuery:'', searchResults:null, viewingText:'', extractLoading:false, extractResults:null, extractSelected:[], extractError:'' },
     turmas: [], turmasLoading:true, viewingTurmaId:null, newTurmaOpen:false, newTurmaName:'', newTurmaStudentsText:'', newStudentName:'',
@@ -3346,6 +3346,10 @@ function renderAiGen(){
           </label>
         `).join('')}
       </div>
+      <p class="muted" style="margin-top:8px;">As questões serão elaboradas em estilo ENEM, contextualizadas (com texto-base/situação-problema) e alinhadas às avaliações externas (SAEB/ENEM).</p>
+      <label style="display:flex;align-items:center;gap:6px;font-weight:400;text-transform:none;">
+        <input type="checkbox" data-action="toggle-ai-provas-antigas" ${g.provasAntigas?'checked':''}> Buscar também questões de provas antigas relacionadas ao tema
+      </label>
       ${g.error ? `<p class="err">${esc(g.error)}</p>` : ''}
       <div class="row" style="margin-top:16px;">
         <button class="btn btn-ghost" data-action="close-ai-gen">Cancelar</button>
@@ -9720,11 +9724,15 @@ async function generateAiQuestions(){
   render();
 
   const tipoLabels = g.tipos.map(t => t==='mc'?'múltipla escolha (4 alternativas)':t==='vf'?'verdadeiro ou falso':'dissertativa').join(', ');
+  const estiloInstrucao = `As questões devem ser elaboradas em estilo ENEM: contextualizadas, apresentando um texto-base, situação-problema, gráfico, tirinha, trecho de reportagem ou caso concreto antes do enunciado da pergunta, exigindo interpretação e aplicação do conhecimento (não apenas memorização). Alinhe o nível de exigência e a forma de cobrança às avaliações externas (ENEM, SAEB, Prova Brasil), evitando questões de resposta puramente decorativa.`;
+  const provasAntigasInstrucao = g.provasAntigas ? `\nAlém disso, busque se inspirar em questões de provas antigas (ENEM, SAEB, vestibulares ou avaliações externas anteriores) relacionadas ao tema, adaptando-as quando necessário — sem copiar textos protegidos por direitos autorais, apenas usando-as como referência de estilo e abordagem.` : '';
   const prompt = `Você é um professor brasileiro do ensino técnico elaborando questões de avaliação.
 Tema: ${temaInput}
 Dificuldade: ${dificuldade}
 Tipos de questão permitidos: ${tipoLabels}
 Gere exatamente ${qtd} questões, distribuindo entre os tipos permitidos.
+
+${estiloInstrucao}${provasAntigasInstrucao}
 
 Responda SOMENTE com um array JSON válido, sem markdown e sem texto fora do JSON, no formato exato abaixo (cada item segue um dos três formatos conforme o "type"):
 [
@@ -10990,9 +10998,10 @@ document.addEventListener('click', (e) => {
   else if(act==='lixeira-excluir-definitivo'){ if(confirm('Excluir definitivamente este item da lixeira? Isso não pode ser desfeito.')){ removeFromTrash(btn.dataset.id).then(list => { state.ui.lixeira.items = list; render(); }); } }
   else if(act==='save-gemini-key'){ saveGeminiKey(); }
   else if(act==='remove-gemini-key'){ removeGeminiKey(); }
-  else if(act==='open-ai-gen'){ p.aiGen = { open:true, tema:'', quantidade:5, dificuldade:'médio', tipos:['mc','vf'], loading:false, results:null, selected:[], error:'' }; render(); }
+  else if(act==='open-ai-gen'){ p.aiGen = { open:true, tema:'', quantidade:5, dificuldade:'médio', tipos:['mc','vf'], provasAntigas:false, loading:false, results:null, selected:[], error:'' }; render(); }
   else if(act==='close-ai-gen'){ p.aiGen.open = false; p.aiGen.results = null; render(); }
   else if(act==='toggle-ai-tipo'){ const t = btn.dataset.tipo; if(p.aiGen.tipos.includes(t)) p.aiGen.tipos = p.aiGen.tipos.filter(x=>x!==t); else p.aiGen.tipos.push(t); }
+  else if(act==='toggle-ai-provas-antigas'){ p.aiGen.provasAntigas = !p.aiGen.provasAntigas; }
   else if(act==='generate-ai-questions'){ generateAiQuestions(); }
   else if(act==='toggle-ai-result'){ const idx = Number(btn.dataset.idx); if(p.aiGen.selected.includes(idx)) p.aiGen.selected = p.aiGen.selected.filter(x=>x!==idx); else p.aiGen.selected.push(idx); }
   else if(act==='add-ai-selected'){
