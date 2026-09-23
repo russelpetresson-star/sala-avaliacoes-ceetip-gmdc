@@ -3577,10 +3577,40 @@ function calcStatusBip(turma, dataStr, agoraMs){
 function renderChamada(filtroTurnos, readOnly){
   return readOnly ? renderChamadaConsulta(filtroTurnos) : renderChamadaBipar(filtroTurnos);
 }
+async function ensureTotalEntradasDia(turmas, dataStr){
+  if(!state.freqMonitor.totalEntradasCache) state.freqMonitor.totalEntradasCache = {};
+  const cache = state.freqMonitor.totalEntradasCache;
+  if(cache[dataStr]) return; // já carregado ou carregando
+  cache[dataStr] = { loading:true, total:null };
+  render();
+  let total = 0;
+  await Promise.all(turmas.map(async tm => {
+    try{
+      const r = await window.storage.get(`chamada:${tm.id}:${dataStr}`, true);
+      const parsed = JSON.parse(r.value);
+      total += (parsed.presentes||[]).length;
+    }catch(e){ /* sem registro para essa turma nesse dia */ }
+  }));
+  cache[dataStr] = { loading:false, total };
+  render();
+}
 function renderChamadaBipar(filtroTurnos){
   const { ch, turmas: todasTurmas } = getChamadaCtx();
   const turmas = filtroTurnos ? todasTurmas.filter(t=>filtroTurnos.includes(t.turno)) : todasTurmas;
   const turma = turmas.find(t=>t.id===ch.turmaId);
+  let totalEscolaHtml = '';
+  if(state.view==='freqmonitor' && turmas.length>0 && ch.data){
+    ensureTotalEntradasDia(turmas, ch.data);
+    const cacheT = (state.freqMonitor.totalEntradasCache||{})[ch.data];
+    const totalVal = (cacheT && !cacheT.loading) ? cacheT.total : null;
+    totalEscolaHtml = `
+      <div class="card" style="margin-bottom:12px; background:#eef6ff; text-align:center;">
+        <div class="muted" style="font-size:.78rem;">🏫 Total de alunos que entraram na escola em ${new Date(ch.data+'T00:00:00').toLocaleDateString('pt-BR')}</div>
+        <div style="font-size:1.6rem; font-weight:700;">${totalVal===null ? '...' : totalVal}</div>
+        <div class="muted" style="font-size:.72rem;">Soma de todas as turmas do turno monitorado (${turmas.length} turma${turmas.length===1?'':'s'})</div>
+      </div>
+    `;
+  }
   let body = '';
   if(filtroTurnos && turmas.length===0){
     body = `<p class="muted center">Nenhuma turma foi marcada com esse turno ainda. Peça ao coordenador para definir o turno de cada turma em "Turmas".</p>`;
@@ -3636,6 +3666,7 @@ function renderChamadaBipar(filtroTurnos){
     `;
   }
   return `
+    ${totalEscolaHtml}
     <div class="card">
       <h2>🪪 Chamada por código de barras</h2>
       <p class="muted">Use o mesmo leitor de código de barras da carteirinha dos alunos que já é usado hoje — cada leitura marca a presença automaticamente pela matrícula cadastrada no sistema. Alunos sem matrícula cadastrada podem ser marcados manualmente na lista à direita.</p>
@@ -3736,6 +3767,9 @@ function focusChamadaInput(){
 async function salvarChamadaToStorage(){
   const { ch } = getChamadaCtx();
   await window.storage.set(`chamada:${ch.turmaId}:${ch.data}`, JSON.stringify({ presentes: ch.presentes, turmaId: ch.turmaId, data: ch.data, atualizadoEm: Date.now() }), true);
+  if(state.view==='freqmonitor' && state.freqMonitor.totalEntradasCache){
+    delete state.freqMonitor.totalEntradasCache[ch.data]; // força recálculo do total da escola nesse dia
+  }
 }
 async function registrarPresencaPorMatricula(valorDigitado){
   const { ch, turmas } = getChamadaCtx();
