@@ -437,7 +437,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-09-22-2100</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-09-22-2200</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -925,7 +925,8 @@ let state = {
     dashboard: { loading:true, stats:null },
     periodosDraft: null,
     changingFreqPassword:false, errorFreq:'',
-    freqConfig: { mesCalendario: new Date().toISOString().slice(0,7), horariosDraft:null, errorHorarios:'' }
+    freqConfig: { mesCalendario: new Date().toISOString().slice(0,7), horariosDraft:null, errorHorarios:'' },
+    importCsv: { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false }
   },
   freqMonitor: {
     session:false, senhaInput:'', error:'',
@@ -5264,6 +5265,7 @@ function renderCoordenador(){
     { action:'coord-sub-view', sub:'freqpainel', icon:'📊', label:'Painel de Frequência' },
     { action:'coord-sub-view', sub:'freqconfig', icon:'⏰', label:'Config. de Frequência' },
     { action:'coord-sub-view', sub:'notas', icon:'🧮', label:'Notas finais' },
+    { action:'coord-sub-view', sub:'importarnotas', icon:'📥', label:'Importar Notas (CSV)' },
     { action:'coord-sub-view', sub:'pesosprof', icon:'⚖️', label:'Pesos dos professores' },
     { action:'coord-sub-view', sub:'periodos', icon:'📅', label:'Períodos' },
     { action:'coord-sub-view', sub:'bloco', icon:'🖨️', label:'Bloco de Provas' },
@@ -5286,6 +5288,7 @@ function renderCoordenador(){
   else if(c.subview==='freqpainel') content = renderFreqPainel(state.professor.freqPainel, state.professor.turmas);
   else if(c.subview==='freqconfig') content = renderCoordFreqConfig();
   else if(c.subview==='notas') content = renderCoordNotas();
+  else if(c.subview==='importarnotas') content = renderImportarNotasCsv();
   else if(c.subview==='pesosprof') content = renderCoordPesosProf();
   else if(c.subview==='periodos') content = renderCoordPeriodos();
   else if(c.subview==='bloco') content = renderBlocoProvas(c.assessments);
@@ -7311,6 +7314,262 @@ async function loadDisciplinas(){
 async function saveDisciplinasToStorage(){
   const p = state.professor;
   await window.storage.set(`disciplinas:${p.session.id}`, JSON.stringify(p.disciplinas), true);
+}
+
+/* ---------------- IMPORTAR NOTAS FINAIS POR CSV ---------------- */
+function normalizeTexto(s){
+  return (s||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').trim().replace(/\s+/g,' ');
+}
+function parseNotaDecimal(raw){
+  if(raw===undefined || raw===null) return null;
+  const s = String(raw).trim();
+  if(s==='') return null;
+  const normalizado = /^\d+,\d+$/.test(s) ? s.replace(',', '.') : s;
+  const n = parseFloat(normalizado);
+  return isNaN(n) ? null : n;
+}
+function detectDelimiterCsv(linha){
+  const qtdPontoEVirgula = (linha.match(/;/g)||[]).length;
+  const qtdVirgula = (linha.match(/,/g)||[]).length;
+  return qtdPontoEVirgula > qtdVirgula ? ';' : ',';
+}
+function parseCsvNotasTexto(texto){
+  const textoLimpo = texto.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const linhas = textoLimpo.split('\n').filter(l => l.trim()!=='');
+  if(linhas.length<2) return { erro: 'O arquivo parece vazio ou não tem linhas de dados.' };
+  const delim = detectDelimiterCsv(linhas[0]);
+  const header = linhas[0].split(delim).map(h=>h.trim());
+  const headerNorm = header.map(h=>normalizeTexto(h));
+  const idxMatricula = headerNorm.findIndex(h=>h==='MATRICULA');
+  const idxAluno = headerNorm.findIndex(h=>h==='ALUNO' || h==='NOME');
+  const idxDisciplina = headerNorm.findIndex(h=>h==='DISCIPLINA');
+  const idxM1Unico = headerNorm.findIndex(h=>h==='M1');
+  const idxM2Unico = headerNorm.findIndex(h=>h==='M2');
+  if(idxMatricula===-1 || idxAluno===-1){
+    return { erro: 'Não encontrei as colunas "Matricula" e "Aluno" (ou "Nome") no cabeçalho do arquivo.' };
+  }
+  const lancamentos = [];
+  const dataLines = linhas.slice(1);
+
+  if(idxDisciplina!==-1 && idxM1Unico!==-1 && idxM2Unico!==-1){
+    // formato "longo": uma linha por (aluno, disciplina), com colunas M1 e M2
+    dataLines.forEach(linha => {
+      const cols = linha.split(delim).map(c=>c.trim());
+      const matricula = cols[idxMatricula]||'';
+      const nomeCsv = cols[idxAluno]||'';
+      const disciplinaNome = (cols[idxDisciplina]||'').trim();
+      if(!matricula && !nomeCsv) return;
+      if(!disciplinaNome) return;
+      const notaM1 = parseNotaDecimal(cols[idxM1Unico]);
+      const notaM2 = parseNotaDecimal(cols[idxM2Unico]);
+      if(notaM1!==null) lancamentos.push({ matricula, nomeCsv, disciplinaNome, unidade:'I Unidade', nota:notaM1 });
+      if(notaM2!==null) lancamentos.push({ matricula, nomeCsv, disciplinaNome, unidade:'II Unidade', nota:notaM2 });
+    });
+    return { formato:'longo', lancamentos };
+  }
+
+  // formato "largo": colunas pareadas "Disciplina_M1"/"Disciplina - M1" etc
+  const colunasDisciplina = [];
+  header.forEach((h, idx) => {
+    if(idx===idxMatricula || idx===idxAluno) return;
+    const m = h.match(/^(.+?)\s*[-_]\s*(M1|M2)\s*$/i);
+    if(!m) return;
+    const nomeBase = m[1].replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+    const unidade = m[2].toUpperCase()==='M1' ? 'I Unidade' : 'II Unidade';
+    colunasDisciplina.push({ idx, disciplinaNome: nomeBase, unidade });
+  });
+  if(colunasDisciplina.length===0){
+    return { erro: 'Não consegui identificar as colunas de notas (esperava algo como "Disciplina_M1"/"Disciplina_M2" ou uma coluna "Disciplina" com colunas "M1"/"M2").' };
+  }
+  dataLines.forEach(linha => {
+    const cols = linha.split(delim).map(c=>c.trim());
+    const matricula = cols[idxMatricula]||'';
+    const nomeCsv = cols[idxAluno]||'';
+    if(!matricula && !nomeCsv) return;
+    colunasDisciplina.forEach(cd => {
+      const nota = parseNotaDecimal(cols[cd.idx]);
+      if(nota!==null) lancamentos.push({ matricula, nomeCsv, disciplinaNome: cd.disciplinaNome, unidade: cd.unidade, nota });
+    });
+  });
+  return { formato:'largo', lancamentos };
+}
+function montarRosterCombinado(){
+  const roster = [];
+  state.professor.turmas.forEach(t => {
+    t.students.forEach(s => roster.push({ studentId:s.id, name:s.name, matricula:(s.matricula||'').trim(), turmaId:t.id, turmaName:t.name }));
+  });
+  return roster;
+}
+async function processarArquivoCsvNotas(file){
+  const c = state.coordenador;
+  c.importCsv = { processando:true, erro:'', resultado:null, nomeArquivo:file.name, importando:false };
+  render();
+  let texto;
+  try{ texto = await file.text(); }
+  catch(e){ c.importCsv = { processando:false, erro:'Não foi possível ler esse arquivo.', resultado:null, nomeArquivo:file.name, importando:false }; render(); return; }
+  const parsed = parseCsvNotasTexto(texto);
+  if(parsed.erro){
+    c.importCsv = { processando:false, erro:parsed.erro, resultado:null, nomeArquivo:file.name, importando:false };
+    render();
+    return;
+  }
+  const roster = montarRosterCombinado();
+  const porMatricula = {};
+  const porNome = {};
+  roster.forEach(r => {
+    if(r.matricula) porMatricula[r.matricula] = r;
+    porNome[normalizeTexto(r.name)] = r;
+  });
+  let matchedPorMatricula = 0, matchedPorNome = 0;
+  const semCorrespondencia = [];
+  const gruposMap = {};
+  parsed.lancamentos.forEach(l => {
+    let aluno = l.matricula ? porMatricula[l.matricula.trim()] : null;
+    let via = 'matricula';
+    if(aluno) matchedPorMatricula++;
+    if(!aluno){
+      aluno = porNome[normalizeTexto(l.nomeCsv)];
+      via = 'nome';
+      if(aluno) matchedPorNome++;
+    }
+    if(!aluno){
+      semCorrespondencia.push(l);
+      return;
+    }
+    const chaveGrupo = normalizeTexto(l.disciplinaNome) + '|' + l.unidade;
+    if(!gruposMap[chaveGrupo]) gruposMap[chaveGrupo] = { disciplinaNome: l.disciplinaNome, unidade: l.unidade, itens: [] };
+    gruposMap[chaveGrupo].itens.push({ studentId: aluno.studentId, studentName: aluno.name, turmaId: aluno.turmaId, turmaName: aluno.turmaName, nota: l.nota, via });
+  });
+  const grupos = Object.values(gruposMap).sort((a,b)=> a.disciplinaNome.localeCompare(b.disciplinaNome,'pt-BR') || a.unidade.localeCompare(b.unidade,'pt-BR'));
+  c.importCsv = {
+    processando:false, erro:'', nomeArquivo:file.name, importando:false,
+    resultado: {
+      formato: parsed.formato,
+      totalLancamentos: parsed.lancamentos.length,
+      matchedPorMatricula, matchedPorNome,
+      semCorrespondencia,
+      grupos
+    }
+  };
+  render();
+}
+async function confirmarImportacaoNotasCsv(){
+  const c = state.coordenador;
+  const resultado = c.importCsv.resultado;
+  if(!resultado) return;
+  c.importCsv.importando = true;
+  render();
+  const assessmentsExistentes = [...state.professor.assessments, ...state.coordenador.assessments];
+  let totalRespostasGravadas = 0;
+  for(const grupo of resultado.grupos){
+    if(grupo.itens.length===0) continue;
+    const turmaIdsEnvolvidas = [...new Set(grupo.itens.map(i=>i.turmaId))];
+    let assessment = assessmentsExistentes.find(a => a.importadoCsv && a.disciplinaName===grupo.disciplinaNome && a.unidade===grupo.unidade);
+    let code;
+    if(assessment){
+      code = assessment.code;
+      const turmaIdsUnidos = [...new Set([...(assessment.turmaIds||[]), ...turmaIdsEnvolvidas])];
+      assessment = { ...assessment, turmaIds: turmaIdsUnidos };
+    } else {
+      code = genCode();
+      assessment = {
+        code,
+        title: `Notas Finais (Importado) - ${grupo.disciplinaNome} - ${grupo.unidade}`,
+        instrumento: 'avaliacao',
+        unidade: grupo.unidade,
+        disciplinaId: null,
+        disciplinaName: grupo.disciplinaNome,
+        turmaIds: turmaIdsEnvolvidas,
+        questions: [{ id:cryptoId(), type:'mc', text:'Nota final (importada via CSV)', points:10, image:null, annulled:false, descritorSaeb:'', conteudo:'',
+          options:[{id:cryptoId(),text:'—'},{id:cryptoId(),text:'—'}], correctOptionId:null }],
+        startAt: null,
+        endAt: new Date(2000,0,1).toISOString(),
+        resultRelease: { mode:'imediato', releaseAt:'' },
+        securityEnabled: false,
+        professorId: null,
+        professorName: 'Coordenação (importado)',
+        createdAt: Date.now(),
+        updatedAt: null,
+        importadoCsv: true
+      };
+    }
+    await window.storage.set(`assessment:${code}`, JSON.stringify(assessment), true);
+    let responses = [];
+    try{ const r = await window.storage.get(`responses:${code}`, true); responses = JSON.parse(r.value); }catch(e){ responses = []; }
+    grupo.itens.forEach(item => {
+      responses = responses.filter(r => r.studentName !== item.studentName);
+      responses.push({ studentName:item.studentName, submittedAt:Date.now(), total:item.nota, details:[], answers:{}, tabSwitches:0, fullscreenExits:0, manual:true, importadoCsv:true });
+      totalRespostasGravadas++;
+    });
+    await window.storage.set(`responses:${code}`, JSON.stringify(responses), true);
+    const idxP = state.professor.assessments.findIndex(a=>a.code===code);
+    if(idxP>=0) state.professor.assessments[idxP] = assessment;
+    const idxC = state.coordenador.assessments.findIndex(a=>a.code===code);
+    if(idxC>=0) state.coordenador.assessments[idxC] = assessment; else state.coordenador.assessments.unshift(assessment);
+  }
+  c.importCsv = { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false };
+  if(c.dashboard) c.dashboard.stats = null;
+  render();
+  alert(`Importação concluída! ${totalRespostasGravadas} nota(s) gravada(s) no sistema.`);
+}
+function cancelarImportacaoNotasCsv(){
+  state.coordenador.importCsv = { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false };
+  render();
+}
+function renderImportarNotasCsv(){
+  const c = state.coordenador;
+  const ic = c.importCsv;
+  let body;
+  if(ic.processando){
+    body = `<div class="spinner"></div>`;
+  } else if(!ic.resultado){
+    body = `
+      <label>Selecione o arquivo CSV com as notas</label>
+      <input type="file" id="import-notas-csv-file" accept=".csv">
+      ${ic.erro ? `<p class="err" style="margin-top:8px;">${esc(ic.erro)}</p>` : ''}
+    `;
+  } else {
+    const r = ic.resultado;
+    body = `
+      <div class="stat-row">
+        ${renderStatTile('📄', r.totalLancamentos, 'Notas encontradas no arquivo', 'teal')}
+        ${renderStatTile('✅', r.matchedPorMatricula + r.matchedPorNome, 'Correspondentes a alunos cadastrados', 'vinho')}
+        ${renderStatTile('⚠️', r.semCorrespondencia.length, 'Sem correspondência', 'coral')}
+      </div>
+      <p class="muted" style="margin-top:10px; font-size:.85rem;">${r.matchedPorMatricula} encontrado(s) pela matrícula, ${r.matchedPorNome} encontrado(s) pelo nome (matrícula não bateu ou estava em branco).</p>
+      <h3 style="margin-top:18px;">O que será gravado (${r.grupos.length} avaliação(ões)/disciplina(s))</h3>
+      ${r.grupos.map(g => `
+        <div class="list-item" style="align-items:flex-start; flex-direction:column;">
+          <strong>${esc(g.disciplinaNome)} — ${esc(g.unidade)}</strong>
+          <span class="muted" style="font-size:.85rem;">${g.itens.length} aluno(s) · turma(s): ${[...new Set(g.itens.map(i=>i.turmaName))].map(esc).join(', ')}</span>
+        </div>
+      `).join('')}
+      ${r.semCorrespondencia.length>0 ? `
+        <h3 style="margin-top:18px;">⚠️ Sem correspondência (${r.semCorrespondencia.length}) — não serão importados</h3>
+        <p class="muted" style="font-size:.85rem;">Confira se a matrícula está cadastrada na turma (em "Turmas") ou se o nome está igual, e reenvie o arquivo depois de corrigir.</p>
+        <div class="table-scroll">
+        <table>
+          <thead><tr><th>Matrícula</th><th>Nome no arquivo</th><th>Disciplina</th><th>Unidade</th></tr></thead>
+          <tbody>
+            ${r.semCorrespondencia.slice(0,50).map(l => `<tr><td>${esc(l.matricula)}</td><td>${esc(l.nomeCsv)}</td><td>${esc(l.disciplinaNome)}</td><td>${esc(l.unidade)}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        </div>
+        ${r.semCorrespondencia.length>50 ? `<p class="muted" style="font-size:.8rem;">e mais ${r.semCorrespondencia.length-50}...</p>` : ''}
+      ` : ''}
+      <div class="row" style="margin-top:16px;">
+        <button class="btn btn-ghost btn-sm" data-action="cancelar-importacao-notas-csv" ${ic.importando?'disabled':''}>Cancelar</button>
+        <button class="btn btn-primary btn-sm" data-action="confirmar-importacao-notas-csv" ${ic.importando?'disabled':''}>${ic.importando?'Gravando...':'Confirmar e gravar no sistema'}</button>
+      </div>
+    `;
+  }
+  return `
+    <div class="card">
+      <h2>📥 Importar Notas Finais (CSV)</h2>
+      <p class="muted">Envie um CSV com as notas finais (M1/M2) por aluno. O sistema tenta casar cada aluno pela matrícula (e pelo nome quando a matrícula não bater) com os alunos já cadastrados em qualquer turma, e cria uma avaliação "importada" por disciplina/unidade — como se a nota já tivesse sido lançada — para preencher os painéis e gráficos. Nada é gravado até você conferir e confirmar.</p>
+      ${body}
+    </div>
+  `;
 }
 
 async function loadPesos(){
@@ -9999,6 +10258,11 @@ document.addEventListener('click', (e) => {
     state.coordenador.mode='list';
     if(state.coordenador.subview==='pesosprof'){ loadCoordProfessorPesos(); }
     if(state.coordenador.subview==='freqconfig'){ ensureTurnoHorariosLoaded().then(render); ensureDiasLetivosLoaded().then(render); }
+    if(state.coordenador.subview==='importarnotas'){
+      state.professor.turmasLoading = true; loadTurmas();
+      if(state.professor.disciplinas.length===0 && state.professor.disciplinasLoading) loadDisciplinas();
+      state.coordenador.assessmentsLoading = true; loadCoordAssessments();
+    }
     if(state.coordenador.subview==='periodos' && state.professor.periodosLoading){ loadPeriodos(); }
     if(state.coordenador.subview==='dashboard'){ calcExecDashboard(); }
     // "Todas as avaliações", "Turmas" e "Notas finais" mostram dados que podem ter mudado
@@ -10049,6 +10313,8 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-remove-professor'){ removeProfessor(btn.dataset.id); }
   else if(act==='coord-save-password'){ saveCoordPassword(); }
   else if(act==='coord-save-freq-password'){ saveFreqMonitorPassword(); }
+  else if(act==='cancelar-importacao-notas-csv'){ cancelarImportacaoNotasCsv(); }
+  else if(act==='confirmar-importacao-notas-csv'){ confirmarImportacaoNotasCsv(); }
   else if(act==='coord-open-results'){ openCoordResults(btn.dataset.code); }
   else if(act==='coord-back-to-list'){ state.coordenador.mode='list'; render(); }
   else if(act==='coord-calc-notas'){ calcCoordNotas(); }
@@ -10449,6 +10715,7 @@ document.addEventListener('change', (e) => {
   else if(el.id==='ai-dificuldade-input'){ p.aiGen.dificuldade = el.value; }
   else if(act==='upload-question-image'){ handleImageUpload(el.dataset.qid, el.files[0]); }
   else if(el.id==='book-file-input'){ if(el.files[0]) loadBookPdf(el.files[0]); }
+  else if(el.id==='import-notas-csv-file'){ if(el.files[0]) processarArquivoCsvNotas(el.files[0]); }
   else if(el.id==='scan-file-input'){ if(el.files[0]) scanAnswerSheet(el.files[0]); }
   else if(el.id==='slides-pdf-input'){ if(el.files[0]) handleSlidesPdfUpload(el.files[0], state.view==='coordenador' ? 'Coordenação' : (p.session?p.session.displayName:'Professor')); }
   else if(el.id==='avulso-numalt-input'){ p.avulso.form.numAlternativas = parseInt(el.value)||5; render(); }
