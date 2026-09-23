@@ -889,7 +889,7 @@ let state = {
     bloco: { turmaId:'', selectedCodes:[], list:[], listLoading:true, mode:'list', current:null,
       imprimirTurmaId:'', imprimirNomesText:'',
       lancarModo:'manual', lancarNome:'', lancarTurmaId:'', lancarStudentId:'', lancarSequencia:'',
-      scanLoading:false, scanError:'', scanReview:null, scanBloco:null, scanStudentName:'', scanTurmaName:'', scanDuplicateInfo:null,
+      scanLoading:false, scanError:'', scanReview:null, scanBloco:null, scanStudentName:'', scanTurmaName:'', scanDuplicateInfo:null, scanQueue:null,
       lancamentos:[], lancamentosLoading:false },
     manualGradePrefill: null,
     livros: [], livrosLoading: true, bancoLivroSelectedId: null,
@@ -899,11 +899,11 @@ let state = {
     quiz: { current:null, presentationMode:false, setup: null },
     roleta: { turmaId:'', pergunta:'', historico:[], current:null, spinning:false, spinDisplay:null, presentationMode:false },
     slides: { decks:[], decksLoading:false, uploadTitle:'', uploading:false, uploadError:'', uploadProgress:null, selectedDeckId:null, turmaId:'', current:null, currentSlideImg:null, engajamento:null, presentationMode:false, historico:[], historicoLoading:false },
-    leitura: { loading:false, error:'', review:null, assessment:null, studentName:'' },
+    leitura: { loading:false, error:'', review:null, assessment:null, studentName:'', scanQueue:null },
     avulso: { list:[], listLoading:true, mode:'list', form:null, current:null,
       imprimirTurmaId:'', imprimirNomesText:'',
       lancarModo:'manual', lancarNome:'', lancarTurmaId:'', lancarSequencia:'',
-      scanLoading:false, scanError:'', scanReview:null, scanAvulso:null, scanStudentName:'', scanTurmaName:'', scanTurmaId:'',
+      scanLoading:false, scanError:'', scanReview:null, scanAvulso:null, scanStudentName:'', scanTurmaName:'', scanTurmaId:'', scanQueue:null,
       respostas:[], respostasLoading:false,
       editandoGabarito:false, gabaritoEditAnswers:[], gabaritoEditError:'',
       professoresCache:null, professoresCacheLoading:false },
@@ -4299,6 +4299,7 @@ function renderBlocoScanReview(){
   }).join('');
   return `
     <div>
+      ${b.scanQueue ? `<p class="muted" style="font-size:.8rem;">📄 Página ${b.scanQueue.index+1} de ${b.scanQueue.files.length} do PDF</p>` : ''}
       <p class="muted">Aluno: <strong>${esc(b.scanStudentName)}</strong>${b.scanTurmaName?' · Turma: '+esc(b.scanTurmaName):''}</p>
       ${b.scanDuplicateInfo ? `
         <div style="background:#fdf3e8; border:1px solid var(--yellow-dark); border-radius:10px; padding:10px 14px; margin:8px 0;">
@@ -4308,8 +4309,9 @@ function renderBlocoScanReview(){
       <p class="muted" style="font-size:.85rem;">Revise questão por questão — o que veio marcado é só uma sugestão da leitura da foto. Corrija o que estiver errado antes de confirmar.</p>
       <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:6px; margin:10px 0;">${rows}</div>
       <div class="row">
-        <button class="btn btn-ghost" data-action="bloco-scan-cancel">Cancelar</button>
-        <button class="btn btn-primary" data-action="bloco-scan-confirm">Confirmar e lançar notas</button>
+        <button class="btn btn-ghost" data-action="bloco-scan-cancel">Cancelar${b.scanQueue?' tudo':''}</button>
+        ${b.scanQueue ? `<button class="btn btn-ghost" data-action="bloco-scan-pular">Pular esta página →</button>` : ''}
+        <button class="btn btn-primary" data-action="bloco-scan-confirm">Confirmar${b.scanQueue?' e ir para a próxima':' e lançar notas'}</button>
       </div>
     </div>
   `;
@@ -4324,14 +4326,15 @@ function renderDetalheBloco(){
   const alunosDaTurma = blocoTurma ? blocoTurma.students.slice().sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')) : [];
   let scanSection = '';
   if(b.scanLoading){
-    scanSection = `<div class="spinner"></div><p class="muted center">Processando a imagem...</p>`;
+    scanSection = `<div class="spinner"></div><p class="muted center">Processando ${b.scanQueue?'a página '+(b.scanQueue.index+1)+' de '+b.scanQueue.files.length:'a imagem'}...</p>`;
   } else if(b.scanReview){
     scanSection = renderBlocoScanReview();
   } else {
     scanSection = `
-      <p class="muted">Envie a foto do cartão-resposta preenchido pelo aluno (gerado em "Imprimir cartões-resposta" abaixo), com o QR code visível, a folha reta e bem iluminada.</p>
-      <input type="file" id="bloco-scan-file-input" accept="image/*" capture="environment">
+      <p class="muted">Envie a foto do cartão-resposta preenchido pelo aluno (gerado em "Imprimir cartões-resposta" abaixo), com o QR code visível, a folha reta e bem iluminada. Você também pode escanear <strong>vários cartões de uma vez num único PDF</strong> (um cartão por página) — o sistema separa as páginas e mostra a revisão de cada aluno, uma de cada vez.</p>
+      <input type="file" id="bloco-scan-file-input" accept="image/*,application/pdf" capture="environment">
       ${b.scanError ? `<p class="err">${esc(b.scanError)}</p>` : ''}
+      ${b.scanQueue ? `<div class="row" style="margin-top:8px; align-items:center; gap:10px;"><span class="muted" style="font-size:.85rem;">Página ${b.scanQueue.index+1} de ${b.scanQueue.files.length} do PDF.</span><button class="btn btn-ghost btn-sm" data-action="bloco-scan-pular">Pular esta página →</button></div>` : ''}
     `;
   }
   let qStart = 1;
@@ -4610,6 +4613,26 @@ async function lancarBlocoManual(){
   b.lancarStudentId=''; b.lancarSequencia='';
   render();
 }
+async function iniciarLeituraBloco(file){
+  const p = state.professor;
+  const b = p.bloco;
+  if(!isPdfFile(file)){ b.scanQueue = null; await scanBlocoSheet(file); return; }
+  b.scanError = ''; b.scanLoading = true; render();
+  let paginas;
+  try{ paginas = await pdfFileToImageFiles(file); }
+  catch(e){ b.scanLoading=false; b.scanError='Não foi possível abrir esse PDF. Confira se o arquivo não está corrompido.'; render(); return; }
+  if(paginas.length===0){ b.scanLoading=false; b.scanError='Esse PDF não tem páginas.'; render(); return; }
+  b.scanQueue = { files: paginas, index: 0 };
+  await scanBlocoSheet(paginas[0]);
+}
+async function blocoScanAvancarFila(){
+  const p = state.professor;
+  const b = p.bloco;
+  const q = b.scanQueue;
+  if(!q || q.index+1 >= q.files.length){ b.scanQueue = null; render(); return; }
+  q.index++;
+  await scanBlocoSheet(q.files[q.index]);
+}
 async function scanBlocoSheet(file){
   const p = state.professor;
   const b = p.bloco;
@@ -4702,9 +4725,9 @@ async function confirmBlocoScan(){
     byCode[r.code].push({ questionId: r.questionId, type: r.type, chosenIdx });
   });
   await lancarBlocoResultados(bloco, b.scanStudentName, b.scanTurmaName, byCode, true);
-  alert('Notas lançadas em cada avaliação a partir da leitura do gabarito.');
   b.scanReview = null; b.scanBloco = null; b.scanStudentName = ''; b.scanTurmaName = ''; b.scanError = ''; b.scanDuplicateInfo = null;
-  render();
+  if(b.scanQueue){ await blocoScanAvancarFila(); }
+  else { alert('Notas lançadas em cada avaliação a partir da leitura do gabarito.'); render(); }
 }
 
 /* ---------------- PAINEL DO PROFESSOR ---------------- */
@@ -4849,7 +4872,7 @@ function renderLeituraGabaritos(){
   const p = state.professor;
   const l = p.leitura;
   if(l.loading){
-    return `<div class="card"><h2>Leitura de Gabaritos</h2><div class="spinner"></div><p class="muted center">Processando a imagem...</p></div>`;
+    return `<div class="card"><h2>Leitura de Gabaritos</h2><div class="spinner"></div><p class="muted center">Processando ${l.scanQueue?'a página '+(l.scanQueue.index+1)+' de '+l.scanQueue.files.length:'a imagem'}...</p></div>`;
   }
   if(l.review){
     const a = l.assessment;
@@ -4879,12 +4902,14 @@ function renderLeituraGabaritos(){
     return `
       <div class="card">
         <h2>Confirme as respostas</h2>
+        ${l.scanQueue ? `<p class="muted" style="font-size:.8rem;">📄 Página ${l.scanQueue.index+1} de ${l.scanQueue.files.length} do PDF</p>` : ''}
         <p class="muted">Aluno identificado: <strong>${esc(l.studentName)}</strong> · ${esc(a.title)}</p>
         <p class="muted" style="font-size:.85rem;">Revise questão por questão — o que veio marcado é só uma sugestão da leitura da foto. Corrija o que estiver errado antes de confirmar.</p>
         ${rows}
         <div class="row" style="margin-top:14px;">
-          <button class="btn btn-ghost" data-action="scan-cancel">Cancelar</button>
-          <button class="btn btn-primary" data-action="scan-confirm">Confirmar e lançar nota</button>
+          <button class="btn btn-ghost" data-action="scan-cancel">Cancelar${l.scanQueue?' tudo':''}</button>
+          ${l.scanQueue ? `<button class="btn btn-ghost" data-action="scan-pular">Pular esta página →</button>` : ''}
+          <button class="btn btn-primary" data-action="scan-confirm">Confirmar${l.scanQueue?' e ir para a próxima':' e lançar nota'}</button>
         </div>
       </div>
     `;
@@ -4892,9 +4917,10 @@ function renderLeituraGabaritos(){
   return `
     <div class="card">
       <h2>Leitura de Gabaritos</h2>
-      <p class="muted">Tire uma foto (ou envie uma já tirada) do cartão-resposta preenchido pelo aluno. O cartão precisa ser um dos gerados em "Gabaritos por aluno" ou "Bloco de Provas", com o QR code visível e a folha o mais reta e bem iluminada possível.</p>
-      <input type="file" id="scan-file-input" accept="image/*" capture="environment">
+      <p class="muted">Tire uma foto (ou envie uma já tirada) do cartão-resposta preenchido pelo aluno. O cartão precisa ser um dos gerados em "Gabaritos por aluno" ou "Bloco de Provas", com o QR code visível e a folha o mais reta e bem iluminada possível. Você também pode escanear <strong>vários cartões de uma vez num único PDF</strong> (um cartão por página) — o sistema separa as páginas e mostra a revisão de cada aluno, uma de cada vez.</p>
+      <input type="file" id="scan-file-input" accept="image/*,application/pdf" capture="environment">
       ${l.error ? `<p class="err">${esc(l.error)}</p>` : ''}
+      ${l.scanQueue ? `<div class="row" style="margin-top:8px; align-items:center; gap:10px;"><span class="muted" style="font-size:.85rem;">Página ${l.scanQueue.index+1} de ${l.scanQueue.files.length} do PDF.</span><button class="btn btn-ghost btn-sm" data-action="scan-pular">Pular esta página →</button></div>` : ''}
     </div>
   `;
 }
@@ -5080,13 +5106,15 @@ function renderAvulsoScanReview(){
   `;
   return `
     <div>
+      ${av.scanQueue ? `<p class="muted" style="font-size:.8rem;">📄 Página ${av.scanQueue.index+1} de ${av.scanQueue.files.length} do PDF</p>` : ''}
       <p class="muted">Aluno: <strong>${esc(av.scanStudentName)}</strong>${av.scanTurmaId?' · Turma: '+esc(state.professor.turmas.find(t=>t.id===av.scanTurmaId)?.name||av.scanTurmaName):''} · ${esc(gab.titulo||'Gabarito Avulso')}</p>
       ${turmaSelectHtml}
       <p class="muted" style="font-size:.85rem;">Revise questão por questão — o que veio marcado é só uma sugestão da leitura da foto. Corrija o que estiver errado antes de confirmar.</p>
       <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:6px; margin:10px 0;">${rows}</div>
       <div class="row">
-        <button class="btn btn-ghost" data-action="avulso-scan-cancel">Cancelar</button>
-        <button class="btn btn-primary" data-action="avulso-scan-confirm">Confirmar e lançar nota</button>
+        <button class="btn btn-ghost" data-action="avulso-scan-cancel">Cancelar${av.scanQueue?' tudo':''}</button>
+        ${av.scanQueue ? `<button class="btn btn-ghost" data-action="avulso-scan-pular">Pular esta página →</button>` : ''}
+        <button class="btn btn-primary" data-action="avulso-scan-confirm">Confirmar${av.scanQueue?' e ir para a próxima':' e lançar nota'}</button>
       </div>
     </div>
   `;
@@ -5157,14 +5185,15 @@ function renderDetalheAvulso(){
   const turmas = state.professor.turmas;
   let scanSection = '';
   if(av.scanLoading){
-    scanSection = `<div class="spinner"></div><p class="muted center">Processando a imagem...</p>`;
+    scanSection = `<div class="spinner"></div><p class="muted center">Processando ${av.scanQueue?'a página '+(av.scanQueue.index+1)+' de '+av.scanQueue.files.length:'a imagem'}...</p>`;
   } else if(av.scanReview){
     scanSection = renderAvulsoScanReview();
   } else {
     scanSection = `
-      <p class="muted">Envie a foto do cartão-resposta preenchido pelo aluno (gerado em "Imprimir cartões-resposta" abaixo), com o QR code visível, a folha reta e bem iluminada.</p>
-      <input type="file" id="avulso-scan-file-input" accept="image/*" capture="environment">
+      <p class="muted">Envie a foto do cartão-resposta preenchido pelo aluno (gerado em "Imprimir cartões-resposta" abaixo), com o QR code visível, a folha reta e bem iluminada. Você também pode escanear <strong>vários cartões de uma vez num único PDF</strong> (um cartão por página) — o sistema separa as páginas e mostra a revisão de cada aluno, uma de cada vez.</p>
+      <input type="file" id="avulso-scan-file-input" accept="image/*,application/pdf" capture="environment">
       ${av.scanError ? `<p class="err">${esc(av.scanError)}</p>` : ''}
+      ${av.scanQueue ? `<div class="row" style="margin-top:8px; align-items:center; gap:10px;"><span class="muted" style="font-size:.85rem;">Página ${av.scanQueue.index+1} de ${av.scanQueue.files.length} do PDF.</span><button class="btn btn-ghost btn-sm" data-action="avulso-scan-pular">Pular esta página →</button></div>` : ''}
     `;
   }
   const rows = (av.respostas||[]).slice().sort((a,b)=>(a.turmaName||'').localeCompare(b.turmaName||'')||a.studentName.localeCompare(b.studentName));
@@ -8492,6 +8521,29 @@ function loadImageFile(file){
     img.src = url;
   });
 }
+function isPdfFile(file){
+  return !!file && (file.type==='application/pdf' || /\.pdf$/i.test(file.name||''));
+}
+// Divide um PDF com vários cartões-resposta escaneados (um por página) em uma lista de imagens,
+// uma por página, na resolução necessária pra leitura confiável das bolinhas. Usada pra permitir
+// que o professor/coordenador escaneie a pilha inteira de cartões de uma vez, em vez de fotografar
+// um por um — cada página passa pelo mesmo pipeline de leitura (QR + bolinhas) de uma foto avulsa.
+async function pdfFileToImageFiles(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const files = [];
+  for(let i=1; i<=pdf.numPages; i++){
+    const page = await pdf.getPage(i);
+    const viewport = page.getViewport({ scale: 2.5 });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width; canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.92));
+    if(blob) files.push(new File([blob], `pagina-${i}.jpg`, { type:'image/jpeg' }));
+  }
+  return files;
+}
 
 function mmToPixel(xmm, ymm, basis){
   const fx = xmm / OMR_LAYOUT.qrSize;
@@ -8534,6 +8586,24 @@ function pickConfidentBubble(darknesses){
   return confident ? minIdx : null;
 }
 
+async function iniciarLeituraGabarito(file){
+  const p = state.professor;
+  if(!isPdfFile(file)){ p.leitura.scanQueue = null; await scanAnswerSheet(file); return; }
+  p.leitura.error = ''; p.leitura.loading = true; render();
+  let paginas;
+  try{ paginas = await pdfFileToImageFiles(file); }
+  catch(e){ p.leitura.loading=false; p.leitura.error='Não foi possível abrir esse PDF. Confira se o arquivo não está corrompido.'; render(); return; }
+  if(paginas.length===0){ p.leitura.loading=false; p.leitura.error='Esse PDF não tem páginas.'; render(); return; }
+  p.leitura.scanQueue = { files: paginas, index: 0 };
+  await scanAnswerSheet(paginas[0]);
+}
+async function leituraScanAvancarFila(){
+  const p = state.professor;
+  const q = p.leitura.scanQueue;
+  if(!q || q.index+1 >= q.files.length){ p.leitura.scanQueue = null; render(); return; }
+  q.index++;
+  await scanAnswerSheet(q.files[q.index]);
+}
 async function scanAnswerSheet(file){
   const p = state.professor;
   p.leitura.error = '';
@@ -8644,9 +8714,10 @@ async function confirmScannedGrade(){
   existing = existing.filter(x=>x.studentName!==p.leitura.studentName);
   existing.push({ studentName:p.leitura.studentName, submittedAt:Date.now(), total, details, answers, tabSwitches:0, fullscreenExits:0, scanned:true });
   await window.storage.set(`responses:${a.code}`, JSON.stringify(existing), true);
-  alert('Nota lançada a partir da leitura do gabarito.');
-  p.leitura = { loading:false, error:'', review:null, assessment:null, studentName:'' };
-  render();
+  const scanQueue = p.leitura.scanQueue;
+  p.leitura = { loading:false, error:'', review:null, assessment:null, studentName:'', scanQueue };
+  if(scanQueue){ await leituraScanAvancarFila(); }
+  else { alert('Nota lançada a partir da leitura do gabarito.'); render(); }
 }
 
 function generateQrDataUrl(text, size){
@@ -9236,6 +9307,28 @@ async function lancarAvulsoManual(){
   render();
 }
 
+// Ponto de entrada do upload: se for um PDF com vários cartões escaneados, quebra em uma página por
+// imagem e começa a fila de leitura (uma revisão por vez); se for uma imagem só, segue como antes.
+async function iniciarLeituraAvulso(file){
+  const p = state.professor;
+  const av = p.avulso;
+  if(!isPdfFile(file)){ av.scanQueue = null; await scanAvulsoSheet(file); return; }
+  av.scanError = ''; av.scanLoading = true; render();
+  let paginas;
+  try{ paginas = await pdfFileToImageFiles(file); }
+  catch(e){ av.scanLoading=false; av.scanError='Não foi possível abrir esse PDF. Confira se o arquivo não está corrompido.'; render(); return; }
+  if(paginas.length===0){ av.scanLoading=false; av.scanError='Esse PDF não tem páginas.'; render(); return; }
+  av.scanQueue = { files: paginas, index: 0 };
+  await scanAvulsoSheet(paginas[0]);
+}
+async function avulsoScanAvancarFila(){
+  const p = state.professor;
+  const av = p.avulso;
+  const q = av.scanQueue;
+  if(!q || q.index+1 >= q.files.length){ av.scanQueue = null; render(); return; }
+  q.index++;
+  await scanAvulsoSheet(q.files[q.index]);
+}
 async function scanAvulsoSheet(file){
   const p = state.professor;
   const av = p.avulso;
@@ -9326,9 +9419,9 @@ async function confirmAvulsoScan(){
   });
   const ok = await lancarRespostaAvulso(gab.code, av.scanStudentName, av.scanTurmaId, t?t.name:av.scanTurmaName, respostas, true);
   if(!ok) return;
-  alert('Nota lançada a partir da leitura do gabarito.');
   av.scanReview = null; av.scanAvulso = null; av.scanStudentName = ''; av.scanTurmaName = ''; av.scanTurmaId = ''; av.scanError = '';
-  render();
+  if(av.scanQueue){ await avulsoScanAvancarFila(); }
+  else { alert('Nota lançada a partir da leitura do gabarito.'); render(); }
 }
 
 async function imprimirCartoesAvulso(){
@@ -10840,10 +10933,12 @@ document.addEventListener('click', (e) => {
   else if(act==='bloco-imprimir-cartoes'){ imprimirCartoesBloco(); }
   else if(act==='bloco-lancar-modo'){ p.bloco.lancarModo = btn.dataset.modo; render(); }
   else if(act==='bloco-lancar-manual'){ lancarBlocoManual(); }
-  else if(act==='bloco-scan-cancel'){ p.bloco.scanReview=null; p.bloco.scanBloco=null; p.bloco.scanError=''; p.bloco.scanDuplicateInfo=null; render(); }
+  else if(act==='bloco-scan-cancel'){ p.bloco.scanReview=null; p.bloco.scanBloco=null; p.bloco.scanError=''; p.bloco.scanDuplicateInfo=null; p.bloco.scanQueue=null; render(); }
   else if(act==='bloco-scan-confirm'){ confirmBlocoScan(); }
-  else if(act==='scan-cancel'){ p.leitura = { loading:false, error:'', review:null, assessment:null, studentName:'' }; render(); }
+  else if(act==='bloco-scan-pular'){ blocoScanAvancarFila(); }
+  else if(act==='scan-cancel'){ p.leitura = { loading:false, error:'', review:null, assessment:null, studentName:'', scanQueue:null }; render(); }
   else if(act==='scan-confirm'){ confirmScannedGrade(); }
+  else if(act==='scan-pular'){ leituraScanAvancarFila(); }
   else if(act==='avulso-novo'){ abrirNovoAvulso(); }
   else if(act==='avulso-abrir'){ abrirAvulso(btn.dataset.id); }
   else if(act==='avulso-excluir'){ excluirAvulso(btn.dataset.id); }
@@ -10860,8 +10955,9 @@ document.addEventListener('click', (e) => {
   else if(act==='avulso-imprimir-cartoes'){ imprimirCartoesAvulso(); }
   else if(act==='avulso-lancar-modo'){ p.avulso.lancarModo = btn.dataset.modo; p.avulso.scanReview=null; p.avulso.scanError=''; render(); }
   else if(act==='avulso-lancar-manual'){ lancarAvulsoManual(); }
-  else if(act==='avulso-scan-cancel'){ p.avulso.scanReview=null; p.avulso.scanAvulso=null; p.avulso.scanError=''; render(); }
+  else if(act==='avulso-scan-cancel'){ p.avulso.scanReview=null; p.avulso.scanAvulso=null; p.avulso.scanError=''; p.avulso.scanQueue=null; render(); }
   else if(act==='avulso-scan-confirm'){ confirmAvulsoScan(); }
+  else if(act==='avulso-scan-pular'){ avulsoScanAvancarFila(); }
   else if(act==='avulso-imprimir-lista'){ imprimirListaNotasAvulso(); }
   else if(act==='avulso-excluir-resposta'){ excluirRespostaAvulso(btn.dataset.name); }
   else if(act==='avulso-editar-gabarito'){
@@ -11060,7 +11156,7 @@ document.addEventListener('input', (e) => {
   else if(el.id==='bloco-lancar-turma-select'){ p.bloco.lancarTurmaId = el.value; }
   else if(el.id==='bloco-lancar-aluno-select'){ p.bloco.lancarStudentId = el.value; }
   else if(el.id==='bloco-lancar-sequencia-input'){ p.bloco.lancarSequencia = el.value; }
-  else if(el.id==='bloco-scan-file-input'){ if(el.files[0]) scanBlocoSheet(el.files[0]); }
+  else if(el.id==='bloco-scan-file-input'){ if(el.files[0]) iniciarLeituraBloco(el.files[0]); }
   else if(el.id==='avulso-lancar-sequencia-input'){ p.avulso.lancarSequencia = el.value; }
 });
 
@@ -11107,7 +11203,7 @@ document.addEventListener('change', (e) => {
   else if(act==='upload-question-image'){ handleImageUpload(el.dataset.qid, el.files[0]); }
   else if(el.id==='book-file-input'){ if(el.files[0]) loadBookPdf(el.files[0]); }
   else if(el.id==='import-notas-csv-file'){ if(el.files[0]) processarArquivoCsvNotas(el.files[0]); }
-  else if(el.id==='scan-file-input'){ if(el.files[0]) scanAnswerSheet(el.files[0]); }
+  else if(el.id==='scan-file-input'){ if(el.files[0]) iniciarLeituraGabarito(el.files[0]); }
   else if(el.id==='slides-pdf-input'){ if(el.files[0]) handleSlidesPdfUpload(el.files[0], state.view==='coordenador' ? 'Coordenação' : (p.session?p.session.displayName:'Professor')); }
   else if(el.id==='avulso-numalt-input'){ p.avulso.form.numAlternativas = parseInt(el.value)||5; render(); }
   else if(el.id==='avulso-unidade-input'){ p.avulso.form.unidade = el.value; render(); }
@@ -11129,7 +11225,7 @@ document.addEventListener('change', (e) => {
   else if(el.id==='chamada-data-fim-input'){ const {ch}=getChamadaCtx(); ch.dataFim = el.value; ch.historico = null; render(); }
   else if(el.id==='freq-painel-turma-select'){ const fp = state.view==='freqmonitor' ? state.freqMonitor.painel : state.professor.freqPainel; fp.turmaId = el.value; render(); }
   else if(el.id==='chamada-data-input'){ const {ch}=getChamadaCtx(); ch.data = el.value; ch.presentes = []; ch.mensagem=''; if(ch.turmaId) loadChamada(); else render(); }
-  else if(el.id==='avulso-scan-file-input'){ if(el.files[0]) scanAvulsoSheet(el.files[0]); }
+  else if(el.id==='avulso-scan-file-input'){ if(el.files[0]) iniciarLeituraAvulso(el.files[0]); }
   else if(el.id==='avulso-scan-turma-select'){ p.avulso.scanTurmaId = el.value; render(); }
   else if(el.id==='professor-photo-input'){ if(el.files[0]) handleProfessorPhotoUpload(el.files[0]); }
 });
