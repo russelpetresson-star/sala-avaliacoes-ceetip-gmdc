@@ -903,9 +903,10 @@ let state = {
     avulso: { list:[], listLoading:true, mode:'list', form:null, current:null,
       imprimirTurmaId:'', imprimirNomesText:'',
       lancarModo:'manual', lancarNome:'', lancarTurmaId:'', lancarSequencia:'',
-      scanLoading:false, scanError:'', scanReview:null, scanAvulso:null, scanStudentName:'', scanTurmaName:'',
+      scanLoading:false, scanError:'', scanReview:null, scanAvulso:null, scanStudentName:'', scanTurmaName:'', scanTurmaId:'',
       respostas:[], respostasLoading:false,
-      editandoGabarito:false, gabaritoEditAnswers:[], gabaritoEditError:'' },
+      editandoGabarito:false, gabaritoEditAnswers:[], gabaritoEditError:'',
+      professoresCache:null, professoresCacheLoading:false },
     unlockRequests: [], unlockRequestsLoading: true,
     periodos: {}, periodosLoading: true,
     pickerOpen:false, pickerSelected:[],
@@ -4922,7 +4923,8 @@ function renderListaAvulsos(){
       ${list.length===0 ? '<p class="muted center">Nenhum gabarito avulso criado ainda.</p>' : list.map(g => `
         <div class="list-item">
           <div>
-            <strong>${esc(g.titulo)}</strong> <span class="muted" style="font-size:.82rem;">· código ${esc(g.code)}</span><br>
+            <strong>${esc(g.titulo)}</strong> <span class="muted" style="font-size:.82rem;">· código ${esc(g.code)}</span>
+            ${g.instrumento ? `<span class="pill" style="font-size:.7rem; padding:1px 8px; background:#dff0d8; margin-left:6px;">🔗 substitui ${esc(instrumentoBaseTitle(g.instrumento))}</span>` : ''}<br>
             <span class="muted" style="font-size:.82rem;">${g.unidade?esc(g.unidade)+' · ':''}${g.dataProva?new Date(g.dataProva+'T00:00:00').toLocaleDateString('pt-BR')+' · ':''}${g.numQuestoes} questões · ${(g.disciplinas||[]).map(d=>esc(d.nome)).join(', ')}</span>
           </div>
           <div class="row" style="flex:0 0 auto;">
@@ -4938,15 +4940,22 @@ function renderListaAvulsos(){
 function renderNovoAvulso(){
   const p = state.professor;
   const f = p.avulso.form;
+  const profCache = p.avulso.professoresCache || [];
+  const instrumentosCompativeis = INSTRUMENTOS.filter(i => ['avaliacao','diagnostica','exercicios'].includes(i.key));
+  const editando = !!f.editingGabaritoId;
   return `
     <div class="card">
-      <h2>Novo gabarito avulso</h2>
+      <h2>${editando ? 'Editar configuração do gabarito' : 'Novo gabarito avulso'}</h2>
+      ${editando ? '<p class="muted" style="font-size:.85rem;">A quantidade de questões, alternativas e os intervalos de cada disciplina não podem ser alterados aqui (já podem estar impressos/aplicados). Você pode ajustar título, unidade, o instrumento substituído e o vínculo de professor(a)/disciplina de cada bloco.</p>' : ''}
       <label>Título / nome da prova</label>
       <input type="text" id="avulso-titulo-input" class="input" value="${esc(f.titulo)}" placeholder="Ex: Prova Integrada I Unidade">
       <div class="row" style="gap:10px; margin-top:8px;">
         <div style="flex:1;">
           <label>Unidade</label>
-          <input type="text" id="avulso-unidade-input" class="input" value="${esc(f.unidade)}" placeholder="Ex: I Unidade">
+          <select id="avulso-unidade-input" class="input">
+            <option value="">— selecionar —</option>
+            ${UNIDADES.map(u => `<option value="${esc(u)}" ${f.unidade===u?'selected':''}>${esc(u)}</option>`).join('')}
+          </select>
         </div>
         <div style="flex:1;">
           <label>Data da prova</label>
@@ -4956,36 +4965,86 @@ function renderNovoAvulso(){
       <div class="row" style="gap:10px; margin-top:8px;">
         <div style="flex:1;">
           <label>Quantidade de questões</label>
-          <input type="number" id="avulso-numquestoes-input" class="input" min="1" max="150" value="${f.numQuestoes}">
+          <input type="number" id="avulso-numquestoes-input" class="input" min="1" max="150" value="${f.numQuestoes}" ${editando?'disabled':''}>
         </div>
         <div style="flex:1;">
           <label>Alternativas por questão</label>
-          <select id="avulso-numalt-input" class="input">
+          <select id="avulso-numalt-input" class="input" ${editando?'disabled':''}>
             ${[2,3,4,5,6].map(n => `<option value="${n}" ${f.numAlternativas===n?'selected':''}>${n} (A–${OPT_LETTERS[n-1]})</option>`).join('')}
           </select>
         </div>
       </div>
 
-      <h3 style="margin-top:18px;">Disciplinas por intervalo de questões</h3>
-      <p class="muted" style="font-size:.85rem;">Ex.: questão 1 a 10 – Química, questão 11 a 20 – Biologia...</p>
-      ${f.disciplinas.map(d => `
-        <div class="row" style="gap:8px; margin-bottom:6px; align-items:center; flex-wrap:wrap;">
-          <input type="text" class="input" style="flex:2; min-width:140px;" data-action="avulso-disc-nome" data-id="${d.id}" value="${esc(d.nome)}" placeholder="Nome da disciplina">
-          <span class="muted">questão</span>
-          <input type="number" class="input" style="flex:0 0 65px;" min="1" max="${f.numQuestoes}" data-action="avulso-disc-inicio" data-id="${d.id}" value="${d.inicio}">
-          <span class="muted">a</span>
-          <input type="number" class="input" style="flex:0 0 65px;" min="1" max="${f.numQuestoes}" data-action="avulso-disc-fim" data-id="${d.id}" value="${d.fim}">
-          <button class="btn btn-ghost btn-sm" data-action="avulso-disc-remover" data-id="${d.id}">✕</button>
-        </div>
-      `).join('')}
-      <button class="btn btn-ghost btn-sm" data-action="avulso-disc-adicionar">+ Adicionar disciplina</button>
+      <h3 style="margin-top:18px;">Esse resultado substitui um instrumento avaliativo?</h3>
+      <p class="muted" style="font-size:.85rem;">Se você escolher um instrumento, a nota de cada aluno (por disciplina, no intervalo de questões definido abaixo) passa a valer automaticamente como esse instrumento — já aparece no painel do(a) professor(a) vinculado(a), somando na nota final do bimestre. Só funciona para disciplinas com professor(a) selecionado(a) abaixo.</p>
+      <select id="avulso-instrumento-input" class="input">
+        <option value="">Não substituir nenhum instrumento (apenas registrar as notas aqui)</option>
+        ${instrumentosCompativeis.map(i => `<option value="${i.key}" ${f.instrumento===i.key?'selected':''}>${esc(i.baseTitle)}</option>`).join('')}
+      </select>
+      <p class="muted" style="font-size:.78rem; margin-top:4px;">A Autoavaliação não pode ser substituída por aqui — ela é sempre calculada a partir de fichas, frequência de login e entrega de exercícios.</p>
+      ${f.instrumento && !f.unidade ? '<p class="err" style="font-size:.82rem; margin-top:4px;">Selecione a unidade acima para poder substituir um instrumento.</p>' : ''}
 
-      <p class="muted" style="font-size:.85rem; margin-top:18px;">O gabarito correto é informado depois, já na tela do gabarito avulso — organizado por disciplina, em colunas, pra evitar erro de contagem. Você já pode imprimir os cartões-resposta assim que salvar aqui.</p>
+      <h3 style="margin-top:18px;">Disciplinas por intervalo de questões</h3>
+      <p class="muted" style="font-size:.85rem;">Ex.: questão 1 a 10 – Química, questão 11 a 20 – Biologia... Para que a nota entre automaticamente no painel de um(a) professor(a), vincule professor(a) + disciplina. Se disciplinas diferentes séries/turmas são dadas por professores diferentes (ex.: Português da 1ª, da 2ª e da 3ª série), adicione um vínculo pra cada um, marcando as turmas de cada professor(a).</p>
+      ${profCache.length===0 && !p.avulso.professoresCacheLoading ? '<p class="muted" style="font-size:.82rem;">Nenhum professor ativo encontrado — os blocos abaixo poderão ser criados só com o nome, sem vínculo automático.</p>' : ''}
+      ${f.disciplinas.map(d => {
+        const vinculos = d.vinculos || [];
+        const precisaTurma = vinculos.length > 1;
+        return `
+        <div class="card" style="background:#f7f5f2; margin-bottom:8px; padding:10px;">
+          <div class="row" style="gap:8px; align-items:center; flex-wrap:wrap;">
+            <input type="text" class="input" style="flex:2; min-width:140px;" data-action="avulso-disc-nome" data-id="${d.id}" value="${esc(d.nome)}" placeholder="Nome da disciplina (aparece no cartão impresso)">
+            <span class="muted">questão</span>
+            <input type="number" class="input" style="flex:0 0 65px;" min="1" max="${f.numQuestoes}" data-action="avulso-disc-inicio" data-id="${d.id}" value="${d.inicio}" ${editando?'disabled':''}>
+            <span class="muted">a</span>
+            <input type="number" class="input" style="flex:0 0 65px;" min="1" max="${f.numQuestoes}" data-action="avulso-disc-fim" data-id="${d.id}" value="${d.fim}" ${editando?'disabled':''}>
+            ${editando ? '' : `<button class="btn btn-ghost btn-sm" data-action="avulso-disc-remover" data-id="${d.id}">✕</button>`}
+          </div>
+          ${vinculos.map((v, vidx) => {
+            const prof = profCache.find(pr=>pr.id===v.professorId);
+            const discOptions = prof ? prof.disciplinas : [];
+            return `
+            <div class="row" style="gap:8px; margin-top:8px; padding-top:8px; border-top:1px dashed #d8d2c8; flex-wrap:wrap; align-items:flex-end;">
+              <div style="flex:1; min-width:160px;">
+                <label style="font-size:.75rem;">${vinculos.length>1?`Professor(a) (vínculo ${vidx+1})`:'Professor(a) (opcional)'}</label>
+                <select class="input" data-action="avulso-vinc-prof" data-id="${d.id}" data-vid="${v.id}" ${p.avulso.professoresCacheLoading?'disabled':''}>
+                  <option value="">— sem vínculo automático —</option>
+                  ${profCache.map(pr => `<option value="${pr.id}" ${v.professorId===pr.id?'selected':''}>${esc(pr.name)}</option>`).join('')}
+                </select>
+              </div>
+              <div style="flex:1; min-width:160px;">
+                <label style="font-size:.75rem;">Disciplina do(a) professor(a)</label>
+                <select class="input" data-action="avulso-vinc-disciplina" data-id="${d.id}" data-vid="${v.id}" ${!v.professorId?'disabled':''}>
+                  <option value="">${v.professorId?'— selecionar —':'selecione o(a) professor(a) primeiro'}</option>
+                  ${discOptions.map(disc => `<option value="${disc.id}" ${v.disciplinaId===disc.id?'selected':''}>${esc(disc.name)}</option>`).join('')}
+                </select>
+              </div>
+              ${vinculos.length>1 ? `<button class="btn btn-ghost btn-sm" data-action="avulso-vinc-remover" data-id="${d.id}" data-vid="${v.id}" style="flex:0 0 auto;">✕ vínculo</button>` : ''}
+              <div style="flex-basis:100%;">
+                <label style="font-size:.75rem;">${precisaTurma?'Turmas deste professor(a) (obrigatório com mais de um vínculo)':'Turmas (deixe em branco = todas as turmas deste gabarito)'}</label>
+                <div class="row" style="gap:4px 10px; flex-wrap:wrap;">
+                  ${(state.professor.turmas||[]).map(t => `
+                    <label style="display:flex; align-items:center; gap:4px; font-weight:400; text-transform:none; font-size:.8rem; flex:0 0 auto;">
+                      <input type="checkbox" data-action="avulso-vinc-toggle-turma" data-id="${d.id}" data-vid="${v.id}" data-tid="${t.id}" ${(v.turmaIds||[]).includes(t.id)?'checked':''}> ${esc(t.name)}
+                    </label>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          `;}).join('')}
+          <div class="row" style="margin-top:8px;">
+            <button class="btn btn-ghost btn-sm" data-action="avulso-vinc-adicionar" data-id="${d.id}">+ Adicionar vínculo (outro professor/série)</button>
+          </div>
+        </div>
+      `;}).join('')}
+      ${editando ? '' : '<button class="btn btn-ghost btn-sm" data-action="avulso-disc-adicionar">+ Adicionar disciplina</button>'}
+
+      ${editando ? '' : '<p class="muted" style="font-size:.85rem; margin-top:18px;">O gabarito correto é informado depois, já na tela do gabarito avulso — organizado por disciplina, em colunas, pra evitar erro de contagem. Você já pode imprimir os cartões-resposta assim que salvar aqui.</p>'}
 
       <div id="avulso-err"></div>
       <div class="row" style="margin-top:14px;">
-        <button class="btn btn-ghost" data-action="avulso-cancelar-novo">Cancelar</button>
-        <button class="btn btn-primary" data-action="avulso-salvar">Salvar gabarito avulso</button>
+        <button class="btn btn-ghost" data-action="${editando?'avulso-cancelar-edicao':'avulso-cancelar-novo'}">Cancelar</button>
+        <button class="btn btn-primary" data-action="${editando?'avulso-salvar-edicao':'avulso-salvar'}">${editando?'Salvar alterações':'Salvar gabarito avulso'}</button>
       </div>
     </div>
   `;
@@ -5012,9 +5071,17 @@ function renderAvulsoScanReview(){
       </div>
     </div>
   `).join('');
+  const turmaSelectHtml = av.scanTurmaId ? '' : `
+    <p class="err" style="font-size:.85rem;">Não foi possível identificar a turma automaticamente por este cartão${av.scanTurmaName?' ("'+esc(av.scanTurmaName)+'" não bate com nenhuma turma cadastrada)':''}. Selecione a turma do aluno para poder confirmar:</p>
+    <select id="avulso-scan-turma-select" class="input">
+      <option value="">— selecione a turma —</option>
+      ${state.professor.turmas.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}
+    </select>
+  `;
   return `
     <div>
-      <p class="muted">Aluno: <strong>${esc(av.scanStudentName)}</strong>${av.scanTurmaName?' · Turma: '+esc(av.scanTurmaName):''} · ${esc(gab.titulo||'Gabarito Avulso')}</p>
+      <p class="muted">Aluno: <strong>${esc(av.scanStudentName)}</strong>${av.scanTurmaId?' · Turma: '+esc(state.professor.turmas.find(t=>t.id===av.scanTurmaId)?.name||av.scanTurmaName):''} · ${esc(gab.titulo||'Gabarito Avulso')}</p>
+      ${turmaSelectHtml}
       <p class="muted" style="font-size:.85rem;">Revise questão por questão — o que veio marcado é só uma sugestão da leitura da foto. Corrija o que estiver errado antes de confirmar.</p>
       <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(190px,1fr)); gap:6px; margin:10px 0;">${rows}</div>
       <div class="row">
@@ -5126,7 +5193,13 @@ function renderDetalheAvulso(){
       <button class="btn btn-ghost btn-sm" data-action="avulso-voltar-lista">← Voltar</button>
       <h2>${esc(gab.titulo)}</h2>
       <p class="muted">${gab.unidade?esc(gab.unidade)+' · ':''}${gab.dataProva?new Date(gab.dataProva+'T00:00:00').toLocaleDateString('pt-BR')+' · ':''}código <strong>${esc(gab.code)}</strong> · ${gab.numQuestoes} questões, ${gab.numAlternativas} alternativas</p>
-      <p class="muted" style="font-size:.85rem;">${(gab.disciplinas||[]).map(d=>`${esc(d.nome)} (Q${d.inicio}–${d.fim})`).join(' · ')}</p>
+      <p class="muted" style="font-size:.85rem;">${(gab.disciplinas||[]).map(d=>{
+        const vinc = avulsoBlocoVinculos(d);
+        const tag = vinc.length===0 ? '' : ' · <span style="color:#2b6f76;">🔗 '+vinc.map(v=>esc(v.professorName||'')+(v.turmaIds&&v.turmaIds.length?' ('+v.turmaIds.length+' turma(s))':'')).join(', ')+'</span>';
+        return `${esc(d.nome)} (Q${d.inicio}–${d.fim})${tag}`;
+      }).join(' · ')}</p>
+      ${gab.instrumento ? `<p class="muted" style="font-size:.85rem; background:#eef6ff; padding:6px 10px; border-radius:6px;">✅ As notas de cada bloco vinculado a professor(a)+disciplina já entram automaticamente como <strong>${esc(instrumentoBaseTitle(gab.instrumento))}</strong> na ${esc(gab.unidade)}, no painel do(a) professor(a) correspondente. Só valem para alunos lançados com turma.</p>` : `<p class="muted" style="font-size:.85rem;">Este gabarito não está configurado para substituir nenhum instrumento avaliativo — as notas ficam só aqui.</p>`}
+      <button class="btn btn-ghost btn-sm" data-action="avulso-editar-config" data-id="${gab.id}" style="margin-top:6px;">✏️ Editar configuração (instrumento/vínculo)</button>
       <p class="muted" style="font-size:.85rem;">${turmasAplicadas.length>0 ? 'Aplicado nas turmas: <strong>'+turmasAplicadas.map(t=>esc(t.turmaName)).join(', ')+'</strong>' : 'Ainda não há turma registrada para este gabarito — ela é registrada automaticamente ao imprimir os cartões por turma.'}</p>
     </div>
 
@@ -5159,9 +5232,9 @@ function renderDetalheAvulso(){
       ${av.lancarModo==='manual' ? `
         <label>Nome do aluno</label>
         <input type="text" id="avulso-lancar-nome-input" class="input" value="${esc(av.lancarNome)}" placeholder="Nome completo">
-        <label style="margin-top:8px;">Turma (opcional)</label>
+        <label style="margin-top:8px;">Turma</label>
         <select id="avulso-lancar-turma-select" class="input">
-          <option value="">— sem turma —</option>
+          <option value="">— selecione a turma —</option>
           ${turmas.map(t=>`<option value="${t.id}" ${av.lancarTurmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
         </select>
         <label style="margin-top:8px;">Gabarito marcado pelo aluno (${gab.numQuestoes} letras, use "-" para questão em branco)</label>
@@ -6185,6 +6258,7 @@ async function restoreFromTrash(id){
       if(item.payload.respostas && item.payload.respostas.length>0){
         await window.storage.set(`avulso-respostas:${item.payload.gabarito.code}`, JSON.stringify(item.payload.respostas), true);
       }
+      await syncAvulsoInstrumento(item.payload.gabarito);
     } else if(item.kind==='avulso-resposta'){
       const { code, resposta } = item.payload;
       let arr; try{ const r = await window.storage.get(`avulso-respostas:${code}`, true); arr = r.value ? JSON.parse(r.value) : []; }catch(e){ arr = []; }
@@ -6192,6 +6266,8 @@ async function restoreFromTrash(id){
       arr.push(resposta);
       await window.storage.set(`avulso-respostas:${code}`, JSON.stringify(arr), true);
       if(state.professor.avulso && state.professor.avulso.current && state.professor.avulso.current.code===code) state.professor.avulso.respostas = arr;
+      const gabRestaurado = await findAvulsoByCode(code);
+      if(gabRestaurado) await syncAvulsoInstrumento(gabRestaurado);
     } else if(item.kind==='resposta-avaliacao'){
       const { code, resposta } = item.payload;
       let arr; try{ const r = await window.storage.get(`responses:${code}`, true); arr = r.value ? JSON.parse(r.value) : []; }catch(e){ arr = []; }
@@ -8643,12 +8719,12 @@ const AVULSO_LAYOUT = {
   colWidth: 95, // mm — deslocamento horizontal da 2ª coluna de questões
 };
 
-function buildAvulsoCartaoPage(gab, studentName, turmaName){
+function buildAvulsoCartaoPage(gab, studentName, turmaName, turmaId){
   const L = AVULSO_LAYOUT;
   const n = gab.numQuestoes;
   const half = Math.ceil(n/2);
   const letters = OPT_LETTERS.slice(0, gab.numAlternativas);
-  const deepLink = `${location.origin}${location.pathname}?avulso_code=${encodeURIComponent(gab.code)}&avulso_student=${encodeURIComponent(studentName)}&avulso_turma=${encodeURIComponent(turmaName||'')}&avulso_data=${encodeURIComponent(gab.dataProva||'')}&avulso_unidade=${encodeURIComponent(gab.unidade||'')}`;
+  const deepLink = `${location.origin}${location.pathname}?avulso_code=${encodeURIComponent(gab.code)}&avulso_student=${encodeURIComponent(studentName)}&avulso_turma=${encodeURIComponent(turmaName||'')}&avulso_turmaid=${encodeURIComponent(turmaId||'')}&avulso_data=${encodeURIComponent(gab.dataProva||'')}&avulso_unidade=${encodeURIComponent(gab.unidade||'')}`;
   const qrDataUrl = generateQrDataUrl(deepLink, 200);
   let rowsHtml = '';
   for(let i=0;i<n;i++){
@@ -8711,17 +8787,195 @@ async function findAvulsoByCode(code){
 }
 
 function novoAvulsoDraft(){
-  return { titulo:'', unidade:'', dataProva:'', numQuestoes:50, numAlternativas:5, disciplinas:[{id:cryptoId(), nome:'', inicio:1, fim:50}] };
+  return { titulo:'', unidade:'', instrumento:'', dataProva:'', numQuestoes:50, numAlternativas:5, disciplinas:[{id:cryptoId(), nome:'', inicio:1, fim:50, vinculos:[{id:cryptoId(), professorId:'', disciplinaId:'', turmaIds:[]}]}] };
 }
 function abrirNovoAvulso(){
   const p = state.professor;
   p.avulso.mode = 'novo';
   p.avulso.form = novoAvulsoDraft();
+  ensureAvulsoProfessoresCache();
   render();
+}
+// Reabre um gabarito avulso já existente (inclusive um criado antes desse recurso de vínculo com
+// instrumento existir) na mesma tela de formulário, pra ajustar título/unidade/instrumento e o
+// vínculo professor+disciplina de cada bloco. Quantidade de questões, alternativas e os intervalos
+// de cada disciplina ficam bloqueados, porque os cartões já podem estar impressos e aplicados.
+function abrirEditarMetaAvulso(id){
+  const p = state.professor;
+  const gab = p.avulso.list.find(x=>x.id===id);
+  if(!gab) return;
+  p.avulso.mode = 'novo';
+  p.avulso.form = {
+    titulo: gab.titulo || '', unidade: gab.unidade || '', instrumento: gab.instrumento || '', dataProva: gab.dataProva || '',
+    numQuestoes: gab.numQuestoes, numAlternativas: gab.numAlternativas,
+    disciplinas: (gab.disciplinas||[]).map(d => ({ id:d.id, nome:d.nome, inicio:d.inicio, fim:d.fim,
+      vinculos: avulsoBlocoVinculos(d).map(v => ({ id:v.id, professorId:v.professorId||'', disciplinaId:v.disciplinaId||'', turmaIds: (v.turmaIds||[]).slice() })) })),
+    editingGabaritoId: gab.id
+  };
+  ensureAvulsoProfessoresCache();
+  render();
+}
+function cancelarEdicaoAvulso(){
+  const p = state.professor;
+  p.avulso.mode = 'detalhe';
+  p.avulso.form = null;
+  render();
+}
+async function salvarEdicaoAvulso(){
+  const p = state.professor;
+  const f = p.avulso.form;
+  const gabOriginal = p.avulso.list.find(x=>x.id===f.editingGabaritoId);
+  const errEl = document.getElementById('avulso-err');
+  const setErr = (msg) => { if(errEl) errEl.innerHTML = `<p class="err">${esc(msg)}</p>`; };
+  if(!gabOriginal){ setErr('Este gabarito não foi encontrado.'); return; }
+  for(const d of f.disciplinas){
+    if(!d.nome || !d.nome.trim()){ setErr('Preencha o nome de todas as disciplinas.'); return; }
+  }
+  if(f.instrumento && !f.unidade){ setErr('Para substituir um instrumento avaliativo, selecione a unidade.'); return; }
+  const disciplinasAtualizadas = construirDisciplinasComVinculos(f, setErr);
+  if(!disciplinasAtualizadas) return;
+  const gabAtualizado = {
+    ...gabOriginal,
+    titulo: (f.titulo||'').trim() || 'Gabarito Avulso',
+    unidade: (f.unidade||'').trim(), instrumento: f.instrumento || '', dataProva: f.dataProva || '',
+    disciplinas: disciplinasAtualizadas
+  };
+  // Limpa a avaliação sintética de qualquer vínculo que existia antes e deixou de existir
+  // (removido, professor trocado, ou instrumento retirado por completo), pra não deixar nota
+  // fantasma no painel de ninguém.
+  for(const dOriginal of gabOriginal.disciplinas){
+    const vinculosAntigos = gabOriginal.instrumento ? avulsoBlocoVinculos(dOriginal) : [];
+    const novo = disciplinasAtualizadas.find(x=>x.id===dOriginal.id);
+    const vinculosNovosIds = new Set(gabAtualizado.instrumento && novo ? novo.vinculos.map(v=>v.id) : []);
+    for(const vAntigo of vinculosAntigos){
+      if(!vinculosNovosIds.has(vAntigo.id)) await cleanupAvulsoVinculo(gabAtualizado.code, vAntigo.id, dOriginal.id);
+    }
+  }
+  const idx = p.avulso.list.findIndex(x=>x.id===gabAtualizado.id);
+  if(idx>=0) p.avulso.list[idx] = gabAtualizado;
+  await saveAvulsosToStorage();
+  await syncAvulsoInstrumento(gabAtualizado);
+  p.avulso.mode = 'detalhe';
+  p.avulso.current = gabAtualizado;
+  p.avulso.form = null;
+  render();
+  alert('Configuração do gabarito atualizada.');
+}
+async function cleanupAvulsoVinculo(code, vinculoId, blockId){
+  const all = [...state.professor.assessments, ...state.coordenador.assessments];
+  let a = all.find(x => x.importadoAvulso && x.avulsoCode===code && x.avulsoVinculoId===vinculoId);
+  if(!a && vinculoId && vinculoId.endsWith('-legacy')){
+    a = all.find(x => x.importadoAvulso && x.avulsoCode===code && x.avulsoDisciplinaBlockId===blockId && !x.avulsoVinculoId);
+  }
+  if(!a) return;
+  try{ await window.storage.delete(`assessment:${a.code}`, true); }catch(e){}
+  try{ await window.storage.delete(`responses:${a.code}`, true); }catch(e){}
+  state.professor.assessments = state.professor.assessments.filter(x=>x.code!==a.code);
+  state.coordenador.assessments = state.coordenador.assessments.filter(x=>x.code!==a.code);
 }
 function avulsoAddDisciplina(){
   const p = state.professor;
-  p.avulso.form.disciplinas.push({ id:cryptoId(), nome:'', inicio:1, fim:p.avulso.form.numQuestoes||1 });
+  p.avulso.form.disciplinas.push({ id:cryptoId(), nome:'', inicio:1, fim:p.avulso.form.numQuestoes||1, vinculos:[{id:cryptoId(), professorId:'', disciplinaId:'', turmaIds:[]}] });
+  render();
+}
+// Gabaritos avulsos criados antes do recurso de "múltiplos vínculos" (um professor por série/turma)
+// guardavam professorId/disciplinaId direto no bloco. Esta função devolve sempre uma lista de
+// vínculos, convertendo o formato antigo na hora, pra manter tudo funcionando sem precisar reeditar.
+function avulsoBlocoVinculos(d){
+  if(Array.isArray(d.vinculos)) return d.vinculos;
+  if(d.professorId && d.disciplinaId){
+    return [{ id: d.id+'-legacy', professorId:d.professorId, disciplinaId:d.disciplinaId, professorName:d.professorName||'', disciplinaName:d.disciplinaName||'', turmaIds:[] }];
+  }
+  return [];
+}
+// Valida e resolve os vínculos (professor+disciplina+turmas) de cada bloco de disciplina de um
+// formulário de gabarito avulso (criação ou edição), retornando a lista final de disciplinas pronta
+// pra salvar, ou null (já com a mensagem de erro definida) se algo estiver inválido.
+function construirDisciplinasComVinculos(f, setErr){
+  const profCache = state.professor.avulso.professoresCache || [];
+  const resultado = [];
+  for(const d of f.disciplinas){
+    const vinculosComProfessor = (d.vinculos||[]).filter(v=>v.professorId);
+    if(vinculosComProfessor.length>1){
+      const usadas = new Set();
+      for(const v of vinculosComProfessor){
+        if(!v.turmaIds || v.turmaIds.length===0){ setErr(`Em "${d.nome||'disciplina'}", selecione as turmas de cada vínculo — como há mais de um professor(a), é preciso dizer quais turmas são de cada um(a).`); return null; }
+        for(const tid of v.turmaIds){
+          if(usadas.has(tid)){ setErr(`Em "${d.nome||'disciplina'}", uma mesma turma não pode estar marcada em mais de um vínculo.`); return null; }
+          usadas.add(tid);
+        }
+      }
+    }
+    const vinculosResolvidos = (d.vinculos||[]).map(v => {
+      const prof = profCache.find(pr=>pr.id===v.professorId);
+      const disc = prof ? (prof.disciplinas||[]).find(x=>x.id===v.disciplinaId) : null;
+      if(!prof || !disc) return null;
+      return { id:v.id, professorId:v.professorId, professorName:prof.name, disciplinaId:v.disciplinaId, disciplinaName:disc.name, turmaIds:(v.turmaIds||[]).slice() };
+    }).filter(Boolean);
+    resultado.push({ id:d.id, nome:d.nome.trim(), inicio:parseInt(d.inicio), fim:parseInt(d.fim), vinculos: vinculosResolvidos });
+  }
+  return resultado;
+}
+function avulsoVinculoAdicionar(blockId){
+  const p = state.professor;
+  const d = (p.avulso.form.disciplinas||[]).find(x=>x.id===blockId);
+  if(!d) return;
+  if(!Array.isArray(d.vinculos)) d.vinculos = avulsoBlocoVinculos(d);
+  d.vinculos.push({ id:cryptoId(), professorId:'', disciplinaId:'', turmaIds:[] });
+  render();
+}
+function avulsoVinculoRemover(blockId, vinculoId){
+  const p = state.professor;
+  const d = (p.avulso.form.disciplinas||[]).find(x=>x.id===blockId);
+  if(!d) return;
+  d.vinculos = (d.vinculos||[]).filter(v=>v.id!==vinculoId);
+  render();
+}
+function avulsoVinculoSetProfessor(blockId, vinculoId, professorId){
+  const p = state.professor;
+  const d = (p.avulso.form.disciplinas||[]).find(x=>x.id===blockId);
+  const v = d ? (d.vinculos||[]).find(x=>x.id===vinculoId) : null;
+  if(!v) return;
+  v.professorId = professorId;
+  v.disciplinaId = '';
+  render();
+}
+function avulsoVinculoSetDisciplina(blockId, vinculoId, disciplinaId){
+  const p = state.professor;
+  const d = (p.avulso.form.disciplinas||[]).find(x=>x.id===blockId);
+  const v = d ? (d.vinculos||[]).find(x=>x.id===vinculoId) : null;
+  if(!v) return;
+  v.disciplinaId = disciplinaId;
+  render();
+}
+function avulsoVinculoToggleTurma(blockId, vinculoId, turmaId){
+  const p = state.professor;
+  const d = (p.avulso.form.disciplinas||[]).find(x=>x.id===blockId);
+  const v = d ? (d.vinculos||[]).find(x=>x.id===vinculoId) : null;
+  if(!v) return;
+  if(!Array.isArray(v.turmaIds)) v.turmaIds = [];
+  if(v.turmaIds.includes(turmaId)) v.turmaIds = v.turmaIds.filter(x=>x!==turmaId);
+  else v.turmaIds.push(turmaId);
+  render();
+}
+async function ensureAvulsoProfessoresCache(forceRefresh){
+  const p = state.professor;
+  if(p.avulso.professoresCache && !forceRefresh) return;
+  p.avulso.professoresCacheLoading = true;
+  render();
+  let cache = [];
+  try{
+    const lista = await fetchProfessoresList();
+    const ativos = lista.filter(pr => pr.activatedAt);
+    cache = await Promise.all(ativos.map(async pr => {
+      let disciplinas = [];
+      try{ const r = await window.storage.get(`disciplinas:${pr.id}`, true); disciplinas = JSON.parse(r.value) || []; }catch(e){ disciplinas = []; }
+      return { id: pr.id, name: pr.displayName || pr.email || 'Professor(a)', disciplinas };
+    }));
+    cache.sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+  }catch(e){ cache = []; }
+  p.avulso.professoresCache = cache;
+  p.avulso.professoresCacheLoading = false;
   render();
 }
 function avulsoRemoveDisciplina(id){
@@ -8745,12 +8999,15 @@ async function salvarAvulso(){
     const ini = parseInt(d.inicio), fim = parseInt(d.fim);
     if(!ini || !fim || ini<1 || fim>n || ini>fim){ setErr(`Intervalo de questões inválido para "${d.nome}".`); return; }
   }
+  if(f.instrumento && !f.unidade){ setErr('Para substituir um instrumento avaliativo, selecione a unidade.'); return; }
+  const disciplinasResolvidas = construirDisciplinasComVinculos(f, setErr);
+  if(!disciplinasResolvidas) return;
   const gab = {
     id: cryptoId(), code: genCode(),
     titulo: (f.titulo||'').trim() || 'Gabarito Avulso',
-    unidade: (f.unidade||'').trim(), dataProva: f.dataProva || '',
+    unidade: (f.unidade||'').trim(), instrumento: f.instrumento || '', dataProva: f.dataProva || '',
     numQuestoes: n, numAlternativas: numAlt,
-    disciplinas: f.disciplinas.map(d => ({ id:d.id, nome:d.nome.trim(), inicio:parseInt(d.inicio), fim:parseInt(d.fim) })),
+    disciplinas: disciplinasResolvidas,
     gabarito: null,
     turmasAplicadas: [],
     createdBy: state.view==='coordenador' ? 'Coordenação' : (p.session?p.session.displayName:'Professor'),
@@ -8783,6 +9040,7 @@ async function salvarGabaritoCorretoAvulso(){
     const recalculadas = av.respostas.map(r => ({ ...r, ...gradeAvulsoRespostas(gab, r.respostas) }));
     av.respostas = recalculadas;
     await window.storage.set(`avulso-respostas:${gab.code}`, JSON.stringify(recalculadas), true);
+    await syncAvulsoInstrumento(gab);
   }
   av.editandoGabarito = false; av.gabaritoEditAnswers = []; av.gabaritoEditError = '';
   alert('Gabarito correto salvo.');
@@ -8819,6 +9077,7 @@ async function excluirAvulso(id){
   p.avulso.list = p.avulso.list.filter(x=>x.id!==id);
   await saveAvulsosToStorage();
   if(gab){ try{ await window.storage.delete(`avulso-respostas:${gab.code}`, true); }catch(e){} }
+  if(gab) await cleanupAvulsoAssessments(gab.code);
   if(p.avulso.current && p.avulso.current.id===id){ p.avulso.mode = 'list'; p.avulso.current = null; }
   if(gab) await moveToTrash('gabarito-avulso', gab.titulo || 'Gabarito avulso', { gabarito: gab, respostas: respostasAntigas });
   render();
@@ -8832,6 +9091,7 @@ async function excluirRespostaAvulso(studentName){
   const existing = (p.avulso.respostas||[]).filter(x=>x.studentName!==studentName);
   p.avulso.respostas = existing;
   await window.storage.set(`avulso-respostas:${gab.code}`, JSON.stringify(existing), true);
+  await syncAvulsoInstrumento(gab);
   if(removida) await moveToTrash('avulso-resposta', `${studentName} — ${gab.titulo||''}`, { code: gab.code, resposta: removida });
   render();
 }
@@ -8853,7 +9113,88 @@ function gradeAvulsoRespostas(gab, respostas){
   return { porDisciplina, acertosTotal, notaGeral, mediaDisciplinas };
 }
 
-async function lancarRespostaAvulso(code, studentName, turmaName, respostasArr, scanned){
+// Sincroniza as notas lançadas de um gabarito avulso com o sistema de avaliações, quando o
+// gabarito foi configurado para substituir um instrumento avaliativo (ver "instrumento"/"unidade"
+// no gabarito e os "vinculos" — professor(a)+disciplina+turmas — de cada bloco de disciplina).
+// Um mesmo bloco pode ter vários vínculos (ex.: Português da 1ª série com um(a) professor(a),
+// da 2ª e da 3ª com outros) — cada vínculo gera sua própria avaliação sintética, só com as
+// notas dos alunos das turmas daquele vínculo. Do mesmo jeito que a importação de notas por CSV
+// faz, pra alimentar o painel do(a) professor(a) certo(a) e a nota final do bimestre automaticamente.
+async function syncAvulsoInstrumento(gab){
+  if(!gab.instrumento || !gab.unidade) return;
+  let respostas = [];
+  try{ const r = await window.storage.get(`avulso-respostas:${gab.code}`, true); respostas = JSON.parse(r.value) || []; }catch(e){ respostas = []; }
+  for(const bloco of (gab.disciplinas||[])){
+    const vinculos = avulsoBlocoVinculos(bloco).filter(v=>v.professorId && v.disciplinaId);
+    if(vinculos.length===0) continue;
+    for(const vinculo of vinculos){
+      await syncAvulsoVinculoAssessment(gab, bloco, vinculo, vinculos.length, respostas);
+    }
+  }
+  if(state.coordenador.dashboard) state.coordenador.dashboard.stats = null;
+}
+async function syncAvulsoVinculoAssessment(gab, bloco, vinculo, totalVinculosDoBloco, respostas){
+  const turmasDoVinculo = vinculo.turmaIds && vinculo.turmaIds.length>0 ? new Set(vinculo.turmaIds) : null;
+  // com um único vínculo no bloco e nenhuma turma marcada, ele vale pra qualquer turma lançada;
+  // com mais de um vínculo, turmaIds é obrigatório (já validado ao salvar), então nunca cai aqui.
+  const aplicaATodas = !turmasDoVinculo && totalVinculosDoBloco===1;
+  const porAluno = [];
+  const turmaIdsSet = new Set();
+  respostas.forEach(r => {
+    if(!r.turmaId) return; // sem turma vinculada, não dá pra saber em qual painel a nota deve entrar
+    if(!aplicaATodas && (!turmasDoVinculo || !turmasDoVinculo.has(r.turmaId))) return;
+    const dd = (r.porDisciplina||[]).find(x=>x.disciplinaId===bloco.id);
+    if(!dd) return;
+    porAluno.push({ studentName: r.studentName, nota: dd.nota });
+    turmaIdsSet.add(r.turmaId);
+  });
+  const assessmentsExistentes = [...state.professor.assessments, ...state.coordenador.assessments];
+  let assessment = assessmentsExistentes.find(a => a.importadoAvulso && a.avulsoCode===gab.code && a.avulsoVinculoId===vinculo.id);
+  if(!assessment && vinculo.id.endsWith('-legacy')){
+    assessment = assessmentsExistentes.find(a => a.importadoAvulso && a.avulsoCode===gab.code && a.avulsoDisciplinaBlockId===bloco.id && !a.avulsoVinculoId);
+  }
+  if(porAluno.length===0 && !assessment) return; // nada lançado ainda pra esse vínculo
+  const code = assessment ? assessment.code : genCode();
+  const turmaIds = turmaIdsSet.size>0 ? [...turmaIdsSet] : (assessment ? (assessment.turmaIds||[]) : (vinculo.turmaIds||[]));
+  assessment = {
+    code,
+    title: `${gab.titulo || 'Gabarito Avulso'} — ${bloco.nome} (Gabarito Avulso)`,
+    instrumento: gab.instrumento,
+    unidade: gab.unidade,
+    disciplinaId: vinculo.disciplinaId || null,
+    disciplinaName: vinculo.disciplinaName || bloco.nome,
+    turmaIds,
+    questions: [{ id:cryptoId(), type:'mc', text:'Nota (gabarito avulso)', points:10, image:null, annulled:false, descritorSaeb:'', conteudo:'',
+      options:[{id:cryptoId(),text:'—'},{id:cryptoId(),text:'—'}], correctOptionId:null }],
+    startAt: null,
+    endAt: new Date(2000,0,1).toISOString(), // trava a avaliação pra alunos não tentarem responder por engano
+    resultRelease: { mode:'imediato', releaseAt:'' },
+    securityEnabled: false,
+    professorId: vinculo.professorId,
+    professorName: vinculo.professorName || 'Professor(a)',
+    createdAt: assessment ? assessment.createdAt : Date.now(),
+    updatedAt: Date.now(),
+    importadoAvulso: true, avulsoCode: gab.code, avulsoDisciplinaBlockId: bloco.id, avulsoVinculoId: vinculo.id
+  };
+  await window.storage.set(`assessment:${code}`, JSON.stringify(assessment), true);
+  const responsesOut = porAluno.map(item => ({ studentName:item.studentName, submittedAt:Date.now(), total:item.nota, details:[], answers:{}, tabSwitches:0, fullscreenExits:0, manual:false, importadoAvulso:true }));
+  await window.storage.set(`responses:${code}`, JSON.stringify(responsesOut), true);
+  const idxP = state.professor.assessments.findIndex(a=>a.code===code);
+  if(idxP>=0) state.professor.assessments[idxP] = assessment; else state.professor.assessments.unshift(assessment);
+  const idxC = state.coordenador.assessments.findIndex(a=>a.code===code);
+  if(idxC>=0) state.coordenador.assessments[idxC] = assessment;
+}
+async function cleanupAvulsoAssessments(code){
+  const all = [...state.professor.assessments, ...state.coordenador.assessments];
+  const codes = new Set(all.filter(a => a.importadoAvulso && a.avulsoCode===code).map(a=>a.code));
+  for(const c of codes){
+    try{ await window.storage.delete(`assessment:${c}`, true); }catch(e){}
+    try{ await window.storage.delete(`responses:${c}`, true); }catch(e){}
+  }
+  state.professor.assessments = state.professor.assessments.filter(a=>!(a.importadoAvulso && a.avulsoCode===code));
+  state.coordenador.assessments = state.coordenador.assessments.filter(a=>!(a.importadoAvulso && a.avulsoCode===code));
+}
+async function lancarRespostaAvulso(code, studentName, turmaId, turmaName, respostasArr, scanned){
   const p = state.professor;
   const gab = await findAvulsoByCode(code);
   if(!gab){ alert('Gabarito avulso não encontrado.'); return null; }
@@ -8862,9 +9203,10 @@ async function lancarRespostaAvulso(code, studentName, turmaName, respostasArr, 
   let existing = [];
   try{ const r = await window.storage.get(`avulso-respostas:${code}`, true); existing = JSON.parse(r.value); }catch(e){ existing = []; }
   existing = existing.filter(x=>x.studentName!==studentName);
-  existing.push({ studentName, turmaName: turmaName||'', submittedAt: Date.now(), respostas: respostasArr, ...resultado, scanned: !!scanned });
+  existing.push({ studentName, turmaId: turmaId||'', turmaName: turmaName||'', submittedAt: Date.now(), respostas: respostasArr, ...resultado, scanned: !!scanned });
   await window.storage.set(`avulso-respostas:${code}`, JSON.stringify(existing), true);
   if(p.avulso.current && p.avulso.current.code===code) p.avulso.respostas = existing;
+  await syncAvulsoInstrumento(gab);
   return existing;
 }
 
@@ -8874,6 +9216,7 @@ async function lancarAvulsoManual(){
   const gab = av.current;
   const name = (av.lancarNome||'').trim();
   if(!name){ alert('Informe o nome do aluno.'); return; }
+  if(!av.lancarTurmaId){ alert('Selecione a turma do aluno.'); return; }
   const seq = (av.lancarSequencia||'').trim().toUpperCase().replace(/\s+/g,'');
   if(seq.length !== gab.numQuestoes){ alert(`A sequência precisa ter exatamente ${gab.numQuestoes} caracteres (uma letra por questão; use "-" para deixar em branco). Você digitou ${seq.length}.`); return; }
   const validLetters = OPT_LETTERS.slice(0, gab.numAlternativas);
@@ -8884,9 +9227,9 @@ async function lancarAvulsoManual(){
     if(!validLetters.includes(ch)){ alert(`Caractere inválido na posição ${i+1}: "${ch}". Use apenas letras de A a ${validLetters[validLetters.length-1]} ou "-" para em branco.`); return; }
     respostas.push(ch);
   }
-  let turmaName = '';
-  if(av.lancarTurmaId){ const t = state.professor.turmas.find(x=>x.id===av.lancarTurmaId); turmaName = t?t.name:''; }
-  const ok = await lancarRespostaAvulso(gab.code, name, turmaName, respostas, false);
+  const t = state.professor.turmas.find(x=>x.id===av.lancarTurmaId);
+  const turmaName = t ? t.name : '';
+  const ok = await lancarRespostaAvulso(gab.code, name, av.lancarTurmaId, turmaName, respostas, false);
   if(!ok) return;
   av.lancarNome = ''; av.lancarSequencia = '';
   alert('Nota lançada.');
@@ -8910,12 +9253,13 @@ async function scanAvulsoSheet(file){
       av.scanError = 'QR code não encontrado na imagem. Tire a foto com o cartão inteiro visível, bem iluminado e o mais reto possível.';
       av.scanLoading = false; render(); return;
     }
-    let code, studentName, turmaName;
+    let code, studentName, turmaName, turmaId;
     try{
       const url = new URL(qr.data);
       code = url.searchParams.get('avulso_code');
       studentName = url.searchParams.get('avulso_student');
       turmaName = url.searchParams.get('avulso_turma') || '';
+      turmaId = url.searchParams.get('avulso_turmaid') || '';
     }catch(e){}
     if(!code || !studentName){
       av.scanError = 'O QR code encontrado não é de um gabarito avulso desta plataforma.';
@@ -8952,9 +9296,13 @@ async function scanAvulsoSheet(file){
       });
       detected.push({ detectedIndex: pickConfidentBubble(darknesses) });
     }
+    let resolvedTurmaId = '';
+    if(turmaId && state.professor.turmas.some(t=>t.id===turmaId)) resolvedTurmaId = turmaId;
+    else if(turmaName){ const t = state.professor.turmas.find(t=>t.name===turmaName); if(t) resolvedTurmaId = t.id; }
     av.scanAvulso = gab;
     av.scanStudentName = studentName;
     av.scanTurmaName = turmaName;
+    av.scanTurmaId = resolvedTurmaId;
     av.scanReview = detected;
     av.scanLoading = false;
     render();
@@ -8969,15 +9317,17 @@ async function confirmAvulsoScan(){
   const p = state.professor;
   const av = p.avulso;
   const gab = av.scanAvulso;
+  if(!av.scanTurmaId){ alert('Não foi possível identificar a turma automaticamente pelo cartão. Selecione a turma do aluno acima antes de confirmar.'); return; }
+  const t = state.professor.turmas.find(x=>x.id===av.scanTurmaId);
   const respostas = av.scanReview.map((r, idx) => {
     const el = document.querySelector(`input[name="avulso-scan-q-${idx}"]:checked`);
     if(!el || el.value==='') return null;
     return OPT_LETTERS[Number(el.value)];
   });
-  const ok = await lancarRespostaAvulso(gab.code, av.scanStudentName, av.scanTurmaName, respostas, true);
+  const ok = await lancarRespostaAvulso(gab.code, av.scanStudentName, av.scanTurmaId, t?t.name:av.scanTurmaName, respostas, true);
   if(!ok) return;
   alert('Nota lançada a partir da leitura do gabarito.');
-  av.scanReview = null; av.scanAvulso = null; av.scanStudentName = ''; av.scanTurmaName = ''; av.scanError = '';
+  av.scanReview = null; av.scanAvulso = null; av.scanStudentName = ''; av.scanTurmaName = ''; av.scanTurmaId = ''; av.scanError = '';
   render();
 }
 
@@ -8989,7 +9339,7 @@ async function imprimirCartoesAvulso(){
   if(av.imprimirTurmaId){
     const t = state.professor.turmas.find(x=>x.id===av.imprimirTurmaId);
     if(!t || t.students.length===0){ alert('Essa turma não tem alunos cadastrados.'); return; }
-    t.students.forEach(s => { pages += buildAvulsoCartaoPage(gab, s.name, t.name); });
+    t.students.forEach(s => { pages += buildAvulsoCartaoPage(gab, s.name, t.name, t.id); });
     // Registra a turma no gabarito, pra identificar depois onde ele foi aplicado.
     if(!Array.isArray(gab.turmasAplicadas)) gab.turmasAplicadas = [];
     const jaTem = gab.turmasAplicadas.find(x=>x.turmaId===t.id);
@@ -10331,7 +10681,10 @@ document.addEventListener('click', (e) => {
       refreshProfessorSlides();
       slidesPollInterval = setInterval(refreshProfessorSlides, 2000);
     }
-    if(state.coordenador.subview==='avulso' && state.professor.avulso.listLoading){ loadAvulsos(); }
+    if(state.coordenador.subview==='avulso'){
+      if(state.professor.avulso.listLoading) loadAvulsos();
+      if(state.professor.turmas.length===0) { state.professor.turmasLoading = true; loadTurmas(); }
+    }
     if(state.coordenador.subview==='bloco' && state.professor.bloco.listLoading){ loadBlocos(); }
     if(state.coordenador.subview==='lixeira'){ loadLixeiraUi(); }
     if(state.coordenador.subview==='ia'){ loadCoordIA(); }
@@ -10496,8 +10849,13 @@ document.addEventListener('click', (e) => {
   else if(act==='avulso-excluir'){ excluirAvulso(btn.dataset.id); }
   else if(act==='avulso-cancelar-novo'){ p.avulso.mode='list'; p.avulso.form=null; render(); }
   else if(act==='avulso-salvar'){ salvarAvulso(); }
+  else if(act==='avulso-editar-config'){ abrirEditarMetaAvulso(btn.dataset.id); }
+  else if(act==='avulso-cancelar-edicao'){ cancelarEdicaoAvulso(); }
+  else if(act==='avulso-salvar-edicao'){ salvarEdicaoAvulso(); }
   else if(act==='avulso-disc-adicionar'){ avulsoAddDisciplina(); }
   else if(act==='avulso-disc-remover'){ avulsoRemoveDisciplina(btn.dataset.id); }
+  else if(act==='avulso-vinc-adicionar'){ avulsoVinculoAdicionar(btn.dataset.id); }
+  else if(act==='avulso-vinc-remover'){ avulsoVinculoRemover(btn.dataset.id, btn.dataset.vid); }
   else if(act==='avulso-voltar-lista'){ p.avulso.mode='list'; p.avulso.current=null; render(); }
   else if(act==='avulso-imprimir-cartoes'){ imprimirCartoesAvulso(); }
   else if(act==='avulso-lancar-modo'){ p.avulso.lancarModo = btn.dataset.modo; p.avulso.scanReview=null; p.avulso.scanError=''; render(); }
@@ -10689,7 +11047,6 @@ document.addEventListener('input', (e) => {
   else if(act==='quiz-question-duration'){ p.quiz.setup.questions[parseInt(el.dataset.qidx)].durationSeconds = parseInt(el.value)||30; }
   else if(el.id==='roleta-pergunta-input'){ p.roleta.pergunta = el.value; }
   else if(el.id==='avulso-titulo-input'){ p.avulso.form.titulo = el.value; }
-  else if(el.id==='avulso-unidade-input'){ p.avulso.form.unidade = el.value; }
   else if(el.id==='avulso-data-input'){ p.avulso.form.dataProva = el.value; }
   else if(el.id==='avulso-numquestoes-input'){ p.avulso.form.numQuestoes = parseInt(el.value)||0; }
   else if(act==='avulso-disc-nome'){ const d = p.avulso.form.disciplinas.find(x=>x.id===el.dataset.id); if(d) d.nome = el.value; }
@@ -10753,6 +11110,11 @@ document.addEventListener('change', (e) => {
   else if(el.id==='scan-file-input'){ if(el.files[0]) scanAnswerSheet(el.files[0]); }
   else if(el.id==='slides-pdf-input'){ if(el.files[0]) handleSlidesPdfUpload(el.files[0], state.view==='coordenador' ? 'Coordenação' : (p.session?p.session.displayName:'Professor')); }
   else if(el.id==='avulso-numalt-input'){ p.avulso.form.numAlternativas = parseInt(el.value)||5; render(); }
+  else if(el.id==='avulso-unidade-input'){ p.avulso.form.unidade = el.value; render(); }
+  else if(el.id==='avulso-instrumento-input'){ p.avulso.form.instrumento = el.value; render(); }
+  else if(act==='avulso-vinc-prof'){ avulsoVinculoSetProfessor(el.dataset.id, el.dataset.vid, el.value); }
+  else if(act==='avulso-vinc-disciplina'){ avulsoVinculoSetDisciplina(el.dataset.id, el.dataset.vid, el.value); }
+  else if(act==='avulso-vinc-toggle-turma'){ avulsoVinculoToggleTurma(el.dataset.id, el.dataset.vid, el.dataset.tid); }
   else if(el.id==='avulso-imprimir-turma-select'){ p.avulso.imprimirTurmaId = el.value; }
   else if(el.id==='avulso-lancar-turma-select'){ p.avulso.lancarTurmaId = el.value; }
   else if(act==='avulso-gabarito-edit-select'){ p.avulso.gabaritoEditAnswers[parseInt(el.dataset.idx)] = el.value; }
@@ -10768,6 +11130,7 @@ document.addEventListener('change', (e) => {
   else if(el.id==='freq-painel-turma-select'){ const fp = state.view==='freqmonitor' ? state.freqMonitor.painel : state.professor.freqPainel; fp.turmaId = el.value; render(); }
   else if(el.id==='chamada-data-input'){ const {ch}=getChamadaCtx(); ch.data = el.value; ch.presentes = []; ch.mensagem=''; if(ch.turmaId) loadChamada(); else render(); }
   else if(el.id==='avulso-scan-file-input'){ if(el.files[0]) scanAvulsoSheet(el.files[0]); }
+  else if(el.id==='avulso-scan-turma-select'){ p.avulso.scanTurmaId = el.value; render(); }
   else if(el.id==='professor-photo-input'){ if(el.files[0]) handleProfessorPhotoUpload(el.files[0]); }
 });
 
