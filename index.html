@@ -895,7 +895,7 @@ let state = {
       lancamentos:[], lancamentosLoading:false },
     manualGradePrefill: null,
     livros: [], livrosLoading: true, bancoLivroSelectedId: null,
-    painel: null,
+    painel: null, painelTab: 'notas', // 'notas' | 'desempenho' | 'conteudo' | 'alunos'
     avisos: [], avisosLoading: true, newAvisoText: '', newAvisoTurmaIds: [], newAvisoPinned: false,
     enquete: { turmaId:'', current:null, loading:false, formQuestion:'', formOptions:['',''] },
     quiz: { current:null, presentationMode:false, setup: null },
@@ -4899,12 +4899,26 @@ function renderProfessorPainel(){
   const porTurmaFiltrado = pn.porTurma.filter(x=>myTurmaNames.has(x.name));
   const ausentesFiltrado = pn.ausentes.filter(x=>myTurmaNames.has(x.turmaName));
   const fg = p.finalGrades;
-  return `
-    <div class="card">
-      <div class="row" style="align-items:center; justify-content:space-between;">
-        <h2>Meu Painel</h2>
-        <button class="btn btn-ghost btn-sm" data-action="refresh-professor-painel">Atualizar</button>
-      </div>
+
+  const tabs = [
+    { id:'notas', label:'📝 Lançar notas' },
+    { id:'desempenho', label:'📊 Desempenho' },
+    { id:'conteudo', label:'🎯 Conteúdo & SAEB' },
+    { id:'alunos', label:'👥 Alunos' },
+  ];
+  const activeTab = tabs.some(t=>t.id===p.painelTab) ? p.painelTab : 'notas';
+
+  const tabsBar = `
+    <div class="row" style="gap:8px; flex-wrap:wrap; margin:14px 0 4px;">
+      ${tabs.map(t => `
+        <button class="btn btn-sm ${activeTab===t.id?'btn-primary':'btn-ghost'}" data-action="painel-tab" data-tab="${t.id}">${t.label}</button>
+      `).join('')}
+    </div>
+  `;
+
+  let tabContent = '';
+  if(activeTab==='notas'){
+    tabContent = `
       <p class="muted">Notas por instrumento avaliativo, turma e unidade. Provas e gabaritos lançados no app (ou lidos por leitura ótica) entram automaticamente; o que foi aplicado presencialmente sem passar pelo app você lança manualmente abaixo.</p>
       <div class="row" style="align-items:flex-end;">
         <div>
@@ -4923,15 +4937,22 @@ function renderProfessorPainel(){
         <button class="btn btn-primary" data-action="calc-final-grades" style="flex:0 0 auto;">Calcular notas</button>
       </div>
       ${renderFinalGradesTable()}
-    </div>
-
-    <div class="card">
+    `;
+  } else if(activeTab==='desempenho'){
+    tabContent = `
       <p class="muted">Análise de desempenho com base em todas as suas avaliações e respostas já lançadas, nas turmas que você leciona.</p>
       ${section('Desempenho por turma', porTurmaFiltrado, 'Sem dados ainda.')}
       ${section('Desempenho por disciplina', pn.porDisciplina, 'Sem dados ainda.')}
+    `;
+  } else if(activeTab==='conteudo'){
+    tabContent = `
+      <p class="muted">Quebra do desempenho por conteúdo e por descritor SAEB, com base nas questões que têm esses campos preenchidos.</p>
       ${section('Desempenho por conteúdo', pn.porConteudo, 'Preencha o campo "Conteúdo" nas questões para ver essa análise.')}
       ${section('Desempenho por descritor SAEB', pn.porDescritor, 'Preencha o campo "Descritor SAEB" nas questões para ver essa análise.')}
-      <h3 style="margin-top:22px;">Desempenho por aluno</h3>
+    `;
+  } else if(activeTab==='alunos'){
+    tabContent = `
+      <h3 style="margin-top:4px;">Desempenho por aluno</h3>
       ${pn.porAluno.length===0 ? '<p class="muted">Sem dados ainda.</p>' : `
         <div class="table-scroll">
         <table>
@@ -4950,6 +4971,17 @@ function renderProfessorPainel(){
         </table>
         </div>
       `}
+    `;
+  }
+
+  return `
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <h2>Meu Painel</h2>
+        <button class="btn btn-ghost btn-sm" data-action="refresh-professor-painel">Atualizar</button>
+      </div>
+      ${tabsBar}
+      ${tabContent}
     </div>
   `;
 }
@@ -11025,6 +11057,7 @@ document.addEventListener('click', (e) => {
     render();
   }
   else if(act==='refresh-professor-painel'){ calcProfessorPainel(); }
+  else if(act==='painel-tab'){ p.painelTab = btn.dataset.tab; render(); }
   else if(act==='publicar-aviso'){ publicarAviso(state.view==='coordenador' ? 'Coordenação' : (p.session?p.session.displayName:'Professor')); }
   else if(act==='toggle-pin-aviso'){ togglePinAviso(btn.dataset.id); }
   else if(act==='delete-aviso'){ deleteAviso(btn.dataset.id); }
