@@ -4081,8 +4081,7 @@ function renderFinalGradesTable(){
     </div>
     ${emRecuperacao.length>0 ? `
       <div class="card" style="background:var(--red-bg, #fbeaea); border:1px solid var(--red); margin:10px 0;">
-        <strong>🔺 ${emRecuperacao.length} aluno(s) em recuperação paralela nesta unidade (nota abaixo de 5):</strong>
-        <p class="muted" style="margin-top:6px;">${emRecuperacao.map(r => `${esc(r.name)} (${r.finalSemRecuperacao.toFixed(1)})${r.temRecuperacao?' — ✅ já fez a recuperação, nota final '+r.final.toFixed(1):''}`).join(' · ')}</p>
+        <strong>🔺 ${emRecuperacao.length} aluno(s) em recuperação paralela nesta unidade (nota abaixo de 5)</strong>
       </div>
     ` : ''}
     ${editMode ? '<p class="muted" style="font-size:.8rem;">Edite qualquer campo abaixo para corrigir uma nota lançada por engano. Deixe em branco para manter o cálculo automático.</p>' : ''}
