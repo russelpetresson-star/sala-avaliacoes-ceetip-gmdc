@@ -94,11 +94,28 @@
   .sidebar-fav-btn.active{ color:var(--yellow); }
   .app-sidebar.expanded .sidebar-fav-btn, .app-sidebar:hover .sidebar-fav-btn{ opacity:1; width:auto; }
   .sidebar-fav-btn:hover{ color:var(--yellow); }
+  .sidebar-search-box{ padding:4px 12px 8px; flex:0 0 auto; }
+  .sidebar-search-box input{ width:100%; box-sizing:border-box; padding:7px 8px; border-radius:8px; border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.08); color:#fff; font-size:.82rem; opacity:0; pointer-events:none; }
+  .app-sidebar.expanded .sidebar-search-box input, .app-sidebar:hover .sidebar-search-box input{ opacity:1; pointer-events:auto; }
+  .sidebar-search-box input::placeholder{ color:rgba(255,255,255,0.55); }
+  .sidebar-search-box input:focus{ outline:none; border-color:rgba(255,255,255,0.6); }
+  .sidebar-empty-search{ padding:0 14px; font-size:.8rem; opacity:0; }
+  .app-sidebar.expanded .sidebar-empty-search, .app-sidebar:hover .sidebar-empty-search{ opacity:1; }
   .sidebar-divider{ height:1px; background:rgba(255,255,255,0.15); margin:6px 14px; flex:0 0 auto; }
+  .sidebar-group-header{ margin:14px 14px 4px; flex:0 0 auto; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px; }
+  .sidebar-group-header:first-of-type{ border-top:none; margin-top:4px; padding-top:0; }
+  .sidebar-group-header-text{ display:block; font-size:.72rem; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:rgba(255,255,255,0.55); opacity:0; width:0; overflow:hidden; white-space:nowrap; transition: opacity .12s; }
+  .app-sidebar.expanded .sidebar-group-header-text, .app-sidebar:hover .sidebar-group-header-text{ opacity:1; width:auto; }
   .app-main{ flex:1 1 auto; min-width:0; }
   @media (max-width: 680px){
     .app-sidebar{ position:fixed; left:8px; top:8px; bottom:8px; }
     .app-main{ margin-left: 76px; }
+    .app-topbar{ margin-left: 76px; }
+    /* No mobile, o menu lateral fica fixo sobre a borda esquerda da tela. Sem isso, o
+       cabeçalho (nome da escola, título) fica atrás do menu, cortado — só o cabeçalho
+       precisa do respiro, porque o conteúdo dentro do menu (.app-main) já tem o seu. */
+    .wrap.wide .letterhead, .wrap.wide header, .wrap.wide .disclaimer{ padding-left: 76px; text-align:left; }
+    .wrap.wide .letterhead{ justify-content:flex-start; }
   }
   header{ text-align:center; margin-bottom: 22px; }
   .letterhead{ display:flex; align-items:center; justify-content:center; gap:10px; margin:2px auto 14px; }
@@ -428,8 +445,10 @@
     .code-box{ font-size:1.7rem; }
     .score-big{ font-size:2.2rem; }
     .app-main{ margin-left: 60px; }
+    .app-topbar{ margin-left: 60px; }
     .app-sidebar{ width:48px; }
     .app-sidebar.expanded, .app-sidebar:hover{ width:210px; }
+    .wrap.wide .letterhead, .wrap.wide header, .wrap.wide .disclaimer{ padding-left: 60px; }
   }
 </style>
 </head>
@@ -870,13 +889,14 @@ const SEED_LIVROS = [
 
 let state = {
   view: 'landing',
-  ui: { sidebarOpen: false, showPrivacy: false, tour: { active:false, role:null, step:0 }, lixeira: { loading:true, items:[] }, installPrompt: { show:false } },
+  ui: { sidebarOpen: false, sidebarSearch: '', showPrivacy: false, tour: { active:false, role:null, step:0 }, lixeira: { loading:true, items:[] }, installPrompt: { show:false } },
   professor: {
     session: null, loginStage:'email', loginEmail:'', loginRecordId:null, loginError:'',
     setupAvatarEmoji:null, setupAvatarColor:null,
     profileEditorOpen:false, avatarDraft:null,
-    subview: 'painel', // 'painel' | 'avaliacoes' | 'banco' | 'turmas' | ...
+    subview: 'inicio', // 'inicio' | 'painel' | 'avaliacoes' | 'banco' | 'turmas' | ...
     mode:'list', assessments: [], loadingList:true, newAssessment: freshAssessment(), resultsFor:null, responses:[], resultsLoading:false, editingCode:null, editingResponseCount:0, correctingResponseIdx:null,
+    correcoesPendentesLoaded:false, correcoesPendentesCount:0,
     bank: [], bankLoading:true, newBankQuestion:null, editingBankId:null,
     aiGen: { open:false, tema:'', quantidade:5, dificuldade:'médio', tipos:['mc','vf'], provasAntigas:false, loading:false, results:null, selected:[], error:'' },
     pasteImport: { open:false, text:'', loading:false, results:null, selected:[], error:'' },
@@ -1033,7 +1053,13 @@ function renderStatTile(icon, value, label, tint){
 function getFavoriteSubs(role){
   try{
     const raw = localStorage.getItem(`sala-favoritos-${role}`);
-    const list = raw ? JSON.parse(raw) : [];
+    if(raw===null){
+      // Primeira vez que esse navegador abre o menu: já vem com um atalho pré-marcado pro
+      // Gabarito Avulso, que os professores relataram ter dificuldade de encontrar no meio
+      // da lista. Se o professor desmarcar a estrela, isso é salvo e o padrão não volta.
+      return role==='professor' ? ['avulso'] : [];
+    }
+    const list = JSON.parse(raw);
     return Array.isArray(list) ? list : [];
   }catch(e){ return []; }
 }
@@ -1049,15 +1075,37 @@ function renderSidebar(items, activeSub, role){
   const expanded = state.ui.sidebarOpen ? 'expanded' : '';
   const favs = role ? getFavoriteSubs(role) : [];
   const favSet = new Set(favs);
-  let ordered = items;
-  if(role && favSet.size>0){
-    const favItems = items.filter(it => it.sub && favSet.has(it.sub));
-    const restItems = items.filter(it => !(it.sub && favSet.has(it.sub)));
+  const searchTerm = (role && state.ui.sidebarSearch) ? state.ui.sidebarSearch.trim().toLowerCase() : '';
+  const baseItems = searchTerm ? items.filter(it => it.label && it.label.toLowerCase().includes(searchTerm)) : items;
+  let ordered = baseItems;
+  if(role && favSet.size>0 && !searchTerm){
+    const favItems = baseItems.filter(it => it.sub && favSet.has(it.sub));
+    const restItems = baseItems.filter(it => !(it.sub && favSet.has(it.sub)));
     ordered = favItems.map(it => ({...it, _fav:true}));
     if(restItems.length>0) ordered = ordered.concat([{ _divider:true }], restItems);
   }
+  const searchBox = role ? `
+    <div class="sidebar-search-box">
+      <input type="text" id="sidebar-search-input" placeholder="🔎 Buscar no menu…" value="${esc(state.ui.sidebarSearch||'')}" autocomplete="off">
+    </div>
+  ` : '';
+  if(searchTerm && ordered.length===0){
+    return `
+      <nav class="app-sidebar ${expanded}">
+        <button class="sidebar-toggle" data-action="toggle-sidebar" title="Abrir/fechar menu">☰</button>
+        ${searchBox}
+        <p class="muted sidebar-empty-search">Nada encontrado para "${esc(state.ui.sidebarSearch)}".</p>
+      </nav>
+    `;
+  }
+  let lastGroup = null;
   const rows = ordered.map(it => {
-    if(it._divider) return `<div class="sidebar-divider"></div>`;
+    if(it._divider) { lastGroup = null; return `<div class="sidebar-divider"></div>`; }
+    let groupHeader = '';
+    if(!it._fav && it.group && it.group!==lastGroup){
+      groupHeader = `<div class="sidebar-group-header"><span class="sidebar-group-header-text">${esc(it.group)}</span></div>`;
+      lastGroup = it.group;
+    }
     const badgeDot = it.badge ? '<span class="badge-dot"></span>' : '';
     const labelText = it.badge ? `${esc(it.label)} (${it.badge})` : esc(it.label);
     const isFav = role && it.sub && favSet.has(it.sub);
@@ -1066,6 +1114,7 @@ function renderSidebar(items, activeSub, role){
     ` : '';
     if(it.href){
       return `
+        ${groupHeader}
         <div class="sidebar-item-row">
           <a class="sidebar-item" href="${it.href}" target="_blank" rel="noopener" title="${esc(it.label)}">
             <span class="icon">${it.icon}${badgeDot}</span>
@@ -1075,6 +1124,7 @@ function renderSidebar(items, activeSub, role){
       `;
     }
     return `
+      ${groupHeader}
       <div class="sidebar-item-row">
         <button class="sidebar-item ${activeSub===it.sub?'active':''}" data-action="${it.action}" data-sub="${it.sub}" title="${esc(it.label)}">
           <span class="icon">${it.icon}${badgeDot}</span>
@@ -1087,6 +1137,7 @@ function renderSidebar(items, activeSub, role){
   return `
     <nav class="app-sidebar ${expanded}">
       <button class="sidebar-toggle" data-action="toggle-sidebar" title="Abrir/fechar menu">☰</button>
+      ${searchBox}
       ${rows}
     </nav>
   `;
@@ -1222,6 +1273,10 @@ function renderProfessor(){
         <button class="btn btn-ghost btn-sm" data-action="prof-logout">Sair</button>
       </div>
     </div>
+    <div class="row quick-actions-bar" style="gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+      ${!(p.subview==='avaliacoes' && p.mode==='new') ? '<button class="btn btn-primary btn-sm" data-action="quick-new-assessment" style="flex:0 0 auto;">+ Nova avaliação</button>' : ''}
+      ${p.subview!=='avulso' ? '<button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="avulso" style="flex:0 0 auto;">🗒️ Gabarito Avulso</button>' : ''}
+    </div>
     ${(p.session.coordNote && !p.session.coordNoteDismissed) ? `
     <div style="background:#fdf3e8; border:1px solid var(--yellow-dark); border-radius:8px; padding:12px 14px; margin-bottom:14px;">
       <strong style="font-size:.85rem;">📋 Recado da coordenação</strong>
@@ -1231,29 +1286,36 @@ function renderProfessor(){
     ` : ''}
   `;
   const sidebarItems = [
-    { action:'sub-view', sub:'painel', icon:'📊', label:'Meu Painel' },
-    { action:'sub-view', sub:'avaliacoes', icon:'📝', label:'Avaliações' },
-    { href:'https://sso.seduc.se.gov.br/', icon:'📋', label:'Fazer Chamada (SEDUC)' },
-    { action:'sub-view', sub:'banco', icon:'📚', label:'Banco de questões' },
-    { action:'sub-view', sub:'turmas', icon:'👥', label:'Turmas' },
-    { action:'sub-view', sub:'chamada', icon:'🪪', label:'Chamada' },
-    { action:'sub-view', sub:'freqpainel', icon:'📊', label:'Painel de Frequência' },
-    { action:'sub-view', sub:'disciplinas', icon:'📖', label:'Disciplinas' },
-    { action:'sub-view', sub:'pesos', icon:'⚖️', label:'Pesos das notas' },
-    { action:'sub-view', sub:'liberacoes', icon:'🔓', label:'Liberações', badge: p.unlockRequests.filter(r=>!r.released).length || 0 },
-    { action:'sub-view', sub:'bloco', icon:'🖨️', label:'Bloco de Provas' },
-    { action:'sub-view', sub:'leitura', icon:'🔍', label:'Leitura de Gabaritos' },
-    { action:'sub-view', sub:'avulso', icon:'🗒️', label:'Gabarito Avulso' },
-    { action:'sub-view', sub:'livros', icon:'📘', label:'Livro Didático' },
-    { action:'sub-view', sub:'mural', icon:'📌', label:'Mural de Avisos' },
-    { action:'sub-view', sub:'enquete', icon:'📣', label:'Enquete Relâmpago' },
-    { action:'sub-view', sub:'quiz', icon:'🎮', label:'Quiz por Equipes' },
-    { action:'sub-view', sub:'roleta', icon:'🎡', label:'Roleta de Sorteio' },
-    { action:'sub-view', sub:'slides', icon:'🖥️', label:'Apresentação de Slides' },
-    { action:'sub-view', sub:'lixeira', icon:'🗑️', label:'Lixeira' },
+    { action:'sub-view', sub:'inicio', icon:'🏠', label:'Início', group:'📊 Painel' },
+    { action:'sub-view', sub:'painel', icon:'📊', label:'Meu Painel', group:'📊 Painel' },
+
+    { action:'sub-view', sub:'avaliacoes', icon:'📝', label:'Avaliações', badge: p.correcoesPendentesCount || 0, group:'📝 Avaliações' },
+    { action:'sub-view', sub:'banco', icon:'📚', label:'Banco de questões', group:'📝 Avaliações' },
+    { action:'sub-view', sub:'disciplinas', icon:'📖', label:'Disciplinas', group:'📝 Avaliações' },
+    { action:'sub-view', sub:'pesos', icon:'⚖️', label:'Pesos das notas', group:'📝 Avaliações' },
+    { action:'sub-view', sub:'liberacoes', icon:'🔓', label:'Liberações', badge: p.unlockRequests.filter(r=>!r.released).length || 0, group:'📝 Avaliações' },
+
+    { action:'sub-view', sub:'turmas', icon:'👥', label:'Turmas', group:'👥 Turmas & Frequência' },
+    { action:'sub-view', sub:'chamada', icon:'🪪', label:'Chamada', badge: (p.freqHoje && p.freqHoje.data ? p.freqHoje.data.filter(l=>l.presentesCount===0).length : 0) || 0, group:'👥 Turmas & Frequência' },
+    { action:'sub-view', sub:'freqpainel', icon:'📊', label:'Painel de Frequência', group:'👥 Turmas & Frequência' },
+    { href:'https://sso.seduc.se.gov.br/', icon:'📋', label:'Fazer Chamada (SEDUC)', group:'👥 Turmas & Frequência' },
+
+    { action:'sub-view', sub:'bloco', icon:'🖨️', label:'Bloco de Provas', group:'🖨️ Provas em Papel' },
+    { action:'sub-view', sub:'leitura', icon:'🔍', label:'Leitura de Gabaritos', group:'🖨️ Provas em Papel' },
+    { action:'sub-view', sub:'avulso', icon:'🗒️', label:'Gabarito Avulso', group:'🖨️ Provas em Papel' },
+
+    { action:'sub-view', sub:'livros', icon:'📘', label:'Livro Didático', group:'🎮 Recursos & Interação' },
+    { action:'sub-view', sub:'mural', icon:'📌', label:'Mural de Avisos', group:'🎮 Recursos & Interação' },
+    { action:'sub-view', sub:'enquete', icon:'📣', label:'Enquete Relâmpago', group:'🎮 Recursos & Interação' },
+    { action:'sub-view', sub:'quiz', icon:'🎮', label:'Quiz por Equipes', group:'🎮 Recursos & Interação' },
+    { action:'sub-view', sub:'roleta', icon:'🎡', label:'Roleta de Sorteio', group:'🎮 Recursos & Interação' },
+    { action:'sub-view', sub:'slides', icon:'🖥️', label:'Apresentação de Slides', group:'🎮 Recursos & Interação' },
+
+    { action:'sub-view', sub:'lixeira', icon:'🗑️', label:'Lixeira', group:'🗑️ Lixeira' },
   ];
   let content;
   if(p.profileEditorOpen) content = renderProfessorProfileEditor();
+  else if(p.subview==='inicio') content = renderProfessorInicio();
   else if(p.subview==='banco') content = renderBanco();
   else if(p.subview==='turmas') content = renderTurmas();
   else if(p.subview==='chamada') content = renderChamada(null, true);
@@ -1273,7 +1335,7 @@ function renderProfessor(){
   else if(p.subview==='slides') content = renderSlides();
   else if(p.subview==='lixeira') content = renderLixeira();
   else content = p.mode==='new' ? renderNewAssessment() : p.mode==='results' ? renderResults() : renderProfessorList();
-  return topBar + `<div class="app-shell">${renderSidebar(sidebarItems, p.subview, 'professor')}<div class="app-main">${content}</div></div>`;
+  return `<div class="app-topbar">${topBar}</div><div class="app-shell">${renderSidebar(sidebarItems, p.subview, 'professor')}<div class="app-main">${content}</div></div>`;
 }
 
 function renderProfessorLogin(){
@@ -2823,6 +2885,98 @@ function renderLivrosDidaticos(canUpload){
   `;
 }
 
+function diarioDismissedHoje(){
+  try{
+    return localStorage.getItem('sala-diario-dismiss') === new Date().toISOString().slice(0,10);
+  }catch(e){ return false; }
+}
+function dismissDiarioHoje(){
+  try{ localStorage.setItem('sala-diario-dismiss', new Date().toISOString().slice(0,10)); }catch(e){}
+  render();
+}
+function renderDiarioCard(){
+  if(diarioDismissedHoje()) return '';
+  return `
+    <div class="card" style="background:#fdf3e8; border:1px solid var(--yellow-dark);">
+      <div class="row" style="align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <div>
+          <strong>📔 Já preencheu o Diário Eletrônico hoje?</strong>
+          <p class="muted" style="margin:4px 0 0;">Não esqueça de lançar a chamada e o conteúdo do dia no SEDUC.</p>
+        </div>
+        <div class="row" style="flex:0 0 auto; gap:8px;">
+          <a class="btn btn-primary btn-sm" href="https://sso.seduc.se.gov.br/" target="_blank" rel="noopener">Abrir Diário (SEDUC)</a>
+          <button class="btn btn-ghost btn-sm" data-action="dismiss-diario-hoje">Já preenchi hoje</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+function getUnidadeAtualInfo(){
+  const periodos = state.professor.periodos || {};
+  const todayStr = new Date().toISOString().slice(0,10);
+  let match = null, lastStarted = null;
+  UNIDADES.forEach(u => {
+    const pu = periodos[u];
+    if(!pu || !pu.avalInicio) return;
+    const start = pu.avalInicio;
+    const end = pu.recFim || pu.avalFim || pu.avalInicio;
+    if(todayStr >= start && todayStr <= end) match = { unidade:u, periodo:pu };
+    if(todayStr >= start) lastStarted = { unidade:u, periodo:pu };
+  });
+  return match || lastStarted || null;
+}
+function renderUnidadeAtualCard(){
+  const info = getUnidadeAtualInfo();
+  if(!info) return '';
+  const pu = info.periodo;
+  const fmt = d => d ? new Date(d+'T00:00:00').toLocaleDateString('pt-BR') : '—';
+  const inicio = pu.avalInicio;
+  const fim = pu.recFim || pu.avalFim;
+  return `
+    <div class="card" style="background:#eaf4f2; border:1px solid var(--teal-dark, #2f6f68);">
+      <h3 style="margin:0 0 6px;">📅 Estamos na ${esc(info.unidade)}</h3>
+      <p style="margin:0 0 8px;">O período vai de <strong>${fmt(inicio)}</strong> a <strong>${fmt(fim)}</strong>.</p>
+      <p class="muted" style="margin:0;">Lembre-se de aplicar todos os instrumentais avaliativos e acompanhar as notas dos estudantes nesta unidade.</p>
+    </div>
+  `;
+}
+function renderProfessorInicio(){
+  const p = state.professor;
+  const emRecuperacao = (p.finalGrades && p.finalGrades.rows) ? p.finalGrades.rows.filter(r=>r.precisaRecuperacao).length : 0;
+  const liberacoesPendentes = p.unlockRequests.filter(r=>!r.released).length;
+  return `
+    ${renderGreetingHeader(p.session.displayName, 'Aqui está um resumo rápido do que precisa da sua atenção hoje.')}
+    ${renderDiarioCard()}
+    ${renderUnidadeAtualCard()}
+    ${renderFreqHojeCard()}
+    ${liberacoesPendentes>0 ? `
+      <div class="card" style="background:#fbeaea; border:1px solid var(--red, #b23b3b);">
+        <div class="row" style="align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+          <strong>🔓 ${liberacoesPendentes} pedido(s) de liberação de prova aguardando você</strong>
+          <button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="liberacoes">Ver liberações</button>
+        </div>
+      </div>
+    ` : ''}
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <div>
+          <strong>📊 Meu Painel</strong>
+          <p class="muted" style="margin:4px 0 0;">Lance notas, acompanhe o desempenho das turmas e veja o conteúdo trabalhado.</p>
+        </div>
+        <button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="painel">Abrir Meu Painel</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <div>
+          <strong>🗒️ Gabarito Avulso</strong>
+          <p class="muted" style="margin:4px 0 0;">Corrigir uma prova integrada em papel, com várias disciplinas no mesmo cartão-resposta.</p>
+        </div>
+        <button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="avulso">Ir para Gabarito Avulso</button>
+      </div>
+    </div>
+  `;
+}
 function renderPeriodosCard(){
   const periodos = state.professor.periodos || {};
   const rows = UNIDADES.filter(u => periodos[u] && (periodos[u].avalInicio || periodos[u].recInicio)).map(u => {
@@ -5034,6 +5188,10 @@ function renderProfessorPainel(){
         <h2>Meu Painel</h2>
         <button class="btn btn-ghost btn-sm" data-action="refresh-professor-painel">Atualizar</button>
       </div>
+      <div class="row" style="align-items:center; justify-content:space-between; background:#fdf3e8; border:1px solid var(--yellow-dark); border-radius:8px; padding:8px 12px; margin:10px 0;">
+        <span style="font-size:.85rem;">🗒️ Precisa lançar uma prova integrada em papel (várias disciplinas no mesmo cartão)? É no <strong>Gabarito Avulso</strong>.</span>
+        <button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="avulso" style="flex:0 0 auto;">Ir para Gabarito Avulso</button>
+      </div>
       ${tabsBar}
       ${disciplinaBar}
       ${tabContent}
@@ -5620,7 +5778,7 @@ function renderCoordenador(){
   else if(c.subview==='lixeira') content = renderLixeira();
   else if(c.subview==='ia') content = renderCoordIA();
   else content = c.mode==='results' ? renderCoordResults() : renderCoordAssessments();
-  return topBar + `<div class="app-shell">${renderSidebar(sidebarItems, c.subview, 'coordenador')}<div class="app-main">${content}</div></div>`;
+  return `<div class="app-topbar">${topBar}</div><div class="app-shell">${renderSidebar(sidebarItems, c.subview, 'coordenador')}<div class="app-main">${content}</div></div>`;
 }
 
 function renderCoordLogin(){
@@ -7954,6 +8112,22 @@ async function ensureProfessorDataLoaded(){
   if(p.disciplinas.length===0 && p.disciplinasLoading) loads.push(loadDisciplinas());
   if(loads.length>0) await Promise.all(loads);
   if(p.subview==='painel' && !p.painel) calcProfessorPainel();
+  if(!p.correcoesPendentesLoaded && !p.loadingList) ensureCorrecoesPendentesCount();
+}
+async function ensureCorrecoesPendentesCount(){
+  const p = state.professor;
+  p.correcoesPendentesLoaded = true;
+  const comDissertativa = p.assessments.filter(a => (a.professorId? a.professorId===p.session.id : true) && (a.questions||[]).some(q=>q.type==='dissertativa'));
+  let total = 0;
+  for(const a of comDissertativa){
+    try{
+      const r = await window.storage.get(`responses:${a.code}`, true);
+      const responses = JSON.parse(r.value) || [];
+      total += responses.filter(resp => (resp.details||[]).some(d=>d.pending)).length;
+    }catch(e){}
+  }
+  p.correcoesPendentesCount = total;
+  render();
 }
 async function loadFreqHoje(){
   const p = state.professor;
@@ -8428,6 +8602,29 @@ function logoutProfessor(){
   p.loginEmail = '';
   p.loginRecordId = null;
   p.loginError = '';
+  // Limpa os dados que ficam guardados em memória por professor (disciplinas, banco de
+  // questões, pesos dos instrumentos e tudo que depende deles). Sem isso, se outro professor
+  // fizer login no mesmo navegador sem recarregar a página, ele veria por um instante os dados
+  // do professor anterior — foi o que causava "disciplinas de um professor iguais às de outro".
+  p.disciplinas = []; p.disciplinasLoading = true;
+  p.bank = []; p.bankLoading = true;
+  p.pesos = {...DEFAULT_PESOS}; p.pesosLoading = true;
+  p.painel = null; p.painelDisciplinaFiltro = ''; p.painelTab = 'notas';
+  p.finalGrades = null;
+  p.disciplinaNamesCache = null; p.disciplinaNamesCacheLoading = false;
+  p.newDisciplinaOpen = false; p.newDisciplinaName = ''; p.newDisciplinaTurmaIds = [];
+  p.editingDisciplinaId = null; p.editingDisciplinaTurmaIds = [];
+  p.assessments = []; p.loadingList = true;
+  p.correcoesPendentesLoaded = false; p.correcoesPendentesCount = 0;
+  p.avisos = []; p.avisosLoading = true;
+  p.livros = []; p.livrosLoading = true;
+  p.periodos = {}; p.periodosLoading = true;
+  p.unlockRequests = []; p.unlockRequestsLoading = true;
+  p.pinLoading = true;
+  p.avulso.professoresCache = null; p.avulso.professoresCacheLoading = false;
+  p.avulso.list = []; p.avulso.listLoading = true;
+  p.bloco.list = []; p.bloco.listLoading = true;
+  p.subview = 'inicio';
   state.view = 'landing';
   render();
   resetIdleLogoutTimer();
@@ -9882,6 +10079,7 @@ async function saveCorrectResponse(idx){
   r.total = r.details.reduce((s,d)=>s+(d.score||0),0);
   await window.storage.set(`responses:${a.code}`, JSON.stringify(p.responses), true);
   p.correctingResponseIdx = null;
+  p.correcoesPendentesCount = Math.max(0, (p.correcoesPendentesCount||0) - 1);
   render();
 }
 
@@ -11008,6 +11206,7 @@ document.addEventListener('click', (e) => {
   else if(act==='prof-login-back-to-email'){ const p=state.professor; p.loginStage='email'; p.loginError=''; render(); }
   else if(act==='prof-logout'){ logoutProfessor(); }
   else if(act==='dismiss-coord-note'){ state.professor.session.coordNoteDismissed = true; render(); }
+  else if(act==='dismiss-diario-hoje'){ dismissDiarioHoje(); }
   else if(act==='open-professor-profile'){ p.avatarDraft = null; p.profileEditorOpen = true; render(); }
   else if(act==='close-professor-profile'){ p.profileEditorOpen = false; p.avatarDraft = null; render(); }
   else if(act==='remover-foto-professor'){ salvarAvatarProfessor({ photoUrl: null }); }
@@ -11028,6 +11227,7 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-sub-view'){
     state.coordenador.subview = btn.dataset.sub;
     state.coordenador.mode='list';
+    state.ui.sidebarSearch = '';
     if(state.coordenador.subview==='pesosprof'){ loadCoordProfessorPesos(); }
     if(state.coordenador.subview==='freqconfig'){ ensureTurnoHorariosLoaded().then(render); ensureDiasLetivosLoaded().then(render); }
     if(state.coordenador.subview==='importarnotas'){
@@ -11098,6 +11298,7 @@ document.addEventListener('click', (e) => {
   else if(act==='sub-view'){
     p.subview = btn.dataset.sub;
     p.profileEditorOpen = false;
+    state.ui.sidebarSearch = '';
     stopLiberacoesPoll();
     if(p.subview==='liberacoes'){
       loadUnlockRequests();
@@ -11189,6 +11390,7 @@ document.addEventListener('click', (e) => {
 
   // avaliações
   else if(act==='new-assessment'){ p.mode='new'; p.newAssessment = freshAssessment(); p.editingCode=null; p.editingResponseCount=0; p.pickerOpen=false; p.pickerSelected=[]; render(); }
+  else if(act==='quick-new-assessment'){ p.subview='avaliacoes'; p.mode='new'; p.newAssessment = freshAssessment(); p.editingCode=null; p.editingResponseCount=0; p.pickerOpen=false; p.pickerSelected=[]; render(); }
   else if(act==='cancel-new'){ p.mode='list'; p.editingCode=null; p.editingResponseCount=0; render(); }
   else if(act==='edit-assessment'){ editAssessment(btn.dataset.code); }
   else if(act==='add-question'){ p.newAssessment.questions.push(freshQuestion(btn.dataset.qtype)); render(); }
@@ -11456,6 +11658,13 @@ document.addEventListener('input', (e) => {
   else if(el.id==='bloco-lancar-aluno-select'){ p.bloco.lancarStudentId = el.value; }
   else if(el.id==='bloco-lancar-sequencia-input'){ p.bloco.lancarSequencia = el.value; }
   else if(el.id==='bloco-scan-file-input'){ if(el.files[0]) iniciarLeituraBloco(el.files[0]); }
+  else if(el.id==='sidebar-search-input'){
+    state.ui.sidebarSearch = el.value;
+    const selStart = el.selectionStart, selEnd = el.selectionEnd;
+    render();
+    const el2 = document.getElementById('sidebar-search-input');
+    if(el2){ el2.focus(); try{ el2.setSelectionRange(selStart, selEnd); }catch(err){} }
+  }
 });
 
 document.addEventListener('change', (e) => {
