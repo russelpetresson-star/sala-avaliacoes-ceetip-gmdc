@@ -896,6 +896,7 @@ let state = {
     manualGradePrefill: null,
     livros: [], livrosLoading: true, bancoLivroSelectedId: null,
     painel: null, painelTab: 'notas', // 'notas' | 'desempenho' | 'conteudo' | 'alunos'
+    painelDisciplinaFiltro: '', // '' = todas as disciplinas; senão, id de uma disciplina do professor
     avisos: [], avisosLoading: true, newAvisoText: '', newAvisoTurmaIds: [], newAvisoPinned: false,
     enquete: { turmaId:'', current:null, loading:false, formQuestion:'', formOptions:['',''] },
     quiz: { current:null, presentationMode:false, setup: null },
@@ -4085,7 +4086,6 @@ function renderFinalGradesTable(){
       </div>
     ` : ''}
     ${editMode ? '<p class="muted" style="font-size:.8rem;">Edite qualquer campo abaixo para corrigir uma nota lançada por engano. Deixe em branco para manter o cálculo automático.</p>' : ''}
-    ${renderFinalGradesChart(fg)}
     <div class="table-scroll">
     <table>
       <tr>
@@ -4114,6 +4114,8 @@ function renderFinalGradesTable(){
       `).join('')}
     </table>
     </div>
+    <h3 style="margin-top:22px;">Gráfico por aluno</h3>
+    ${renderFinalGradesChart(fg)}
   `;
 }
 
@@ -4777,11 +4779,21 @@ async function calcProfessorPainel(){
   const myDisciplinaIds = new Set(p.disciplinas.map(d=>d.id));
   const myDisciplinaNames = new Set(p.disciplinas.map(d=>d.name));
   const myTurmaIds = new Set(professorTurmas().map(t=>t.id));
+  // Se o professor filtrou por uma disciplina específica (seletor no topo do Meu Painel), só entram
+  // avaliações daquela disciplina — importante pra quem leciona mais de uma disciplina na mesma turma.
+  const filtroDisciplina = p.painelDisciplinaFiltro ? p.disciplinas.find(d=>d.id===p.painelDisciplinaFiltro) : null;
   const myAssessments = p.assessments.filter(a => {
-    if(a.professorId) return a.professorId===p.session.id;
-    const disciplinaBate = (a.disciplinaId && myDisciplinaIds.has(a.disciplinaId)) || (a.disciplinaName && myDisciplinaNames.has(a.disciplinaName));
-    if(!disciplinaBate) return false;
-    return (a.turmaIds||[]).some(tid => myTurmaIds.has(tid));
+    if(a.professorId){ if(a.professorId!==p.session.id) return false; }
+    else {
+      const disciplinaBate = (a.disciplinaId && myDisciplinaIds.has(a.disciplinaId)) || (a.disciplinaName && myDisciplinaNames.has(a.disciplinaName));
+      if(!disciplinaBate) return false;
+      if(!(a.turmaIds||[]).some(tid => myTurmaIds.has(tid))) return false;
+    }
+    if(filtroDisciplina){
+      const bateFiltro = a.disciplinaId ? a.disciplinaId===filtroDisciplina.id : a.disciplinaName===filtroDisciplina.name;
+      if(!bateFiltro) return false;
+    }
+    return true;
   });
   const turmaStats = {}, disciplinaStats = {}, conteudoStats = {}, descritorStats = {}, alunoStats = {};
   const ausentesMap = {}; // key: turmaName + '|' + studentName -> {turmaName, studentName, count}
@@ -4804,8 +4816,10 @@ async function calcProfessorPainel(){
           if(!disciplinaStats[a.disciplinaName]) disciplinaStats[a.disciplinaName] = {sum:0,count:0};
           disciplinaStats[a.disciplinaName].sum += pct; disciplinaStats[a.disciplinaName].count++;
         }
-        if(!alunoStats[resp.studentName]) alunoStats[resp.studentName] = {sum:0,count:0};
-        alunoStats[resp.studentName].sum += pct; alunoStats[resp.studentName].count++;
+        const alunoTurmaName = turma ? turma.name : '—';
+        const alunoKey = alunoTurmaName + '|' + resp.studentName;
+        if(!alunoStats[alunoKey]) alunoStats[alunoKey] = {sum:0,count:0, turmaName:alunoTurmaName, studentName:resp.studentName};
+        alunoStats[alunoKey].sum += pct; alunoStats[alunoKey].count++;
       }
       (resp.details||[]).forEach(d => {
         const q = a.questions.find(x=>x.id===d.questionId);
@@ -4844,6 +4858,8 @@ async function calcProfessorPainel(){
     arr.sort((x,y) => order==='asc' ? x.avg-y.avg : y.avg-x.avg);
     return arr;
   };
+  const porAlunoArr = Object.values(alunoStats).map(v => ({ turmaName: v.turmaName, name: v.studentName, avg: v.sum/v.count, count: v.count }));
+  porAlunoArr.sort((x,y) => x.turmaName.localeCompare(y.turmaName, 'pt-BR') || x.avg-y.avg);
 
   p.painel = {
     loading:false,
@@ -4851,7 +4867,7 @@ async function calcProfessorPainel(){
     porDisciplina: toSortedArray(disciplinaStats, 'desc'),
     porConteudo: toSortedArray(conteudoStats, 'asc'),
     porDescritor: toSortedArray(descritorStats, 'asc'),
-    porAluno: toSortedArray(alunoStats, 'asc'),
+    porAluno: porAlunoArr,
     ausentes: Object.values(ausentesMap).sort((x,y)=>y.count-x.count)
   };
   render();
@@ -4916,28 +4932,48 @@ function renderProfessorPainel(){
     </div>
   `;
 
+  const disciplinaFiltroAtual = p.painelDisciplinaFiltro ? p.disciplinas.find(d=>d.id===p.painelDisciplinaFiltro) : null;
+  const disciplinaBar = `
+    <div class="row" style="align-items:center; gap:10px; margin:2px 0 14px;">
+      <label style="margin:0; flex:0 0 auto;">Disciplina</label>
+      <select id="painel-disciplina-select" style="max-width:280px;">
+        <option value="">Todas as disciplinas</option>
+        ${p.disciplinas.map(d => `<option value="${d.id}" ${p.painelDisciplinaFiltro===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}
+      </select>
+      <span class="muted" style="font-size:.8rem;">${activeTab==='notas' ? 'Escolha uma disciplina pra lançar notas — cada disciplina tem seus próprios instrumentos.' : 'Filtra o que aparece nesta aba. "Todas" mostra tudo o que você leciona junto.'}</span>
+    </div>
+  `;
+
+  // Turmas em que a disciplina filtrada é lecionada (só faz sentido lançar notas de uma
+  // disciplina específica, senão as notas de disciplinas diferentes se misturariam).
+  const turmasDaDisciplina = disciplinaFiltroAtual ? p.turmas.filter(t => (disciplinaFiltroAtual.turmaIds||[]).includes(t.id)) : [];
+
   let tabContent = '';
   if(activeTab==='notas'){
-    tabContent = `
-      <p class="muted">Notas por instrumento avaliativo, turma e unidade. Provas e gabaritos lançados no app (ou lidos por leitura ótica) entram automaticamente; o que foi aplicado presencialmente sem passar pelo app você lança manualmente abaixo.</p>
-      <div class="row" style="align-items:flex-end;">
-        <div>
-          <label>Turma</label>
-          <select id="painel-turma-select">
-            <option value="">— selecione a turma —</option>
-            ${myTurmas.map(t=>`<option value="${t.id}" ${fg && fg.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
-          </select>
+    if(!disciplinaFiltroAtual){
+      tabContent = `<p class="muted">Selecione uma disciplina acima pra lançar ou consultar as notas por instrumento avaliativo. Como um professor pode lecionar mais de uma disciplina na mesma turma, as notas são sempre lançadas disciplina por disciplina, pra não misturar os instrumentos de uma com os da outra.</p>`;
+    } else {
+      tabContent = `
+        <p class="muted">Notas de <strong>${esc(disciplinaFiltroAtual.name)}</strong> por instrumento avaliativo, turma e unidade. Provas e gabaritos lançados no app (ou lidos por leitura ótica) entram automaticamente; o que foi aplicado presencialmente sem passar pelo app você lança manualmente abaixo.</p>
+        <div class="row" style="align-items:flex-end;">
+          <div>
+            <label>Turma</label>
+            <select id="painel-turma-select">
+              <option value="">— selecione a turma —</option>
+              ${turmasDaDisciplina.map(t=>`<option value="${t.id}" ${fg && fg.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label>Unidade</label>
+            <select id="final-unidade-select">
+              ${UNIDADES.map(u => `<option value="${esc(u)}" ${p.finalGradesUnidade===u?'selected':''}>${esc(u)}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn btn-primary" data-action="calc-final-grades" style="flex:0 0 auto;">Calcular notas</button>
         </div>
-        <div>
-          <label>Unidade</label>
-          <select id="final-unidade-select">
-            ${UNIDADES.map(u => `<option value="${esc(u)}" ${p.finalGradesUnidade===u?'selected':''}>${esc(u)}</option>`).join('')}
-          </select>
-        </div>
-        <button class="btn btn-primary" data-action="calc-final-grades" style="flex:0 0 auto;">Calcular notas</button>
-      </div>
-      ${renderFinalGradesTable()}
-    `;
+        ${renderFinalGradesTable()}
+      `;
+    }
   } else if(activeTab==='desempenho'){
     tabContent = `
       <p class="muted">Análise de desempenho com base em todas as suas avaliações e respostas já lançadas, nas turmas que você leciona.</p>
@@ -4951,26 +4987,45 @@ function renderProfessorPainel(){
       ${section('Desempenho por descritor SAEB', pn.porDescritor, 'Preencha o campo "Descritor SAEB" nas questões para ver essa análise.')}
     `;
   } else if(activeTab==='alunos'){
+    // Agrupa alunos e ausências por turma, na mesma ordem das turmas do professor.
+    const porAlunoPorTurma = {};
+    pn.porAluno.forEach(a => { (porAlunoPorTurma[a.turmaName] = porAlunoPorTurma[a.turmaName] || []).push(a); });
+    const ausentesPorTurma = {};
+    ausentesFiltrado.forEach(a => { (ausentesPorTurma[a.turmaName] = ausentesPorTurma[a.turmaName] || []).push(a); });
+    const turmaNomesOrdenados = myTurmas.map(t=>t.name).filter(n => porAlunoPorTurma[n] || ausentesPorTurma[n]);
+    // Turmas com dados mas fora do vínculo atual (caso raro) entram no fim, pra nada se perder.
+    Object.keys({...porAlunoPorTurma, ...ausentesPorTurma}).forEach(n => { if(!turmaNomesOrdenados.includes(n)) turmaNomesOrdenados.push(n); });
+
     tabContent = `
       <h3 style="margin-top:4px;">Desempenho por aluno</h3>
-      ${pn.porAluno.length===0 ? '<p class="muted">Sem dados ainda.</p>' : `
-        <div class="table-scroll">
-        <table>
-          <tr><th>Aluno</th><th>Média</th><th>Avaliações</th></tr>
-          ${pn.porAluno.map(a => `<tr><td>${esc(a.name)}</td><td>${a.avg.toFixed(1)}%</td><td>${a.count}</td></tr>`).join('')}
-        </table>
-        </div>
-      `}
+      ${pn.porAluno.length===0 ? '<p class="muted">Sem dados ainda.</p>' : turmaNomesOrdenados.map(turmaName => {
+        const alunos = porAlunoPorTurma[turmaName];
+        if(!alunos || alunos.length===0) return '';
+        return `
+          <h4 style="margin:16px 0 6px; font-size:.95rem; color: var(--board); border-bottom:1px solid var(--paper-line); padding-bottom:4px;">${esc(turmaName)}</h4>
+          <div class="table-scroll">
+          <table>
+            <tr><th>Aluno</th><th>Média</th><th>Avaliações</th></tr>
+            ${alunos.map(a => `<tr><td>${esc(a.name)}</td><td>${a.avg.toFixed(1)}%</td><td>${a.count}</td></tr>`).join('')}
+          </table>
+          </div>
+        `;
+      }).join('')}
       <h3 style="margin-top:22px;">Alunos ausentes</h3>
       <p class="muted" style="font-size:.82rem; margin-top:-6px;">Alunos matriculados na turma que não responderam a uma avaliação já encerrada.</p>
-      ${ausentesFiltrado.length===0 ? '<p class="muted">Nenhuma ausência registrada.</p>' : `
-        <div class="table-scroll">
-        <table>
-          <tr><th>Aluno</th><th>Turma</th><th>Ausências</th></tr>
-          ${ausentesFiltrado.map(a => `<tr><td>${esc(a.studentName)}</td><td>${esc(a.turmaName)}</td><td>${a.count}</td></tr>`).join('')}
-        </table>
-        </div>
-      `}
+      ${ausentesFiltrado.length===0 ? '<p class="muted">Nenhuma ausência registrada.</p>' : turmaNomesOrdenados.map(turmaName => {
+        const ausentes = ausentesPorTurma[turmaName];
+        if(!ausentes || ausentes.length===0) return '';
+        return `
+          <h4 style="margin:16px 0 6px; font-size:.95rem; color: var(--board); border-bottom:1px solid var(--paper-line); padding-bottom:4px;">${esc(turmaName)}</h4>
+          <div class="table-scroll">
+          <table>
+            <tr><th>Aluno</th><th>Ausências</th></tr>
+            ${ausentes.map(a => `<tr><td>${esc(a.studentName)}</td><td>${a.count}</td></tr>`).join('')}
+          </table>
+          </div>
+        `;
+      }).join('')}
     `;
   }
 
@@ -4981,6 +5036,7 @@ function renderProfessorPainel(){
         <button class="btn btn-ghost btn-sm" data-action="refresh-professor-painel">Atualizar</button>
       </div>
       ${tabsBar}
+      ${disciplinaBar}
       ${tabContent}
     </div>
   `;
@@ -6995,7 +7051,8 @@ async function calcCoordNotas(){
   for(const key of Object.keys(groups)){
     const g = groups[key];
     const pesos = await getPesos(g.professorId);
-    const overrides = await getNotasManuais(g.professorId, turmaId, unidade);
+    const disciplinaIdDoGrupo = g.assessments[0] ? g.assessments[0].disciplinaId : null;
+    const overrides = await getNotasManuais(g.professorId, turmaId, unidade, disciplinaIdDoGrupo);
     const { rows, total } = await computeGradesForAssessments(g.assessments, pesos, turma, unidade, overrides);
     const grades = {};
     rows.forEach(r => { grades[r.name] = { final: r.final, precisaRecuperacao: r.precisaRecuperacao, temRecuperacao: r.temRecuperacao }; });
@@ -10227,10 +10284,19 @@ function calcEngajamentoRatio(o){
   const soma = components.reduce((s,c)=>s+c.peso*c.valor,0);
   return pesoTotal>0 ? soma/pesoTotal : 1;
 }
-async function getNotasManuais(professorId, turmaId, unidade){
+async function getNotasManuais(professorId, turmaId, unidade, disciplinaId){
   if(!professorId || !turmaId || !unidade) return {};
-  try{ const r = await window.storage.get(`notas-manuais:${professorId}:${turmaId}:${unidade}`, true); return r.value ? JSON.parse(r.value) : {}; }
-  catch(e){ return {}; }
+  try{
+    const r = await window.storage.get(`notas-manuais:${professorId}:${turmaId}:${unidade}:${disciplinaId||'geral'}`, true);
+    if(r.value) return JSON.parse(r.value);
+  }catch(e){}
+  // Compatibilidade: antes de existir o filtro por disciplina, os ajustes manuais eram salvos
+  // sem essa parte da chave. Se não achar nada na chave nova, tenta a chave antiga, pra não
+  // "sumir" com ajustes que professores já tinham salvo.
+  try{
+    const r2 = await window.storage.get(`notas-manuais:${professorId}:${turmaId}:${unidade}`, true);
+    return r2.value ? JSON.parse(r2.value) : {};
+  }catch(e){ return {}; }
 }
 async function computeGradesForAssessments(assessments, pesos, turma, unidade, overrides){
   const roster = turma ? turma.students.map(s=>s.name) : [];
@@ -10322,19 +10388,29 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
 
 async function calcFinalGrades(){
   const p = state.professor;
+  const disciplina = p.disciplinas.find(d=>d.id===p.painelDisciplinaFiltro);
+  if(!disciplina){ alert('Selecione a disciplina no topo do Meu Painel.'); return; }
   const tid = document.getElementById('painel-turma-select').value;
   if(!tid){ alert('Selecione a turma.'); return; }
   const t = p.turmas.find(x=>x.id===tid);
   const unidade = document.getElementById('final-unidade-select').value;
   p.finalGradesUnidade = unidade;
-  p.finalGrades = { turmaId: tid, unidade, loading:true, rows:[], total:0, editMode:false };
+  p.finalGrades = { turmaId: tid, unidade, disciplinaId: disciplina.id, loading:true, rows:[], total:0, editMode:false };
   render();
 
-  const relevant = p.assessments.filter(a => assessmentTurmaIds(a).includes(tid) && (a.unidade||'')===unidade && (!a.professorId || a.professorId===p.session.id));
-  const overrides = await getNotasManuais(p.session.id, tid, unidade);
+  // Restrito à disciplina selecionada: um professor pode lecionar mais de uma disciplina na
+  // mesma turma, e cada uma tem seus próprios instrumentos avaliativos — não podem se misturar.
+  const relevant = p.assessments.filter(a => {
+    if(!assessmentTurmaIds(a).includes(tid)) return false;
+    if((a.unidade||'')!==unidade) return false;
+    if(a.professorId){ if(a.professorId!==p.session.id) return false; } // pertence a outro professor
+    const disciplinaBate = a.disciplinaId ? a.disciplinaId===disciplina.id : a.disciplinaName===disciplina.name;
+    return disciplinaBate;
+  });
+  const overrides = await getNotasManuais(p.session.id, tid, unidade, disciplina.id);
   const { rows, total } = await computeGradesForAssessments(relevant, p.pesos, t, unidade, overrides);
 
-  p.finalGrades = { turmaId: tid, unidade, loading:false, rows, total, editMode:false };
+  p.finalGrades = { turmaId: tid, unidade, disciplinaId: disciplina.id, loading:false, rows, total, editMode:false };
   render();
 }
 function toggleEditFinalGrades(on){
@@ -10369,7 +10445,7 @@ async function saveManualGrades(tid){
     readField(`manual-rec-${idx}`, r.autoRecuperacao, 'recuperacao');
     if(Object.keys(entry).length>0) overrides[r.name] = entry;
   });
-  await window.storage.set(`notas-manuais:${p.session.id}:${tid}:${fg.unidade}`, JSON.stringify(overrides), true);
+  await window.storage.set(`notas-manuais:${p.session.id}:${tid}:${fg.unidade}:${fg.disciplinaId||'geral'}`, JSON.stringify(overrides), true);
   alert('Notas ajustadas manualmente foram salvas.');
   await calcFinalGrades(tid);
 }
@@ -11389,6 +11465,7 @@ document.addEventListener('change', (e) => {
   const p = state.professor, al = state.aluno, c = state.coordenador;
   if(el.id==='coord-filter-professor'){ c.filterProfessorId = el.value; render(); return; }
   if(el.id==='disciplina-name-input'){ p.newDisciplinaName = el.value; render(); return; }
+  if(el.id==='painel-disciplina-select'){ p.painelDisciplinaFiltro = el.value; p.finalGrades = null; p.painel = null; render(); calcProfessorPainel(); return; }
   if(el.id==='bloco-turma-select'){ p.bloco.turmaId = el.value; p.bloco.selectedCodes = []; render(); return; }
   if(el.id==='banco-livro-select'){ p.bancoLivroSelectedId = el.value || null; render(); return; }
   if(el.id==='new-aviso-text'){ p.newAvisoText = el.value; return; }
