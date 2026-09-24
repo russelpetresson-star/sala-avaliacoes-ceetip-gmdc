@@ -875,14 +875,16 @@ let state = {
     session: null, loginStage:'email', loginEmail:'', loginRecordId:null, loginError:'',
     setupAvatarEmoji:null, setupAvatarColor:null,
     profileEditorOpen:false, avatarDraft:null,
-    subview: 'avaliacoes', // 'avaliacoes' | 'banco' | 'turmas'
+    subview: 'painel', // 'painel' | 'avaliacoes' | 'banco' | 'turmas' | ...
     mode:'list', assessments: [], loadingList:true, newAssessment: freshAssessment(), resultsFor:null, responses:[], resultsLoading:false, editingCode:null, editingResponseCount:0, correctingResponseIdx:null,
     bank: [], bankLoading:true, newBankQuestion:null, editingBankId:null,
     aiGen: { open:false, tema:'', quantidade:5, dificuldade:'médio', tipos:['mc','vf'], provasAntigas:false, loading:false, results:null, selected:[], error:'' },
     pasteImport: { open:false, text:'', loading:false, results:null, selected:[], error:'' },
     book: { open:false, fileName:'', pages:[], loading:false, error:'', searchQuery:'', searchResults:null, viewingText:'', extractLoading:false, extractResults:null, extractSelected:[], extractError:'' },
     turmas: [], turmasLoading:true, viewingTurmaId:null, newTurmaOpen:false, newTurmaName:'', newTurmaStudentsText:'', newStudentName:'',
-    disciplinas: [], disciplinasLoading:true, newDisciplinaOpen:false, newDisciplinaName:'',
+    disciplinas: [], disciplinasLoading:true, newDisciplinaOpen:false, newDisciplinaName:'', newDisciplinaTurmaIds:[],
+    editingDisciplinaId:null, editingDisciplinaTurmaIds:[],
+    disciplinaNamesCache:null, disciplinaNamesCacheLoading:false,
     pesos: {...DEFAULT_PESOS}, pesosLoading:true, pesosDraft:null,
     pin: '1234', pinLoading:true,
     finalGrades: null, finalGradesUnidade: 'I Unidade',
@@ -1228,6 +1230,7 @@ function renderProfessor(){
     ` : ''}
   `;
   const sidebarItems = [
+    { action:'sub-view', sub:'painel', icon:'📊', label:'Meu Painel' },
     { action:'sub-view', sub:'avaliacoes', icon:'📝', label:'Avaliações' },
     { href:'https://sso.seduc.se.gov.br/', icon:'📋', label:'Fazer Chamada (SEDUC)' },
     { action:'sub-view', sub:'banco', icon:'📚', label:'Banco de questões' },
@@ -1241,7 +1244,6 @@ function renderProfessor(){
     { action:'sub-view', sub:'leitura', icon:'🔍', label:'Leitura de Gabaritos' },
     { action:'sub-view', sub:'avulso', icon:'🗒️', label:'Gabarito Avulso' },
     { action:'sub-view', sub:'livros', icon:'📘', label:'Livro Didático' },
-    { action:'sub-view', sub:'painel', icon:'📊', label:'Meu Painel' },
     { action:'sub-view', sub:'mural', icon:'📌', label:'Mural de Avisos' },
     { action:'sub-view', sub:'enquete', icon:'📣', label:'Enquete Relâmpago' },
     { action:'sub-view', sub:'quiz', icon:'🎮', label:'Quiz por Equipes' },
@@ -4046,18 +4048,8 @@ function renderTurmaDetail(t){
       ${renderFreqPainelBody(t)}
 
       <h3 style="margin-top:24px;">Nota final do bimestre</h3>
-      ${p.session ? `
-      <div class="row" style="align-items:flex-end;">
-        <div>
-          <label>Unidade</label>
-          <select id="final-unidade-select">
-            ${UNIDADES.map(u => `<option value="${esc(u)}" ${p.finalGradesUnidade===u?'selected':''}>${esc(u)}</option>`).join('')}
-          </select>
-        </div>
-        <button class="btn btn-primary" data-action="calc-final-grades" data-tid="${t.id}" style="flex:0 0 auto;">Calcular notas</button>
-      </div>
-      ${renderFinalGradesTable(t)}
-      ` : '<p class="muted">Entre pela aba Professor para calcular a nota final — o cálculo usa o banco de pesos de cada professor.</p>'}
+      <p class="muted">As notas por instrumento avaliativo dessa turma agora ficam em <strong>📊 Meu Painel</strong> (turma vinculada a alguma disciplina sua aparece lá automaticamente).</p>
+      <button class="btn btn-ghost btn-sm" data-action="sub-view" data-sub="painel">Ir para Meu Painel</button>
 
       <div style="margin-top:16px;">
         <button class="btn btn-ghost" data-action="back-to-turmas">← Voltar às turmas</button>
@@ -4066,9 +4058,9 @@ function renderTurmaDetail(t){
   `;
 }
 
-function renderFinalGradesTable(t){
+function renderFinalGradesTable(){
   const fg = state.professor.finalGrades;
-  if(!fg || fg.turmaId!==t.id) return '';
+  if(!fg) return '';
   if(fg.loading) return '<div class="spinner"></div>';
   const pesos = state.professor.pesos;
   const emRecuperacao = fg.rows.filter(r=>r.precisaRecuperacao);
@@ -4079,10 +4071,10 @@ function renderFinalGradesTable(t){
       <div class="row" style="flex:0 0 auto; gap:8px;">
         ${editMode ? `
           <button class="btn btn-ghost btn-sm" data-action="cancel-edit-final-grades">Cancelar</button>
-          <button class="btn btn-primary btn-sm" data-action="save-manual-grades" data-tid="${t.id}">💾 Salvar edições</button>
+          <button class="btn btn-primary btn-sm" data-action="save-manual-grades" data-tid="${fg.turmaId}">💾 Salvar edições</button>
         ` : `
-          <button class="btn btn-ghost btn-sm" data-action="toggle-edit-final-grades" data-tid="${t.id}">✏️ Editar notas manualmente</button>
-          <button class="btn btn-ghost btn-sm" data-action="export-final-grades-xlsx" data-tid="${t.id}">Exportar .xlsx</button>
+          <button class="btn btn-ghost btn-sm" data-action="toggle-edit-final-grades" data-tid="${fg.turmaId}">✏️ Editar notas manualmente</button>
+          <button class="btn btn-ghost btn-sm" data-action="export-final-grades-xlsx" data-tid="${fg.turmaId}">Exportar .xlsx</button>
         `}
       </div>
     </div>
@@ -4158,6 +4150,18 @@ function renderFinalGradesChart(fg){
 
 /* ---------------- DISCIPLINAS ---------------- */
 
+function renderTurmaChecklist(turmas, selectedIds, actionName){
+  if(turmas.length===0) return `<p class="muted" style="font-size:.85rem;">Nenhuma turma cadastrada ainda — cadastre em "Turmas" primeiro.</p>`;
+  return `
+    <div style="border:1px solid var(--paper-line); border-radius:8px; padding:10px; margin:6px 0;">
+      ${turmas.map(t => `
+        <label style="display:flex; align-items:center; gap:8px; font-weight:400; text-transform:none; padding:3px 0;">
+          <input type="checkbox" data-action="${actionName}" data-tid="${t.id}" ${selectedIds.includes(t.id)?'checked':''}> ${esc(t.name)}
+        </label>
+      `).join('')}
+    </div>
+  `;
+}
 function renderDisciplinas(){
   const p = state.professor;
   if(p.newDisciplinaOpen){
@@ -4165,7 +4169,20 @@ function renderDisciplinas(){
       <div class="card">
         <h2>Nova disciplina</h2>
         <label>Nome da disciplina</label>
-        <input type="text" id="disciplina-name-input" value="${esc(p.newDisciplinaName)}" placeholder="Ex: Segurança do Trabalho">
+        <input type="text" id="disciplina-name-input" list="disciplina-nomes-datalist" value="${esc(p.newDisciplinaName)}" placeholder="Ex: Segurança do Trabalho" autocomplete="off">
+        <datalist id="disciplina-nomes-datalist">
+          ${(p.disciplinaNamesCache||[]).map(n => `<option value="${esc(n)}"></option>`).join('')}
+        </datalist>
+        <p class="muted" style="font-size:.78rem;">${p.disciplinaNamesCacheLoading ? 'Carregando nomes já usados na escola…' : 'Dica: comece a digitar e veja se essa disciplina já existe com outro nome (ex: "Arte" x "Artes") antes de cadastrar uma nova.'}</p>
+        ${(() => {
+          const own = p.disciplinas.map(d=>d.name);
+          const all = [...new Set([...(p.disciplinaNamesCache||[]), ...own])];
+          const parecido = p.newDisciplinaName.trim() ? findSimilarDisciplinaName(p.newDisciplinaName.trim(), all.filter(n => normalizeDisciplinaName(n)!==normalizeDisciplinaName(p.newDisciplinaName))) : null;
+          return parecido ? `<p style="font-size:.85rem; color:#8a5a00; background:#fff6e0; border:1px solid #f0d896; border-radius:6px; padding:8px 10px; margin-top:6px;">⚠️ Já existe uma disciplina cadastrada como "<strong>${esc(parecido)}</strong>". Pra não fragmentar os relatórios, considere usar esse mesmo nome.</p>` : '';
+        })()}
+        <label style="margin-top:10px;">Em quais turmas você leciona essa disciplina?</label>
+        <p class="muted" style="font-size:.82rem;">Isso define o que aparece pra você no Meu Painel — só as turmas ligadas às suas disciplinas.</p>
+        ${renderTurmaChecklist(p.turmas, p.newDisciplinaTurmaIds, 'toggle-new-disciplina-turma')}
         <div id="disciplina-err"></div>
         <div class="row" style="margin-top:14px;">
           <button class="btn btn-ghost" data-action="cancel-new-disciplina">Cancelar</button>
@@ -4180,12 +4197,26 @@ function renderDisciplinas(){
   } else if(p.disciplinas.length===0){
     body = `<div class="empty">Nenhuma disciplina cadastrada ainda.</div>`;
   } else {
-    body = p.disciplinas.map(d => `
-      <div class="list-item">
-        <strong>${esc(d.name)}</strong>
-        <button class="btn btn-danger btn-sm" data-action="delete-disciplina" data-did="${d.id}">Excluir</button>
+    body = p.disciplinas.map(d => {
+      const turmaIds = d.turmaIds || [];
+      const turmaNames = p.turmas.filter(t=>turmaIds.includes(t.id)).map(t=>t.name);
+      const editing = p.editingDisciplinaId===d.id;
+      return `
+      <div class="list-item" style="align-items:flex-start; flex-direction:column;">
+        <div class="row" style="width:100%; justify-content:space-between; align-items:center;">
+          <strong>${esc(d.name)}</strong>
+          <div class="row" style="flex:0 0 auto; gap:6px;">
+            <button class="btn btn-ghost btn-sm" data-action="${editing?'cancelar-editar-disciplina-turmas':'editar-disciplina-turmas'}" data-did="${d.id}">${editing?'Cancelar':'✏️ Turmas'}</button>
+            <button class="btn btn-danger btn-sm" data-action="delete-disciplina" data-did="${d.id}">Excluir</button>
+          </div>
+        </div>
+        <span class="muted" style="font-size:.82rem;">${turmaNames.length>0 ? 'Turmas: '+turmaNames.map(esc).join(', ') : 'Nenhuma turma vinculada ainda — você não vai ver dados dela no Meu Painel.'}</span>
+        ${editing ? `
+          ${renderTurmaChecklist(p.turmas, p.editingDisciplinaTurmaIds, 'toggle-editing-disciplina-turma')}
+          <button class="btn btn-primary btn-sm" data-action="salvar-disciplina-turmas" data-did="${d.id}">Salvar turmas</button>
+        ` : ''}
       </div>
-    `).join('');
+    `; }).join('');
   }
   return `
     <div class="card">
@@ -4830,22 +4861,62 @@ function renderPainelBar(item){
 
 function renderProfessorPainel(){
   const p = state.professor;
+  const myTurmas = professorTurmas();
+
+  if(p.disciplinasLoading || p.turmasLoading){
+    return `<div class="card"><h2>Meu Painel</h2><div class="spinner"></div></div>`;
+  }
+  if(myTurmas.length===0){
+    return `
+      <div class="card">
+        <h2>Meu Painel</h2>
+        <p class="muted">Este é o seu painel principal: aqui ficam a análise de desempenho das suas disciplinas e o lançamento de notas por instrumento avaliativo — tudo restrito às turmas que você leciona.</p>
+        <p class="muted">Você ainda não vinculou nenhuma turma às suas disciplinas, então não há nada pra mostrar aqui ainda. Vá em <strong>📖 Disciplinas</strong> e, em cada disciplina, marque em quais turmas você leciona.</p>
+        <button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="disciplinas">Ir para Disciplinas</button>
+      </div>
+    `;
+  }
   if(!p.painel || p.painel.loading){
     return `<div class="card"><h2>Meu Painel</h2><div class="spinner"></div></div>`;
   }
+  const myTurmaNames = new Set(myTurmas.map(t=>t.name));
   const pn = p.painel;
   const section = (title, items, emptyMsg) => `
     <h3 style="margin-top:22px;">${title}</h3>
     ${items.length===0 ? `<p class="muted">${emptyMsg}</p>` : items.map(renderPainelBar).join('')}
   `;
+  const porTurmaFiltrado = pn.porTurma.filter(x=>myTurmaNames.has(x.name));
+  const ausentesFiltrado = pn.ausentes.filter(x=>myTurmaNames.has(x.turmaName));
+  const fg = p.finalGrades;
   return `
     <div class="card">
       <div class="row" style="align-items:center; justify-content:space-between;">
         <h2>Meu Painel</h2>
         <button class="btn btn-ghost btn-sm" data-action="refresh-professor-painel">Atualizar</button>
       </div>
-      <p class="muted">Análise com base em todas as suas avaliações e respostas já lançadas.</p>
-      ${section('Desempenho por turma', pn.porTurma, 'Sem dados ainda.')}
+      <p class="muted">Notas por instrumento avaliativo, turma e unidade. Provas e gabaritos lançados no app (ou lidos por leitura ótica) entram automaticamente; o que foi aplicado presencialmente sem passar pelo app você lança manualmente abaixo.</p>
+      <div class="row" style="align-items:flex-end;">
+        <div>
+          <label>Turma</label>
+          <select id="painel-turma-select">
+            <option value="">— selecione a turma —</option>
+            ${myTurmas.map(t=>`<option value="${t.id}" ${fg && fg.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label>Unidade</label>
+          <select id="final-unidade-select">
+            ${UNIDADES.map(u => `<option value="${esc(u)}" ${p.finalGradesUnidade===u?'selected':''}>${esc(u)}</option>`).join('')}
+          </select>
+        </div>
+        <button class="btn btn-primary" data-action="calc-final-grades" style="flex:0 0 auto;">Calcular notas</button>
+      </div>
+      ${renderFinalGradesTable()}
+    </div>
+
+    <div class="card">
+      <p class="muted">Análise de desempenho com base em todas as suas avaliações e respostas já lançadas, nas turmas que você leciona.</p>
+      ${section('Desempenho por turma', porTurmaFiltrado, 'Sem dados ainda.')}
       ${section('Desempenho por disciplina', pn.porDisciplina, 'Sem dados ainda.')}
       ${section('Desempenho por conteúdo', pn.porConteudo, 'Preencha o campo "Conteúdo" nas questões para ver essa análise.')}
       ${section('Desempenho por descritor SAEB', pn.porDescritor, 'Preencha o campo "Descritor SAEB" nas questões para ver essa análise.')}
@@ -4860,11 +4931,11 @@ function renderProfessorPainel(){
       `}
       <h3 style="margin-top:22px;">Alunos ausentes</h3>
       <p class="muted" style="font-size:.82rem; margin-top:-6px;">Alunos matriculados na turma que não responderam a uma avaliação já encerrada.</p>
-      ${pn.ausentes.length===0 ? '<p class="muted">Nenhuma ausência registrada.</p>' : `
+      ${ausentesFiltrado.length===0 ? '<p class="muted">Nenhuma ausência registrada.</p>' : `
         <div class="table-scroll">
         <table>
           <tr><th>Aluno</th><th>Turma</th><th>Ausências</th></tr>
-          ${pn.ausentes.map(a => `<tr><td>${esc(a.studentName)}</td><td>${esc(a.turmaName)}</td><td>${a.count}</td></tr>`).join('')}
+          ${ausentesFiltrado.map(a => `<tr><td>${esc(a.studentName)}</td><td>${esc(a.turmaName)}</td><td>${a.count}</td></tr>`).join('')}
         </table>
         </div>
       `}
@@ -7765,12 +7836,9 @@ async function savePin(){
   alert('PIN de liberação salvo.');
 }
 
-function ensureProfessorDataLoaded(){
+async function ensureProfessorDataLoaded(){
   const p = state.professor;
-  if(p.assessments.length===0 && p.loadingList) loadAssessmentsList();
   if(p.bank.length===0 && p.bankLoading) loadBank();
-  if(p.turmas.length===0 && p.turmasLoading) loadTurmas();
-  if(p.disciplinas.length===0 && p.disciplinasLoading) loadDisciplinas();
   if(p.pesosLoading) loadPesos();
   if(p.pinLoading) loadPin();
   if(p.unlockRequestsLoading) loadUnlockRequests();
@@ -7778,6 +7846,15 @@ function ensureProfessorDataLoaded(){
   if(p.livrosLoading) loadLivros();
   if(p.avisosLoading) loadAvisos();
   if(p.freqHoje.loading) loadFreqHoje();
+
+  // Meu Painel virou a tela principal e depende de avaliações, turmas e disciplinas
+  // já carregadas — por isso essas três são aguardadas antes de calcular o painel.
+  const loads = [];
+  if(p.assessments.length===0 && p.loadingList) loads.push(loadAssessmentsList());
+  if(p.turmas.length===0 && p.turmasLoading) loads.push(loadTurmas());
+  if(p.disciplinas.length===0 && p.disciplinasLoading) loads.push(loadDisciplinas());
+  if(loads.length>0) await Promise.all(loads);
+  if(p.subview==='painel' && !p.painel) calcProfessorPainel();
 }
 async function loadFreqHoje(){
   const p = state.professor;
@@ -9062,6 +9139,67 @@ async function ensureAvulsoProfessoresCache(forceRefresh){
   p.avulso.professoresCacheLoading = false;
   render();
 }
+// Normaliza um nome de disciplina pra comparação: remove acentos, pontuação e caixa,
+// pra "Ed. Física" e "Educação física" caírem na mesma forma de comparação.
+function normalizeDisciplinaName(s){
+  return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[.,]/g,'').replace(/\s+/g,' ').trim();
+}
+function levenshteinDistance(a,b){
+  const m=a.length, n=b.length;
+  if(m===0) return n; if(n===0) return m;
+  const dp = Array.from({length:m+1}, () => new Array(n+1).fill(0));
+  for(let i=0;i<=m;i++) dp[i][0]=i;
+  for(let j=0;j<=n;j++) dp[0][j]=j;
+  for(let i=1;i<=m;i++){
+    for(let j=1;j<=n;j++){
+      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+// Duas palavras "parecem" a mesma disciplina se forem iguais, se uma for abreviação da
+// outra (prefixo, ex. "ed" de "educacao") ou se diferirem por só uma letra (plural/erro
+// de digitação, ex. "arte"/"artes").
+function disciplinaWordsSimilar(w1, w2){
+  if(w1===w2) return true;
+  if(w1.length>=2 && w2.length>=2 && (w1.startsWith(w2) || w2.startsWith(w1))) return true;
+  if(Math.max(w1.length,w2.length)>=4 && levenshteinDistance(w1,w2)<=1) return true;
+  return false;
+}
+// Procura, numa lista de nomes já em uso na escola, um nome "parecido" com o nome digitado.
+// Devolve o nome original (com a grafia como foi cadastrado) ou null se não achar nada parecido.
+function findSimilarDisciplinaName(name, existingNames){
+  const norm = normalizeDisciplinaName(name);
+  if(!norm) return null;
+  const normWords = norm.split(' ').filter(Boolean);
+  for(const existing of existingNames){
+    const en = normalizeDisciplinaName(existing);
+    if(!en || en===norm.trim()) { if(en===norm) return existing; continue; }
+    const ew = en.split(' ').filter(Boolean);
+    if(ew.length===normWords.length && ew.every((w,i)=>disciplinaWordsSimilar(w, normWords[i]))) return existing;
+  }
+  return null;
+}
+// Carrega (com cache) os nomes de disciplina já cadastrados por QUALQUER professor da escola,
+// pra alimentar o autocompletar e o aviso de nome parecido ao criar uma disciplina nova.
+async function ensureDisciplinaNamesCache(forceRefresh){
+  const p = state.professor;
+  if(p.disciplinaNamesCache && !forceRefresh) return;
+  p.disciplinaNamesCacheLoading = true;
+  let names = [];
+  try{
+    const lista = await fetchProfessoresList();
+    const listas = await Promise.all(lista.map(async pr => {
+      try{ const r = await window.storage.get(`disciplinas:${pr.id}`, true); return (JSON.parse(r.value)||[]).map(d=>d.name); }catch(e){ return []; }
+    }));
+    const seen = new Set();
+    listas.flat().forEach(n => { const key = normalizeDisciplinaName(n); if(n && !seen.has(key)){ seen.add(key); names.push(n); } });
+    names.sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  }catch(e){ names = []; }
+  p.disciplinaNamesCache = names;
+  p.disciplinaNamesCacheLoading = false;
+  render();
+}
 function avulsoRemoveDisciplina(id){
   const p = state.professor;
   p.avulso.form.disciplinas = p.avulso.form.disciplinas.filter(d=>d.id!==id);
@@ -10139,8 +10277,10 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
   return { rows, total };
 }
 
-async function calcFinalGrades(tid){
+async function calcFinalGrades(){
   const p = state.professor;
+  const tid = document.getElementById('painel-turma-select').value;
+  if(!tid){ alert('Selecione a turma.'); return; }
   const t = p.turmas.find(x=>x.id===tid);
   const unidade = document.getElementById('final-unidade-select').value;
   p.finalGradesUnidade = unidade;
@@ -10223,12 +10363,39 @@ async function saveDisciplina(){
   if(p.disciplinas.some(d => d.name.toLowerCase()===p.newDisciplinaName.trim().toLowerCase())){
     errEl.innerHTML = '<p class="err">Essa disciplina já está cadastrada.</p>'; return;
   }
-  const disciplina = { id: cryptoId(), name: p.newDisciplinaName.trim(), createdAt: Date.now() };
+  let nomeFinal = p.newDisciplinaName.trim();
+  const nomesEscola = [...new Set([...(p.disciplinaNamesCache||[]), ...p.disciplinas.map(d=>d.name)])];
+  const parecido = findSimilarDisciplinaName(nomeFinal, nomesEscola.filter(n => normalizeDisciplinaName(n)!==normalizeDisciplinaName(nomeFinal)));
+  if(parecido){
+    const usarExistente = confirm(`Já existe uma disciplina cadastrada na escola como "${parecido}".\n\nClique OK pra usar esse mesmo nome (recomendado, evita duplicar nos relatórios) ou Cancelar pra manter "${nomeFinal}" como um nome novo e diferente.`);
+    if(usarExistente) nomeFinal = parecido;
+  }
+  if(p.disciplinas.some(d => d.name.toLowerCase()===nomeFinal.toLowerCase())){
+    errEl.innerHTML = '<p class="err">Essa disciplina já está cadastrada com esse nome.</p>'; return;
+  }
+  const disciplina = { id: cryptoId(), name: nomeFinal, turmaIds: p.newDisciplinaTurmaIds.slice(), createdAt: Date.now() };
   p.disciplinas.unshift(disciplina);
   await saveDisciplinasToStorage();
   p.newDisciplinaOpen = false;
   p.newDisciplinaName = '';
+  p.newDisciplinaTurmaIds = [];
   render();
+}
+async function salvarDisciplinaTurmas(did){
+  const p = state.professor;
+  const d = p.disciplinas.find(x=>x.id===did);
+  if(!d) return;
+  d.turmaIds = p.editingDisciplinaTurmaIds.slice();
+  await saveDisciplinasToStorage();
+  p.editingDisciplinaId = null;
+  p.painel = null;
+  render();
+}
+function professorTurmas(){
+  const p = state.professor;
+  const ids = new Set();
+  p.disciplinas.forEach(d => (d.turmaIds||[]).forEach(tid => ids.add(tid)));
+  return p.turmas.filter(t => ids.has(t.id));
 }
 
 async function deleteDisciplina(did){
@@ -11058,7 +11225,7 @@ document.addEventListener('click', (e) => {
   else if(act==='award-ficha-manual'){ awardFichas(btn.dataset.tid, btn.dataset.sid, 1, 'Participação em sala (professor)').then(()=>render()); }
   else if(act==='delete-turma'){ deleteTurma(btn.dataset.tid); }
   else if(act==='print-signature-list'){ printTurmaSignatureList(btn.dataset.tid); }
-  else if(act==='calc-final-grades'){ calcFinalGrades(btn.dataset.tid); }
+  else if(act==='calc-final-grades'){ calcFinalGrades(); }
   else if(act==='export-final-grades-xlsx'){ exportFinalGradesXlsx(btn.dataset.tid); }
   else if(act==='toggle-edit-final-grades'){ toggleEditFinalGrades(true); }
   else if(act==='cancel-edit-final-grades'){ toggleEditFinalGrades(false); }
@@ -11068,8 +11235,11 @@ document.addEventListener('click', (e) => {
   else if(act==='imprimir-boletim-aluno'){ imprimirBoletimAluno(btn.dataset.name); }
 
   // disciplinas
-  else if(act==='open-new-disciplina'){ p.newDisciplinaOpen = true; p.newDisciplinaName=''; render(); }
+  else if(act==='open-new-disciplina'){ p.newDisciplinaOpen = true; p.newDisciplinaName=''; p.newDisciplinaTurmaIds=[]; render(); ensureDisciplinaNamesCache(); }
   else if(act==='cancel-new-disciplina'){ p.newDisciplinaOpen = false; render(); }
+  else if(act==='editar-disciplina-turmas'){ const d = p.disciplinas.find(x=>x.id===btn.dataset.did); p.editingDisciplinaId = btn.dataset.did; p.editingDisciplinaTurmaIds = d ? (d.turmaIds||[]).slice() : []; render(); }
+  else if(act==='cancelar-editar-disciplina-turmas'){ p.editingDisciplinaId = null; render(); }
+  else if(act==='salvar-disciplina-turmas'){ salvarDisciplinaTurmas(btn.dataset.did); }
   else if(act==='save-disciplina'){ saveDisciplina(); }
   else if(act==='delete-disciplina'){ deleteDisciplina(btn.dataset.did); }
   else if(act==='save-pesos'){ savePesos(); }
@@ -11174,6 +11344,7 @@ document.addEventListener('change', (e) => {
   const act = el.dataset ? el.dataset.action : null;
   const p = state.professor, al = state.aluno, c = state.coordenador;
   if(el.id==='coord-filter-professor'){ c.filterProfessorId = el.value; render(); return; }
+  if(el.id==='disciplina-name-input'){ p.newDisciplinaName = el.value; render(); return; }
   if(el.id==='bloco-turma-select'){ p.bloco.turmaId = el.value; p.bloco.selectedCodes = []; render(); return; }
   if(el.id==='banco-livro-select'){ p.bancoLivroSelectedId = el.value || null; render(); return; }
   if(el.id==='new-aviso-text'){ p.newAvisoText = el.value; return; }
@@ -11220,6 +11391,8 @@ document.addEventListener('change', (e) => {
   else if(act==='avulso-vinc-prof'){ avulsoVinculoSetProfessor(el.dataset.id, el.dataset.vid, el.value); }
   else if(act==='avulso-vinc-disciplina'){ avulsoVinculoSetDisciplina(el.dataset.id, el.dataset.vid, el.value); }
   else if(act==='avulso-vinc-toggle-turma'){ avulsoVinculoToggleTurma(el.dataset.id, el.dataset.vid, el.dataset.tid); }
+  else if(act==='toggle-new-disciplina-turma'){ const tid = el.dataset.tid; const arr = p.newDisciplinaTurmaIds; const i = arr.indexOf(tid); if(i>=0) arr.splice(i,1); else arr.push(tid); }
+  else if(act==='toggle-editing-disciplina-turma'){ const tid = el.dataset.tid; const arr = p.editingDisciplinaTurmaIds; const i = arr.indexOf(tid); if(i>=0) arr.splice(i,1); else arr.push(tid); }
   else if(el.id==='avulso-imprimir-turma-select'){ p.avulso.imprimirTurmaId = el.value; }
   else if(el.id==='avulso-lancar-turma-select'){ p.avulso.lancarTurmaId = el.value; p.avulso.lancarStudentId = ''; p.avulso.lancarRespostas = new Array(p.avulso.current.numQuestoes).fill(''); render(); }
   else if(el.id==='avulso-lancar-aluno-select'){ p.avulso.lancarStudentId = el.value; render(); }
