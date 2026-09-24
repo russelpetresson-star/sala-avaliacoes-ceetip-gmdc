@@ -4771,7 +4771,18 @@ async function calcProfessorPainel(){
   const p = state.professor;
   p.painel = { loading:true };
   render();
-  const myAssessments = p.assessments.filter(a => !a.professorId || a.professorId===p.session.id);
+  // Um professor só deve ver, no Meu Painel, avaliações que são realmente dele: criadas por ele
+  // (professorId bate) ou — no caso de notas importadas via CSV pela coordenação, que não têm
+  // professorId — só quando a disciplina é uma das dele E foi aplicada numa turma vinculada a ela.
+  const myDisciplinaIds = new Set(p.disciplinas.map(d=>d.id));
+  const myDisciplinaNames = new Set(p.disciplinas.map(d=>d.name));
+  const myTurmaIds = new Set(professorTurmas().map(t=>t.id));
+  const myAssessments = p.assessments.filter(a => {
+    if(a.professorId) return a.professorId===p.session.id;
+    const disciplinaBate = (a.disciplinaId && myDisciplinaIds.has(a.disciplinaId)) || (a.disciplinaName && myDisciplinaNames.has(a.disciplinaName));
+    if(!disciplinaBate) return false;
+    return (a.turmaIds||[]).some(tid => myTurmaIds.has(tid));
+  });
   const turmaStats = {}, disciplinaStats = {}, conteudoStats = {}, descritorStats = {}, alunoStats = {};
   const ausentesMap = {}; // key: turmaName + '|' + studentName -> {turmaName, studentName, count}
 
