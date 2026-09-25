@@ -556,7 +556,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-09-25-1730</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-09-25-1800</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -7658,8 +7658,9 @@ function renderNovoAvulso(){
               </div>
             </div>
           `;}).join('')}
+          ${vinculos.length===0 ? '<p class="err" style="font-size:.8rem; margin-top:6px;">⚠️ Esta disciplina ainda não tem professor(a) vinculado(a) — as notas não vão aparecer no painel de ninguém até você adicionar um vínculo abaixo.</p>' : ''}
           <div class="row" style="margin-top:8px;">
-            <button class="btn btn-ghost btn-sm" data-action="avulso-vinc-adicionar" data-id="${d.id}">+ Adicionar vínculo (outro professor/série)</button>
+            <button class="btn btn-ghost btn-sm" data-action="avulso-vinc-adicionar" data-id="${d.id}">${vinculos.length===0 ? '+ Vincular professor(a) e disciplina' : '+ Adicionar outro vínculo (outro professor/série)'}</button>
           </div>
         </div>
       `;}).join('')}
@@ -12174,6 +12175,14 @@ function construirDisciplinasComVinculos(f, setErr){
       vinculosResolvidos.push({ id:v.id, professorId:v.professorId, professorName:prof.name, disciplinaId:v.disciplinaId, disciplinaName:disc.name, turmaIds:(v.turmaIds||[]).slice() });
     }
     resultado.push({ id:d.id, nome:d.nome.trim(), inicio:parseInt(d.inicio), fim:parseInt(d.fim), vinculos: vinculosResolvidos });
+  }
+  // Se este gabarito está configurado pra substituir um instrumento avaliativo, mas NENHUMA
+  // disciplina tem vínculo com professor(a), salvar assim não tem efeito nenhum: a nota fica só
+  // aqui no gabarito avulso e nunca aparece no painel de ninguém. Avisa antes de deixar salvar
+  // dessa forma, em vez de deixar passar silenciosamente (foi exatamente isso que gerou confusão).
+  if(f.instrumento && resultado.every(d => d.vinculos.length===0)){
+    setErr('Este gabarito está configurado pra substituir um instrumento avaliativo, mas nenhuma disciplina tem professor(a) vinculado(a) — assim a nota não vai aparecer no painel de ninguém. Adicione o vínculo (professor + disciplina) em pelo menos uma disciplina, ou remova a substituição de instrumento acima.');
+    return null;
   }
   return resultado;
 }
