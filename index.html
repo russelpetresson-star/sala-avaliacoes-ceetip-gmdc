@@ -994,6 +994,7 @@ let state = {
     painel: null, painelTab: 'notas', // 'notas' | 'desempenho' | 'conteudo' | 'alunos'
     painelDisciplinaFiltro: '', // '' = todas as disciplinas; senão, id de uma disciplina do professor
     avisos: [], avisosLoading: true, newAvisoText: '', newAvisoTurmaIds: [], newAvisoPinned: false,
+    materiais: [], materiaisLoading: true, newMaterialOpen:false, newMaterialTitle:'', newMaterialUrl:'', newMaterialDescricao:'', newMaterialTurmaIds:[], materialError:'',
     enquete: { turmaId:'', current:null, loading:false, formQuestion:'', formOptions:['',''] },
     quiz: { current:null, presentationMode:false, setup: null },
     roleta: { turmaId:'', pergunta:'', historico:[], current:null, spinning:false, spinDisplay:null, presentationMode:false },
@@ -1388,6 +1389,7 @@ function renderProfessor(){
 
     { action:'sub-view', sub:'livros', icon:'📘', label:'Livro Didático', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'mural', icon:'📌', label:'Mural de Avisos', group:'🎮 Recursos & Interação' },
+    { action:'sub-view', sub:'material', icon:'📎', label:'Material da Turma', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'enquete', icon:'📣', label:'Enquete Relâmpago', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'quiz', icon:'🎮', label:'Quiz por Equipes', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'roleta', icon:'🎡', label:'Roleta de Sorteio', group:'🎮 Recursos & Interação' },
@@ -1411,6 +1413,7 @@ function renderProfessor(){
   else if(p.subview==='livros') content = renderLivrosDidaticos(false);
   else if(p.subview==='painel') content = renderProfessorPainel();
   else if(p.subview==='mural') content = renderMuralAvisos(true);
+  else if(p.subview==='material') content = renderMateriais();
   else if(p.subview==='enquete') content = renderEnqueteRelampago();
   else if(p.subview==='quiz') content = renderQuizEquipes();
   else if(p.subview==='roleta') content = renderRoleta();
@@ -1661,6 +1664,150 @@ function renderMuralAvisos(canManage){
       <h2>Mural de Avisos</h2>
       ${formBlock}
       ${listBlock}
+    </div>
+  `;
+}
+
+/* ---------------- MATERIAL DA TURMA ---------------- */
+
+async function loadMateriais(){
+  const p = state.professor;
+  p.materiaisLoading = true;
+  try{ const r = await window.storage.get('materiais-turma', true); p.materiais = JSON.parse(r.value); }
+  catch(e){ p.materiais = []; }
+  p.materiaisLoading = false;
+  render();
+}
+async function saveMateriaisToStorage(){
+  await window.storage.set('materiais-turma', JSON.stringify(state.professor.materiais), true);
+}
+function abrirNovoMaterial(){
+  const p = state.professor;
+  p.newMaterialOpen = true;
+  p.newMaterialTitle = '';
+  p.newMaterialUrl = '';
+  p.newMaterialDescricao = '';
+  p.newMaterialTurmaIds = [];
+  p.materialError = '';
+  render();
+}
+function cancelarNovoMaterial(){
+  const p = state.professor;
+  p.newMaterialOpen = false;
+  render();
+}
+function toggleMaterialTurma(tid){
+  const p = state.professor;
+  if(p.newMaterialTurmaIds.includes(tid)) p.newMaterialTurmaIds = p.newMaterialTurmaIds.filter(x=>x!==tid);
+  else p.newMaterialTurmaIds.push(tid);
+  render();
+}
+async function salvarMaterial(authorName){
+  const p = state.professor;
+  const title = p.newMaterialTitle.trim();
+  const url = p.newMaterialUrl.trim();
+  if(!title){ p.materialError = 'Dê um título para o material.'; render(); return; }
+  if(!url){ p.materialError = 'Cole o link do material.'; render(); return; }
+  if(p.newMaterialTurmaIds.length===0){ p.materialError = 'Marque pelo menos uma turma.'; render(); return; }
+  const material = {
+    id: cryptoId(),
+    title,
+    url,
+    descricao: p.newMaterialDescricao.trim(),
+    turmaIds: [...p.newMaterialTurmaIds],
+    authorId: p.session.id,
+    authorName,
+    createdAt: Date.now()
+  };
+  p.materiais.unshift(material);
+  p.newMaterialOpen = false;
+  p.materialError = '';
+  await saveMateriaisToStorage();
+  render();
+}
+async function excluirMaterial(id){
+  const p = state.professor;
+  if(!confirm('Excluir este material? Os alunos das turmas vinculadas deixarão de vê-lo.')) return;
+  p.materiais = p.materiais.filter(m=>m.id!==id);
+  await saveMateriaisToStorage();
+  render();
+}
+function renderMateriais(){
+  const p = state.professor;
+  if(p.materiaisLoading) return `<div class="card"><h2>📎 Material da Turma</h2><div class="spinner"></div></div>`;
+  const minhasTurmas = professorTurmas();
+  const turmaCheckboxes = minhasTurmas.map(t => `
+    <label class="picker-item">
+      <input type="checkbox" data-action="toggle-material-turma" data-tid="${t.id}" ${p.newMaterialTurmaIds.includes(t.id)?'checked':''}>
+      <span>${esc(t.name)}</span>
+    </label>
+  `).join('');
+  const formBlock = p.newMaterialOpen ? `
+    <div style="border:1px dashed var(--paper-line); border-radius:10px; padding:14px; margin-bottom:16px;">
+      <h3 style="margin-top:0;">Novo material</h3>
+      <label>Título</label>
+      <input type="text" id="material-title-input" value="${esc(p.newMaterialTitle)}" placeholder="Ex: Apostila de Circuitos Elétricos — Cap. 3">
+      <label>Link (Google Drive, YouTube, site etc.)</label>
+      <input type="text" id="material-url-input" value="${esc(p.newMaterialUrl)}" placeholder="Cole aqui o link de compartilhamento">
+      <p class="muted" style="font-size:.8rem; margin-top:2px;">Se for um arquivo do Google Drive, ative o compartilhamento "qualquer pessoa com o link" antes de colar aqui.</p>
+      <label>Observação (opcional)</label>
+      <textarea id="material-descricao-input" placeholder="Ex: Leiam antes da próxima aula.">${esc(p.newMaterialDescricao)}</textarea>
+      <label style="margin-top:10px;">Para quais turmas?</label>
+      ${minhasTurmas.length===0 ? '<p class="muted" style="font-size:.82rem;">Nenhuma turma vinculada a uma disciplina sua ainda — vá em "Disciplinas" e marque em quais turmas você leciona.</p>' : `<div class="picker">${turmaCheckboxes}</div>`}
+      ${p.materialError ? `<p class="err">${esc(p.materialError)}</p>` : ''}
+      <div class="row" style="margin-top:12px;">
+        <button class="btn btn-ghost" data-action="cancelar-novo-material">Cancelar</button>
+        <button class="btn btn-primary" data-action="salvar-material">Disponibilizar</button>
+      </div>
+    </div>
+  ` : '';
+  const lista = p.materiais.slice().sort((a,b)=>b.createdAt-a.createdAt);
+  const listBlock = lista.length===0 ? '<p class="muted">Nenhum material disponibilizado ainda.</p>' : lista.map(m => {
+    const turmaNames = (m.turmaIds||[]).map(tid => { const t = p.turmas.find(x=>x.id===tid); return t?t.name:'?'; }).join(', ') || 'nenhuma turma';
+    const souAutor = m.authorId === p.session.id;
+    return `
+    <div class="list-item" style="align-items:flex-start; flex-wrap:wrap;">
+      <div>
+        <strong>${esc(m.title)}</strong><br>
+        <span class="muted" style="font-size:.78rem;">${esc(m.authorName)} · ${new Date(m.createdAt).toLocaleDateString('pt-BR')} · turma(s): ${esc(turmaNames)}</span>
+        ${m.descricao ? `<p style="margin:6px 0 0; font-size:.9rem;">${esc(m.descricao)}</p>` : ''}
+      </div>
+      <div class="row" style="flex:0 0 auto; gap:8px;">
+        <a class="btn btn-ghost btn-sm" href="${esc(m.url)}" target="_blank" rel="noopener">Abrir</a>
+        ${souAutor ? `<button class="btn btn-danger btn-sm" data-action="excluir-material" data-id="${m.id}">Excluir</button>` : ''}
+      </div>
+    </div>
+  `;
+  }).join('');
+  return `
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <h2>📎 Material da Turma</h2>
+        ${!p.newMaterialOpen ? '<button class="btn btn-primary btn-sm" data-action="abrir-novo-material">+ Novo material</button>' : ''}
+      </div>
+      <p class="muted">Compartilhe links de PDFs, apostilas, vídeos e outros materiais direto com os alunos das turmas que você leciona — sem precisar apresentar ao vivo.</p>
+      ${formBlock}
+      ${listBlock}
+    </div>
+  `;
+}
+function renderAlunoMateriaisTurmaBlock(){
+  const al = state.aluno;
+  const meus = (state.professor.materiais||[]).filter(m => (m.turmaIds||[]).includes(al.turma.id)).sort((a,b)=>b.createdAt-a.createdAt);
+  if(meus.length===0) return '';
+  return `
+    <div class="card">
+      <h3 style="margin-top:0;">📎 Material da Turma</h3>
+      ${meus.map(m => `
+        <div class="list-item" style="align-items:flex-start;">
+          <div>
+            <strong>${esc(m.title)}</strong><br>
+            <span class="muted" style="font-size:.78rem;">${esc(m.authorName)} · ${new Date(m.createdAt).toLocaleDateString('pt-BR')}</span>
+            ${m.descricao ? `<p style="margin:6px 0 0; font-size:.9rem;">${esc(m.descricao)}</p>` : ''}
+          </div>
+          <a class="btn btn-primary btn-sm" href="${esc(m.url)}" target="_blank" rel="noopener">Abrir</a>
+        </div>
+      `).join('')}
     </div>
   `;
 }
@@ -7493,6 +7640,8 @@ function renderStudentDashboard(){
 
     ${renderAlunoMateriaisSlidesBlock()}
 
+    ${renderAlunoMateriaisTurmaBlock()}
+
     ${renderAlunoRoletaBlock()}
 
     ${renderAlunoQuizBlock()}
@@ -8212,6 +8361,7 @@ async function ensureProfessorDataLoaded(){
   if(p.periodosLoading) loadPeriodos();
   if(p.livrosLoading) loadLivros();
   if(p.avisosLoading) loadAvisos();
+  if(p.materiaisLoading) loadMateriais();
   if(p.freqHoje.loading) loadFreqHoje();
 
   // Meu Painel virou a tela principal e depende de avaliações, turmas e disciplinas
@@ -8729,6 +8879,7 @@ function logoutProfessor(){
   p.assessments = []; p.loadingList = true;
   p.correcoesPendentesLoaded = false; p.correcoesPendentesCount = 0;
   p.avisos = []; p.avisosLoading = true;
+  p.materiais = []; p.materiaisLoading = true; p.newMaterialOpen = false; p.newMaterialTitle=''; p.newMaterialUrl=''; p.newMaterialDescricao=''; p.newMaterialTurmaIds=[]; p.materialError='';
   p.livros = []; p.livrosLoading = true;
   p.periodos = {}; p.periodosLoading = true;
   p.unlockRequests = []; p.unlockRequestsLoading = true;
@@ -10910,6 +11061,10 @@ async function salvarDisciplinaTurmas(did){
 }
 function professorTurmas(){
   const p = state.professor;
+  // Várias telas (Turmas, Chamada, Mural, Bloco de Provas, Quiz, Roleta, Slides...) são
+  // reaproveitadas também pela coordenação, que enxerga a escola inteira e não tem uma
+  // sessão de professor (p.session) — nesse caso não há o que filtrar, mostra tudo.
+  if(!p.session) return p.turmas;
   const ids = new Set();
   p.disciplinas.forEach(d => (d.turmaIds||[]).forEach(tid => ids.add(tid)));
   return p.turmas.filter(t => ids.has(t.id));
@@ -10919,6 +11074,7 @@ function professorTurmas(){
 // ainda não tenha vinculado a nenhuma disciplina — senão a turma "sumiria" assim que criada).
 function turmasVisiveisProfessor(){
   const p = state.professor;
+  if(!p.session) return p.turmas;
   const meusIds = new Set(professorTurmas().map(t=>t.id));
   return p.turmas.filter(t => meusIds.has(t.id) || t.criadoPorId===p.session.id);
 }
@@ -11161,6 +11317,7 @@ async function loadStudentDashboard(){
   al.stage = 'dashboard';
   render();
   if(state.professor.avisosLoading) loadAvisos();
+  if(state.professor.materiaisLoading) loadMateriais();
   if(al.matriculaStudentId && al.turma) registerStudentLogin(al.turma.id, al.matriculaStudentId);
   stopAlunoEnquetePoll();
   pollAlunoAtividadesAoVivo();
@@ -11553,6 +11710,11 @@ document.addEventListener('click', (e) => {
   else if(act==='publicar-aviso'){ publicarAviso(state.view==='coordenador' ? 'Coordenação' : (p.session?p.session.displayName:'Professor')); }
   else if(act==='toggle-pin-aviso'){ togglePinAviso(btn.dataset.id); }
   else if(act==='delete-aviso'){ deleteAviso(btn.dataset.id); }
+  else if(act==='abrir-novo-material'){ abrirNovoMaterial(); }
+  else if(act==='cancelar-novo-material'){ cancelarNovoMaterial(); }
+  else if(act==='toggle-material-turma'){ toggleMaterialTurma(btn.dataset.tid); }
+  else if(act==='salvar-material'){ salvarMaterial(p.session ? p.session.displayName : 'Professor'); }
+  else if(act==='excluir-material'){ excluirMaterial(btn.dataset.id); }
   else if(act==='start-enquete'){ startEnquete(state.view==='coordenador' ? 'Coordenação' : (p.session?p.session.displayName:'Professor')); }
   else if(act==='encerrar-enquete'){ encerrarEnquete(); }
   else if(act==='limpar-enquete'){ limparEnquete(); }
@@ -11857,6 +12019,9 @@ document.addEventListener('input', (e) => {
   else if(act==='opt-text'){ const q = findQuestionRef(el.dataset.qid); const o = q.options.find(o=>o.id===el.dataset.oid); o.text = el.value; }
   else if(act==='model-answer'){ const q = findQuestionRef(el.dataset.qid); q.modelAnswer = el.value; }
   else if(act==='answer-text'){ al.answers[el.dataset.qid] = el.value; }
+  else if(el.id==='material-title-input'){ p.newMaterialTitle = el.value; }
+  else if(el.id==='material-url-input'){ p.newMaterialUrl = el.value; }
+  else if(el.id==='material-descricao-input'){ p.newMaterialDescricao = el.value; }
   else if(el.id==='enquete-question-input'){ p.enquete.formQuestion = el.value; }
   else if(act==='enquete-option-input'){ p.enquete.formOptions[parseInt(el.dataset.idx)] = el.value; }
   else if(act==='quiz-team-name-input'){ p.quiz.setup.teams[parseInt(el.dataset.idx)].name = el.value; }
