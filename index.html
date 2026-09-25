@@ -4915,9 +4915,9 @@ async function scanBlocoSheet(file){
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const qr = jsQR(imageData.data, canvas.width, canvas.height);
+    const qr = decodeQrRobust(canvas, imageData);
     if(!qr){
-      b.scanError = 'QR code não encontrado na imagem. Tire a foto com o cartão inteiro visível, bem iluminado e o mais reto possível.';
+      b.scanError = 'QR code não encontrado na imagem. Tente aproximar mais a câmera do QR code, evitar sombra e reflexo sobre o papel, e tirar a foto com o cartão bem iluminado e o mais reto possível.';
       b.scanLoading = false; render(); return;
     }
     let blocoId, studentName, turmaName;
@@ -9046,6 +9046,95 @@ function mmToPixel(xmm, ymm, basis){
   };
 }
 
+// Leitura de QR code mais tolerante a fotos ruins. Tenta, nesta ordem: (1) a imagem
+// original; (2) a mesma imagem com contraste realçado (ajuda em fotos com pouca luz,
+// sombra do celular ou luz desigual — não precisa remapear coordenadas porque o
+// tamanho da imagem não muda); (3) a imagem girada em 180°, 90° e 270° (ajuda quando a
+// folha foi fotografada de cabeça pra baixo ou de lado). Nas rotações, as coordenadas do
+// QR code encontrado são recalculadas de volta pro sistema da imagem original, porque o
+// resto do código usa essas coordenadas pra encontrar as bolinhas marcadas na folha.
+function decodeQrRobust(canvas, imageData){
+  const w = canvas.width, h = canvas.height;
+  let qr = jsQR(imageData.data, w, h, { inversionAttempts: 'attemptBoth' });
+  if(qr) return qr;
+
+  try{
+    const enhanced = enhanceContrastImageData(imageData);
+    qr = jsQR(enhanced.data, w, h, { inversionAttempts: 'attemptBoth' });
+    if(qr) return qr;
+  }catch(e){}
+
+  for(const angle of [180, 90, 270]){
+    try{
+      const rotated = rotateCanvasBy(canvas, angle);
+      const rw = rotated.canvas.width, rh = rotated.canvas.height;
+      const rData = rotated.ctx.getImageData(0, 0, rw, rh);
+      let rqr = jsQR(rData.data, rw, rh, { inversionAttempts: 'attemptBoth' });
+      if(!rqr){
+        const rEnhanced = enhanceContrastImageData(rData);
+        rqr = jsQR(rEnhanced.data, rw, rh, { inversionAttempts: 'attemptBoth' });
+      }
+      if(rqr){
+        rqr.location = remapQrLocation(rqr.location, angle, w, h, rw, rh);
+        return rqr;
+      }
+    }catch(e){}
+  }
+  return null;
+}
+function enhanceContrastImageData(imageData){
+  const { data, width, height } = imageData;
+  const gray = new Float32Array(width*height);
+  let min = 255, max = 0;
+  for(let i=0, p=0; i<data.length; i+=4, p++){
+    const g = 0.299*data[i] + 0.587*data[i+1] + 0.114*data[i+2];
+    gray[p] = g;
+    if(g<min) min = g;
+    if(g>max) max = g;
+  }
+  const range = Math.max(1, max-min);
+  const out = new Uint8ClampedArray(data.length);
+  for(let p=0, i=0; p<gray.length; p++, i+=4){
+    const v = (gray[p]-min) * 255/range;
+    out[i]=v; out[i+1]=v; out[i+2]=v; out[i+3]=255;
+  }
+  return new ImageData(out, width, height);
+}
+function rotateCanvasBy(canvas, angleDeg){
+  const rad = angleDeg * Math.PI/180;
+  const w = canvas.width, h = canvas.height;
+  const swap = (angleDeg===90 || angleDeg===270);
+  const rw = swap ? h : w, rh = swap ? w : h;
+  const rc = document.createElement('canvas');
+  rc.width = rw; rc.height = rh;
+  const rctx = rc.getContext('2d');
+  rctx.translate(rw/2, rh/2);
+  rctx.rotate(rad);
+  rctx.drawImage(canvas, -w/2, -h/2);
+  return { canvas: rc, ctx: rctx };
+}
+function unrotatePoint(pt, angleDeg, w, h, rw, rh){
+  const rad = angleDeg * Math.PI/180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const Lx = pt.x - rw/2, Ly = pt.y - rh/2;
+  return {
+    x: (Lx*cos + Ly*sin) + w/2,
+    y: (-Lx*sin + Ly*cos) + h/2,
+  };
+}
+function remapQrLocation(loc, angleDeg, w, h, rw, rh){
+  const remap = (pt) => pt ? unrotatePoint(pt, angleDeg, w, h, rw, rh) : pt;
+  return {
+    ...loc,
+    topLeftCorner: remap(loc.topLeftCorner),
+    topRightCorner: remap(loc.topRightCorner),
+    bottomLeftCorner: remap(loc.bottomLeftCorner),
+    bottomRightCorner: remap(loc.bottomRightCorner),
+    topLeftFinderPattern: remap(loc.topLeftFinderPattern),
+    topRightFinderPattern: remap(loc.topRightFinderPattern),
+    bottomLeftFinderPattern: remap(loc.bottomLeftFinderPattern),
+  };
+}
 function sampleDarkness(imageData, cx, cy, radiusPx){
   const { data, width, height } = imageData;
   let sum = 0, count = 0;
@@ -9110,9 +9199,9 @@ async function scanAnswerSheet(file){
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const qr = jsQR(imageData.data, canvas.width, canvas.height);
+    const qr = decodeQrRobust(canvas, imageData);
     if(!qr){
-      p.leitura.error = 'QR code não encontrado na imagem. Tire a foto com o cartão inteiro visível, bem iluminado e o mais reto possível.';
+      p.leitura.error = 'QR code não encontrado na imagem. Tente aproximar mais a câmera do QR code, evitar sombra e reflexo sobre o papel, e tirar a foto com o cartão bem iluminado e o mais reto possível.';
       p.leitura.loading = false;
       render();
       return;
@@ -9887,9 +9976,9 @@ async function scanAvulsoSheet(file){
     const ctx = canvas.getContext('2d');
     ctx.drawImage(img, 0, 0);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const qr = jsQR(imageData.data, canvas.width, canvas.height);
+    const qr = decodeQrRobust(canvas, imageData);
     if(!qr){
-      av.scanError = 'QR code não encontrado na imagem. Tire a foto com o cartão inteiro visível, bem iluminado e o mais reto possível.';
+      av.scanError = 'QR code não encontrado na imagem. Tente aproximar mais a câmera do QR code, evitar sombra e reflexo sobre o papel, e tirar a foto com o cartão bem iluminado e o mais reto possível.';
       av.scanLoading = false; render(); return;
     }
     let code, studentName, turmaName, turmaId;
