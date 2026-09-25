@@ -12,6 +12,17 @@
 <link rel="apple-touch-icon" id="apple-touch-icon-link">
 <link rel="icon" id="favicon-link">
 <link rel="manifest" id="pwa-manifest-link">
+<script>
+  // Aplica o tema salvo (ou a preferência do sistema) antes da página pintar,
+  // pra não piscar claro-depois-escuro no carregamento.
+  (function(){
+    try{
+      var saved = localStorage.getItem('sala-theme');
+      var theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    }catch(e){}
+  })();
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap');
 
@@ -37,15 +48,36 @@
     --tint-coral: #fbe9e2;
     --tint-gold: #fbf1de;
     --tint-plum: #f2e7ee;
+    --body-bg: #ffffff;
+    --surface: #ffffff;
+  }
+  :root[data-theme="dark"]{
+    --board: #7a2942;
+    --board-dark: #2a0a12;
+    --paper: #211d20;
+    --paper-line: #3c363a;
+    --ink: #ece7e2;
+    --ink-soft: #a89f9a;
+    --body-bg: #171415;
+    --surface: #2a262a;
+    --tint-vinho: #35232a;
+    --tint-teal: #1e3230;
+    --tint-coral: #3a2a22;
+    --tint-gold: #392f1e;
+    --tint-plum: #302433;
+    --accent-yellow-bg: #3a3020;
+    --accent-teal-bg: #1c2f2d;
+    --accent-red-bg: #3a2426;
   }
   *{box-sizing:border-box;}
   body{
     margin:0;
     min-height:100vh;
-    background: #ffffff;
+    background: var(--body-bg);
     font-family:'Source Sans 3', sans-serif;
     color: var(--ink);
     padding: 28px 16px 60px;
+    transition: background .15s ease, color .15s ease;
   }
   .wrap{ max-width: 780px; margin: 0 auto; transition: max-width .2s ease; }
   .wrap.wide{ max-width: 1180px; }
@@ -114,7 +146,7 @@
     /* No mobile, o menu lateral fica fixo sobre a borda esquerda da tela. Sem isso, o
        cabeçalho (nome da escola, título) fica atrás do menu, cortado — só o cabeçalho
        precisa do respiro, porque o conteúdo dentro do menu (.app-main) já tem o seu. */
-    .wrap.wide .letterhead, .wrap.wide header, .wrap.wide .disclaimer{ padding-left: 76px; text-align:left; }
+    .wrap.wide .letterhead, .wrap.wide header, .wrap.wide .disclaimer, .wrap.wide .disclaimer-details{ padding-left: 76px; text-align:left; }
     .wrap.wide .letterhead{ justify-content:flex-start; }
   }
   header{ text-align:center; margin-bottom: 22px; }
@@ -226,21 +258,21 @@
   .landing-cards{ display:flex; gap:20px; flex-wrap:wrap; justify-content:center; }
   .landing-card{
     flex:1 1 220px; max-width:280px;
-    border:none; cursor:pointer; text-align:left;
-    border-radius:20px; padding:26px 22px;
-    display:flex; flex-direction:column; gap:6px;
+    border:none; cursor:pointer; text-align:center;
+    border-radius:20px; padding:28px 22px;
+    display:flex; flex-direction:column; align-items:center; gap:6px;
     box-shadow: 0 10px 26px rgba(92,26,43,0.10);
     transition: transform .15s ease, box-shadow .15s ease;
     font-family:'Source Sans 3', sans-serif;
   }
   .landing-card:hover{ transform: translateY(-4px); box-shadow: 0 16px 34px rgba(92,26,43,0.16); }
   .landing-card .landing-icon{
-    width:54px; height:54px; border-radius:16px; color:#fff;
-    display:flex; align-items:center; justify-content:center; font-size:1.7rem;
-    margin-bottom:6px;
+    width:72px; height:72px; border-radius:20px; color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:2.4rem;
+    margin-bottom:8px;
   }
   .landing-card h3{ font-size:1.25rem; margin:0; }
-  .landing-card p{ margin:0; font-size:.86rem; color:var(--ink-soft); line-height:1.4; }
+  .landing-card p{ margin:0; font-size:.82rem; color:var(--ink-soft); line-height:1.4; }
   .landing-card.landing-vinho{ background:var(--tint-vinho); } .landing-card.landing-vinho .landing-icon{ background:var(--board); } .landing-card.landing-vinho h3{ color:var(--board); }
   .landing-card.landing-teal{ background:var(--tint-teal); } .landing-card.landing-teal .landing-icon{ background:var(--teal); } .landing-card.landing-teal h3{ color:var(--teal); }
   .landing-card.landing-plum{ background:var(--tint-plum); } .landing-card.landing-plum .landing-icon{ background:var(--plum); } .landing-card.landing-plum h3{ color:var(--plum); }
@@ -260,7 +292,7 @@
   .conn-banner.offline{ background:#a33131; }
   .conn-banner.weak{ background:#a67a15; }
   .idle-warning-banner{ position:fixed; bottom:0; left:0; right:0; z-index:300; display:none; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap; background:var(--yellow-dark); color:#fff; padding:10px 14px; font-size:.85rem; font-weight:600; }
-  .idle-warning-banner button{ background:#fff; color:var(--ink); border:none; border-radius:6px; padding:6px 12px; font-weight:700; font-size:.82rem; cursor:pointer; }
+  .idle-warning-banner button{ background:var(--surface); color:var(--ink); border:none; border-radius:6px; padding:6px 12px; font-weight:700; font-size:.82rem; cursor:pointer; }
   .tour-overlay{ position:fixed; inset:0; z-index:400; background:rgba(44,42,34,0.62); display:flex; align-items:center; justify-content:center; padding:16px; }
   .tour-card{ background:var(--paper); border-radius:14px; max-width:420px; width:100%; padding:24px 22px; box-shadow:0 12px 40px rgba(0,0,0,0.35); text-align:center; }
   .tour-card .tour-icon{ font-size:2.6rem; margin-bottom:6px; }
@@ -278,7 +310,7 @@
   label:first-child{ margin-top:0; }
   input[type=text], input[type=number], textarea, select{
     width:100%; padding:9px 11px; border:1px solid var(--paper-line); border-radius:6px;
-    font-family:'Source Sans 3', sans-serif; font-size:.98rem; background:#fff; color:var(--ink);
+    font-family:'Source Sans 3', sans-serif; font-size:.98rem; background:var(--surface); color:var(--ink);
   }
   textarea{ resize: vertical; min-height:64px;
     background-image: repeating-linear-gradient(var(--paper-line) 0 1px, transparent 1px 28px);
@@ -299,7 +331,7 @@
   .row{ display:flex; gap:10px; flex-wrap:wrap; }
   .row > *{ flex:1; }
 
-  .q-card{ border:1px solid var(--paper-line); border-radius:8px; padding:16px; margin-bottom:14px; background:#fff; }
+  .q-card{ border:1px solid var(--paper-line); border-radius:8px; padding:16px; margin-bottom:14px; background:var(--surface); }
   .img-preview{ margin:10px 0; }
   .img-preview img{ max-width:100%; max-height:220px; border-radius:6px; border:1px solid var(--paper-line); display:block; }
   .q-head{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px;}
@@ -311,8 +343,44 @@
     background: var(--board); color: #fff; text-align:center; padding:10px 0; border-radius:8px; margin: 14px 0;
   }
   table{ width:100%; border-collapse:collapse; margin-top:10px;}
-  th, td{ text-align:left; padding:8px 6px; border-bottom:1px solid var(--paper-line); font-size:.92rem;}
+  th, td{ text-align:left; padding:10px 8px; border-bottom:1px solid var(--paper-line); font-size:.92rem;}
   th{ font-size:.75rem; text-transform:uppercase; color:var(--ink-soft); letter-spacing:.03em;}
+  table tr:nth-child(even){ background: var(--tint-vinho); }
+  .inicio-card{ border-left-width:5px; border-left-style:solid; }
+  .inicio-card.accent-yellow{ border-left-color:var(--yellow-dark); background:var(--accent-yellow-bg,#fdf3e8); border-color:var(--accent-yellow-bg,#fdf3e8); }
+  .inicio-card.accent-teal{ border-left-color:#2f6f68; background:var(--accent-teal-bg,#eaf4f2); border-color:var(--accent-teal-bg,#eaf4f2); }
+  .inicio-card.accent-red{ border-left-color:var(--red); background:var(--accent-red-bg,#fbeaea); border-color:var(--accent-red-bg,#fbeaea); }
+  .gabarito-bolinha{
+    width:32px; height:32px; border-radius:50%; border:2px solid var(--paper-line);
+    background:var(--surface); color:var(--ink); font-weight:700; font-size:.85rem;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+    padding:0; transition: background .1s ease, border-color .1s ease, color .1s ease, transform .1s ease;
+    font-family:'Source Sans 3', sans-serif;
+  }
+  .gabarito-bolinha:hover{ border-color:var(--board); transform:scale(1.08); }
+  .gabarito-bolinha.selected{ background:var(--board); border-color:var(--board); color:#fff; }
+  .gabarito-bolinha-limpar{
+    width:24px; height:24px; border-radius:50%; border:1px dashed var(--paper-line); background:transparent;
+    color:var(--ink-soft); font-size:.7rem; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    flex:0 0 auto; padding:0;
+  }
+  .gabarito-bolinha-limpar:hover{ color:var(--red); border-color:var(--red); }
+  .quick-shortcuts-row{ display:flex; gap:12px; flex-wrap:wrap; margin-top:6px; }
+  .quick-shortcut-tile{
+    flex:1 1 160px; display:flex; align-items:center; gap:10px;
+    background:transparent; border:1px dashed var(--paper-line); border-radius:14px;
+    padding:14px 16px; cursor:pointer; text-align:left; font-family:'Source Sans 3', sans-serif;
+    color:var(--ink); transition: background .12s, border-color .12s;
+  }
+  .quick-shortcut-tile:hover{ background:var(--tint-vinho); border-color:var(--board); }
+  .quick-shortcut-tile .qs-icon{ font-size:1.5rem; flex:0 0 auto; }
+  .quick-shortcut-tile .qs-label{ font-weight:600; font-size:.9rem; }
+  .quick-shortcut-tile .qs-sub{ display:block; font-weight:400; font-size:.78rem; color:var(--ink-soft); margin-top:2px; }
+  .table-scroll table th:first-child, .table-scroll table td:first-child{
+    position:sticky; left:0; background:var(--paper); z-index:1;
+    box-shadow: 1px 0 0 var(--paper-line);
+  }
+  .table-scroll table tr:nth-child(even) th:first-child, .table-scroll table tr:nth-child(even) td:first-child{ background: var(--tint-vinho); }
   .list-item{ display:flex; justify-content:space-between; align-items:center; padding:12px 4px; border-bottom:1px solid var(--paper-line); gap:10px; flex-wrap:wrap; }
   .list-item:last-child{ border-bottom:none; }
   .list-item.clickable{ cursor:pointer; }
@@ -323,10 +391,15 @@
   .err{ color: var(--red); font-size:.9rem; margin-top:6px; }
   .empty{ text-align:center; color:var(--ink-soft); padding: 26px 10px; }
   .disclaimer{ text-align:center; color:var(--ink-soft); font-size:.78rem; margin-top:22px; }
+  .disclaimer-details{ text-align:center; margin-top:22px; }
+  .disclaimer-details summary{ cursor:pointer; color:var(--ink-soft); font-size:.76rem; list-style:none; display:inline-flex; align-items:center; gap:4px; opacity:.75; }
+  .disclaimer-details summary::-webkit-details-marker{ display:none; }
+  .disclaimer-details summary:hover{ opacity:1; }
+  .disclaimer-details p{ color:var(--ink-soft); font-size:.78rem; max-width:520px; margin:8px auto 0; }
   .spinner{ width:26px;height:26px;border:3px solid var(--paper-line); border-top-color:var(--board); border-radius:50%; margin:20px auto; animation: spin 0.8s linear infinite;}
   @keyframes spin{ to{ transform: rotate(360deg);} }
   .stat-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:14px; }
-  .stat-card{ background:#fff; border:1px solid var(--paper-line); border-radius:8px; padding:12px 8px; text-align:center; }
+  .stat-card{ background:var(--surface); border:1px solid var(--paper-line); border-radius:8px; padding:12px 8px; text-align:center; }
   .stat-value{ font-family:'Caveat',cursive; font-size:1.7rem; font-weight:700; color:var(--board); line-height:1.1;}
   .stat-label{ font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); margin-top:2px;}
   @media (max-width:520px){ .stat-grid{ grid-template-columns:repeat(2,1fr); } }
@@ -345,7 +418,7 @@
   .dist-bar-wrap{ width:100%; height:100px; display:flex; align-items:flex-end; justify-content:center; }
   .dist-bar{ width:60%; background:var(--yellow); border-radius:4px 4px 0 0; min-height:2px; display:flex; align-items:flex-start; justify-content:center; padding-top:3px; font-size:.78rem; font-weight:700; color:var(--ink); }
   .dist-label{ font-size:.72rem; color:var(--ink-soft); margin-top:6px; text-align:center; }
-  .picker{ border:1px dashed var(--paper-line); border-radius:8px; padding:12px; margin:12px 0; background:#fdfcf8;}
+  .picker{ border:1px dashed var(--paper-line); border-radius:8px; padding:12px; margin:12px 0; background:var(--surface);}
   .picker-item{ display:flex; align-items:center; gap:8px; padding:6px 2px; border-bottom:1px solid var(--paper-line); font-size:.9rem;}
   .picker-item:last-child{ border-bottom:none; }
   .student-chip{ display:flex; align-items:center; justify-content:space-between; padding:7px 10px; border:1px solid var(--paper-line); border-radius:6px; margin-bottom:6px; font-size:.9rem;}
@@ -448,7 +521,7 @@
     .app-topbar{ margin-left: 60px; }
     .app-sidebar{ width:48px; }
     .app-sidebar.expanded, .app-sidebar:hover{ width:210px; }
-    .wrap.wide .letterhead, .wrap.wide header, .wrap.wide .disclaimer{ padding-left: 60px; }
+    .wrap.wide .letterhead, .wrap.wide header, .wrap.wide .disclaimer, .wrap.wide .disclaimer-details{ padding-left: 60px; }
   }
 </style>
 </head>
@@ -471,7 +544,10 @@
   </header>
   <div class="tabs" id="tabs"></div>
   <div id="root"></div>
-  <p class="disclaimer">Os dados desta página ficam salvos de forma compartilhada — qualquer pessoa com acesso a este link pode ver os testes, o banco de questões, as turmas e as respostas.</p>
+  <details class="disclaimer-details">
+    <summary>🔒 Sobre a privacidade dos dados</summary>
+    <p>Os dados desta página ficam salvos de forma compartilhada — qualquer pessoa com acesso a este link pode ver os testes, o banco de questões, as turmas e as respostas.</p>
+  </details>
 </div>
 <div id="print-area"></div>
 
@@ -1031,6 +1107,10 @@ function saudacaoDoDia(){
 function firstName(fullName){
   return (fullName||'').trim().split(/\s+/)[0] || '';
 }
+function renderThemeToggleBtn(extraStyle){
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  return `<button class="btn btn-ghost btn-sm" data-action="toggle-theme" title="Alternar tema claro/escuro" style="${extraStyle||''}">${isDark ? '☀️ Claro' : '🌙 Escuro'}</button>`;
+}
 function renderGreetingHeader(name, subtitle){
   return `
     <div class="greeting-header">
@@ -1184,26 +1264,27 @@ function renderLanding(){
       <button class="landing-card landing-vinho" data-action="goto-landing-role" data-role="professor">
         <div class="landing-icon">🧑‍🏫</div>
         <h3>Professor</h3>
-        <p>Crie avaliações, gerencie turmas e use as atividades gamificadas (quiz, enquete, roleta).</p>
+        <p>Avaliações, turmas e atividades</p>
       </button>
       <button class="landing-card landing-teal" data-action="goto-landing-role" data-role="aluno">
         <div class="landing-icon">🎓</div>
         <h3>Aluno</h3>
-        <p>Entre com sua matrícula para responder provas, ver resultados e participar das atividades da turma.</p>
+        <p>Responder provas e ver resultados</p>
       </button>
       <button class="landing-card landing-plum" data-action="goto-landing-role" data-role="coordenador">
         <div class="landing-icon">🗂️</div>
         <h3>Coordenador</h3>
-        <p>Acompanhe professores, turmas, notas finais e a visão geral da escola.</p>
+        <p>Visão geral da escola</p>
       </button>
       <button class="landing-card landing-teal" data-action="goto-landing-role" data-role="freqmonitor">
         <div class="landing-icon">🪪</div>
-        <h3>Controle de Frequência</h3>
-        <p>Área dos monitores para fazer a leitura da carteirinha dos alunos nas turmas da manhã.</p>
+        <h3>Frequência</h3>
+        <p>Leitura da carteirinha</p>
       </button>
     </div>
-    <p style="text-align:center; margin-top:18px;">
-      <button class="btn btn-ghost btn-sm" data-action="open-privacy-notice">🔒 Aviso de Privacidade</button>
+    <p class="row" style="justify-content:center; margin-top:18px; flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-sm" data-action="open-privacy-notice" style="flex:0 0 auto;">🔒 Aviso de Privacidade</button>
+      ${renderThemeToggleBtn('flex:0 0 auto;')}
     </p>
   `;
 }
@@ -1268,6 +1349,7 @@ function renderProfessor(){
         <span class="muted">Logado como <strong>${esc(p.session.displayName)}</strong> (${esc(p.session.email)})</span>
       </span>
       <div class="row" style="flex:0 0 auto; gap:6px;">
+        ${renderThemeToggleBtn()}
         <button class="btn btn-ghost btn-sm" data-action="start-tour" data-role="professor">🧭 Tour</button>
         <button class="btn btn-ghost btn-sm" data-action="open-professor-profile">👤 Meu perfil</button>
         <button class="btn btn-ghost btn-sm" data-action="prof-logout">Sair</button>
@@ -1278,7 +1360,7 @@ function renderProfessor(){
       ${p.subview!=='avulso' ? '<button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="avulso" style="flex:0 0 auto;">🗒️ Gabarito Avulso</button>' : ''}
     </div>
     ${(p.session.coordNote && !p.session.coordNoteDismissed) ? `
-    <div style="background:#fdf3e8; border:1px solid var(--yellow-dark); border-radius:8px; padding:12px 14px; margin-bottom:14px;">
+    <div style="background:var(--accent-yellow-bg,#fdf3e8); border:1px solid var(--yellow-dark); border-radius:8px; padding:12px 14px; margin-bottom:14px;">
       <strong style="font-size:.85rem;">📋 Recado da coordenação</strong>
       <p style="margin:6px 0 8px; font-size:.92rem;">${esc(p.session.coordNote)}</p>
       <button class="btn btn-ghost btn-sm" data-action="dismiss-coord-note">Ok, entendi</button>
@@ -2663,7 +2745,7 @@ function renderSlides(){
         <p class="muted" style="font-size:.8rem;">Dica: para o modo projeção aparecer limpo (sem esse painel) na TV/projetor, abra a Sala de Avaliações numa segunda aba ou dispositivo conectado à TV, entre como este mesmo professor e clique em "Abrir modo projeção" só nela. Este painel com o engajamento fica só neste dispositivo, com você.</p>
 
         ${baixo ? `
-        <div style="background:#fdf3e8; border:1px solid var(--yellow-dark); border-radius:10px; padding:14px; margin:14px 0;">
+        <div style="background:var(--accent-yellow-bg,#fdf3e8); border:1px solid var(--yellow-dark); border-radius:10px; padding:14px; margin:14px 0;">
           <strong>💡 Engajamento baixo (${pct}%)</strong>
           <p style="margin:6px 0 10px; font-size:.9rem;">Parte da turma saiu da apresentação. Que tal uma pausa com uma enquete, um quiz relâmpago ou chamar alguém na roleta para reengajar a turma?</p>
           <div class="row" style="gap:8px; flex-wrap:wrap;">
@@ -2897,7 +2979,7 @@ function dismissDiarioHoje(){
 function renderDiarioCard(){
   if(diarioDismissedHoje()) return '';
   return `
-    <div class="card" style="background:#fdf3e8; border:1px solid var(--yellow-dark);">
+    <div class="card inicio-card accent-yellow">
       <div class="row" style="align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
         <div>
           <strong>📔 Já preencheu o Diário Eletrônico hoje?</strong>
@@ -2933,7 +3015,7 @@ function renderUnidadeAtualCard(){
   const inicio = pu.avalInicio;
   const fim = pu.recFim || pu.avalFim;
   return `
-    <div class="card" style="background:#eaf4f2; border:1px solid var(--teal-dark, #2f6f68);">
+    <div class="card inicio-card accent-teal">
       <h3 style="margin:0 0 6px;">📅 Estamos na ${esc(info.unidade)}</h3>
       <p style="margin:0 0 8px;">O período vai de <strong>${fmt(inicio)}</strong> a <strong>${fmt(fim)}</strong>.</p>
       <p class="muted" style="margin:0;">Lembre-se de aplicar todos os instrumentais avaliativos e acompanhar as notas dos estudantes nesta unidade.</p>
@@ -2950,30 +3032,28 @@ function renderProfessorInicio(){
     ${renderUnidadeAtualCard()}
     ${renderFreqHojeCard()}
     ${liberacoesPendentes>0 ? `
-      <div class="card" style="background:#fbeaea; border:1px solid var(--red, #b23b3b);">
+      <div class="card inicio-card accent-red">
         <div class="row" style="align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
           <strong>🔓 ${liberacoesPendentes} pedido(s) de liberação de prova aguardando você</strong>
           <button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="liberacoes">Ver liberações</button>
         </div>
       </div>
     ` : ''}
-    <div class="card">
-      <div class="row" style="align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-        <div>
-          <strong>📊 Meu Painel</strong>
-          <p class="muted" style="margin:4px 0 0;">Lance notas, acompanhe o desempenho das turmas e veja o conteúdo trabalhado.</p>
-        </div>
-        <button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="painel">Abrir Meu Painel</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="row" style="align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-        <div>
-          <strong>🗒️ Gabarito Avulso</strong>
-          <p class="muted" style="margin:4px 0 0;">Corrigir uma prova integrada em papel, com várias disciplinas no mesmo cartão-resposta.</p>
-        </div>
-        <button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="avulso">Ir para Gabarito Avulso</button>
-      </div>
+    <div class="quick-shortcuts-row">
+      <button class="quick-shortcut-tile" data-action="sub-view" data-sub="painel">
+        <span class="qs-icon">📊</span>
+        <span>
+          <span class="qs-label">Meu Painel</span>
+          <span class="qs-sub">Notas, desempenho e conteúdo</span>
+        </span>
+      </button>
+      <button class="quick-shortcut-tile" data-action="sub-view" data-sub="avulso">
+        <span class="qs-icon">🗒️</span>
+        <span>
+          <span class="qs-label">Gabarito Avulso</span>
+          <span class="qs-sub">Corrigir prova integrada em papel</span>
+        </span>
+      </button>
     </div>
   `;
 }
@@ -3168,7 +3248,7 @@ function renderCorrectResponsePanel(a, r, idx){
   const pendingDetails = r.details.map((d,di) => ({...d, di})).filter(d=>d.pending);
   return `
     <tr><td colspan="5">
-      <div class="q-card" style="background:#fdf3e8;">
+      <div class="q-card" style="background:var(--accent-yellow-bg,#fdf3e8);">
         <strong>Corrigir dissertativas de ${esc(r.studentName)}</strong>
         ${pendingDetails.map(d => {
           const q = a.questions.find(x=>x.id===d.questionId);
@@ -4234,7 +4314,7 @@ function renderFinalGradesTable(){
       </div>
     </div>
     ${emRecuperacao.length>0 ? `
-      <div class="card" style="background:var(--red-bg, #fbeaea); border:1px solid var(--red); margin:10px 0;">
+      <div class="card" style="background:var(--accent-red-bg,#fbeaea); border:1px solid var(--red); margin:10px 0;">
         <strong>🔺 ${emRecuperacao.length} aluno(s) em recuperação paralela nesta unidade (nota abaixo de 5)</strong>
       </div>
     ` : ''}
@@ -4333,7 +4413,7 @@ function renderDisciplinas(){
           const own = p.disciplinas.map(d=>d.name);
           const all = [...new Set([...(p.disciplinaNamesCache||[]), ...own])];
           const parecido = p.newDisciplinaName.trim() ? findSimilarDisciplinaName(p.newDisciplinaName.trim(), all.filter(n => normalizeDisciplinaName(n)!==normalizeDisciplinaName(p.newDisciplinaName))) : null;
-          return parecido ? `<p style="font-size:.85rem; color:#8a5a00; background:#fff6e0; border:1px solid #f0d896; border-radius:6px; padding:8px 10px; margin-top:6px;">⚠️ Já existe uma disciplina cadastrada como "<strong>${esc(parecido)}</strong>". Pra não fragmentar os relatórios, considere usar esse mesmo nome.</p>` : '';
+          return parecido ? `<p style="font-size:.85rem; color:var(--ink); background:var(--accent-yellow-bg,#fff6e0); border:1px solid var(--yellow-dark); border-radius:6px; padding:8px 10px; margin-top:6px;">⚠️ Já existe uma disciplina cadastrada como "<strong>${esc(parecido)}</strong>". Pra não fragmentar os relatórios, considere usar esse mesmo nome.</p>` : '';
         })()}
         <label style="margin-top:10px;">Em quais turmas você leciona essa disciplina?</label>
         <p class="muted" style="font-size:.82rem;">Isso define o que aparece pra você no Meu Painel — só as turmas ligadas às suas disciplinas.</p>
@@ -4492,7 +4572,7 @@ function renderBlocoScanReview(){
       ${b.scanQueue ? `<p class="muted" style="font-size:.8rem;">📄 Página ${b.scanQueue.index+1} de ${b.scanQueue.files.length} do PDF</p>` : ''}
       <p class="muted">Aluno: <strong>${esc(b.scanStudentName)}</strong>${b.scanTurmaName?' · Turma: '+esc(b.scanTurmaName):''}</p>
       ${b.scanDuplicateInfo ? `
-        <div style="background:#fdf3e8; border:1px solid var(--yellow-dark); border-radius:10px; padding:10px 14px; margin:8px 0;">
+        <div style="background:var(--accent-yellow-bg,#fdf3e8); border:1px solid var(--yellow-dark); border-radius:10px; padding:10px 14px; margin:8px 0;">
           ⚠️ <strong>Este aluno já tem nota lançada neste bloco</strong> (${b.scanDuplicateInfo.scanned?'por leitura':'lançamento manual'}, em ${new Date(b.scanDuplicateInfo.submittedAt).toLocaleString('pt-BR')}). Confirmar abaixo vai <strong>substituir</strong> a nota anterior em cada avaliação.
         </div>
       ` : ''}
@@ -5188,7 +5268,7 @@ function renderProfessorPainel(){
         <h2>Meu Painel</h2>
         <button class="btn btn-ghost btn-sm" data-action="refresh-professor-painel">Atualizar</button>
       </div>
-      <div class="row" style="align-items:center; justify-content:space-between; background:#fdf3e8; border:1px solid var(--yellow-dark); border-radius:8px; padding:8px 12px; margin:10px 0;">
+      <div class="row" style="align-items:center; justify-content:space-between; background:var(--accent-yellow-bg,#fdf3e8); border:1px solid var(--yellow-dark); border-radius:8px; padding:8px 12px; margin:10px 0;">
         <span style="font-size:.85rem;">🗒️ Precisa lançar uma prova integrada em papel (várias disciplinas no mesmo cartão)? É no <strong>Gabarito Avulso</strong>.</span>
         <button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="avulso" style="flex:0 0 auto;">Ir para Gabarito Avulso</button>
       </div>
@@ -5348,7 +5428,7 @@ function renderNovoAvulso(){
         const vinculos = d.vinculos || [];
         const precisaTurma = vinculos.length > 1;
         return `
-        <div class="card" style="background:#f7f5f2; margin-bottom:8px; padding:10px;">
+        <div class="card" style="background:var(--surface); margin-bottom:8px; padding:10px;">
           <div class="row" style="gap:8px; align-items:center; flex-wrap:wrap;">
             <input type="text" class="input" style="flex:2; min-width:140px;" data-action="avulso-disc-nome" data-id="${d.id}" value="${esc(d.nome)}" placeholder="Nome da disciplina (aparece no cartão impresso)">
             <span class="muted">questão</span>
@@ -5491,6 +5571,30 @@ function renderGabaritoGridEditavel(gab, answers, actionName){
     </div>
   `;
 }
+function renderGabaritoGridBolinhas(gab, answers, actionName){
+  const columns = gabaritoColunasPorDisciplina(gab.disciplinas, gab.numQuestoes);
+  const validLetters = OPT_LETTERS.slice(0, gab.numAlternativas);
+  return `
+    <div style="display:flex; gap:22px; flex-wrap:wrap; margin:10px 0;">
+      ${columns.map(col => `
+        <div style="min-width:150px;">
+          <h4 style="margin:0 0 8px; font-size:.85rem; color:var(--board);">${esc(col.label)}${col.qs.length>0?` (Q${col.qs[0]}–${col.qs[col.qs.length-1]})`:''}</h4>
+          ${col.qs.map(qn => `
+            <div class="row" style="align-items:center; gap:8px; margin-bottom:7px; flex-wrap:nowrap;">
+              <span style="width:28px; font-weight:600; font-size:.85rem; flex:0 0 auto;">Q${qn}</span>
+              <div class="row" style="gap:5px; flex-wrap:nowrap; flex:0 0 auto;">
+                ${validLetters.map(l => `
+                  <button type="button" class="gabarito-bolinha ${answers[qn-1]===l?'selected':''}" data-action="${actionName}" data-idx="${qn-1}" data-letra="${l}" title="${l}">${l}</button>
+                `).join('')}
+                ${answers[qn-1] ? `<button type="button" class="gabarito-bolinha-limpar" data-action="${actionName}" data-idx="${qn-1}" data-letra="" title="Limpar resposta">✕</button>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
 function renderGabaritoGridSomenteLeitura(gab){
   const columns = gabaritoColunasPorDisciplina(gab.disciplinas, gab.numQuestoes);
   return `
@@ -5606,7 +5710,8 @@ function renderDetalheAvulso(){
         ${av.lancarTurmaId && alunosDaTurma.length===0 ? `<p class="muted" style="font-size:.82rem;">Essa turma não tem alunos cadastrados.</p>` : ''}
         ${av.lancarTurmaId && av.lancarStudentId ? `
           <label style="margin-top:8px;">Gabarito marcado pelo aluno</label>
-          ${renderGabaritoGridEditavel(gab, av.lancarRespostas, 'avulso-lancar-resposta-select')}
+          <p class="muted" style="font-size:.82rem; margin-top:-4px;">Toque na letra que o aluno marcou em cada questão.</p>
+          ${renderGabaritoGridBolinhas(gab, av.lancarRespostas, 'avulso-lancar-resposta-bolinha')}
           <div class="row" style="margin-top:10px;">
             <button class="btn btn-primary" data-action="avulso-lancar-manual">Lançar nota</button>
           </div>
@@ -5726,6 +5831,7 @@ function renderCoordenador(){
     <div class="row" style="align-items:center; justify-content:space-between; margin-bottom:10px;">
       <span class="muted" style="font-size:.85rem;">Painel do coordenador</span>
       <div class="row" style="flex:0 0 auto; gap:6px;">
+        ${renderThemeToggleBtn()}
         <button class="btn btn-ghost btn-sm" data-action="start-tour" data-role="coordenador">🧭 Tour</button>
         <button class="btn btn-ghost btn-sm" data-action="coord-logout">Sair</button>
       </div>
@@ -6117,7 +6223,7 @@ function renderCoordPesosProf(){
         </div>
         ${total!==10 ? '<p class="err" style="font-size:.82rem;">O total não fecha em 10 pontos — pode valer a pena orientar o professor a revisar.</p>' : ''}
         ${pr.coordNote ? `
-          <div style="background:#fdf3e8; border:1px solid var(--yellow-dark); border-radius:6px; padding:10px 12px; margin-top:10px;">
+          <div style="background:var(--accent-yellow-bg,#fdf3e8); border:1px solid var(--yellow-dark); border-radius:6px; padding:10px 12px; margin-top:10px;">
             <strong style="font-size:.85rem;">Recado enviado:</strong>
             <p style="margin:4px 0 8px; font-size:.9rem;">${esc(pr.coordNote)}</p>
             <button class="btn btn-ghost btn-sm" data-action="coord-clear-note" data-id="${pr.id}">Remover recado</button>
@@ -11182,6 +11288,13 @@ document.addEventListener('click', (e) => {
   else if(act==='open-privacy-notice'){ state.ui.showPrivacy = true; render(); }
   else if(act==='close-privacy-notice'){ state.ui.showPrivacy = false; render(); }
   else if(act==='toggle-sidebar'){ state.ui.sidebarOpen = !state.ui.sidebarOpen; render(); }
+  else if(act==='toggle-theme'){
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = current==='dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try{ localStorage.setItem('sala-theme', next); }catch(e){}
+    render();
+  }
   else if(act==='toggle-favorite'){ toggleFavoriteSub(btn.dataset.role, btn.dataset.sub); render(); }
   else if(act==='start-tour'){ startTour(btn.dataset.role); }
   else if(act==='tour-next'){ state.ui.tour.step++; render(); }
@@ -11452,6 +11565,7 @@ document.addEventListener('click', (e) => {
   else if(act==='avulso-voltar-lista'){ p.avulso.mode='list'; p.avulso.current=null; render(); }
   else if(act==='avulso-imprimir-cartoes'){ imprimirCartoesAvulso(); }
   else if(act==='avulso-lancar-modo'){ p.avulso.lancarModo = btn.dataset.modo; p.avulso.scanReview=null; p.avulso.scanError=''; render(); }
+  else if(act==='avulso-lancar-resposta-bolinha'){ p.avulso.lancarRespostas[parseInt(btn.dataset.idx)] = btn.dataset.letra; render(); }
   else if(act==='avulso-lancar-manual'){ lancarAvulsoManual(); }
   else if(act==='avulso-scan-cancel'){ p.avulso.scanReview=null; p.avulso.scanAvulso=null; p.avulso.scanError=''; p.avulso.scanQueue=null; render(); }
   else if(act==='avulso-scan-confirm'){ confirmAvulsoScan(); }
