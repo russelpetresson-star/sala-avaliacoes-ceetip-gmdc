@@ -398,6 +398,32 @@
   .disclaimer-details p{ color:var(--ink-soft); font-size:.78rem; max-width:520px; margin:8px auto 0; }
   .spinner{ width:26px;height:26px;border:3px solid var(--paper-line); border-top-color:var(--board); border-radius:50%; margin:20px auto; animation: spin 0.8s linear infinite;}
   @keyframes spin{ to{ transform: rotate(360deg);} }
+  .quiz-timer-urgente{ animation: quiz-pulse 1s ease-in-out infinite; }
+  @keyframes quiz-pulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.12); } }
+  .badge-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(110px,1fr)); gap:10px; margin-top:12px; }
+  .badge-item{ text-align:center; padding:10px 6px; border-radius:10px; background:var(--surface); border:1px solid var(--paper-line); }
+  .badge-item.locked{ opacity:.4; filter:grayscale(1); }
+  .badge-emoji{ font-size:1.8rem; display:block; }
+  .badge-label{ font-size:.72rem; font-weight:600; margin-top:4px; }
+  .badge-desc{ font-size:.65rem; color:var(--ink-soft); margin-top:2px; }
+  .trilha-track{ display:flex; align-items:center; overflow-x:auto; padding:10px 2px 4px; }
+  .trilha-step{ display:flex; flex-direction:column; align-items:center; flex:0 0 auto; min-width:60px; }
+  .trilha-node{ width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.1rem; background:var(--surface); border:2px solid var(--paper-line); flex:0 0 auto; }
+  .trilha-step.feita .trilha-node{ background:var(--green); border-color:var(--green); }
+  .trilha-step.disponivel .trilha-node{ background:var(--yellow); border-color:var(--yellow); animation: quiz-pulse 1.4s ease-in-out infinite; }
+  .trilha-step.bloqueada .trilha-node{ opacity:.5; }
+  .trilha-label{ font-size:.62rem; color:var(--ink-soft); margin-top:3px; text-align:center; max-width:74px; }
+  .trilha-linha{ height:3px; background:var(--paper-line); flex:1 1 24px; min-width:16px; margin:0 2px 18px; }
+  .trilha-linha.feita{ background:var(--green); }
+  .ra-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:14px; margin-top:12px; }
+  .ra-card{ border:1px solid var(--paper-line); border-radius:10px; overflow:hidden; background:var(--surface); }
+  .ra-card model-viewer{ width:100%; height:220px; background:#f2f2f2; display:block; --poster-color: transparent; }
+  .ra-card-body{ padding:10px 12px; }
+  .ra-card-title{ font-weight:700; font-size:.95rem; margin:0 0 2px; }
+  .ra-card-desc{ font-size:.82rem; color:var(--ink-soft); margin:0 0 6px; }
+  .ra-sites-list{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .ra-site-link{ display:inline-block; padding:6px 12px; border-radius:999px; background:var(--tint-teal); border:1px solid var(--teal); font-size:.82rem; text-decoration:none; color:inherit; }
+  .ra-site-link:hover{ filter:brightness(0.95); }
   .stat-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:14px; }
   .stat-card{ background:var(--surface); border:1px solid var(--paper-line); border-radius:8px; padding:12px 8px; text-align:center; }
   .stat-value{ font-family:'Caveat',cursive; font-size:1.7rem; font-weight:700; color:var(--board); line-height:1.1;}
@@ -407,6 +433,7 @@
   .chart-label{ flex:0 0 130px; font-size:.85rem; }
   .chart-track{ flex:1; background:#efece2; border-radius:5px; height:14px; overflow:hidden; }
   .chart-fill{ height:100%; border-radius:5px; transition:width .3s; }
+  .quiz-bar-fill{ transition: width .9s cubic-bezier(.22,1,.36,1); }
   .chart-pct{ flex:0 0 70px; font-size:.82rem; text-align:right; color:var(--ink-soft); }
   .stack-track{ flex:1; display:flex; height:14px; border-radius:5px; overflow:hidden; background:#efece2; }
   .stack-seg{ height:100%; }
@@ -554,6 +581,9 @@
 <!-- Firebase (banco de dados e arquivos) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- model-viewer (Realidade Aumentada no navegador, sem instalar app) -->
+<script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyCAYrKnwCfQfm84m47vSjRALV0DSHrPnms",
@@ -834,7 +864,62 @@ function ensureStudentGamification(s){
   if(!s.avatarEmoji) s.avatarEmoji = null;
   if(!s.avatarColor) s.avatarColor = null;
   if(!Array.isArray(s.loginLog)) s.loginLog = [];
+  if(!s.contadores || typeof s.contadores!=='object') s.contadores = {};
   return s;
+}
+const NIVEL_LIMIARES = [0, 20, 50, 100, 180, 300, 450, 650, 900, 1200];
+function computeNivelInfo(fichas){
+  const f = fichas||0;
+  let nivel = 1;
+  for(let i=1;i<NIVEL_LIMIARES.length;i++){ if(f>=NIVEL_LIMIARES[i]) nivel = i+1; }
+  const base = NIVEL_LIMIARES[nivel-1];
+  const proximo = NIVEL_LIMIARES[nivel] !== undefined ? NIVEL_LIMIARES[nivel] : null;
+  const pct = proximo===null ? 100 : Math.min(100, Math.round(((f-base)/(proximo-base))*100));
+  return { nivel, fichas:f, base, proximo, pct, maximo: proximo===null };
+}
+function computeStudentStreak(loginLog){
+  const dias = [...new Set(loginLog||[])].sort();
+  if(dias.length===0) return { atual:0, melhor:0 };
+  let melhor = 1, corrente = 1;
+  for(let i=1;i<dias.length;i++){
+    const prev = new Date(dias[i-1]+'T00:00:00');
+    const cur = new Date(dias[i]+'T00:00:00');
+    const diffDias = Math.round((cur-prev)/86400000);
+    if(diffDias===1){ corrente++; } else { corrente = 1; }
+    if(corrente>melhor) melhor = corrente;
+  }
+  // sequência atual só conta se o último acesso foi hoje ou ontem
+  const hoje = new Date().toISOString().slice(0,10);
+  const ontem = new Date(Date.now()-86400000).toISOString().slice(0,10);
+  const ultimo = dias[dias.length-1];
+  let atual = 1;
+  if(ultimo!==hoje && ultimo!==ontem){ atual = 0; }
+  else {
+    atual = 1;
+    for(let i=dias.length-1;i>0;i--){
+      const diffDias = Math.round((new Date(dias[i]+'T00:00:00') - new Date(dias[i-1]+'T00:00:00'))/86400000);
+      if(diffDias===1) atual++; else break;
+    }
+  }
+  return { atual, melhor };
+}
+const CONQUISTA_DEFS = [
+  { id:'bronze', emoji:'🥉', label:'Bronze', desc:'Acumule 10 fichas', check:(s)=>(s.fichas||0)>=10 },
+  { id:'prata', emoji:'🥈', label:'Prata', desc:'Acumule 50 fichas', check:(s)=>(s.fichas||0)>=50 },
+  { id:'ouro', emoji:'🥇', label:'Ouro', desc:'Acumule 150 fichas', check:(s)=>(s.fichas||0)>=150 },
+  { id:'diamante', emoji:'💎', label:'Diamante', desc:'Acumule 300 fichas', check:(s)=>(s.fichas||0)>=300 },
+  { id:'sequencia3', emoji:'🔥', label:'Em Chamas', desc:'Use o app 3 dias seguidos', check:(s)=>computeStudentStreak(s.loginLog).melhor>=3 },
+  { id:'sequencia7', emoji:'🔥🔥', label:'Semana Cheia', desc:'Use o app 7 dias seguidos', check:(s)=>computeStudentStreak(s.loginLog).melhor>=7 },
+  { id:'quiz', emoji:'🧠', label:'Mestre do Quiz', desc:'Acerte 5 perguntas no Quiz por Equipes', check:(s)=>((s.contadores||{}).quiz||0)>=5 },
+  { id:'roleta', emoji:'🎡', label:'Estrela da Roleta', desc:'Participe 3 vezes do sorteio da roleta', check:(s)=>((s.contadores||{}).roleta||0)>=3 },
+  { id:'enquete', emoji:'🗳️', label:'Voz Ativa', desc:'Responda 5 enquetes relâmpago', check:(s)=>((s.contadores||{}).enquete||0)>=5 },
+  { id:'participacao', emoji:'🙋', label:'Participativo', desc:'Receba 5 fichas de participação do professor', check:(s)=>((s.contadores||{}).participacao||0)>=5 },
+  { id:'duelo', emoji:'⚔️', label:'Duelista', desc:'Vença 1 Duelo', check:(s)=>((s.contadores||{}).duelo||0)>=1 },
+  { id:'duelo5', emoji:'🏆', label:'Campeão de Duelos', desc:'Vença 5 Duelos', check:(s)=>((s.contadores||{}).duelo||0)>=5 },
+];
+function computeConquistas(s){
+  ensureStudentGamification(s);
+  return CONQUISTA_DEFS.map(def => ({ ...def, achieved: !!def.check(s) }));
 }
 async function registerStudentLogin(turmaId, studentId){
   const today = new Date().toISOString().slice(0,10);
@@ -870,7 +955,7 @@ function professorAvatarHtml(session, size){
   const color = (session && session.avatarColor) || 'var(--board)';
   return `<span style="display:inline-flex; align-items:center; justify-content:center; width:${sz}px; height:${sz}px; border-radius:50%; background:${color}; font-size:${Math.round(sz*0.55)}px; flex:0 0 auto;">${emoji}</span>`;
 }
-async function awardFichas(turmaId, studentId, amount, motivo){
+async function awardFichas(turmaId, studentId, amount, motivo, categoria){
   let turmasFresh;
   try{ const r = await window.storage.get('turmas', true); turmasFresh = JSON.parse(r.value); }catch(e){ turmasFresh = state.professor.turmas; }
   const t = turmasFresh.find(x=>x.id===turmaId);
@@ -881,6 +966,7 @@ async function awardFichas(turmaId, studentId, amount, motivo){
   s.fichas += amount;
   s.fichasHistorico.unshift({ motivo, amount, at: Date.now() });
   s.fichasHistorico = s.fichasHistorico.slice(0,20);
+  if(categoria) s.contadores[categoria] = (s.contadores[categoria]||0) + 1;
   await window.storage.set('turmas', JSON.stringify(turmasFresh), true);
   state.professor.turmas = turmasFresh;
   if(state.aluno.turma && state.aluno.turma.id===turmaId){
@@ -970,8 +1056,9 @@ let state = {
     session: null, loginStage:'email', loginEmail:'', loginRecordId:null, loginError:'',
     setupAvatarEmoji:null, setupAvatarColor:null, setupName:'', setupPassword:'', setupPassword2:'',
     profileEditorOpen:false, avatarDraft:null,
+    myIaKey:'', myIaKeyInput:'', myIaKeyLoading:false, myIaSaved:false,
     subview: 'inicio', // 'inicio' | 'painel' | 'avaliacoes' | 'banco' | 'turmas' | ...
-    mode:'list', assessments: [], loadingList:true, newAssessment: freshAssessment(), resultsFor:null, responses:[], resultsLoading:false, editingCode:null, editingResponseCount:0, correctingResponseIdx:null,
+    mode:'list', assessments: [], loadingList:true, newAssessment: freshAssessment(), resultsFor:null, responses:[], resultsLoading:false, editingCode:null, editingResponseCount:0, correctingResponseIdx:null, commentingResponseIdx:null,
     correcoesPendentesLoaded:false, correcoesPendentesCount:0,
     bank: [], bankLoading:true, newBankQuestion:null, editingBankId:null,
     aiGen: { open:false, tema:'', quantidade:5, dificuldade:'médio', tipos:['mc','vf'], provasAntigas:false, loading:false, results:null, selected:[], error:'' },
@@ -995,9 +1082,15 @@ let state = {
     painelDisciplinaFiltro: '', // '' = todas as disciplinas; senão, id de uma disciplina do professor
     avisos: [], avisosLoading: true, newAvisoText: '', newAvisoTurmaIds: [], newAvisoPinned: false,
     materiais: [], materiaisLoading: true, newMaterialOpen:false, newMaterialTitle:'', newMaterialUrl:'', newMaterialDescricao:'', newMaterialTurmaIds:[], materialError:'',
+    tarefas: [], tarefasLoading: true, newTarefaOpen:false, newTarefaTitle:'', newTarefaDescricao:'', newTarefaPrazo:'', newTarefaTurmaIds:[], tarefaError:'',
+    viewingTarefaId: null, tarefaEntregas: {}, gradingEntregaId: null, gradeNotaInput:'', gradeFeedbackInput:'',
+    cronograma: [], cronogramaLoading: true, newCronogramaOpen:false, newCronogramaData:'', newCronogramaConteudo:'', newCronogramaTurmaIds:[], cronogramaError:'',
+    duvidas: [], duvidasLoading: true,
+    raItems: [], raItemsLoading: true, newRaOpen:false, newRaTitle:'', newRaModelUrl:'', newRaPosterUrl:'', newRaDescricao:'', newRaTurmaIds:[], raError:'', editingRaId:null,
     enquete: { turmaId:'', current:null, loading:false, formQuestion:'', formOptions:['',''] },
     quiz: { current:null, presentationMode:false, setup: null },
     roleta: { turmaId:'', pergunta:'', historico:[], current:null, spinning:false, spinDisplay:null, presentationMode:false },
+    duelo: { turmaId:'', studentAId:'', studentBId:'', questionText:'', options:['',''], correctIndex:0, durationSeconds:20, current:null, presentationMode:false },
     slides: { decks:[], decksLoading:false, uploadTitle:'', uploading:false, uploadError:'', uploadProgress:null, selectedDeckId:null, turmaId:'', current:null, currentSlideImg:null, engajamento:null, presentationMode:false, historico:[], historicoLoading:false },
     leitura: { loading:false, error:'', review:null, assessment:null, studentName:'', scanQueue:null },
     avulso: { list:[], listLoading:true, mode:'list', form:null, current:null,
@@ -1020,7 +1113,7 @@ let state = {
     professores:[], professoresLoading:true, newProfEmail:'', newProfDisciplina:'',
     assessments:[], assessmentsLoading:true, filterProfessorId:'', filterDisciplina:'',
     resultsFor:null, responses:[], resultsLoading:false,
-    notasTurmaId:'', notasUnidade:'I Unidade', notasLoading:false, notasColunas:[], notasRows:[],
+    notasTurmaId:'', notasUnidade:'I Unidade', notasLoading:false, notasColunas:[], notasRows:[], boletimCompletoLoading:null,
     professorPesos:{}, professorPesosLoading:true,
     ia: { loading:true, key:'', keyInput:'', saved:false },
     dashboard: { loading:true, stats:null },
@@ -1039,7 +1132,7 @@ let state = {
   diasLetivos: { loading:true, map:{} },
   turnoHorarios: { loading:true, map:{} },
   freqStatsCache: {},
-  aluno: { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false }
+  aluno: { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, dueloAtivo:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false, tarefasTurma:[], tarefaEntregasProprias:{}, enviandoTarefaId:null, tarefaSubmitFile:null, tarefaSubmitFileName:'', tarefaSubmitLink:'', tarefaSubmitComentario:'', tarefaSubmitError:'', tarefaSubmitUploading:false, duvidaFormOpen:false, newDuvidaTexto:'', duvidaError:'', novidades:null, duvidaIaLoadingId:null, duvidaIaErro:'' }
 };
 
 
@@ -1322,9 +1415,14 @@ function render(){
   }
   root.innerHTML = state.view==='professor' ? renderProfessor() : state.view==='coordenador' ? renderCoordenador() : state.view==='freqmonitor' ? renderFreqMonitor() : renderAluno();
   const wide = (state.view==='professor' && !!state.professor.session) || (state.view==='coordenador' && !!state.coordenador.session);
-  const full = state.professor.quiz.presentationMode || state.professor.roleta.presentationMode || state.professor.slides.presentationMode;
+  const full = state.professor.quiz.presentationMode || state.professor.roleta.presentationMode || state.professor.duelo.presentationMode || state.professor.slides.presentationMode;
   const wrapEl = document.querySelector('.wrap');
   if(wrapEl){ wrapEl.classList.toggle('wide', wide); wrapEl.classList.toggle('full', full); }
+  requestAnimationFrame(()=>{
+    requestAnimationFrame(()=>{
+      document.querySelectorAll('.quiz-bar-fill[data-target]').forEach(el => { el.style.width = el.dataset.target; });
+    });
+  });
 }
 
 /* ---------------- PROFESSOR ---------------- */
@@ -1339,6 +1437,9 @@ function renderProfessor(){
   }
   if(p.subview==='roleta' && p.roleta.presentationMode){
     return renderRoletaPresentation();
+  }
+  if(p.subview==='duelo' && p.duelo.presentationMode && p.duelo.current){
+    return renderDueloPresentation();
   }
   if(p.subview==='slides' && p.slides.presentationMode && p.slides.current){
     return renderSlidesPresentation();
@@ -1390,10 +1491,15 @@ function renderProfessor(){
     { action:'sub-view', sub:'livros', icon:'📘', label:'Livro Didático', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'mural', icon:'📌', label:'Mural de Avisos', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'material', icon:'📎', label:'Material da Turma', group:'🎮 Recursos & Interação' },
+    { action:'sub-view', sub:'tarefas', icon:'🗂️', label:'Tarefas', group:'🎮 Recursos & Interação' },
+    { action:'sub-view', sub:'cronograma', icon:'📅', label:'Cronograma de Aulas', group:'🎮 Recursos & Interação' },
+    { action:'sub-view', sub:'duvidas', icon:'❓', label:'Mural de Dúvidas', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'enquete', icon:'📣', label:'Enquete Relâmpago', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'quiz', icon:'🎮', label:'Quiz por Equipes', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'roleta', icon:'🎡', label:'Roleta de Sorteio', group:'🎮 Recursos & Interação' },
+    { action:'sub-view', sub:'duelo', icon:'⚔️', label:'Modo Duelo', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'slides', icon:'🖥️', label:'Apresentação de Slides', group:'🎮 Recursos & Interação' },
+    { action:'sub-view', sub:'ra', icon:'🕶️', label:'Realidade Aumentada', group:'🎮 Recursos & Interação' },
 
     { action:'sub-view', sub:'lixeira', icon:'🗑️', label:'Lixeira', group:'🗑️ Lixeira' },
   ];
@@ -1414,10 +1520,15 @@ function renderProfessor(){
   else if(p.subview==='painel') content = renderProfessorPainel();
   else if(p.subview==='mural') content = renderMuralAvisos(true);
   else if(p.subview==='material') content = renderMateriais();
+  else if(p.subview==='tarefas') content = renderTarefas();
+  else if(p.subview==='cronograma') content = renderCronograma();
+  else if(p.subview==='duvidas') content = renderMuralDuvidas();
   else if(p.subview==='enquete') content = renderEnqueteRelampago();
   else if(p.subview==='quiz') content = renderQuizEquipes();
   else if(p.subview==='roleta') content = renderRoleta();
+  else if(p.subview==='duelo') content = renderDuelo();
   else if(p.subview==='slides') content = renderSlides();
+  else if(p.subview==='ra') content = renderRealidadeAumentada(true);
   else if(p.subview==='lixeira') content = renderLixeira();
   else content = p.mode==='new' ? renderNewAssessment() : p.mode==='results' ? renderResults() : renderProfessorList();
   return `<div class="app-topbar">${topBar}</div><div class="app-shell">${renderSidebar(sidebarItems, p.subview, 'professor')}<div class="app-main">${content}</div></div>`;
@@ -1521,6 +1632,25 @@ function renderProfessorProfileEditor(){
       <div class="row" style="margin-top:12px;">
         <button class="btn btn-primary btn-sm" data-action="salvar-avatar-professor">Usar este avatar</button>
       </div>
+
+      <h3 style="margin-top:26px;">🤖 Minha Chave de IA (opcional)</h3>
+      <p class="muted" style="font-size:.85rem;">A escola usa uma chave gratuita do Google Gemini <strong>compartilhada por todos os professores</strong> para os recursos de IA (gerar questões, importar PDF ou texto). Ela tem um limite baixo — cerca de 15 chamadas por minuto — então, se vários professores usarem ao mesmo tempo, pode aparecer erro de "limite excedido".</p>
+      <p class="muted" style="font-size:.85rem;">Cadastrando sua própria chave (gratuita, sem cartão de crédito, leva 1 minuto), você passa a ter um limite só seu, sem depender do uso dos outros professores. O caminho:</p>
+      <ol class="muted" style="font-size:.85rem; padding-left:20px;">
+        <li>Acesse <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> com uma conta Google (a sua mesmo, pessoal).</li>
+        <li>Clique em "Create API key" — é gratuito, não pede cartão.</li>
+        <li>Copie a chave gerada (começa com "AIza...") e cole no campo abaixo.</li>
+      </ol>
+      ${p.myIaKeyLoading ? '<div class="spinner"></div>' : `
+        <label>Minha chave de API do Gemini</label>
+        <input type="text" id="my-ia-key-input" value="${esc(p.myIaKeyInput)}" placeholder="Cole aqui a sua chave (começa com AIza...)">
+        <p class="muted" style="font-size:.8rem;">${p.myIaKey ? '✅ Você está usando sua própria chave — seu uso não afeta os outros professores.' : 'ℹ️ Você ainda está usando a chave compartilhada da escola.'}</p>
+        ${p.myIaSaved ? '<p class="muted" style="color:var(--green);">Chave salva!</p>' : ''}
+        <div class="row" style="margin-top:8px;">
+          ${p.myIaKey ? `<button class="btn btn-danger btn-sm" data-action="remove-my-ia-key">Remover minha chave</button>` : ''}
+          <button class="btn btn-primary btn-sm" data-action="save-my-ia-key">Salvar</button>
+        </div>
+      `}
     </div>
   `;
 }
@@ -1812,6 +1942,1100 @@ function renderAlunoMateriaisTurmaBlock(){
   `;
 }
 
+/* ---------------- TAREFAS (envio de arquivo) ---------------- */
+
+function tarefaEntregaKey(tarefaId, studentId){ return `tarefa-entrega:${tarefaId}:${studentId}`; }
+
+async function loadTarefas(){
+  const p = state.professor;
+  p.tarefasLoading = true;
+  try{ const r = await window.storage.get('tarefas', true); p.tarefas = JSON.parse(r.value); }
+  catch(e){ p.tarefas = []; }
+  p.tarefasLoading = false;
+  render();
+}
+async function saveTarefasToStorage(){
+  await window.storage.set('tarefas', JSON.stringify(state.professor.tarefas), true);
+}
+function abrirNovaTarefa(){
+  const p = state.professor;
+  p.newTarefaOpen = true;
+  p.newTarefaTitle = ''; p.newTarefaDescricao = ''; p.newTarefaPrazo = ''; p.newTarefaTurmaIds = [];
+  p.tarefaError = '';
+  render();
+}
+function cancelarNovaTarefa(){ state.professor.newTarefaOpen = false; render(); }
+function toggleTarefaTurma(tid){
+  const p = state.professor;
+  if(p.newTarefaTurmaIds.includes(tid)) p.newTarefaTurmaIds = p.newTarefaTurmaIds.filter(x=>x!==tid);
+  else p.newTarefaTurmaIds.push(tid);
+  render();
+}
+async function salvarTarefa(authorName){
+  const p = state.professor;
+  const title = p.newTarefaTitle.trim();
+  if(!title){ p.tarefaError = 'Dê um título para a tarefa.'; render(); return; }
+  if(p.newTarefaTurmaIds.length===0){ p.tarefaError = 'Marque pelo menos uma turma.'; render(); return; }
+  const tarefa = {
+    id: cryptoId(), title,
+    descricao: p.newTarefaDescricao.trim(),
+    prazo: p.newTarefaPrazo || '',
+    turmaIds: [...p.newTarefaTurmaIds],
+    authorId: p.session.id, authorName,
+    createdAt: Date.now()
+  };
+  p.tarefas.unshift(tarefa);
+  p.newTarefaOpen = false;
+  p.tarefaError = '';
+  await saveTarefasToStorage();
+  render();
+}
+async function excluirTarefa(id){
+  if(!confirm('Excluir esta tarefa? As entregas já enviadas pelos alunos continuam guardadas, mas ninguém mais verá a tarefa.')) return;
+  const p = state.professor;
+  p.tarefas = p.tarefas.filter(t=>t.id!==id);
+  await saveTarefasToStorage();
+  render();
+}
+function abrirTarefaDetalhe(id){
+  const p = state.professor;
+  p.viewingTarefaId = id;
+  render();
+  loadEntregasDaTarefa(id);
+}
+function fecharTarefaDetalhe(){
+  state.professor.viewingTarefaId = null;
+  render();
+}
+async function loadEntregasDaTarefa(tarefaId){
+  const p = state.professor;
+  p.tarefaEntregas[tarefaId] = { loading:true, list:[] };
+  render();
+  let list = [];
+  try{
+    const r = await window.storage.list(tarefaEntregaKey(tarefaId,''), true);
+    const results = await Promise.all((r.keys||[]).map(async k => {
+      try{ const rr = await window.storage.get(k, true); return JSON.parse(rr.value); }catch(e){ return null; }
+    }));
+    list = results.filter(Boolean);
+  }catch(e){ list = []; }
+  p.tarefaEntregas[tarefaId] = { loading:false, list };
+  render();
+}
+function abrirCorrecaoEntrega(tarefaId, studentId){
+  const cache = state.professor.tarefaEntregas[tarefaId];
+  if(!cache) return;
+  const item = cache.list.find(e=>e.studentId===studentId);
+  if(!item) return;
+  item.editing = true;
+  item.draftNota = item.nota!=null ? String(item.nota) : '';
+  item.draftFeedback = item.feedback || '';
+  render();
+}
+function cancelarCorrecaoEntrega(tarefaId, studentId){
+  const cache = state.professor.tarefaEntregas[tarefaId];
+  if(!cache) return;
+  const item = cache.list.find(e=>e.studentId===studentId);
+  if(item) item.editing = false;
+  render();
+}
+async function salvarCorrecaoEntrega(tarefaId, studentId){
+  const cache = state.professor.tarefaEntregas[tarefaId];
+  if(!cache) return;
+  const item = cache.list.find(e=>e.studentId===studentId);
+  if(!item) return;
+  const notaTxt = (item.draftNota||'').trim().replace(',','.');
+  item.nota = notaTxt ? parseFloat(notaTxt) : null;
+  item.feedback = (item.draftFeedback||'').trim();
+  item.corrigidoAt = Date.now();
+  item.editing = false;
+  render();
+  await window.storage.set(tarefaEntregaKey(tarefaId, studentId), JSON.stringify(item), true);
+}
+function renderTarefas(){
+  const p = state.professor;
+  if(p.viewingTarefaId){
+    const t = p.tarefas.find(x=>x.id===p.viewingTarefaId);
+    if(!t){ p.viewingTarefaId = null; }
+    else return renderTarefaDetalhe(t);
+  }
+  if(p.tarefasLoading) return `<div class="card"><h2>🗂️ Tarefas</h2><div class="spinner"></div></div>`;
+  const minhasTurmas = professorTurmas();
+  const turmaCheckboxes = minhasTurmas.map(t => `
+    <label class="picker-item">
+      <input type="checkbox" data-action="toggle-tarefa-turma" data-tid="${t.id}" ${p.newTarefaTurmaIds.includes(t.id)?'checked':''}>
+      <span>${esc(t.name)}</span>
+    </label>
+  `).join('');
+  const formBlock = p.newTarefaOpen ? `
+    <div style="border:1px dashed var(--paper-line); border-radius:10px; padding:14px; margin-bottom:16px;">
+      <h3 style="margin-top:0;">Nova tarefa</h3>
+      <label>Título</label>
+      <input type="text" id="tarefa-title-input" value="${esc(p.newTarefaTitle)}" placeholder="Ex: Lista de exercícios — Circuitos em série">
+      <label>Instruções (opcional)</label>
+      <textarea id="tarefa-descricao-input" placeholder="Explique o que o aluno deve entregar...">${esc(p.newTarefaDescricao)}</textarea>
+      <label>Prazo de entrega (opcional)</label>
+      <input type="date" id="tarefa-prazo-input" value="${esc(p.newTarefaPrazo)}">
+      <label style="margin-top:10px;">Para quais turmas?</label>
+      ${minhasTurmas.length===0 ? '<p class="muted" style="font-size:.82rem;">Nenhuma turma vinculada a uma disciplina sua ainda — vá em "Disciplinas" e marque em quais turmas você leciona.</p>' : `<div class="picker">${turmaCheckboxes}</div>`}
+      ${p.tarefaError ? `<p class="err">${esc(p.tarefaError)}</p>` : ''}
+      <div class="row" style="margin-top:12px;">
+        <button class="btn btn-ghost" data-action="cancelar-nova-tarefa">Cancelar</button>
+        <button class="btn btn-primary" data-action="salvar-tarefa">Criar tarefa</button>
+      </div>
+    </div>
+  ` : '';
+  const lista = p.tarefas.slice().sort((a,b)=>b.createdAt-a.createdAt);
+  const listBlock = lista.length===0 ? '<p class="muted">Nenhuma tarefa criada ainda.</p>' : lista.map(t => {
+    const turmaNames = (t.turmaIds||[]).map(tid => { const tm = p.turmas.find(x=>x.id===tid); return tm?tm.name:'?'; }).join(', ') || 'nenhuma turma';
+    const souAutor = t.authorId === p.session.id;
+    const prazoTxt = t.prazo ? new Date(t.prazo+'T00:00:00').toLocaleDateString('pt-BR') : 'sem prazo definido';
+    return `
+    <div class="list-item clickable" data-action="ver-tarefa" data-id="${t.id}" style="align-items:flex-start; flex-wrap:wrap;">
+      <div>
+        <strong>${esc(t.title)}</strong><br>
+        <span class="muted" style="font-size:.78rem;">${esc(t.authorName)} · prazo: ${prazoTxt} · turma(s): ${esc(turmaNames)}</span>
+      </div>
+      <div class="row" style="flex:0 0 auto; gap:8px;">
+        <span class="muted">→</span>
+        ${souAutor ? `<button class="btn btn-danger btn-sm" data-action="excluir-tarefa" data-id="${t.id}" onclick="event.stopPropagation()">Excluir</button>` : ''}
+      </div>
+    </div>
+  `;
+  }).join('');
+  return `
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <h2>🗂️ Tarefas</h2>
+        ${!p.newTarefaOpen ? '<button class="btn btn-primary btn-sm" data-action="abrir-nova-tarefa">+ Nova tarefa</button>' : ''}
+      </div>
+      <p class="muted">Peça um trabalho, exercício ou redação com prazo de entrega — o aluno envia uma foto/arquivo (ou um link) e você corrige com nota e comentário.</p>
+      ${formBlock}
+      ${listBlock}
+    </div>
+  `;
+}
+function renderTarefaDetalhe(t){
+  const p = state.professor;
+  const cache = p.tarefaEntregas[t.id];
+  const turmas = (t.turmaIds||[]).map(tid => p.turmas.find(x=>x.id===tid)).filter(Boolean);
+  const prazoTxt = t.prazo ? new Date(t.prazo+'T00:00:00').toLocaleDateString('pt-BR') : 'sem prazo definido';
+  let body;
+  if(!cache || cache.loading){
+    body = '<div class="spinner"></div>';
+  } else {
+    const entregasPorAluno = {};
+    cache.list.forEach(e => { entregasPorAluno[e.studentId] = e; });
+    body = turmas.map(turma => `
+      <h3 style="margin-top:20px;">${esc(turma.name)}</h3>
+      ${turma.students.slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR')).map(s => {
+        const e = entregasPorAluno[s.id];
+        if(!e){
+          return `
+            <div class="list-item">
+              <span>${esc(s.name)}</span>
+              <span class="muted">Ainda não entregou</span>
+            </div>
+          `;
+        }
+        const anexo = e.fileDataUrl ? `<a href="${e.fileDataUrl}" target="_blank" rel="noopener">Ver arquivo enviado</a>` : (e.linkUrl ? `<a href="${esc(e.linkUrl)}" target="_blank" rel="noopener">Abrir link enviado</a>` : '<span class="muted">Sem anexo</span>');
+        return `
+          <div class="list-item" style="align-items:flex-start; flex-wrap:wrap;">
+            <div>
+              <strong>${esc(s.name)}</strong><br>
+              <span class="muted" style="font-size:.8rem;">Enviou em ${new Date(e.submittedAt).toLocaleString('pt-BR')}</span><br>
+              ${anexo}
+              ${e.comentario ? `<p style="margin:6px 0 0; font-size:.9rem;"><em>"${esc(e.comentario)}"</em></p>` : ''}
+              ${e.editing ? `
+                <div style="margin-top:8px; max-width:360px;">
+                  <label style="font-size:.75rem;">Nota</label>
+                  <input type="text" data-action="tarefa-nota-input" data-tid="${t.id}" data-sid="${s.id}" value="${esc(e.draftNota||'')}" style="max-width:100px;">
+                  <label style="font-size:.75rem;">Feedback pro aluno</label>
+                  <textarea data-action="tarefa-feedback-input" data-tid="${t.id}" data-sid="${s.id}" placeholder="Comentário sobre o trabalho...">${esc(e.draftFeedback||'')}</textarea>
+                  <div class="row" style="margin-top:6px;">
+                    <button class="btn btn-ghost btn-sm" data-action="cancelar-correcao-entrega" data-tid="${t.id}" data-sid="${s.id}">Cancelar</button>
+                    <button class="btn btn-primary btn-sm" data-action="salvar-correcao-entrega" data-tid="${t.id}" data-sid="${s.id}">Salvar correção</button>
+                  </div>
+                </div>
+              ` : `
+                <p style="margin:6px 0 0; font-size:.85rem;">${e.corrigidoAt ? `<strong>Nota: ${e.nota!=null?e.nota:'—'}</strong>${e.feedback?' · '+esc(e.feedback):''}` : '<span class="muted">Ainda não corrigido</span>'}</p>
+              `}
+            </div>
+            ${!e.editing ? `<button class="btn btn-ghost btn-sm" data-action="abrir-correcao-entrega" data-tid="${t.id}" data-sid="${s.id}">${e.corrigidoAt?'Editar correção':'Corrigir'}</button>` : ''}
+          </div>
+        `;
+      }).join('')}
+    `).join('');
+  }
+  return `
+    <div class="card">
+      <button class="btn btn-ghost btn-sm" data-action="fechar-tarefa-detalhe">← Voltar</button>
+      <h2 style="margin-top:8px;">${esc(t.title)}</h2>
+      <p class="muted">Prazo: ${prazoTxt}</p>
+      ${t.descricao ? `<p>${esc(t.descricao)}</p>` : ''}
+      ${body}
+    </div>
+  `;
+}
+
+/* ---- Lado do aluno ---- */
+
+async function loadMinhasEntregasTarefas(){
+  const al = state.aluno;
+  const tarefas = (state.professor.tarefas||[]).filter(t => (t.turmaIds||[]).includes(al.turma.id));
+  al.tarefasTurma = tarefas;
+  const results = await Promise.all(tarefas.map(async t => {
+    try{ const r = await window.storage.get(tarefaEntregaKey(t.id, al.matriculaStudentId), true); return [t.id, JSON.parse(r.value)]; }
+    catch(e){ return [t.id, null]; }
+  }));
+  al.tarefaEntregasProprias = {};
+  results.forEach(([tid, entrega]) => { if(entrega) al.tarefaEntregasProprias[tid] = entrega; });
+  render();
+}
+function abrirEnvioTarefa(tarefaId){
+  const al = state.aluno;
+  al.enviandoTarefaId = tarefaId;
+  const existente = al.tarefaEntregasProprias[tarefaId];
+  al.tarefaSubmitFile = existente ? (existente.fileDataUrl||null) : null;
+  al.tarefaSubmitFileName = existente ? (existente.fileName||'') : '';
+  al.tarefaSubmitLink = existente ? (existente.linkUrl||'') : '';
+  al.tarefaSubmitComentario = existente ? (existente.comentario||'') : '';
+  al.tarefaSubmitError = '';
+  al.stage = 'envio-tarefa';
+  render();
+}
+function fecharEnvioTarefa(){
+  const al = state.aluno;
+  al.enviandoTarefaId = null;
+  al.stage = 'dashboard';
+  render();
+}
+async function handleTarefaFileUpload(file){
+  const al = state.aluno;
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ al.tarefaSubmitError = 'Envie uma foto (imagem) do seu trabalho, ou cole um link abaixo.'; render(); return; }
+  try{
+    const img = await loadImageFile(file);
+    let dataUrl = resizeImageToDataUrl(img, 1400, 0.72);
+    if(dataUrl.length > 700000) dataUrl = resizeImageToDataUrl(img, 1000, 0.6);
+    if(dataUrl.length > 700000) dataUrl = resizeImageToDataUrl(img, 700, 0.5);
+    al.tarefaSubmitFile = dataUrl;
+    al.tarefaSubmitFileName = file.name;
+    al.tarefaSubmitError = '';
+  }catch(e){
+    al.tarefaSubmitError = 'Não foi possível processar essa imagem. Tente outra foto.';
+  }
+  render();
+}
+async function enviarTarefa(){
+  const al = state.aluno;
+  const tarefaId = al.enviandoTarefaId;
+  const t = al.tarefasTurma.find(x=>x.id===tarefaId);
+  if(!t) return;
+  const link = al.tarefaSubmitLink.trim();
+  if(!al.tarefaSubmitFile && !link){ al.tarefaSubmitError = 'Envie uma foto do seu trabalho ou cole um link.'; render(); return; }
+  const anterior = al.tarefaEntregasProprias[tarefaId];
+  const entrega = {
+    tarefaId, studentId: al.matriculaStudentId, studentName: al.name, turmaId: al.turma.id,
+    fileDataUrl: al.tarefaSubmitFile || null,
+    fileName: al.tarefaSubmitFileName || '',
+    linkUrl: link || '',
+    comentario: al.tarefaSubmitComentario.trim(),
+    submittedAt: Date.now(),
+    nota: anterior ? anterior.nota : null,
+    feedback: anterior ? anterior.feedback : '',
+    corrigidoAt: anterior ? anterior.corrigidoAt : null
+  };
+  al.tarefaSubmitUploading = true;
+  render();
+  try{
+    await window.storage.set(tarefaEntregaKey(tarefaId, al.matriculaStudentId), JSON.stringify(entrega), true);
+    al.tarefaEntregasProprias[tarefaId] = entrega;
+    al.enviandoTarefaId = null;
+    al.stage = 'dashboard';
+  }catch(e){
+    al.tarefaSubmitError = 'Não foi possível enviar. Confira sua conexão e tente de novo.';
+  }
+  al.tarefaSubmitUploading = false;
+  render();
+}
+function renderEnvioTarefaForm(){
+  const al = state.aluno;
+  const t = al.tarefasTurma.find(x=>x.id===al.enviandoTarefaId);
+  if(!t) return '<div class="card"><p class="muted">Tarefa não encontrada.</p><button class="btn btn-primary" data-action="fechar-envio-tarefa">Voltar</button></div>';
+  return `
+    <div class="card">
+      <button class="btn btn-ghost btn-sm" data-action="fechar-envio-tarefa">← Voltar</button>
+      <h2 style="margin-top:8px;">${esc(t.title)}</h2>
+      ${t.descricao ? `<p>${esc(t.descricao)}</p>` : ''}
+      <label style="margin-top:10px;">Envie uma foto do seu trabalho</label>
+      <input type="file" id="tarefa-file-input" accept="image/*" capture="environment">
+      ${al.tarefaSubmitFile ? `<div style="margin-top:8px;"><img src="${al.tarefaSubmitFile}" style="max-width:220px; border-radius:8px; border:1px solid var(--paper-line);"></div>` : ''}
+      <p class="muted center" style="margin:10px 0;">ou</p>
+      <label>Cole um link (Google Drive, documento, etc.)</label>
+      <input type="text" id="tarefa-link-input" value="${esc(al.tarefaSubmitLink)}" placeholder="https://...">
+      <label style="margin-top:10px;">Comentário (opcional)</label>
+      <textarea id="tarefa-comentario-input" placeholder="Alguma observação pro professor?">${esc(al.tarefaSubmitComentario)}</textarea>
+      ${al.tarefaSubmitError ? `<p class="err">${esc(al.tarefaSubmitError)}</p>` : ''}
+      <button class="btn btn-primary btn-block" style="margin-top:14px;" data-action="enviar-tarefa" ${al.tarefaSubmitUploading?'disabled':''}>${al.tarefaSubmitUploading?'Enviando...':(al.tarefaEntregasProprias[t.id]?'Reenviar':'Enviar')}</button>
+    </div>
+  `;
+}
+function renderAlunoTarefasBlock(){
+  const al = state.aluno;
+  if(!al.tarefasTurma || al.tarefasTurma.length===0) return '';
+  const hoje = new Date().toISOString().slice(0,10);
+  return `
+    <div class="card">
+      <h3 style="margin-top:0;">🗂️ Tarefas</h3>
+      ${al.tarefasTurma.slice().sort((a,b)=>b.createdAt-a.createdAt).map(t => {
+        const entrega = al.tarefaEntregasProprias[t.id];
+        const atrasada = t.prazo && t.prazo < hoje && !entrega;
+        const prazoTxt = t.prazo ? new Date(t.prazo+'T00:00:00').toLocaleDateString('pt-BR') : 'sem prazo definido';
+        let statusHtml;
+        if(entrega && entrega.corrigidoAt){
+          statusHtml = `<span class="pill" style="font-size:.75rem;">Nota: ${entrega.nota!=null?entrega.nota:'—'}</span>`;
+        } else if(entrega){
+          statusHtml = `<span class="muted">Enviado em ${new Date(entrega.submittedAt).toLocaleDateString('pt-BR')} · aguardando correção</span>`;
+        } else {
+          statusHtml = atrasada ? '<span class="err">Prazo encerrado — ainda não enviou</span>' : '<span class="muted">Ainda não enviou</span>';
+        }
+        return `
+          <div class="list-item" style="align-items:flex-start; flex-wrap:wrap;">
+            <div>
+              <strong>${esc(t.title)}</strong><br>
+              <span class="muted" style="font-size:.8rem;">Prazo: ${prazoTxt}</span><br>
+              ${entrega && entrega.feedback ? `<p style="margin:6px 0 0; font-size:.9rem;">💬 ${esc(entrega.feedback)}</p>` : ''}
+              <p style="margin:4px 0 0;">${statusHtml}</p>
+            </div>
+            <button class="btn ${entrega?'btn-ghost':'btn-primary'} btn-sm" data-action="abrir-envio-tarefa" data-id="${t.id}">${entrega?'Ver / Reenviar':'Enviar'}</button>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+/* ---------------- CRONOGRAMA / PLANO DE AULA ---------------- */
+
+async function loadCronograma(){
+  const p = state.professor;
+  p.cronogramaLoading = true;
+  try{ const r = await window.storage.get('cronograma', true); p.cronograma = JSON.parse(r.value); }
+  catch(e){ p.cronograma = []; }
+  p.cronogramaLoading = false;
+  render();
+}
+async function saveCronogramaToStorage(){
+  await window.storage.set('cronograma', JSON.stringify(state.professor.cronograma), true);
+}
+function abrirNovoCronograma(){
+  const p = state.professor;
+  p.newCronogramaOpen = true;
+  p.newCronogramaData = new Date().toISOString().slice(0,10);
+  p.newCronogramaConteudo = '';
+  p.newCronogramaTurmaIds = [];
+  p.cronogramaError = '';
+  render();
+}
+function cancelarNovoCronograma(){ state.professor.newCronogramaOpen = false; render(); }
+function toggleCronogramaTurma(tid){
+  const p = state.professor;
+  if(p.newCronogramaTurmaIds.includes(tid)) p.newCronogramaTurmaIds = p.newCronogramaTurmaIds.filter(x=>x!==tid);
+  else p.newCronogramaTurmaIds.push(tid);
+  render();
+}
+async function salvarCronograma(authorName){
+  const p = state.professor;
+  const conteudo = p.newCronogramaConteudo.trim();
+  if(!p.newCronogramaData){ p.cronogramaError = 'Escolha a data da aula.'; render(); return; }
+  if(!conteudo){ p.cronogramaError = 'Descreva o conteúdo da aula.'; render(); return; }
+  if(p.newCronogramaTurmaIds.length===0){ p.cronogramaError = 'Marque pelo menos uma turma.'; render(); return; }
+  const item = {
+    id: cryptoId(),
+    data: p.newCronogramaData,
+    conteudo,
+    turmaIds: [...p.newCronogramaTurmaIds],
+    authorId: p.session.id, authorName,
+    createdAt: Date.now()
+  };
+  p.cronograma.unshift(item);
+  p.newCronogramaOpen = false;
+  p.cronogramaError = '';
+  await saveCronogramaToStorage();
+  render();
+}
+async function excluirCronograma(id){
+  if(!confirm('Excluir este item do cronograma?')) return;
+  const p = state.professor;
+  p.cronograma = p.cronograma.filter(x=>x.id!==id);
+  await saveCronogramaToStorage();
+  render();
+}
+function renderCronograma(){
+  const p = state.professor;
+  if(p.cronogramaLoading) return `<div class="card"><h2>📅 Cronograma de Aulas</h2><div class="spinner"></div></div>`;
+  const minhasTurmas = professorTurmas();
+  const turmaCheckboxes = minhasTurmas.map(t => `
+    <label class="picker-item">
+      <input type="checkbox" data-action="toggle-cronograma-turma" data-tid="${t.id}" ${p.newCronogramaTurmaIds.includes(t.id)?'checked':''}>
+      <span>${esc(t.name)}</span>
+    </label>
+  `).join('');
+  const formBlock = p.newCronogramaOpen ? `
+    <div style="border:1px dashed var(--paper-line); border-radius:10px; padding:14px; margin-bottom:16px;">
+      <h3 style="margin-top:0;">Nova aula no cronograma</h3>
+      <label>Data da aula</label>
+      <input type="date" id="cronograma-data-input" value="${esc(p.newCronogramaData)}">
+      <label>Conteúdo previsto</label>
+      <textarea id="cronograma-conteudo-input" placeholder="Ex: Leis de Kirchhoff — exercícios em sala">${esc(p.newCronogramaConteudo)}</textarea>
+      <label style="margin-top:10px;">Para quais turmas?</label>
+      ${minhasTurmas.length===0 ? '<p class="muted" style="font-size:.82rem;">Nenhuma turma vinculada a uma disciplina sua ainda — vá em "Disciplinas" e marque em quais turmas você leciona.</p>' : `<div class="picker">${turmaCheckboxes}</div>`}
+      ${p.cronogramaError ? `<p class="err">${esc(p.cronogramaError)}</p>` : ''}
+      <div class="row" style="margin-top:12px;">
+        <button class="btn btn-ghost" data-action="cancelar-novo-cronograma">Cancelar</button>
+        <button class="btn btn-primary" data-action="salvar-cronograma">Adicionar ao cronograma</button>
+      </div>
+    </div>
+  ` : '';
+  const hoje = new Date().toISOString().slice(0,10);
+  const lista = p.cronograma.slice().sort((a,b)=>a.data.localeCompare(b.data));
+  const listBlock = lista.length===0 ? '<p class="muted">Nenhuma aula cadastrada no cronograma ainda.</p>' : lista.map(item => {
+    const turmaNames = (item.turmaIds||[]).map(tid => { const t = p.turmas.find(x=>x.id===tid); return t?t.name:'?'; }).join(', ') || 'nenhuma turma';
+    const souAutor = item.authorId === p.session.id;
+    const passada = item.data < hoje;
+    return `
+    <div class="list-item" style="align-items:flex-start; flex-wrap:wrap; ${passada?'opacity:.6;':''}">
+      <div>
+        <strong>${new Date(item.data+'T00:00:00').toLocaleDateString('pt-BR')}</strong> — ${esc(item.conteudo)}<br>
+        <span class="muted" style="font-size:.78rem;">${esc(item.authorName)} · turma(s): ${esc(turmaNames)}</span>
+      </div>
+      ${souAutor ? `<button class="btn btn-danger btn-sm" data-action="excluir-cronograma" data-id="${item.id}">Excluir</button>` : ''}
+    </div>
+  `;
+  }).join('');
+  return `
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <h2>📅 Cronograma de Aulas</h2>
+        ${!p.newCronogramaOpen ? '<button class="btn btn-primary btn-sm" data-action="abrir-novo-cronograma">+ Nova aula</button>' : ''}
+      </div>
+      <p class="muted">Registre o conteúdo previsto de cada aula — os alunos das turmas marcadas veem essa agenda no painel deles.</p>
+      ${formBlock}
+      ${listBlock}
+    </div>
+  `;
+}
+function renderAlunoCronogramaBlock(){
+  const al = state.aluno;
+  const hoje = new Date().toISOString().slice(0,10);
+  const itens = (state.professor.cronograma||[]).filter(c => (c.turmaIds||[]).includes(al.turma.id) && c.data >= hoje).sort((a,b)=>a.data.localeCompare(b.data)).slice(0,8);
+  if(itens.length===0) return '';
+  return `
+    <div class="card">
+      <h3 style="margin-top:0;">📅 Próximas Aulas</h3>
+      ${itens.map(item => `
+        <div class="list-item">
+          <div>
+            <strong>${new Date(item.data+'T00:00:00').toLocaleDateString('pt-BR')}</strong> — ${esc(item.conteudo)}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+/* ---------------- MURAL DE DÚVIDAS (fórum simples) ---------------- */
+
+async function loadDuvidas(){
+  const p = state.professor;
+  p.duvidasLoading = true;
+  try{ const r = await window.storage.get('duvidas', true); p.duvidas = JSON.parse(r.value); }
+  catch(e){ p.duvidas = []; }
+  p.duvidasLoading = false;
+  render();
+}
+async function saveDuvidasToStorage(){
+  await window.storage.set('duvidas', JSON.stringify(state.professor.duvidas), true);
+}
+async function excluirDuvida(id){
+  if(!confirm('Excluir esta pergunta e todas as respostas dela?')) return;
+  const p = state.professor;
+  p.duvidas = p.duvidas.filter(d=>d.id!==id);
+  await saveDuvidasToStorage();
+  render();
+}
+async function enviarRespostaDuvida(id, authorName, authorRole){
+  const p = state.professor;
+  const d = p.duvidas.find(x=>x.id===id);
+  if(!d) return;
+  const texto = (d.draftResposta||'').trim();
+  if(!texto) return;
+  d.respostas = d.respostas || [];
+  d.respostas.push({ id: cryptoId(), authorName, authorRole, texto, createdAt: Date.now() });
+  d.draftResposta = '';
+  render();
+  await saveDuvidasToStorage();
+}
+function renderDuvidaThread(d, turmaName, canDelete, extraActionsHtml){
+  return `
+    <div class="list-item" style="align-items:flex-start; flex-wrap:wrap;">
+      <div style="width:100%;">
+        <strong>${esc(d.authorName)}</strong> <span class="muted" style="font-size:.78rem;">${d.authorRole==='professor'?'(professor)':'(aluno)'} · ${esc(turmaName)} · ${new Date(d.createdAt).toLocaleString('pt-BR')}</span>
+        <p style="margin:4px 0 8px;">${esc(d.texto)}</p>
+        ${(d.respostas||[]).map(r => `
+          <div style="margin:6px 0 6px 16px; padding:8px 10px; background:${r.authorRole==='ia'?'var(--tint-teal)':'var(--tint-vinho)'}; border-radius:8px; ${r.authorRole==='ia'?'border:1px dashed var(--teal);':''}">
+            <strong style="font-size:.85rem;">${esc(r.authorName)}</strong> <span class="muted" style="font-size:.75rem;">${r.authorRole==='professor'?'(professor)':r.authorRole==='ia'?'(gerado por IA — confira com o professor)':'(aluno)'} · ${new Date(r.createdAt).toLocaleDateString('pt-BR')}</span>
+            <p style="margin:2px 0 0; font-size:.9rem; white-space:pre-wrap;">${esc(r.texto)}</p>
+          </div>
+        `).join('')}
+        ${extraActionsHtml||''}
+        <div style="margin:8px 0 0 16px; max-width:420px;">
+          <textarea data-action="duvida-resposta-input" data-id="${d.id}" placeholder="Escreva uma resposta..." style="min-height:50px;">${esc(d.draftResposta||'')}</textarea>
+          <button class="btn btn-primary btn-sm" style="margin-top:4px;" data-action="responder-duvida" data-id="${d.id}">Responder</button>
+          ${canDelete ? `<button class="btn btn-danger btn-sm" style="margin-top:4px;" data-action="excluir-duvida" data-id="${d.id}">Excluir pergunta</button>` : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+function renderMuralDuvidas(){
+  const p = state.professor;
+  if(p.duvidasLoading) return `<div class="card"><h2>❓ Mural de Dúvidas</h2><div class="spinner"></div></div>`;
+  const minhasTurmaIds = new Set(professorTurmas().map(t=>t.id));
+  const lista = p.duvidas.filter(d => minhasTurmaIds.has(d.turmaId)).slice().sort((a,b)=>b.createdAt-a.createdAt);
+  const listBlock = lista.length===0 ? '<p class="muted">Nenhuma pergunta ainda nas suas turmas.</p>' : lista.map(d => {
+    const t = p.turmas.find(x=>x.id===d.turmaId);
+    return renderDuvidaThread(d, t?t.name:'?', true);
+  }).join('');
+  return `
+    <div class="card">
+      <h2>❓ Mural de Dúvidas</h2>
+      <p class="muted">Perguntas dos alunos das suas turmas. Responda por aqui — os colegas de turma também veem as respostas.</p>
+      ${listBlock}
+    </div>
+  `;
+}
+
+const IA_DICA_LIMITE_DIARIO = 5;
+function iaDicaUsoKey(studentId){
+  return `ia-dica-uso:${studentId}:${new Date().toISOString().slice(0,10)}`;
+}
+async function getUsoIaAlunoHoje(studentId){
+  try{ const r = await window.storage.get(iaDicaUsoKey(studentId), true); return parseInt(r.value)||0; }catch(e){ return 0; }
+}
+async function incrementarUsoIaAluno(studentId, novoTotal){
+  await window.storage.set(iaDicaUsoKey(studentId), String(novoTotal), true);
+}
+async function pedirDicaIA(duvidaId){
+  const al = state.aluno;
+  al.duvidaIaErro = '';
+  const usoAtual = await getUsoIaAlunoHoje(al.matriculaStudentId);
+  if(usoAtual>=IA_DICA_LIMITE_DIARIO){
+    al.duvidaIaErro = `Você já usou suas ${IA_DICA_LIMITE_DIARIO} dicas de IA de hoje. Tente de novo amanhã ou peça ajuda ao professor.`;
+    render();
+    return;
+  }
+  al.duvidaIaLoadingId = duvidaId;
+  render();
+  try{
+    let duvidas;
+    try{ const r = await window.storage.get('duvidas', true); duvidas = JSON.parse(r.value); }catch(e){ duvidas = state.professor.duvidas; }
+    const d = duvidas.find(x=>x.id===duvidaId);
+    if(!d) throw new Error('IA_ERRO');
+    const key = await resolveGeminiKeyForTurma(al.turma.id);
+    const prompt = `Você é um tutor gentil e didático de uma escola técnica brasileira (ensino médio integrado). Um aluno tem a seguinte dúvida:
+"${d.texto}"
+
+Dê uma explicação clara e uma dica que ajude o aluno a entender e resolver por conta própria — se for um exercício, NÃO entregue a resposta final pronta, guie o raciocínio. Seja breve (no máximo 3 parágrafos curtos), didático e encorajador. Responda em português do Brasil.
+
+Responda SOMENTE com um objeto JSON válido, sem markdown, no formato exato: {"dica":"texto da explicação aqui"}`;
+    const parsed = await callGeminiJSON(prompt, key);
+    const texto = (parsed && parsed.dica) ? String(parsed.dica).trim() : '';
+    if(!texto) throw new Error('IA_SEM_RESPOSTA');
+    d.respostas = d.respostas || [];
+    d.respostas.push({ id: cryptoId(), authorName:'🤖 IA', authorRole:'ia', texto, createdAt: Date.now() });
+    await window.storage.set('duvidas', JSON.stringify(duvidas), true);
+    state.professor.duvidas = duvidas;
+    await incrementarUsoIaAluno(al.matriculaStudentId, usoAtual+1);
+  }catch(e){
+    al.duvidaIaErro = iaErrorMessage(e);
+  }
+  al.duvidaIaLoadingId = null;
+  render();
+}
+function abrirNovaDuvida(){
+  const al = state.aluno;
+  al.duvidaFormOpen = true;
+  al.newDuvidaTexto = '';
+  al.duvidaError = '';
+  render();
+}
+function cancelarNovaDuvida(){ state.aluno.duvidaFormOpen = false; render(); }
+async function enviarDuvida(){
+  const al = state.aluno;
+  const texto = al.newDuvidaTexto.trim();
+  if(!texto){ al.duvidaError = 'Escreva sua dúvida.'; render(); return; }
+  const duvida = { id: cryptoId(), turmaId: al.turma.id, authorName: al.name, authorRole:'aluno', texto, createdAt: Date.now(), respostas: [] };
+  state.professor.duvidas.unshift(duvida);
+  al.duvidaFormOpen = false;
+  al.newDuvidaTexto = '';
+  render();
+  await saveDuvidasToStorage();
+}
+function renderAlunoDuvidasBlock(){
+  const al = state.aluno;
+  const minhas = (state.professor.duvidas||[]).filter(d => d.turmaId===al.turma.id).sort((a,b)=>b.createdAt-a.createdAt);
+  const formBlock = al.duvidaFormOpen ? `
+    <div style="margin:10px 0; border:1px dashed var(--paper-line); border-radius:10px; padding:12px;">
+      <textarea id="duvida-texto-input" placeholder="Digite sua dúvida...">${esc(al.newDuvidaTexto)}</textarea>
+      ${al.duvidaError ? `<p class="err">${esc(al.duvidaError)}</p>` : ''}
+      <div class="row" style="margin-top:8px;">
+        <button class="btn btn-ghost btn-sm" data-action="cancelar-nova-duvida">Cancelar</button>
+        <button class="btn btn-primary btn-sm" data-action="enviar-duvida">Publicar pergunta</button>
+      </div>
+    </div>
+  ` : '';
+  return `
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <h3 style="margin:0;">❓ Mural de Dúvidas</h3>
+        ${!al.duvidaFormOpen ? '<button class="btn btn-primary btn-sm" data-action="abrir-nova-duvida">+ Fazer uma pergunta</button>' : ''}
+      </div>
+      ${formBlock}
+      ${minhas.length===0 ? '<p class="muted">Nenhuma pergunta ainda. Seja o primeiro a perguntar!</p>' : minhas.map(d => {
+        const isAutor = d.authorName===al.name && d.authorRole==='aluno';
+        const jaTemDicaIa = (d.respostas||[]).some(r => r.authorRole==='ia');
+        let extraActionsHtml = '';
+        if(isAutor && !jaTemDicaIa){
+          if(al.duvidaIaLoadingId === d.id){
+            extraActionsHtml = `<p class="muted" style="margin:6px 0 0;">🤖 Pensando numa dica...</p>`;
+          } else {
+            extraActionsHtml = `
+              <div style="margin-top:6px;">
+                <button class="btn btn-ghost btn-sm" data-action="pedir-dica-ia" data-id="${d.id}">💡 Pedir dica pra IA</button>
+                ${al.duvidaIaErro ? `<p class="err" style="margin:4px 0 0;">${esc(al.duvidaIaErro)}</p>` : ''}
+              </div>
+            `;
+          }
+        }
+        return renderDuvidaThread(d, al.turma.name, isAutor, extraActionsHtml);
+      }).join('')}
+    </div>
+  `;
+}
+
+/* ---------------- REALIDADE AUMENTADA (WebAR) ---------------- */
+
+// Exemplos prontos (modelos 3D públicos e gratuitos) para o professor já ver funcionando
+// e entender o conceito antes de cadastrar os próprios modelos.
+const RA_EXEMPLOS_PADRAO = [
+  {
+    id: 'exemplo-gearbox',
+    title: 'Exemplo: Caixa de engrenagens (Eletromecânica)',
+    descricao: 'Modelo de demonstração gratuito — gire, dê zoom e, no celular, toque em "Ver em RA" para projetar no ambiente real.',
+    modelUrl: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/main/2.0/GearboxAssy/glTF-Binary/GearboxAssy.glb',
+    posterUrl: '',
+    turmaIds: [],
+    isExemplo: true
+  },
+  {
+    id: 'exemplo-capacete',
+    title: 'Exemplo: Capacete de proteção (Segurança do Trabalho)',
+    descricao: 'Modelo de demonstração gratuito — bom para mostrar como um EPI pode ser explorado em 3D antes de ver o real.',
+    modelUrl: 'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/DamagedHelmet/glTF-Binary/DamagedHelmet.glb',
+    posterUrl: '',
+    turmaIds: [],
+    isExemplo: true
+  },
+  {
+    id: 'exemplo-astronauta',
+    title: 'Exemplo genérico: Astronauta',
+    descricao: 'O exemplo clássico usado nos tutoriais do Google — ótimo para testar rápido se a RA funciona no seu celular.',
+    modelUrl: 'https://modelviewer.dev/shared-assets/models/Astronaut.glb',
+    posterUrl: '',
+    turmaIds: [],
+    isExemplo: true
+  }
+];
+const RA_SITES_MODELOS = [
+  { nome: 'Sketchfab', url: 'https://sketchfab.com/search?features=downloadable&sort_by=-likeCount&type=models' },
+  { nome: 'Smithsonian 3D', url: 'https://3d.si.edu/' },
+  { nome: 'NASA 3D Resources', url: 'https://www.nasa.gov/3d-resources/' },
+  { nome: 'glTF Sample Assets (Khronos)', url: 'https://github.khronos.org/glTF-Assets/' },
+  { nome: 'CGTrader (modelos gratuitos)', url: 'https://www.cgtrader.com/free-3d-models' },
+  { nome: 'Free3D', url: 'https://free3d.com/3d-models' }
+];
+
+async function loadRaItems(){
+  const p = state.professor;
+  p.raItemsLoading = true;
+  try{
+    const r = await window.storage.get('ra-items', true);
+    p.raItems = JSON.parse(r.value);
+  }catch(e){
+    // Primeira vez que a escola usa este recurso: começa com os exemplos prontos,
+    // para o professor já ver a RA funcionando e entender o conceito.
+    p.raItems = RA_EXEMPLOS_PADRAO.map(x => ({...x}));
+    try{ await window.storage.set('ra-items', JSON.stringify(p.raItems), true); }catch(e2){}
+  }
+  p.raItemsLoading = false;
+  render();
+}
+async function saveRaItemsToStorage(){
+  await window.storage.set('ra-items', JSON.stringify(state.professor.raItems), true);
+}
+function abrirNovoRa(){
+  const p = state.professor;
+  p.newRaOpen = true;
+  p.editingRaId = null;
+  p.newRaTitle = '';
+  p.newRaModelUrl = '';
+  p.newRaPosterUrl = '';
+  p.newRaDescricao = '';
+  p.newRaTurmaIds = [];
+  p.raError = '';
+  render();
+}
+function editarRa(id){
+  const p = state.professor;
+  const item = p.raItems.find(x=>x.id===id);
+  if(!item) return;
+  p.newRaOpen = true;
+  p.editingRaId = id;
+  p.newRaTitle = item.title;
+  p.newRaModelUrl = item.modelUrl;
+  p.newRaPosterUrl = item.posterUrl||'';
+  p.newRaDescricao = item.descricao||'';
+  p.newRaTurmaIds = [...(item.turmaIds||[])];
+  p.raError = '';
+  render();
+}
+function cancelarNovoRa(){
+  state.professor.newRaOpen = false;
+  render();
+}
+function toggleRaTurma(tid){
+  const p = state.professor;
+  if(p.newRaTurmaIds.includes(tid)) p.newRaTurmaIds = p.newRaTurmaIds.filter(x=>x!==tid);
+  else p.newRaTurmaIds.push(tid);
+  render();
+}
+async function salvarRa(authorName){
+  const p = state.professor;
+  const title = p.newRaTitle.trim();
+  const modelUrl = p.newRaModelUrl.trim();
+  if(!title){ p.raError = 'Dê um título para o modelo.'; render(); return; }
+  if(!modelUrl){ p.raError = 'Cole o link do modelo 3D (.glb ou .gltf).'; render(); return; }
+  if(!/\.(glb|gltf)(\?.*)?$/i.test(modelUrl)){ p.raError = 'O link precisa apontar para um arquivo .glb ou .gltf.'; render(); return; }
+  if(p.editingRaId){
+    const item = p.raItems.find(x=>x.id===p.editingRaId);
+    if(item){
+      item.title = title;
+      item.modelUrl = modelUrl;
+      item.posterUrl = p.newRaPosterUrl.trim();
+      item.descricao = p.newRaDescricao.trim();
+      item.turmaIds = [...p.newRaTurmaIds];
+    }
+  } else {
+    p.raItems.unshift({
+      id: cryptoId(),
+      title,
+      modelUrl,
+      posterUrl: p.newRaPosterUrl.trim(),
+      descricao: p.newRaDescricao.trim(),
+      turmaIds: [...p.newRaTurmaIds],
+      authorId: p.session ? p.session.id : null,
+      authorName,
+      createdAt: Date.now(),
+      isExemplo: false
+    });
+  }
+  p.newRaOpen = false;
+  p.editingRaId = null;
+  p.raError = '';
+  await saveRaItemsToStorage();
+  render();
+}
+async function excluirRa(id){
+  const p = state.professor;
+  if(!confirm('Excluir este modelo de Realidade Aumentada? Os alunos das turmas vinculadas deixarão de vê-lo.')) return;
+  p.raItems = p.raItems.filter(x=>x.id!==id);
+  await saveRaItemsToStorage();
+  render();
+}
+function raModelViewerHtml(item){
+  return `<model-viewer src="${esc(item.modelUrl)}" ${item.posterUrl?`poster="${esc(item.posterUrl)}"`:''} camera-controls auto-rotate ar ar-modes="webxr scene-viewer quick-look" shadow-intensity="1" alt="${esc(item.title)}"></model-viewer>`;
+}
+function renderRealidadeAumentada(canManage){
+  const p = state.professor;
+  if(p.raItemsLoading) return `<div class="card"><h2>🕶️ Realidade Aumentada</h2><div class="spinner"></div></div>`;
+  const minhasTurmas = canManage ? professorTurmas() : (p.turmas||[]);
+  const turmaCheckboxes = minhasTurmas.map(t => `
+    <label class="picker-item">
+      <input type="checkbox" data-action="toggle-ra-turma" data-tid="${t.id}" ${p.newRaTurmaIds.includes(t.id)?'checked':''}>
+      <span>${esc(t.name)}</span>
+    </label>
+  `).join('');
+  const explicacao = `
+    <div class="card" style="margin-bottom:14px;">
+      <h2 style="margin-top:0;">🕶️ Realidade Aumentada</h2>
+      <p style="margin:0 0 8px;">Nenhum aplicativo é necessário: os alunos abrem no celular pelo próprio navegador, giram o modelo 3D na tela e, tocando em "Ver em RA", projetam o objeto no ambiente real usando a câmera.</p>
+      <p class="muted" style="margin:0;">Cole abaixo o link direto de um arquivo <strong>.glb</strong> ou <strong>.gltf</strong>. Não sabe onde conseguir um? Veja os sites abaixo — a maioria tem modelos gratuitos para baixar e alguns permitem link direto.</p>
+      <div class="ra-sites-list">
+        ${RA_SITES_MODELOS.map(s => `<a class="ra-site-link" href="${esc(s.url)}" target="_blank" rel="noopener">🔗 ${esc(s.nome)}</a>`).join('')}
+      </div>
+    </div>
+  `;
+  const formBlock = canManage && p.newRaOpen ? `
+    <div style="border:1px dashed var(--paper-line); border-radius:10px; padding:14px; margin-bottom:16px;">
+      <h3 style="margin-top:0;">${p.editingRaId ? 'Editar modelo' : 'Novo modelo em RA'}</h3>
+      <label>Título</label>
+      <input type="text" id="ra-title-input" value="${esc(p.newRaTitle)}" placeholder="Ex: Motor elétrico trifásico">
+      <label>Link do modelo 3D (.glb ou .gltf)</label>
+      <input type="text" id="ra-model-url-input" value="${esc(p.newRaModelUrl)}" placeholder="Cole aqui o link direto do arquivo .glb">
+      <label>Imagem de capa (opcional)</label>
+      <input type="text" id="ra-poster-url-input" value="${esc(p.newRaPosterUrl)}" placeholder="Link de uma imagem exibida antes do modelo carregar">
+      <label>Observação (opcional)</label>
+      <textarea id="ra-descricao-input" placeholder="Ex: Observe as fases do motor.">${esc(p.newRaDescricao)}</textarea>
+      <label style="margin-top:10px;">Para quais turmas?</label>
+      ${minhasTurmas.length===0 ? '<p class="muted" style="font-size:.82rem;">Nenhuma turma vinculada a uma disciplina sua ainda.</p>' : `<div class="picker">${turmaCheckboxes}</div>`}
+      <p class="muted" style="font-size:.8rem;">Deixe sem marcar nenhuma turma para exibir aos alunos de todas as turmas.</p>
+      ${p.newRaModelUrl.trim() ? `<div class="ra-card" style="margin-top:10px; max-width:320px;">${raModelViewerHtml({title:p.newRaTitle||'Pré-visualização', modelUrl:p.newRaModelUrl.trim(), posterUrl:p.newRaPosterUrl.trim()})}</div>` : ''}
+      ${p.raError ? `<p class="err">${esc(p.raError)}</p>` : ''}
+      <div class="row" style="margin-top:12px;">
+        <button class="btn btn-ghost" data-action="cancelar-novo-ra">Cancelar</button>
+        <button class="btn btn-primary" data-action="salvar-ra">${p.editingRaId ? 'Salvar alterações' : 'Disponibilizar'}</button>
+      </div>
+    </div>
+  ` : '';
+  const lista = p.raItems.slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
+  const gridBlock = lista.length===0 ? '<p class="muted">Nenhum modelo em RA disponibilizado ainda.</p>' : `<div class="ra-grid">${lista.map(item => {
+    const turmaNames = (item.turmaIds||[]).length ? (item.turmaIds||[]).map(tid => { const t = p.turmas.find(x=>x.id===tid); return t?t.name:'?'; }).join(', ') : 'todas as turmas';
+    return `
+    <div class="ra-card">
+      ${raModelViewerHtml(item)}
+      <div class="ra-card-body">
+        <p class="ra-card-title">${esc(item.title)}${item.isExemplo?' <span class="pill" style="font-size:.65rem;">exemplo</span>':''}</p>
+        ${item.descricao ? `<p class="ra-card-desc">${esc(item.descricao)}</p>` : ''}
+        <span class="muted" style="font-size:.75rem;">turma(s): ${esc(turmaNames)}</span>
+        ${canManage ? `
+          <div class="row" style="margin-top:8px;">
+            <button class="btn btn-ghost btn-sm" data-action="editar-ra" data-id="${item.id}">Editar</button>
+            <button class="btn btn-danger btn-sm" data-action="excluir-ra" data-id="${item.id}">Excluir</button>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  `;
+  }).join('')}</div>`;
+  return `
+    ${explicacao}
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <h2 style="margin:0;">📦 Meus modelos em RA</h2>
+        ${canManage && !p.newRaOpen ? '<button class="btn btn-primary btn-sm" data-action="abrir-novo-ra">+ Novo modelo</button>' : ''}
+      </div>
+      ${formBlock}
+      ${gridBlock}
+    </div>
+  `;
+}
+function renderAlunoRABlock(){
+  const al = state.aluno;
+  const itens = (state.professor.raItems||[]).filter(item => !item.turmaIds || item.turmaIds.length===0 || item.turmaIds.includes(al.turma.id));
+  if(itens.length===0) return '';
+  return `
+    <div class="card">
+      <h3 style="margin-top:0;">🕶️ Realidade Aumentada</h3>
+      <p class="muted" style="margin:0 0 8px;">Gire o modelo com o dedo e, se estiver no celular, toque no ícone de RA para ver em tamanho real na sua frente.</p>
+      <div class="ra-grid">
+        ${itens.map(item => `
+          <div class="ra-card">
+            ${raModelViewerHtml(item)}
+            <div class="ra-card-body">
+              <p class="ra-card-title">${esc(item.title)}</p>
+              ${item.descricao ? `<p class="ra-card-desc">${esc(item.descricao)}</p>` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/* ---------------- NOTIFICAÇÕES DE NOVIDADE ---------------- */
+
+function ultimaVisitaKey(){ return `sala-ultima-visita-${state.aluno.matriculaStudentId}`; }
+function getUltimaVisita(){
+  try{ const v = localStorage.getItem(ultimaVisitaKey()); return v ? parseInt(v) : 0; }catch(e){ return 0; }
+}
+function setUltimaVisitaAgora(){
+  try{ localStorage.setItem(ultimaVisitaKey(), String(Date.now())); }catch(e){}
+}
+async function computeNovidadesAluno(){
+  const al = state.aluno;
+  if(!al.turma || !al.matriculaStudentId) return;
+  const lastVisit = getUltimaVisita();
+  await Promise.all([loadAvisos(), loadMateriais(), loadCronograma(), loadDuvidas()]);
+  const turmaId = al.turma.id;
+  const isNovo = ts => !!ts && ts > lastVisit;
+  const avisos = (state.professor.avisos||[]).filter(a => (!a.turmaIds||a.turmaIds.length===0||a.turmaIds.includes(turmaId)) && isNovo(a.createdAt)).length;
+  const materiais = (state.professor.materiais||[]).filter(m => (m.turmaIds||[]).includes(turmaId) && isNovo(m.createdAt)).length;
+  const tarefas = (state.professor.tarefas||[]).filter(t => (t.turmaIds||[]).includes(turmaId) && isNovo(t.createdAt)).length;
+  const cronograma = (state.professor.cronograma||[]).filter(c => (c.turmaIds||[]).includes(turmaId) && isNovo(c.createdAt)).length;
+  let duvidas = 0;
+  (state.professor.duvidas||[]).filter(d=>d.turmaId===turmaId).forEach(d => {
+    if(isNovo(d.createdAt)) duvidas++;
+    (d.respostas||[]).forEach(r => { if(isNovo(r.createdAt)) duvidas++; });
+  });
+  const total = avisos + materiais + tarefas + cronograma + duvidas;
+  al.novidades = { avisos, materiais, tarefas, cronograma, duvidas, total, houveVisitaAnterior: lastVisit>0 };
+  setUltimaVisitaAgora();
+  render();
+}
+function renderAlunoNovidadesBanner(){
+  const n = state.aluno.novidades;
+  if(!n || n.total===0 || !n.houveVisitaAnterior) return '';
+  const partes = [];
+  if(n.avisos) partes.push(`${n.avisos} aviso(s)`);
+  if(n.materiais) partes.push(`${n.materiais} material(is)`);
+  if(n.tarefas) partes.push(`${n.tarefas} tarefa(s)`);
+  if(n.cronograma) partes.push(`${n.cronograma} aula(s) no cronograma`);
+  if(n.duvidas) partes.push(`${n.duvidas} novidade(s) no Mural de Dúvidas`);
+  return `
+    <div class="card inicio-card accent-teal">
+      <strong>🔔 Novidades desde sua última visita</strong>
+      <p style="margin:4px 0 0;">${esc(partes.join(', '))}.</p>
+    </div>
+  `;
+}
+
+/* ---------------- RANKING, TRILHA E CONQUISTAS ---------------- */
+
+function renderAlunoRankingTrilhaBlock(){
+  const al = state.aluno;
+  if(!al.turma || !al.turma.students) return '';
+  const meStudent = al.turma.students.find(s=>s.id===al.matriculaStudentId);
+  if(!meStudent) return '';
+  ensureStudentGamification(meStudent);
+  const nivelInfo = computeNivelInfo(meStudent.fichas);
+  const streak = computeStudentStreak(meStudent.loginLog);
+  const conquistas = computeConquistas(meStudent);
+  const conquistadas = conquistas.filter(c=>c.achieved).length;
+
+  const ranking = [...al.turma.students].map(s=>ensureStudentGamification(s)).sort((a,b)=>b.fichas-a.fichas);
+  const minhaPosicao = ranking.findIndex(s=>s.id===al.matriculaStudentId) + 1;
+  const top10 = ranking.slice(0,10);
+  const meVisivel = top10.some(s=>s.id===al.matriculaStudentId);
+
+  return `
+    <div class="card" style="margin-top:16px;">
+      <h2 style="margin-top:0;">🌟 Sua Jornada</h2>
+      <div class="row" style="align-items:center; gap:14px; flex-wrap:wrap;">
+        ${studentAvatarHtml(meStudent, 56)}
+        <div style="flex:1; min-width:180px;">
+          <div class="row" style="justify-content:space-between; font-size:.9rem;">
+            <strong>Nível ${nivelInfo.nivel}</strong>
+            <span class="muted">${nivelInfo.maximo ? 'Nível máximo!' : `${nivelInfo.fichas} / ${nivelInfo.proximo} 🎫`}</span>
+          </div>
+          <div class="chart-track" style="height:12px; margin-top:4px;"><div class="chart-fill" style="width:${nivelInfo.pct}%; background:var(--board);"></div></div>
+        </div>
+      </div>
+      <div class="row" style="gap:16px; margin-top:14px; flex-wrap:wrap;">
+        <span class="pill">🎫 ${meStudent.fichas} ficha(s)</span>
+        <span class="pill">🏅 ${minhaPosicao}º lugar na turma</span>
+        <span class="pill">🔥 ${streak.atual} dia(s) seguidos</span>
+        <span class="pill">🏆 ${conquistadas}/${conquistas.length} conquistas</span>
+      </div>
+
+      <h3 style="margin-top:20px;">🏆 Ranking da Turma</h3>
+      ${top10.map((s,i) => `
+        <div class="list-item" style="${s.id===al.matriculaStudentId?'background:var(--surface); border-color:var(--board);':''}">
+          <span>${i+1}º · ${studentAvatarHtml(s,26)} ${esc(s.name)}${s.id===al.matriculaStudentId?' <span class="muted">(você)</span>':''}</span>
+          <span class="muted">${s.fichas} 🎫 · Nv.${computeNivelInfo(s.fichas).nivel}</span>
+        </div>
+      `).join('')}
+      ${!meVisivel ? `
+        <div class="list-item" style="background:var(--surface); border-color:var(--board);">
+          <span>${minhaPosicao}º · ${studentAvatarHtml(meStudent,26)} ${esc(meStudent.name)} <span class="muted">(você)</span></span>
+          <span class="muted">${meStudent.fichas} 🎫 · Nv.${nivelInfo.nivel}</span>
+        </div>
+      ` : ''}
+
+      <h3 style="margin-top:20px;">🎖️ Conquistas</h3>
+      <div class="badge-grid">
+        ${conquistas.map(c => `
+          <div class="badge-item ${c.achieved?'':'locked'}" title="${esc(c.desc)}">
+            <span class="badge-emoji">${c.achieved?c.emoji:'🔒'}</span>
+            <div class="badge-label">${esc(c.label)}</div>
+            <div class="badge-desc">${esc(c.desc)}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function computeDisciplinaTrilhas(al){
+  const porDisciplina = {};
+  const addStep = (disciplinaName, unidade, ordem, step) => {
+    const key = disciplinaName || 'Sem disciplina';
+    if(!porDisciplina[key]) porDisciplina[key] = [];
+    porDisciplina[key].push({ unidade, ordem, ...step });
+  };
+  (al.dashboardRealizadas||[]).forEach(r => {
+    const a = r.assessment;
+    const max = (a.questions||[]).reduce((s,q)=>s+(q.points||0),0);
+    const pct = max>0 ? Math.round((r.response.total/max)*100) : 0;
+    addStep(a.disciplinaName, a.unidade, r.response.submittedAt||0, { status:'feita', title:a.title||computeAssessmentTitle(a), pct });
+  });
+  (al.dashboardPendentes||[]).forEach(p => {
+    const a = p.assessment;
+    addStep(a.disciplinaName, a.unidade, a.startAt?new Date(a.startAt).getTime():Date.now(), { status: p.status==='aberta' ? 'disponivel' : 'bloqueada', title:a.title||computeAssessmentTitle(a) });
+  });
+  Object.keys(porDisciplina).forEach(k => porDisciplina[k].sort((x,y) => {
+    const iu = UNIDADES.indexOf(x.unidade), ju = UNIDADES.indexOf(y.unidade);
+    if(iu!==ju) return iu-ju;
+    return x.ordem - y.ordem;
+  }));
+  return porDisciplina;
+}
+function renderAlunoTrilhaIndividualBlock(){
+  const al = state.aluno;
+  if(!al.turma || al.dashboardLoading) return '';
+  const trilhas = computeDisciplinaTrilhas(al);
+  const disciplinas = Object.keys(trilhas).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  if(disciplinas.length===0) return '';
+  return `
+    <div class="card" style="margin-top:16px;">
+      <h2 style="margin-top:0;">🗺️ Minha Trilha de Progresso</h2>
+      <p class="muted">Cada etapa é uma avaliação da disciplina — vá completando a trilha ao longo do bimestre.</p>
+      ${disciplinas.map(nome => {
+        const steps = trilhas[nome];
+        const feitas = steps.filter(s=>s.status==='feita').length;
+        return `
+          <div style="margin-top:18px;">
+            <div class="row" style="justify-content:space-between; align-items:center;">
+              <strong>${esc(nome)}</strong>
+              <span class="muted" style="font-size:.8rem;">${feitas}/${steps.length} concluída(s)</span>
+            </div>
+            <div class="trilha-track">
+              ${steps.map((s,i) => `
+                <div class="trilha-step ${s.status}">
+                  <div class="trilha-node" title="${esc(s.title)}">${s.status==='feita' ? '✅' : s.status==='disponivel' ? '🔓' : '🔒'}</div>
+                  <div class="trilha-label">${s.status==='feita' ? s.pct+'%' : (s.status==='disponivel' ? 'Disponível' : 'Em breve')}</div>
+                </div>
+                ${i<steps.length-1 ? `<div class="trilha-linha ${s.status==='feita'?'feita':''}"></div>` : ''}
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
 /* ---------------- ENQUETE RELÂMPAGO ---------------- */
 
 let enquetePollInterval = null;
@@ -1887,7 +3111,7 @@ async function submitEnqueteResposta(optionIndex){
   al.enqueteAtiva = fresh;
   render();
   if(!jaHaviaRespondido && al.matriculaStudentId && al.turma){
-    awardFichas(al.turma.id, al.matriculaStudentId, 2, 'Participou da enquete "'+fresh.question+'"').then(()=>{
+    awardFichas(al.turma.id, al.matriculaStudentId, 2, 'Participou da enquete "'+fresh.question+'"', 'enquete').then(()=>{
       if(state.aluno.stage==='dashboard') render();
     });
   }
@@ -2011,9 +3235,113 @@ function renderAlunoEnqueteBlock(){
 
 /* ---------------- QUIZ POR EQUIPES ---------------- */
 
+const QUIZ_POWERS = {
+  dobro: { label: 'Dobro de Pontos', emoji: '⚡', desc: 'Se sua equipe acertar essa pergunta, os pontos valem em dobro!' },
+  cola:  { label: 'Cola da Sorte', emoji: '🔍', desc: 'Elimina uma alternativa errada só pra sua equipe.' }
+};
+
 let quizPollInterval = null;
+let quizLastTickSecond = null;
+let lastQuizLeaderId = null;
+let quizBarAnimKey = null;
 function stopQuizPoll(){
   if(quizPollInterval){ clearInterval(quizPollInterval); quizPollInterval = null; }
+  quizLastTickSecond = null;
+}
+function quizResetEffectsState(){
+  quizLastTickSecond = null;
+  lastQuizLeaderId = null;
+  quizBarAnimKey = null;
+}
+let quizAudioCtx = null;
+function getQuizAudioCtx(){
+  if(!quizAudioCtx){ try{ quizAudioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  return quizAudioCtx;
+}
+function quizBeep(freq, durationMs, type, volume){
+  const ctx = getQuizAudioCtx();
+  if(!ctx) return;
+  try{
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type||'sine';
+    osc.frequency.value = freq;
+    gain.gain.value = volume||0.12;
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + durationMs/1000);
+    osc.stop(ctx.currentTime + durationMs/1000 + 0.03);
+  }catch(e){}
+}
+function quizPlayTick(){ quizBeep(880, 90, 'square', 0.07); }
+function quizPlayCorrect(){ quizBeep(660,120,'sine',0.14); setTimeout(()=>quizBeep(990,180,'sine',0.14),110); }
+function quizPlayWrong(){ quizBeep(180,260,'sawtooth',0.1); }
+function triggerQuizConfetti(){
+  try{
+    const container = document.createElement('div');
+    container.style.cssText = 'position:fixed; inset:0; pointer-events:none; z-index:99999; overflow:hidden;';
+    document.body.appendChild(container);
+    const colors = ['#f94144','#f3722c','#f9c74f','#90be6d','#43aa8b','#577590','#f8961e'];
+    for(let i=0;i<70;i++){
+      const piece = document.createElement('div');
+      const size = 6+Math.random()*7;
+      piece.style.cssText = `position:absolute; top:-20px; left:${Math.random()*100}%; width:${size}px; height:${size*0.45}px; background:${colors[Math.floor(Math.random()*colors.length)]}; opacity:${0.85+Math.random()*0.15}; transform:rotate(${Math.random()*360}deg); border-radius:2px;`;
+      const duration = 1800+Math.random()*1500;
+      const drift = (Math.random()-0.5)*220;
+      try{
+        piece.animate([
+          { transform:`translate(0,0) rotate(0deg)`, opacity:1 },
+          { transform:`translate(${drift}px, 100vh) rotate(${360+Math.random()*360}deg)`, opacity:0.3 }
+        ], { duration, easing:'ease-in', fill:'forwards' });
+      }catch(e){}
+      container.appendChild(piece);
+    }
+    setTimeout(()=>container.remove(), 3500);
+  }catch(e){}
+}
+function checkQuizLeaderChange(q){
+  if(!q || !q.teams || !q.teams.length) return;
+  const sorted = [...q.teams].sort((a,b)=>(q.scores[b.id]||0)-(q.scores[a.id]||0));
+  const leader = sorted[0];
+  const leaderScore = (q.scores[leader.id]||0);
+  if(leaderScore>0 && leader.id !== lastQuizLeaderId){
+    const isFirstCheck = lastQuizLeaderId===null;
+    lastQuizLeaderId = leader.id;
+    if(!isFirstCheck) triggerQuizConfetti();
+  }
+}
+function checkQuizTick(q){
+  if(!q || q.status!=='question'){ quizLastTickSecond = null; return; }
+  const question = q.questions[q.currentIndex];
+  const remaining = Math.max(0, Math.ceil((question.durationSeconds*1000 - (Date.now()-q.currentStartedAt))/1000));
+  if(remaining<=5 && remaining>0 && remaining!==quizLastTickSecond){
+    quizLastTickSecond = remaining;
+    quizPlayTick();
+  }
+  if(remaining<=0) quizLastTickSecond = null;
+}
+async function checkQuizAutoReveal(q){
+  if(!q || q.status!=='question') return;
+  const question = q.questions[q.currentIndex];
+  const elapsed = (Date.now() - q.currentStartedAt)/1000;
+  const totalStudents = q.teams.reduce((sum,t)=>sum+t.studentIds.length,0);
+  const answeredCount = Object.keys(q.currentAnswers||{}).length;
+  if(elapsed >= (question.durationSeconds||30) || (totalStudents>0 && answeredCount>=totalStudents)){
+    await quizRevealAnswer();
+  }
+}
+function quizScoreboardBars(q, animateKey){
+  const revealInfo = q.revealInfo;
+  const sortedTeams = [...q.teams].sort((a,b)=>(q.scores[b.id]||0)-(q.scores[a.id]||0));
+  const maxScore = Math.max(1, ...sortedTeams.map(t=>q.scores[t.id]||0));
+  const animate = animateKey ? (animateKey !== quizBarAnimKey && (quizBarAnimKey = animateKey)) : false;
+  return sortedTeams.map((team,i) => {
+    const after = q.scores[team.id]||0;
+    const before = (animate && revealInfo && revealInfo.pointsAwarded) ? Math.max(0, after - (revealInfo.pointsAwarded[team.id]||0)) : after;
+    const afterPct = Math.min(100, (after/maxScore)*100);
+    const beforePct = Math.min(100, (before/maxScore)*100);
+    return { team, rank:i+1, after, startPct: animate ? beforePct : afterPct, targetPct: afterPct };
+  });
 }
 async function loadQuizAtivo(){
   try{
@@ -2030,6 +3358,9 @@ async function refreshProfessorQuiz(){
   const fresh = await loadQuizAtivo();
   q.current = fresh;
   if(JSON.stringify(fresh) !== prev) render();
+  checkQuizLeaderChange(fresh);
+  if(q.presentationMode) checkQuizTick(fresh);
+  await checkQuizAutoReveal(fresh);
 }
 function freshQuizQuestion(){
   return { id: cryptoId(), text:'', options:['',''], correctIndex:0, durationSeconds:30 };
@@ -2074,11 +3405,13 @@ async function startQuizSession(authorName){
     status: 'lobby',
     teams: s.teams.map(t => ({ id:t.id, name:t.name, color:t.color, studentIds:[...t.studentIds] })),
     questions: s.questions.map(q => ({ id:q.id, text:q.text.trim(), options:q.options.filter(o=>o.trim()), correctIndex:q.correctIndex, durationSeconds: parseInt(q.durationSeconds)||30 })),
-    currentIndex: -1, currentAnswers: {}, currentStartedAt: null, scores
+    currentIndex: -1, currentAnswers: {}, currentStartedAt: null, scores,
+    streaks: {}, teamPowers: {}, activePowers: {}, colaEliminated: {}, revealInfo: null
   };
   await saveQuizAtivo(quiz);
   p.quiz.current = quiz;
   p.quiz.setup = null;
+  quizResetEffectsState();
   render();
 }
 async function quizNextQuestion(){
@@ -2089,9 +3422,23 @@ async function quizNextQuestion(){
   if(nextIdx >= q.questions.length){
     q.status = 'ended';
   } else {
+    q.teamPowers = q.teamPowers || {};
+    // mecânica de "virada de jogo": a equipe em último lugar ganha um poder pra usar na próxima pergunta
+    if(nextIdx > 0 && q.teams.length>=2){
+      const sorted = [...q.teams].sort((a,b)=>(q.scores[a.id]||0)-(q.scores[b.id]||0));
+      const lastTeam = sorted[0];
+      const jaTem = lastTeam && q.teamPowers[lastTeam.id] && !q.teamPowers[lastTeam.id].used;
+      if(lastTeam && !jaTem){
+        const tipos = Object.keys(QUIZ_POWERS);
+        q.teamPowers[lastTeam.id] = { type: tipos[Math.floor(Math.random()*tipos.length)], used:false };
+      }
+    }
     q.currentIndex = nextIdx;
     q.status = 'question';
     q.currentAnswers = {};
+    q.activePowers = {};
+    q.colaEliminated = {};
+    q.revealInfo = null;
     q.currentStartedAt = Date.now();
   }
   await saveQuizAtivo(q);
@@ -2102,33 +3449,105 @@ async function quizRevealAnswer(){
   const q = p.quiz.current;
   if(!q || q.status!=='question') return;
   const question = q.questions[q.currentIndex];
+  q.streaks = q.streaks || {};
+  q.activePowers = q.activePowers || {};
+
+  const distribution = question.options.map(()=>0);
+  Object.values(q.currentAnswers||{}).forEach(ans => { if(distribution[ans.optionIndex]!==undefined) distribution[ans.optionIndex]++; });
+
   const correctStudentIds = [];
+  const pointsAwarded = {};
+  const comboBonuses = {};
+  const correctTeamIds = [];
+
   q.teams.forEach(team => {
+    let teamCorrectCount = 0;
+    let teamPoints = 0;
     team.studentIds.forEach(sid => {
       const ans = q.currentAnswers[sid];
       if(ans && ans.optionIndex === question.correctIndex){
-        q.scores[team.id] = (q.scores[team.id]||0) + 10;
+        const dur = question.durationSeconds || 30;
+        const elapsed = Math.max(0, ((ans.at||q.currentStartedAt) - q.currentStartedAt)/1000);
+        let pts = Math.round(10 - 5 * Math.min(1, elapsed/dur)); // de 10 (instantâneo) a 5 (no limite do tempo)
+        pts = Math.max(5, pts);
+        if(q.activePowers[team.id]==='dobro') pts = pts * 2;
+        teamPoints += pts;
         correctStudentIds.push(sid);
+        teamCorrectCount++;
       }
     });
+    if(teamCorrectCount>0){
+      correctTeamIds.push(team.id);
+      const novaSequencia = (q.streaks[team.id]||0) + 1;
+      q.streaks[team.id] = novaSequencia;
+      if(novaSequencia>=3){
+        teamPoints += 5;
+        comboBonuses[team.id] = { streak: novaSequencia, bonus: 5 };
+      }
+    } else {
+      q.streaks[team.id] = 0;
+    }
+    if(teamPoints>0){
+      q.scores[team.id] = (q.scores[team.id]||0) + teamPoints;
+      pointsAwarded[team.id] = teamPoints;
+    }
   });
+
+  q.revealInfo = { distribution, correctIndex: question.correctIndex, pointsAwarded, comboBonuses, correctTeamIds };
   q.status = 'reveal';
+  q.activePowers = {};
   await saveQuizAtivo(q);
   render();
-  correctStudentIds.forEach(sid => { awardFichas(q.turmaId, sid, 3, 'Acertou uma pergunta no Quiz por Equipes'); });
+  correctStudentIds.forEach(sid => { awardFichas(q.turmaId, sid, 3, 'Acertou uma pergunta no Quiz por Equipes', 'quiz'); });
+}
+async function activateQuizPower(){
+  const al = state.aluno;
+  const q = al.quizAtivo;
+  if(!q) return;
+  const myTeam = findMyQuizTeam(q, al.matriculaStudentId);
+  if(!myTeam) return;
+  const fresh = await loadQuizAtivo();
+  if(!fresh || fresh.id!==q.id || fresh.status!=='question'){ al.quizAtivo = fresh; render(); return; }
+  fresh.teamPowers = fresh.teamPowers || {};
+  fresh.activePowers = fresh.activePowers || {};
+  fresh.colaEliminated = fresh.colaEliminated || {};
+  const power = fresh.teamPowers[myTeam.id];
+  if(!power || power.used || fresh.activePowers[myTeam.id]){ al.quizAtivo = fresh; render(); return; }
+  power.used = true;
+  fresh.activePowers[myTeam.id] = power.type;
+  if(power.type==='cola'){
+    const question = fresh.questions[fresh.currentIndex];
+    const wrongIndices = question.options.map((_,i)=>i).filter(i=>i!==question.correctIndex);
+    const elim = wrongIndices[Math.floor(Math.random()*wrongIndices.length)];
+    fresh.colaEliminated[myTeam.id] = elim;
+  }
+  await saveQuizAtivo(fresh);
+  al.quizAtivo = fresh;
+  render();
 }
 async function quizClear(){
   if(!confirm('Encerrar esta sessão de quiz e apagar o placar?')) return;
   await saveQuizAtivo(null);
   state.professor.quiz.current = null;
   state.professor.quiz.presentationMode = false;
+  quizResetEffectsState();
   render();
 }
 async function pollQuizForAluno(){
   const al = state.aluno;
   if(al.stage !== 'dashboard' || !al.turma) return;
+  const prev = al.quizAtivo;
   const q = await loadQuizAtivo();
   al.quizAtivo = (q && q.turmaId === al.turma.id) ? q : null;
+  if(al.quizAtivo && al.quizAtivo.status==='reveal' && (!prev || prev.status!=='reveal' || prev.currentIndex!==al.quizAtivo.currentIndex)){
+    const myTeam = findMyQuizTeam(al.quizAtivo, al.matriculaStudentId);
+    if(myTeam){
+      const question = al.quizAtivo.questions[al.quizAtivo.currentIndex];
+      const minhaResposta = al.quizAtivo.currentAnswers && al.quizAtivo.currentAnswers[al.matriculaStudentId];
+      const meAcertei = minhaResposta && minhaResposta.optionIndex===question.correctIndex;
+      if(minhaResposta){ meAcertei ? quizPlayCorrect() : quizPlayWrong(); }
+    }
+  }
   render();
 }
 async function submitQuizAnswer(optionIndex){
@@ -2231,16 +3650,41 @@ function renderQuizSetupForm(){
     </div>
   `;
 }
+function quizDistributionChartHtml(question, distribution, correctIndex, dark){
+  const maxCount = Math.max(...distribution, 1);
+  const labelColor = dark ? 'rgba(255,255,255,.85)' : '';
+  return `
+    <div class="dist-chart" style="margin-top:10px;">
+      ${distribution.map((count,i) => `
+        <div class="dist-col">
+          <div class="dist-bar-wrap">
+            <div class="dist-bar" style="height:${(count/maxCount)*100}%; background:${i===correctIndex?'var(--green)':'var(--red)'}; color:#fff;">${count>0?count:''}</div>
+          </div>
+          <div class="dist-label" style="${labelColor?'color:'+labelColor+';':''}">${String.fromCharCode(65+i)}${i===correctIndex?' ✓':''}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+function quizComboBadgeHtml(revealInfo, teamId){
+  const combo = revealInfo && revealInfo.comboBonuses && revealInfo.comboBonuses[teamId];
+  if(!combo) return '';
+  return ` <span class="pill" style="background:var(--red); color:#fff; font-size:.7rem;">🔥 ${combo.streak} em sequência! +${combo.bonus}</span>`;
+}
 function renderQuizLive(){
   const p = state.professor;
   const q = p.quiz.current;
-  const sortedTeams = [...q.teams].sort((a,b)=>(q.scores[b.id]||0)-(q.scores[a.id]||0));
+  const bars = quizScoreboardBars(q, q.status==='reveal' ? `${q.id}:${q.currentIndex}:reveal` : null);
+  const sortedTeams = bars.map(b=>b.team);
   const scoreboard = `
     <h3 style="margin-top:0;">Placar</h3>
-    ${sortedTeams.map((team,i) => `
-      <div class="list-item" style="border-left:6px solid ${team.color};">
-        <span>${i+1}º · ${esc(team.name)} <span class="muted">(${team.studentIds.length} aluno(s))</span></span>
-        <strong>${q.scores[team.id]||0} pts</strong>
+    ${bars.map(b => `
+      <div class="list-item" style="border-left:6px solid ${b.team.color}; flex-direction:column; align-items:stretch; gap:4px;">
+        <div class="row" style="justify-content:space-between; align-items:center;">
+          <span>${b.rank}º · ${esc(b.team.name)} <span class="muted">(${b.team.studentIds.length} aluno(s))</span>${quizComboBadgeHtml(q.revealInfo, b.team.id)}</span>
+          <strong>${b.after} pts</strong>
+        </div>
+        <div class="chart-track"><div class="chart-fill quiz-bar-fill" style="width:${b.startPct}%; background:${b.team.color};" data-target="${b.targetPct}%"></div></div>
       </div>
     `).join('')}
   `;
@@ -2262,15 +3706,17 @@ function renderQuizLive(){
       </div>
       <p style="font-weight:600; font-size:1.15rem; margin-top:10px;">${esc(question.text)}</p>
       ${question.options.map((opt,i)=>`<p style="margin:4px 0;">${String.fromCharCode(65+i)}) ${esc(opt)}</p>`).join('')}
-      <p class="muted" style="margin-top:10px;">${answeredCount} de ${totalStudents} já responderam.</p>
-      <button class="btn btn-primary btn-block" style="margin-top:10px;" data-action="quiz-reveal-answer">Revelar resposta</button>
+      <p class="muted" style="margin-top:10px;">${answeredCount} de ${totalStudents} já responderam. A resposta é revelada automaticamente quando o tempo acabar ou todos responderem.</p>
+      <button class="btn btn-primary btn-block" style="margin-top:10px;" data-action="quiz-reveal-answer">Revelar agora</button>
     `;
   } else if(q.status==='reveal'){
     const question = q.questions[q.currentIndex];
     const isLast = q.currentIndex >= q.questions.length-1;
+    const dist = q.revealInfo ? q.revealInfo.distribution : question.options.map(()=>0);
     body = `
       <h3 style="margin-top:14px;">Resposta certa: ${esc(question.options[question.correctIndex])}</h3>
-      <p class="muted">Pontos já somados ao placar acima.</p>
+      ${quizDistributionChartHtml(question, dist, question.correctIndex, false)}
+      <p class="muted" style="margin-top:10px;">Pontos já somados ao placar acima.</p>
       <button class="btn btn-primary btn-block" style="margin-top:10px;" data-action="quiz-next-question">${isLast ? '🏁 Ver resultado final' : '▶ Próxima pergunta'}</button>
     `;
   } else if(q.status==='ended'){
@@ -2299,15 +3745,17 @@ function renderQuizEquipes(){
 function renderQuizPresentation(){
   const p = state.professor;
   const q = p.quiz.current;
-  const sortedTeams = [...q.teams].sort((a,b)=>(q.scores[b.id]||0)-(q.scores[a.id]||0));
+  const bars = quizScoreboardBars(q, q.status==='reveal' ? `${q.id}:${q.currentIndex}:reveal-pres` : null);
+  const sortedTeams = bars.map(b=>b.team);
   let center = '';
   if(q.status==='lobby'){
     center = `<h1 style="font-size:2.2rem; text-align:center;">Prontos para começar!</h1>`;
   } else if(q.status==='question'){
     const question = q.questions[q.currentIndex];
     const remaining = Math.max(0, question.durationSeconds - Math.floor((Date.now()-q.currentStartedAt)/1000));
+    const urgente = remaining<=5;
     center = `
-      <p style="text-align:center; font-size:4.5rem; font-weight:800; margin:10px 0;">${remaining}</p>
+      <p class="${urgente?'quiz-timer-urgente':''}" style="text-align:center; font-size:4.5rem; font-weight:800; margin:10px 0; ${urgente?'color:var(--red);':''}">${remaining}</p>
       <h1 style="text-align:center; font-size:2rem; margin-top:0;">${esc(question.text)}</h1>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:760px; margin:20px auto;">
         ${question.options.map((opt,i)=>`<div style="background:var(--board); color:#fff; padding:18px; border-radius:10px; font-size:1.3rem; text-align:center;">${String.fromCharCode(65+i)}) ${esc(opt)}</div>`).join('')}
@@ -2315,7 +3763,11 @@ function renderQuizPresentation(){
     `;
   } else if(q.status==='reveal'){
     const question = q.questions[q.currentIndex];
-    center = `<h1 style="text-align:center; font-size:2rem;">✅ Resposta: ${esc(question.options[question.correctIndex])}</h1>`;
+    const dist = q.revealInfo ? q.revealInfo.distribution : question.options.map(()=>0);
+    center = `
+      <h1 style="text-align:center; font-size:2rem;">✅ Resposta: ${esc(question.options[question.correctIndex])}</h1>
+      ${quizDistributionChartHtml(question, dist, question.correctIndex, true)}
+    `;
   } else if(q.status==='ended'){
     center = `<h1 style="text-align:center; font-size:2.4rem;">🏆 ${esc(sortedTeams[0]?sortedTeams[0].name:'-')}</h1>`;
   }
@@ -2327,11 +3779,14 @@ function renderQuizPresentation(){
       </div>
       ${center}
       <div style="display:flex; gap:14px; flex-wrap:wrap; justify-content:center; margin-top:20px;">
-        ${sortedTeams.map((team,i)=>`
-          <div style="background:${team.color}; color:#fff; padding:14px 22px; border-radius:12px; text-align:center; min-width:140px;">
-            <div style="font-size:1.3rem; font-weight:700;">${i+1}º</div>
-            <div style="font-size:1.05rem;">${esc(team.name)}</div>
-            <div style="font-size:1.6rem; font-weight:800;">${q.scores[team.id]||0}</div>
+        ${bars.map(b=>`
+          <div style="background:${b.team.color}; color:#fff; padding:14px 22px; border-radius:12px; text-align:center; min-width:160px;">
+            <div style="font-size:1.3rem; font-weight:700;">${b.rank}º</div>
+            <div style="font-size:1.05rem;">${esc(b.team.name)}${quizComboBadgeHtml(q.revealInfo, b.team.id)}</div>
+            <div style="font-size:1.6rem; font-weight:800;">${b.after}</div>
+            <div style="height:8px; background:rgba(255,255,255,.35); border-radius:5px; overflow:hidden; margin-top:6px;">
+              <div class="chart-fill quiz-bar-fill" style="height:100%; width:${b.startPct}%; background:#fff;" data-target="${b.targetPct}%"></div>
+            </div>
           </div>
         `).join('')}
       </div>
@@ -2355,20 +3810,35 @@ function renderAlunoQuizBlock(){
     const question = q.questions[q.currentIndex];
     const remaining = Math.max(0, question.durationSeconds - Math.floor((Date.now()-q.currentStartedAt)/1000));
     const jaRespondeu = q.currentAnswers && Object.prototype.hasOwnProperty.call(q.currentAnswers, al.matriculaStudentId);
+    const meuPoder = q.teamPowers && q.teamPowers[myTeam.id];
+    const poderAtivo = q.activePowers && q.activePowers[myTeam.id];
+    const eliminado = q.colaEliminated ? q.colaEliminated[myTeam.id] : undefined;
+    const poderBlock = (meuPoder && !meuPoder.used && !jaRespondeu) ? `
+      <div class="card" style="background:var(--yellow); margin:8px 0; padding:10px;">
+        <p style="margin:0 0 6px; font-weight:600;">${QUIZ_POWERS[meuPoder.type].emoji} Poder disponível: ${esc(QUIZ_POWERS[meuPoder.type].label)}</p>
+        <p class="muted" style="margin:0 0 8px; font-size:.8rem;">${esc(QUIZ_POWERS[meuPoder.type].desc)}</p>
+        <button class="btn btn-primary btn-sm" data-action="quiz-activate-power">Usar poder agora</button>
+      </div>
+    ` : (poderAtivo ? `<p class="muted" style="font-size:.82rem;">${QUIZ_POWERS[poderAtivo].emoji} ${esc(QUIZ_POWERS[poderAtivo].label)} ativado nessa pergunta!</p>` : '');
     body = `
       <div class="row" style="justify-content:space-between; align-items:center;">
         <strong>Pergunta ${q.currentIndex+1} de ${q.questions.length}</strong>
         <span class="pill">⏱ ${remaining}s</span>
       </div>
       <p style="font-weight:600; margin-top:8px;">${esc(question.text)}</p>
-      ${jaRespondeu ? '<p class="muted">Resposta enviada! Aguarde o professor revelar.</p>' : question.options.map((opt,i) => `
-        <button class="btn btn-ghost btn-block" style="margin-bottom:8px; text-align:left;" data-action="quiz-answer" data-idx="${i}">${String.fromCharCode(65+i)}) ${esc(opt)}</button>
-      `).join('')}
+      ${poderBlock}
+      ${jaRespondeu ? '<p class="muted">Resposta enviada! Aguarde o professor revelar.</p>' : question.options.map((opt,i) => {
+        if(eliminado===i) return `<button class="btn btn-ghost btn-block" style="margin-bottom:8px; text-align:left; opacity:.4; text-decoration:line-through;" disabled>${String.fromCharCode(65+i)}) ${esc(opt)}</button>`;
+        return `<button class="btn btn-ghost btn-block" style="margin-bottom:8px; text-align:left;" data-action="quiz-answer" data-idx="${i}">${String.fromCharCode(65+i)}) ${esc(opt)}</button>`;
+      }).join('')}
     `;
   } else if(q.status==='reveal'){
     const question = q.questions[q.currentIndex];
     const meAcertei = q.currentAnswers && q.currentAnswers[al.matriculaStudentId] && q.currentAnswers[al.matriculaStudentId].optionIndex===question.correctIndex;
-    body = `<p style="font-weight:600;">${meAcertei ? '✅ Você acertou! +3 fichas' : '❌ Resposta certa: '+esc(question.options[question.correctIndex])}</p>`;
+    body = `
+      <p style="font-weight:600;">${meAcertei ? '✅ Você acertou! +3 fichas' : '❌ Resposta certa: '+esc(question.options[question.correctIndex])}</p>
+      ${quizComboBadgeHtml(q.revealInfo, myTeam.id)}
+    `;
   }
   return `
     <div class="card" style="border:2px solid ${myTeam.color}; margin-top:16px;">
@@ -2455,7 +3925,7 @@ async function finalizarSorteio(candidates, authorName){
 async function roletaDarFichas(){
   const cur = state.professor.roleta.current;
   if(!cur || cur.fichasDadas) return;
-  await awardFichas(cur.turmaId, cur.selectedStudentId, 5, 'Participação no sorteio da roleta');
+  await awardFichas(cur.turmaId, cur.selectedStudentId, 5, 'Participação no sorteio da roleta', 'roleta');
   cur.fichasDadas = true;
   await saveRoletaAtiva(cur);
   render();
@@ -2486,7 +3956,7 @@ async function submitRoletaResposta(){
   await saveRoletaAtiva(fresh);
   al.roletaAtiva = fresh;
   render();
-  awardFichas(fresh.turmaId, al.matriculaStudentId, 2, 'Respondeu ao sorteio da roleta').then(()=>{
+  awardFichas(fresh.turmaId, al.matriculaStudentId, 2, 'Respondeu ao sorteio da roleta', 'roleta').then(()=>{
     if(state.aluno.stage==='dashboard') render();
   });
 }
@@ -2605,6 +4075,330 @@ function renderAlunoRoletaBlock(){
         <button class="btn btn-primary btn-block" style="margin-top:8px;" data-action="roleta-confirmar-participacao">✋ Respondi oralmente</button>
       ` : ''}
       ${r.resposta ? `<p class="muted" style="${souEu?'color:#fff;':''}">Resposta registrada: "${esc(r.resposta)}"</p>` : ''}
+    </div>
+  `;
+}
+
+/* ---------------- MODO DUELO (1x1) ---------------- */
+
+let dueloPollInterval = null;
+let dueloLastTickSecond = null;
+function stopDueloPoll(){
+  if(dueloPollInterval){ clearInterval(dueloPollInterval); dueloPollInterval = null; }
+  dueloLastTickSecond = null;
+}
+async function loadDueloAtivo(){
+  try{
+    const r = await window.storage.get('duelo-ativo', true);
+    return r && r.value ? JSON.parse(r.value) : null;
+  }catch(e){ return null; }
+}
+async function saveDueloAtivo(obj){
+  await window.storage.set('duelo-ativo', obj ? JSON.stringify(obj) : JSON.stringify(null), true);
+}
+function dueloSortearDupla(){
+  const ds = state.professor.duelo;
+  const turma = state.professor.turmas.find(t=>t.id===ds.turmaId);
+  if(!turma || turma.students.length<2){ alert('Essa turma precisa de pelo menos 2 alunos cadastrados.'); return; }
+  const shuffled = [...turma.students].sort(()=>Math.random()-0.5);
+  ds.studentAId = shuffled[0].id;
+  ds.studentBId = shuffled[1].id;
+  render();
+}
+async function startDuelo(authorName){
+  const p = state.professor;
+  const ds = p.duelo;
+  if(!ds.turmaId){ alert('Selecione uma turma.'); return; }
+  const turma = p.turmas.find(t=>t.id===ds.turmaId);
+  if(!ds.studentAId || !ds.studentBId || ds.studentAId===ds.studentBId){ alert('Escolha dois alunos diferentes.'); return; }
+  if(!ds.questionText.trim()){ alert('Digite a pergunta.'); return; }
+  if(ds.options.filter(o=>o.trim()).length<2){ alert('Preencha pelo menos 2 opções.'); return; }
+  const studentA = turma.students.find(s=>s.id===ds.studentAId);
+  const studentB = turma.students.find(s=>s.id===ds.studentBId);
+  const duelo = {
+    id: cryptoId(), turmaId: ds.turmaId, turmaName: turma.name, authorName, createdAt: Date.now(),
+    status: 'question',
+    studentA: { id:studentA.id, name:studentA.name, avatarEmoji:studentA.avatarEmoji, avatarColor:studentA.avatarColor },
+    studentB: { id:studentB.id, name:studentB.name, avatarEmoji:studentB.avatarEmoji, avatarColor:studentB.avatarColor },
+    question: { text: ds.questionText.trim(), options: ds.options.filter(o=>o.trim()), correctIndex: ds.correctIndex, durationSeconds: parseInt(ds.durationSeconds)||20 },
+    startedAt: Date.now(), answers: {}, winnerId: null
+  };
+  await saveDueloAtivo(duelo);
+  p.duelo.current = duelo;
+  dueloLastTickSecond = null;
+  render();
+}
+function checkDueloTick(d){
+  if(!d || d.status!=='question'){ dueloLastTickSecond = null; return; }
+  const remaining = Math.max(0, Math.ceil((d.question.durationSeconds*1000 - (Date.now()-d.startedAt))/1000));
+  if(remaining<=5 && remaining>0 && remaining!==dueloLastTickSecond){
+    dueloLastTickSecond = remaining;
+    quizPlayTick();
+  }
+  if(remaining<=0) dueloLastTickSecond = null;
+}
+async function refreshProfessorDuelo(){
+  const ds = state.professor.duelo;
+  const prev = JSON.stringify(ds.current);
+  const fresh = await loadDueloAtivo();
+  ds.current = fresh;
+  if(JSON.stringify(fresh) !== prev) render();
+  if(ds.presentationMode) checkDueloTick(fresh);
+  await checkDueloAutoReveal(fresh);
+}
+async function checkDueloAutoReveal(d){
+  if(!d || d.status!=='question') return;
+  const elapsed = (Date.now() - d.startedAt)/1000;
+  const totalRespostas = Object.keys(d.answers||{}).length;
+  if(elapsed >= (d.question.durationSeconds||20) || totalRespostas>=2){
+    await dueloRevealAnswer();
+  }
+}
+async function dueloRevealAnswer(){
+  const p = state.professor;
+  const d = p.duelo.current;
+  if(!d || d.status!=='question') return;
+  const ansA = d.answers[d.studentA.id];
+  const ansB = d.answers[d.studentB.id];
+  const acertouA = ansA && ansA.optionIndex===d.question.correctIndex;
+  const acertouB = ansB && ansB.optionIndex===d.question.correctIndex;
+  let winnerId = null;
+  if(acertouA && acertouB){ winnerId = ansA.at<=ansB.at ? d.studentA.id : d.studentB.id; }
+  else if(acertouA){ winnerId = d.studentA.id; }
+  else if(acertouB){ winnerId = d.studentB.id; }
+  d.winnerId = winnerId;
+  d.status = 'reveal';
+  await saveDueloAtivo(d);
+  render();
+  if(winnerId) triggerQuizConfetti();
+  if(winnerId){
+    const loserId = winnerId===d.studentA.id ? d.studentB.id : d.studentA.id;
+    await awardFichas(d.turmaId, winnerId, 8, 'Venceu um Duelo', 'duelo');
+    await awardFichas(d.turmaId, loserId, 2, 'Participou de um Duelo');
+  } else {
+    await awardFichas(d.turmaId, d.studentA.id, 1, 'Participou de um Duelo');
+    await awardFichas(d.turmaId, d.studentB.id, 1, 'Participou de um Duelo');
+  }
+}
+async function dueloClear(){
+  await saveDueloAtivo(null);
+  state.professor.duelo.current = null;
+  state.professor.duelo.presentationMode = false;
+  dueloLastTickSecond = null;
+  render();
+}
+async function pollDueloForAluno(){
+  const al = state.aluno;
+  if(al.stage !== 'dashboard' || !al.turma) return;
+  const prev = al.dueloAtivo;
+  const d = await loadDueloAtivo();
+  al.dueloAtivo = (d && d.turmaId === al.turma.id) ? d : null;
+  if(al.dueloAtivo && al.dueloAtivo.status==='reveal' && (!prev || prev.status!=='reveal' || prev.id!==al.dueloAtivo.id)){
+    const souParticipante = al.dueloAtivo.studentA.id===al.matriculaStudentId || al.dueloAtivo.studentB.id===al.matriculaStudentId;
+    if(souParticipante){
+      al.dueloAtivo.winnerId===al.matriculaStudentId ? quizPlayCorrect() : quizPlayWrong();
+    }
+  }
+  render();
+}
+async function submitDueloAnswer(optionIndex){
+  const al = state.aluno;
+  const d = al.dueloAtivo;
+  if(!d || d.status!=='question') return;
+  const souParticipante = d.studentA.id===al.matriculaStudentId || d.studentB.id===al.matriculaStudentId;
+  if(!souParticipante) return;
+  const fresh = await loadDueloAtivo();
+  if(!fresh || fresh.id!==d.id || fresh.status!=='question') { al.dueloAtivo = fresh; render(); return; }
+  fresh.answers = fresh.answers || {};
+  if(fresh.answers[al.matriculaStudentId]){ al.dueloAtivo = fresh; render(); return; }
+  fresh.answers[al.matriculaStudentId] = { optionIndex, at: Date.now() };
+  await saveDueloAtivo(fresh);
+  al.dueloAtivo = fresh;
+  render();
+}
+function renderDuelo(){
+  const p = state.professor;
+  const ds = p.duelo;
+  if(ds.current) return renderDueloLive();
+  const turmaOptions = professorTurmas().map(t=>`<option value="${t.id}" ${ds.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
+  const turma = p.turmas.find(t=>t.id===ds.turmaId);
+  const dupla = (turma && ds.studentAId && ds.studentBId) ? {
+    a: turma.students.find(s=>s.id===ds.studentAId), b: turma.students.find(s=>s.id===ds.studentBId)
+  } : null;
+  const podeIniciar = turma && ds.studentAId && ds.studentBId && ds.studentAId!==ds.studentBId && ds.questionText.trim() && ds.options.filter(o=>o.trim()).length>=2;
+  return `
+    <div class="card">
+      <h2>⚔️ Modo Duelo</h2>
+      <p class="muted">Escolha 2 alunos da turma pra uma disputa individual: ganha quem responder certo mais rápido.</p>
+      <label>Turma</label>
+      <select id="duelo-turma-select">
+        <option value="">Selecione...</option>
+        ${turmaOptions}
+      </select>
+      ${turma ? `
+        <div class="row" style="align-items:flex-end; gap:10px; margin-top:12px;">
+          <div style="flex:1;">
+            <label>Aluno A</label>
+            <select id="duelo-student-a-select">
+              <option value="">Selecione...</option>
+              ${turma.students.map(s=>`<option value="${s.id}" ${ds.studentAId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div style="flex:1;">
+            <label>Aluno B</label>
+            <select id="duelo-student-b-select">
+              <option value="">Selecione...</option>
+              ${turma.students.map(s=>`<option value="${s.id}" ${ds.studentBId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}
+            </select>
+          </div>
+          <button class="btn btn-ghost btn-sm" data-action="duelo-sortear-dupla">🎲 Sortear dupla</button>
+        </div>
+        ${dupla && dupla.a && dupla.b ? `
+          <div class="row" style="justify-content:center; align-items:center; gap:14px; margin-top:14px;">
+            <div style="text-align:center;">${studentAvatarHtml(dupla.a,50)}<div>${esc(dupla.a.name)}</div></div>
+            <strong style="font-size:1.4rem;">VS</strong>
+            <div style="text-align:center;">${studentAvatarHtml(dupla.b,50)}<div>${esc(dupla.b.name)}</div></div>
+          </div>
+        ` : ''}
+        <label style="margin-top:14px;">Pergunta</label>
+        <input type="text" id="duelo-question-input" placeholder="Digite a pergunta" value="${esc(ds.questionText)}">
+        <label style="margin-top:8px;">Opções (marque a correta)</label>
+        ${ds.options.map((opt,i) => `
+          <div class="row" style="margin-bottom:6px; align-items:center;">
+            <input type="radio" name="duelo-correct" data-action="duelo-set-correct" data-idx="${i}" ${ds.correctIndex===i?'checked':''} style="width:auto;">
+            <input type="text" data-action="duelo-option-text" data-idx="${i}" placeholder="Opção ${i+1}" value="${esc(opt)}" style="flex:1;">
+            ${ds.options.length>2 ? `<button class="btn btn-ghost btn-sm" data-action="duelo-remove-option" data-idx="${i}">✕</button>` : ''}
+          </div>
+        `).join('')}
+        <button class="btn btn-ghost btn-sm" data-action="duelo-add-option">+ Opção</button>
+        <label style="margin-top:8px;">Tempo para responder (segundos)</label>
+        <input type="number" id="duelo-duration-input" min="5" max="120" value="${ds.durationSeconds}" style="max-width:100px;">
+        ${podeIniciar ? `<button class="btn btn-primary btn-block" style="margin-top:16px;" data-action="duelo-start">⚔️ Iniciar Duelo</button>` : '<p class="muted" style="margin-top:12px;">Escolha 2 alunos diferentes e preencha a pergunta com pelo menos 2 opções.</p>'}
+      ` : ''}
+    </div>
+  `;
+}
+function dueloStudentCardHtml(student, opts){
+  const { destaque, vencedor, resposta } = opts||{};
+  return `
+    <div style="text-align:center; padding:14px; border-radius:12px; ${vencedor?'background:var(--green); color:#fff;':'background:var(--surface); border:1px solid var(--paper-line);'} ${destaque?'box-shadow:0 0 0 3px var(--board);':''}">
+      ${studentAvatarHtml(student, 60)}
+      <div style="font-weight:700; margin-top:6px;">${esc(student.name)}</div>
+      ${vencedor ? '<div style="font-size:.85rem; margin-top:2px;">🏆 Venceu!</div>' : ''}
+      ${resposta ? `<div style="font-size:.78rem; margin-top:2px;">respondeu em ${resposta}s</div>` : ''}
+    </div>
+  `;
+}
+function renderDueloLive(){
+  const p = state.professor;
+  const d = p.duelo.current;
+  let body = '';
+  if(d.status==='question'){
+    const remaining = Math.max(0, d.question.durationSeconds - Math.floor((Date.now()-d.startedAt)/1000));
+    const respA = d.answers[d.studentA.id];
+    const respB = d.answers[d.studentB.id];
+    body = `
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <h3 style="margin:0;">${esc(d.question.text)}</h3>
+        <span class="pill" style="font-size:1.1rem;">⏱ ${remaining}s</span>
+      </div>
+      <div class="row" style="justify-content:center; gap:20px; margin-top:14px;">
+        ${dueloStudentCardHtml(d.studentA, { resposta: respA?Math.round((respA.at-d.startedAt)/1000):null })}
+        ${dueloStudentCardHtml(d.studentB, { resposta: respB?Math.round((respB.at-d.startedAt)/1000):null })}
+      </div>
+      <p class="muted" style="margin-top:10px; text-align:center;">A resposta é revelada automaticamente quando os dois responderem ou o tempo acabar.</p>
+      <button class="btn btn-primary btn-block" style="margin-top:10px;" data-action="duelo-reveal">Revelar agora</button>
+    `;
+  } else if(d.status==='reveal'){
+    body = `
+      <h3 style="text-align:center;">Resposta certa: ${esc(d.question.options[d.question.correctIndex])}</h3>
+      <div class="row" style="justify-content:center; gap:20px; margin-top:14px;">
+        ${dueloStudentCardHtml(d.studentA, { vencedor: d.winnerId===d.studentA.id })}
+        ${dueloStudentCardHtml(d.studentB, { vencedor: d.winnerId===d.studentB.id })}
+      </div>
+      ${!d.winnerId ? '<p class="muted" style="text-align:center; margin-top:10px;">Ninguém acertou dessa vez.</p>' : ''}
+      <button class="btn btn-primary btn-block" style="margin-top:16px;" data-action="duelo-clear">🏁 Encerrar e começar outro</button>
+    `;
+  }
+  return `
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <h2>⚔️ Duelo — ${esc(d.turmaName)}</h2>
+        <div class="row" style="flex:0 0 auto; gap:6px;">
+          <button class="btn btn-ghost btn-sm" data-action="duelo-toggle-presentation">🖥️ Modo Apresentação</button>
+          <button class="btn btn-danger btn-sm" data-action="duelo-clear">Encerrar</button>
+        </div>
+      </div>
+      ${body}
+    </div>
+  `;
+}
+function renderDueloPresentation(){
+  const p = state.professor;
+  const d = p.duelo.current;
+  let center = '';
+  if(d.status==='question'){
+    const remaining = Math.max(0, d.question.durationSeconds - Math.floor((Date.now()-d.startedAt)/1000));
+    const urgente = remaining<=5;
+    center = `
+      <p class="${urgente?'quiz-timer-urgente':''}" style="text-align:center; font-size:4rem; font-weight:800; margin:6px 0; ${urgente?'color:var(--red);':''}">${remaining}</p>
+      <h1 style="text-align:center; font-size:1.8rem;">${esc(d.question.text)}</h1>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:700px; margin:16px auto;">
+        ${d.question.options.map((opt,i)=>`<div style="background:var(--board); color:#fff; padding:16px; border-radius:10px; font-size:1.2rem; text-align:center;">${String.fromCharCode(65+i)}) ${esc(opt)}</div>`).join('')}
+      </div>
+    `;
+  } else if(d.status==='reveal'){
+    center = `<h1 style="text-align:center; font-size:1.8rem;">✅ Resposta: ${esc(d.question.options[d.question.correctIndex])}</h1>`;
+  }
+  return `
+    <div style="min-height:100vh; padding:30px; background:var(--paper);">
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <h2 style="margin:0;">Duelo — ${esc(d.turmaName)}</h2>
+        <button class="btn btn-ghost" data-action="duelo-toggle-presentation">Sair do modo apresentação</button>
+      </div>
+      ${center}
+      <div style="display:flex; justify-content:center; align-items:center; gap:30px; margin-top:26px;">
+        ${dueloStudentCardHtml(d.studentA, { vencedor: d.status==='reveal' && d.winnerId===d.studentA.id })}
+        <strong style="font-size:1.6rem;">VS</strong>
+        ${dueloStudentCardHtml(d.studentB, { vencedor: d.status==='reveal' && d.winnerId===d.studentB.id })}
+      </div>
+      ${d.status==='question' ? `<div style="text-align:center; margin-top:24px;"><button class="btn btn-primary" data-action="duelo-reveal">Revelar resposta</button></div>` : ''}
+      ${d.status==='reveal' ? `<div style="text-align:center; margin-top:24px;"><button class="btn btn-primary" data-action="duelo-clear">Encerrar e começar outro</button></div>` : ''}
+    </div>
+  `;
+}
+function renderAlunoDueloBlock(){
+  const al = state.aluno;
+  const d = al.dueloAtivo;
+  if(!d) return '';
+  const souA = d.studentA.id===al.matriculaStudentId;
+  const souB = d.studentB.id===al.matriculaStudentId;
+  const souParticipante = souA || souB;
+  let body = '';
+  if(d.status==='question'){
+    const remaining = Math.max(0, d.question.durationSeconds - Math.floor((Date.now()-d.startedAt)/1000));
+    const jaRespondeu = d.answers && Object.prototype.hasOwnProperty.call(d.answers, al.matriculaStudentId);
+    body = `
+      <div class="row" style="justify-content:space-between; align-items:center;">
+        <strong>${esc(d.question.text)}</strong>
+        <span class="pill">⏱ ${remaining}s</span>
+      </div>
+      ${souParticipante ? (jaRespondeu ? '<p class="muted" style="margin-top:8px;">Resposta enviada! Aguarde a revelação.</p>' : d.question.options.map((opt,i) => `
+        <button class="btn btn-ghost btn-block" style="margin:8px 0 0; text-align:left;" data-action="duelo-answer" data-idx="${i}">${String.fromCharCode(65+i)}) ${esc(opt)}</button>
+      `).join('')) : '<p class="muted" style="margin-top:8px;">Só quem está duelando pode responder. Torça!</p>'}
+    `;
+  } else if(d.status==='reveal'){
+    body = `<p style="font-weight:600; margin-top:6px;">Resposta certa: ${esc(d.question.options[d.question.correctIndex])}</p>`;
+  }
+  return `
+    <div class="card" style="border:2px solid var(--board); margin-top:16px;">
+      <h3 style="margin-top:0;">⚔️ Duelo em andamento</h3>
+      <div class="row" style="justify-content:center; gap:18px; margin-bottom:8px;">
+        ${dueloStudentCardHtml(d.studentA, { destaque:souA, vencedor: d.status==='reveal' && d.winnerId===d.studentA.id })}
+        <strong>VS</strong>
+        ${dueloStudentCardHtml(d.studentB, { destaque:souB, vencedor: d.status==='reveal' && d.winnerId===d.studentB.id })}
+      </div>
+      ${body}
     </div>
   `;
 }
@@ -3419,6 +5213,35 @@ function renderCorrectResponsePanel(a, r, idx){
   `;
 }
 
+function renderCommentResponsePanel(r, idx){
+  const draft = r.commentDraft!=null ? r.commentDraft : (r.comentarioProfessor||'');
+  return `
+    <tr><td colspan="5">
+      <div class="q-card" style="background:var(--tint-teal);">
+        <strong>Comentário para ${esc(r.studentName)}</strong>
+        <p class="muted" style="margin:4px 0 8px; font-size:.82rem;">Esse comentário aparece pro aluno junto com o resultado da prova (não altera a nota).</p>
+        <textarea data-action="comment-response-input" data-idx="${idx}" placeholder="Ex: Bom trabalho! Reveja o conteúdo de equações de 2º grau.">${esc(draft)}</textarea>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-ghost btn-sm" data-action="close-comment-response">Cancelar</button>
+          <button class="btn btn-primary btn-sm" data-action="save-comment-response" data-idx="${idx}">Salvar comentário</button>
+        </div>
+      </div>
+    </td></tr>
+  `;
+}
+
+async function saveCommentResponse(idx){
+  const p = state.professor;
+  const a = p.resultsFor;
+  const r = p.responses[idx];
+  if(!r) return;
+  r.comentarioProfessor = (r.commentDraft!=null ? r.commentDraft : (r.comentarioProfessor||'')).trim();
+  delete r.commentDraft;
+  p.commentingResponseIdx = null;
+  render();
+  await window.storage.set(`responses:${a.code}`, JSON.stringify(p.responses), true);
+}
+
 function renderResults(){
   const a = state.professor.resultsFor;
   const responses = state.professor.responses;
@@ -3454,10 +5277,12 @@ function renderResults(){
             </td>
             <td>
               ${r.details.some(d=>d.pending) ? `<button class="btn btn-primary btn-sm" data-action="open-correct-response" data-idx="${idx}">Corrigir</button>` : ''}
+              <button class="btn btn-ghost btn-sm" data-action="open-comment-response" data-idx="${idx}">${r.comentarioProfessor?'💬 Comentário':'💬 Comentar'}</button>
               <button class="btn btn-danger btn-sm" data-action="delete-response" data-idx="${idx}">✕</button>
             </td>
           </tr>
           ${state.professor.correctingResponseIdx===idx ? renderCorrectResponsePanel(a, r, idx) : ''}
+          ${state.professor.commentingResponseIdx===idx ? renderCommentResponsePanel(r, idx) : ''}
         `).join('')}
       </table>
       </div>
@@ -5975,6 +7800,9 @@ function renderCoordenador(){
   if(c.subview==='roleta' && state.professor.roleta.presentationMode){
     return renderRoletaPresentation();
   }
+  if(c.subview==='duelo' && state.professor.duelo.presentationMode && state.professor.duelo.current){
+    return renderDueloPresentation();
+  }
   if(c.subview==='slides' && state.professor.slides.presentationMode && state.professor.slides.current){
     return renderSlidesPresentation();
   }
@@ -6008,6 +7836,7 @@ function renderCoordenador(){
     { action:'coord-sub-view', sub:'enquete', icon:'📣', label:'Enquete Relâmpago' },
     { action:'coord-sub-view', sub:'quiz', icon:'🎮', label:'Quiz por Equipes' },
     { action:'coord-sub-view', sub:'roleta', icon:'🎡', label:'Roleta de Sorteio' },
+    { action:'coord-sub-view', sub:'duelo', icon:'⚔️', label:'Modo Duelo' },
     { action:'coord-sub-view', sub:'slides', icon:'🖥️', label:'Apresentação de Slides' },
     { action:'coord-sub-view', sub:'lixeira', icon:'🗑️', label:'Lixeira' },
     { action:'coord-sub-view', sub:'ia', icon:'🤖', label:'Configurações de IA' },
@@ -6031,6 +7860,7 @@ function renderCoordenador(){
   else if(c.subview==='enquete') content = renderEnqueteRelampago();
   else if(c.subview==='quiz') content = renderQuizEquipes();
   else if(c.subview==='roleta') content = renderRoleta();
+  else if(c.subview==='duelo') content = renderDuelo();
   else if(c.subview==='slides') content = renderSlides();
   else if(c.subview==='lixeira') content = renderLixeira();
   else if(c.subview==='ia') content = renderCoordIA();
@@ -6425,7 +8255,10 @@ function renderCoordNotas(){
               const badge = g.precisaRecuperacao ? (g.temRecuperacao ? ' <span class="pill" style="background:var(--green); color:#fff; font-size:.62rem;" title="Fez recuperação paralela">✅</span>' : ' <span class="pill" style="background:var(--red); color:#fff; font-size:.62rem;" title="Abaixo de 5 — recuperação paralela">🔺</span>') : '';
               return `<td><strong>${g.final.toFixed(1)}</strong>${badge}</td>`;
             }).join('')}
-            <td><button class="btn btn-ghost btn-sm" data-action="imprimir-boletim-aluno" data-name="${esc(r.name)}">📄 Boletim</button></td>
+            <td style="white-space:nowrap;">
+              <button class="btn btn-ghost btn-sm" data-action="imprimir-boletim-aluno" data-name="${esc(r.name)}">📄 Boletim</button>
+              <button class="btn btn-ghost btn-sm" data-action="imprimir-boletim-completo" data-name="${esc(r.name)}" ${c.boletimCompletoLoading===r.name?'disabled':''}>${c.boletimCompletoLoading===r.name?'Gerando...':'📄 Boletim completo'}</button>
+            </td>
           </tr>
         `).join('')}
       </table>
@@ -6950,10 +8783,40 @@ async function loadLixeiraUi(){
   render();
 }
 async function getGeminiApiKey(){
+  // Se houver um professor logado com sua própria chave cadastrada, ela tem prioridade
+  // (evita que o uso de um professor consuma o limite gratuito compartilhado da escola).
+  const p = state.professor;
+  if(p && p.session && p.session.id){
+    try{
+      const r = await window.storage.get(`gemini-api-key-professor:${p.session.id}`, true);
+      const v = (r.value||'').trim();
+      if(v) return v;
+    }catch(e){}
+  }
   try{ const r = await window.storage.get('gemini-api-key', true); return (r.value||'').trim(); }catch(e){ return ''; }
 }
-async function callGeminiJSONOnce(prompt){
-  const key = await getGeminiApiKey();
+async function getGeminiApiKeyOwnedBy(professorId){
+  try{ const r = await window.storage.get(`gemini-api-key-professor:${professorId}`, true); return (r.value||'').trim(); }catch(e){ return ''; }
+}
+// Usado quando quem está chamando a IA é o ALUNO (sem sessão de professor no navegador):
+// procura, entre os professores que lecionam nessa turma, algum com chave própria cadastrada;
+// se nenhum tiver, cai para a chave compartilhada da escola.
+async function resolveGeminiKeyForTurma(turmaId){
+  try{
+    const professores = await fetchProfessoresList();
+    for(const prof of professores){
+      let disciplinas = [];
+      try{ const r = await window.storage.get(`disciplinas:${prof.id}`, true); disciplinas = JSON.parse(r.value)||[]; }catch(e){ disciplinas = []; }
+      if(disciplinas.some(d => (d.turmaIds||[]).includes(turmaId))){
+        const key = await getGeminiApiKeyOwnedBy(prof.id);
+        if(key) return key;
+      }
+    }
+  }catch(e){}
+  try{ const r = await window.storage.get('gemini-api-key', true); return (r.value||'').trim(); }catch(e){ return ''; }
+}
+async function callGeminiJSONOnce(prompt, keyOverride){
+  const key = keyOverride || await getGeminiApiKey();
   if(!key) throw new Error('IA_NAO_CONFIGURADA');
   let resp, data;
   try{
@@ -7003,13 +8866,13 @@ async function callGeminiJSONOnce(prompt){
 // Chamadas à IA (Gemini) falham de forma intermitente por natureza (limite de uso por minuto,
 // sobrecarga momentânea do modelo gratuito, resposta mal formatada). Em vez de mostrar erro na
 // primeira falha, tenta de novo automaticamente algumas vezes antes de desistir.
-async function callGeminiJSON(prompt){
+async function callGeminiJSON(prompt, keyOverride){
   const retryDelaysMs = [1500, 3500, 6000];
   const retryableErrors = ['IA_REDE','IA_INDISPONIVEL','IA_JSON_INVALIDO','IA_SEM_RESPOSTA','IA_LIMITE_EXCEDIDO'];
   let lastErr;
   for(let attempt=0; attempt<=retryDelaysMs.length; attempt++){
     try{
-      return await callGeminiJSONOnce(prompt);
+      return await callGeminiJSONOnce(prompt, keyOverride);
     }catch(e){
       lastErr = e;
       const isLast = attempt===retryDelaysMs.length;
@@ -7057,28 +8920,56 @@ async function removeGeminiKey(){
   ia.keyInput = '';
   render();
 }
+async function loadMyIaKey(){
+  const p = state.professor;
+  if(!p.session) return;
+  p.myIaKeyLoading = true;
+  render();
+  p.myIaKey = await getGeminiApiKeyOwnedBy(p.session.id);
+  p.myIaKeyInput = p.myIaKey;
+  p.myIaKeyLoading = false;
+  render();
+}
+async function saveMyIaKey(){
+  const p = state.professor;
+  const val = (p.myIaKeyInput||'').trim();
+  await window.storage.set(`gemini-api-key-professor:${p.session.id}`, val, true);
+  p.myIaKey = val;
+  p.myIaSaved = true;
+  render();
+  setTimeout(() => { p.myIaSaved = false; render(); }, 3000);
+}
+async function removeMyIaKey(){
+  const p = state.professor;
+  await window.storage.delete(`gemini-api-key-professor:${p.session.id}`, true);
+  p.myIaKey = '';
+  p.myIaKeyInput = '';
+  render();
+}
 function renderCoordIA(){
   const ia = state.coordenador.ia;
   if(ia.loading) return `<div class="card"><h2>🤖 Configurações de IA</h2><div class="spinner"></div></div>`;
   return `
     <div class="card">
       <h2>🤖 Configurações de IA</h2>
-      <p class="muted">Ative recursos de IA gratuitos para ajudar os professores a criar questões de prova: gerar questões a partir de um tema, importar questões coladas de um texto, ou extrair questões de um PDF de livro didático (ou lista de exercícios).</p>
-      <p class="muted">A IA usada é o <strong>Google Gemini</strong>, que tem uma camada gratuita. Para ativar:</p>
+      <p class="muted">Ative recursos de IA gratuitos para ajudar os professores a criar questões de prova: gerar questões a partir de um tema, importar questões coladas de um texto, ou extrair questões de um PDF de livro didático (ou lista de exercícios). Também é essa IA que responde às dicas pedidas pelos alunos no Mural de Dúvidas.</p>
+      <p class="muted">A IA usada é o <strong>Google Gemini</strong>, que tem uma camada gratuita. Essa chave abaixo é a <strong>chave de reserva da escola</strong> — usada sempre que um professor não tiver cadastrado a própria chave pessoal (veja o aviso mais abaixo). Para cadastrar:</p>
       <ol class="muted" style="padding-left:20px;">
         <li>Acesse <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> com uma conta Google.</li>
         <li>Clique em "Create API key" e copie a chave gerada.</li>
         <li>Cole a chave no campo abaixo e clique em "Salvar".</li>
       </ol>
-      <label>Chave de API do Gemini</label>
+      <label>Chave de API do Gemini (reserva da escola)</label>
       <input type="text" id="gemini-key-input" value="${esc(ia.keyInput)}" placeholder="Cole aqui a chave (começa com AIza...)">
-      <p class="muted" style="font-size:.8rem;">${ia.key ? '✅ IA configurada e disponível para os professores.' : '⚠ IA ainda não configurada — os professores não verão os recursos de IA funcionando.'}</p>
+      <p class="muted" style="font-size:.8rem;">${ia.key ? '✅ IA configurada e disponível para os professores.' : '⚠ IA ainda não configurada — os professores não verão os recursos de IA funcionando (a menos que cada um tenha cadastrado sua própria chave).'}</p>
       ${ia.saved ? '<p class="muted" style="color:var(--green);">Chave salva!</p>' : ''}
       <div class="row" style="margin-top:14px;">
         ${ia.key ? `<button class="btn btn-danger btn-sm" data-action="remove-gemini-key">Remover chave</button>` : ''}
         <button class="btn btn-primary" data-action="save-gemini-key">Salvar</button>
       </div>
       <p class="muted" style="font-size:.78rem; margin-top:14px;">⚠ Por não haver servidor próprio neste app, essa chave fica acessível a quem tiver acesso técnico ao código da página. Como a camada gratuita do Gemini não cobra cartão e tem limites diários, o risco é apenas de a cota gratuita acabar mais rápido — nunca uma cobrança inesperada.</p>
+      <hr style="margin:20px 0; border:none; border-top:1px solid var(--paper-line);">
+      <p class="muted" style="font-size:.85rem;"><strong>⚠ Importante:</strong> essa chave de reserva é <strong>compartilhada por toda a escola</strong> e o Gemini gratuito permite só cerca de 15 chamadas por minuto. Se vários professores (ou alunos pedindo dica de IA) usarem ao mesmo tempo, é comum aparecer erro de "limite excedido". Recomende a cada professor que cadastre a própria chave gratuita em <strong>Meu perfil → Minha Chave de IA</strong> — leva 1 minuto e elimina esse gargalo.</p>
     </div>
   `;
 }
@@ -7427,20 +9318,8 @@ function imprimirBoletimAluno(studentName){
   `;
   printPages(page);
 }
-async function calcCoordNotas(){
+async function calcColunasParaUnidade(turmaId, unidade, turma){
   const c = state.coordenador;
-  const turmaId = document.getElementById('coord-notas-turma-select').value;
-  const unidade = document.getElementById('coord-notas-unidade-select').value;
-  c.notasTurmaId = turmaId;
-  c.notasUnidade = unidade;
-  if(!turmaId){ c.notasColunas=[]; c.notasRows=[]; render(); return; }
-  c.notasLoading = true;
-  render();
-
-  const turma = state.professor.turmas.find(t=>t.id===turmaId);
-  const roster = turma ? turma.students.map(s=>s.name) : [];
-  const rosterMatriculas = {};
-  if(turma) turma.students.forEach(s => { rosterMatriculas[s.name] = s.matricula||''; });
   const relevant = c.assessments.filter(a => assessmentTurmaIds(a).includes(turmaId) && (a.unidade||'')===unidade);
 
   // group by professor + disciplina (each subject is graded with its own professor's pesos)
@@ -7473,11 +9352,91 @@ async function calcCoordNotas(){
     colunas.push({ disciplinaName: g.disciplinaName, professorName: g.professorName, total, grades });
   }
   colunas.sort((a,b)=>a.disciplinaName.localeCompare(b.disciplinaName, 'pt-BR'));
+  return colunas;
+}
+
+async function calcCoordNotas(){
+  const c = state.coordenador;
+  const turmaId = document.getElementById('coord-notas-turma-select').value;
+  const unidade = document.getElementById('coord-notas-unidade-select').value;
+  c.notasTurmaId = turmaId;
+  c.notasUnidade = unidade;
+  if(!turmaId){ c.notasColunas=[]; c.notasRows=[]; render(); return; }
+  c.notasLoading = true;
+  render();
+
+  const turma = state.professor.turmas.find(t=>t.id===turmaId);
+  const roster = turma ? turma.students.map(s=>s.name) : [];
+  const rosterMatriculas = {};
+  if(turma) turma.students.forEach(s => { rosterMatriculas[s.name] = s.matricula||''; });
+
+  const colunas = await calcColunasParaUnidade(turmaId, unidade, turma);
 
   c.notasColunas = colunas;
   c.notasRows = roster.map(name => ({ name, matricula: rosterMatriculas[name]||'' }));
   c.notasLoading = false;
   render();
+}
+
+async function imprimirBoletimCompletoAluno(studentName){
+  const c = state.coordenador;
+  const turmaId = c.notasTurmaId;
+  if(!turmaId){ alert('Calcule as notas antes de imprimir o boletim.'); return; }
+  const t = state.professor.turmas.find(x=>x.id===turmaId);
+  const r = c.notasRows.find(x=>x.name===studentName);
+  c.boletimCompletoLoading = studentName;
+  render();
+  try{
+    const porUnidade = {};
+    for(const u of UNIDADES){
+      porUnidade[u] = await calcColunasParaUnidade(turmaId, u, t);
+    }
+    // union of disciplinas across all unidades, preserving alphabetical order
+    const disciplinasMap = {};
+    UNIDADES.forEach(u => {
+      porUnidade[u].forEach(col => {
+        if(!disciplinasMap[col.disciplinaName]) disciplinasMap[col.disciplinaName] = { disciplinaName: col.disciplinaName, professorName: col.professorName };
+      });
+    });
+    const disciplinas = Object.values(disciplinasMap).sort((a,b)=>a.disciplinaName.localeCompare(b.disciplinaName, 'pt-BR'));
+
+    const rows = disciplinas.map(d => {
+      const notasPorUnidade = UNIDADES.map(u => {
+        const col = porUnidade[u].find(c2 => c2.disciplinaName===d.disciplinaName);
+        const g = col ? col.grades[studentName] : undefined;
+        return g!==undefined ? g.final : null;
+      });
+      const validas = notasPorUnidade.filter(n => n!==null);
+      const media = validas.length ? (validas.reduce((a,b)=>a+b,0) / validas.length) : null;
+      return `
+        <tr>
+          <td>${esc(d.disciplinaName)}</td>
+          <td>${esc(d.professorName||'-')}</td>
+          ${notasPorUnidade.map(n => `<td style="text-align:center;">${n!==null?n.toFixed(1):'-'}</td>`).join('')}
+          <td style="text-align:center;"><strong>${media!==null?media.toFixed(1):'-'}</strong></td>
+        </tr>
+      `;
+    }).join('');
+
+    const page = `
+      <div class="pv-page">
+        ${buildPrintHeader({ title: 'Boletim Individual — Ano Letivo', subtitle: t?t.name:'' })}
+        <p style="margin:6px 0 14px; font-size:.95rem;"><strong>Aluno:</strong> ${esc(studentName)}${r&&r.matricula?' · <strong>Matrícula:</strong> '+esc(r.matricula):''}</p>
+        <table class="pv-sign-table">
+          <thead><tr>
+            <th>Disciplina</th><th>Professor</th>
+            ${UNIDADES.map(u => `<th style="text-align:center;">${esc(u)}</th>`).join('')}
+            <th style="text-align:center;">Média</th>
+          </tr></thead>
+          <tbody>${rows.length?rows:'<tr><td colspan="'+(UNIDADES.length+3)+'" class="muted" style="text-align:center;">Nenhuma nota lançada ainda.</td></tr>'}</tbody>
+        </table>
+      </div>
+    `;
+    printPages(page);
+  } finally {
+    c.boletimCompletoLoading = null;
+    render();
+  }
 }
 
 async function openCoordResults(code){
@@ -7501,6 +9460,7 @@ function renderAluno(){
   if(al.stage==='dashboard') return renderStudentDashboard();
   if(al.stage==='apresentacao') return renderSlidesApresentacaoAluno();
   if(al.stage==='material-slides') return renderMaterialSlidesAluno();
+  if(al.stage==='envio-tarefa') return renderEnvioTarefaForm();
   if(al.stage==='avatar-edit') return renderAvatarEdit();
   if(al.stage==='aluno-livros') return renderAlunoLivros();
   if(al.stage==='code') return renderCode();
@@ -7636,13 +9596,29 @@ function renderStudentDashboard(){
       </div>
     </div>
 
+    ${renderAlunoNovidadesBanner()}
+
+    ${renderAlunoRankingTrilhaBlock()}
+
+    ${renderAlunoTrilhaIndividualBlock()}
+
     ${renderAlunoSlidesBlock()}
 
     ${renderAlunoMateriaisSlidesBlock()}
 
     ${renderAlunoMateriaisTurmaBlock()}
 
+    ${renderAlunoTarefasBlock()}
+
+    ${renderAlunoCronogramaBlock()}
+
+    ${renderAlunoDuvidasBlock()}
+
+    ${renderAlunoRABlock()}
+
     ${renderAlunoRoletaBlock()}
+
+    ${renderAlunoDueloBlock()}
 
     ${renderAlunoQuizBlock()}
 
@@ -7650,20 +9626,6 @@ function renderStudentDashboard(){
 
     <div class="card">
       <h2>Minhas provas</h2>
-
-      ${(() => {
-        if(!al.turma.students || al.turma.students.length<2) return '';
-        const ranking = [...al.turma.students].map(s=>ensureStudentGamification(s)).sort((a,b)=>b.fichas-a.fichas).slice(0,5);
-        return `
-          <h3 style="margin-top:20px;">🏆 Ranking de Fichas da Turma</h3>
-          ${ranking.map((s,i) => `
-            <div class="list-item">
-              <span>${i+1}º · ${studentAvatarHtml(s,26)} ${esc(s.name)}${s.id===al.matriculaStudentId?' <span class="muted">(você)</span>':''}</span>
-              <span class="muted">${s.fichas} 🎫</span>
-            </div>
-          `).join('')}
-        `;
-      })()}
 
       ${(() => {
         const meus = sortedAvisos((state.professor.avisos||[]).filter(a => !a.turmaIds || a.turmaIds.length===0 || a.turmaIds.includes(al.turma.id)));
@@ -7945,6 +9907,7 @@ function renderResultadoAluno(){
       <h2 class="center">${esc(a.title)}</h2>
       <div class="score-big">${r.total} / ${max}</div>
       <p class="score-sub">Resultado de ${esc(r.studentName)}</p>
+      ${r.comentarioProfessor ? `<div class="q-card" style="background:var(--tint-teal);"><strong>💬 Comentário do professor</strong><p style="margin:6px 0 0;">${esc(r.comentarioProfessor)}</p></div>` : ''}
       ${details}
       ${backButtonHtml('Responder outra avaliação')}
     </div>
@@ -8362,6 +10325,10 @@ async function ensureProfessorDataLoaded(){
   if(p.livrosLoading) loadLivros();
   if(p.avisosLoading) loadAvisos();
   if(p.materiaisLoading) loadMateriais();
+  if(p.tarefasLoading) loadTarefas();
+  if(p.cronogramaLoading) loadCronograma();
+  if(p.duvidasLoading) loadDuvidas();
+  if(p.raItemsLoading) loadRaItems();
   if(p.freqHoje.loading) loadFreqHoje();
 
   // Meu Painel virou a tela principal e depende de avaliações, turmas e disciplinas
@@ -8880,6 +10847,9 @@ function logoutProfessor(){
   p.correcoesPendentesLoaded = false; p.correcoesPendentesCount = 0;
   p.avisos = []; p.avisosLoading = true;
   p.materiais = []; p.materiaisLoading = true; p.newMaterialOpen = false; p.newMaterialTitle=''; p.newMaterialUrl=''; p.newMaterialDescricao=''; p.newMaterialTurmaIds=[]; p.materialError='';
+  p.tarefas = []; p.tarefasLoading = true; p.newTarefaOpen=false; p.newTarefaTitle=''; p.newTarefaDescricao=''; p.newTarefaPrazo=''; p.newTarefaTurmaIds=[]; p.tarefaError=''; p.viewingTarefaId=null; p.tarefaEntregas={};
+  p.cronograma = []; p.cronogramaLoading = true; p.newCronogramaOpen=false; p.newCronogramaData=''; p.newCronogramaConteudo=''; p.newCronogramaTurmaIds=[]; p.cronogramaError='';
+  p.duvidas = []; p.duvidasLoading = true;
   p.livros = []; p.livrosLoading = true;
   p.periodos = {}; p.periodosLoading = true;
   p.unlockRequests = []; p.unlockRequestsLoading = true;
@@ -10489,6 +12459,8 @@ async function openResults(code){
   p.resultsFor = a;
   p.resultsLoading = true;
   p.mode = 'results';
+  p.correctingResponseIdx = null;
+  p.commentingResponseIdx = null;
   render();
   try{
     const r = await window.storage.get(`responses:${code}`, true);
@@ -11309,6 +13281,7 @@ async function pollAlunoAtividadesAoVivo(){
   await pollEnqueteForAluno();
   await pollQuizForAluno();
   await pollRoletaForAluno();
+  await pollDueloForAluno();
   await pollSlidesForAluno();
 }
 async function loadStudentDashboard(){
@@ -11318,6 +13291,9 @@ async function loadStudentDashboard(){
   render();
   if(state.professor.avisosLoading) loadAvisos();
   if(state.professor.materiaisLoading) loadMateriais();
+  if(state.professor.cronogramaLoading) loadCronograma();
+  if(state.professor.duvidasLoading) loadDuvidas();
+  if(state.professor.raItemsLoading) loadRaItems();
   if(al.matriculaStudentId && al.turma) registerStudentLogin(al.turma.id, al.matriculaStudentId);
   stopAlunoEnquetePoll();
   pollAlunoAtividadesAoVivo();
@@ -11348,6 +13324,12 @@ async function loadStudentDashboard(){
   al.dashboardLoading = false;
   render();
   loadMateriaisSlidesDaTurma(al.turma.id);
+  loadTarefasParaAluno();
+  computeNovidadesAluno();
+}
+async function loadTarefasParaAluno(){
+  if(state.professor.tarefasLoading) await loadTarefas();
+  await loadMinhasEntregasTarefas();
 }
 async function loadMateriaisSlidesDaTurma(turmaId){
   const al = state.aluno;
@@ -11580,7 +13562,9 @@ document.addEventListener('click', (e) => {
   else if(act==='prof-logout'){ logoutProfessor(); }
   else if(act==='dismiss-coord-note'){ state.professor.session.coordNoteDismissed = true; render(); }
   else if(act==='dismiss-diario-hoje'){ dismissDiarioHoje(); }
-  else if(act==='open-professor-profile'){ p.avatarDraft = null; p.profileEditorOpen = true; render(); }
+  else if(act==='open-professor-profile'){ p.avatarDraft = null; p.profileEditorOpen = true; render(); loadMyIaKey(); }
+  else if(act==='save-my-ia-key'){ saveMyIaKey(); }
+  else if(act==='remove-my-ia-key'){ removeMyIaKey(); }
   else if(act==='close-professor-profile'){ p.profileEditorOpen = false; p.avatarDraft = null; render(); }
   else if(act==='remover-foto-professor'){ salvarAvatarProfessor({ photoUrl: null }); }
   else if(act==='prof-avatar-emoji'){ p.avatarDraft = p.avatarDraft || { emoji:AVATAR_EMOJIS[0], color:AVATAR_COLORS[0] }; p.avatarDraft.emoji = btn.dataset.emoji; render(); }
@@ -11634,6 +13618,11 @@ document.addEventListener('click', (e) => {
     if(state.coordenador.subview==='roleta'){
       refreshProfessorRoleta();
       roletaPollInterval = setInterval(refreshProfessorRoleta, 2000);
+    }
+    stopDueloPoll();
+    if(state.coordenador.subview==='duelo'){
+      refreshProfessorDuelo();
+      dueloPollInterval = setInterval(refreshProfessorDuelo, 1000);
     }
     stopSlidesPoll();
     if(state.coordenador.subview==='slides'){
@@ -11693,6 +13682,11 @@ document.addEventListener('click', (e) => {
       refreshProfessorRoleta();
       roletaPollInterval = setInterval(refreshProfessorRoleta, 2000);
     }
+    stopDueloPoll();
+    if(p.subview==='duelo'){
+      refreshProfessorDuelo();
+      dueloPollInterval = setInterval(refreshProfessorDuelo, 1000);
+    }
     stopSlidesPoll();
     if(p.subview==='slides'){
       loadSlidesDecks();
@@ -11715,6 +13709,36 @@ document.addEventListener('click', (e) => {
   else if(act==='toggle-material-turma'){ toggleMaterialTurma(btn.dataset.tid); }
   else if(act==='salvar-material'){ salvarMaterial(p.session ? p.session.displayName : 'Professor'); }
   else if(act==='excluir-material'){ excluirMaterial(btn.dataset.id); }
+  else if(act==='abrir-nova-tarefa'){ abrirNovaTarefa(); }
+  else if(act==='cancelar-nova-tarefa'){ cancelarNovaTarefa(); }
+  else if(act==='toggle-tarefa-turma'){ toggleTarefaTurma(btn.dataset.tid); }
+  else if(act==='salvar-tarefa'){ salvarTarefa(p.session ? p.session.displayName : 'Professor'); }
+  else if(act==='excluir-tarefa'){ excluirTarefa(btn.dataset.id); }
+  else if(act==='ver-tarefa'){ abrirTarefaDetalhe(btn.dataset.id); }
+  else if(act==='fechar-tarefa-detalhe'){ fecharTarefaDetalhe(); }
+  else if(act==='abrir-correcao-entrega'){ abrirCorrecaoEntrega(btn.dataset.tid, btn.dataset.sid); }
+  else if(act==='cancelar-correcao-entrega'){ cancelarCorrecaoEntrega(btn.dataset.tid, btn.dataset.sid); }
+  else if(act==='salvar-correcao-entrega'){ salvarCorrecaoEntrega(btn.dataset.tid, btn.dataset.sid); }
+  else if(act==='abrir-envio-tarefa'){ abrirEnvioTarefa(btn.dataset.id); }
+  else if(act==='fechar-envio-tarefa'){ fecharEnvioTarefa(); }
+  else if(act==='enviar-tarefa'){ enviarTarefa(); }
+  else if(act==='abrir-novo-cronograma'){ abrirNovoCronograma(); }
+  else if(act==='cancelar-novo-cronograma'){ cancelarNovoCronograma(); }
+  else if(act==='toggle-cronograma-turma'){ toggleCronogramaTurma(btn.dataset.tid); }
+  else if(act==='salvar-cronograma'){ salvarCronograma(p.session ? p.session.displayName : 'Professor'); }
+  else if(act==='excluir-cronograma'){ excluirCronograma(btn.dataset.id); }
+  else if(act==='excluir-duvida'){ excluirDuvida(btn.dataset.id); }
+  else if(act==='responder-duvida'){ enviarRespostaDuvida(btn.dataset.id, state.view==='professor' ? (p.session?p.session.displayName:'Professor') : al.name, state.view==='professor' ? 'professor' : 'aluno'); }
+  else if(act==='abrir-nova-duvida'){ abrirNovaDuvida(); }
+  else if(act==='cancelar-nova-duvida'){ cancelarNovaDuvida(); }
+  else if(act==='enviar-duvida'){ enviarDuvida(); }
+  else if(act==='pedir-dica-ia'){ pedirDicaIA(btn.dataset.id); }
+  else if(act==='abrir-novo-ra'){ abrirNovoRa(); }
+  else if(act==='cancelar-novo-ra'){ cancelarNovoRa(); }
+  else if(act==='toggle-ra-turma'){ toggleRaTurma(btn.dataset.tid); }
+  else if(act==='salvar-ra'){ salvarRa(p.session ? p.session.displayName : 'Professor'); }
+  else if(act==='editar-ra'){ editarRa(btn.dataset.id); }
+  else if(act==='excluir-ra'){ excluirRa(btn.dataset.id); }
   else if(act==='start-enquete'){ startEnquete(state.view==='coordenador' ? 'Coordenação' : (p.session?p.session.displayName:'Professor')); }
   else if(act==='encerrar-enquete'){ encerrarEnquete(); }
   else if(act==='limpar-enquete'){ limparEnquete(); }
@@ -11743,10 +13767,25 @@ document.addEventListener('click', (e) => {
   else if(act==='quiz-clear'){ quizClear(); }
   else if(act==='quiz-toggle-presentation'){ p.quiz.presentationMode = !p.quiz.presentationMode; render(); resetIdleLogoutTimer(); }
   else if(act==='quiz-answer'){ submitQuizAnswer(parseInt(btn.dataset.idx)); }
+  else if(act==='quiz-activate-power'){ activateQuizPower(); }
   else if(act==='roleta-girar'){ girarRoleta(state.view==='coordenador' ? 'Coordenação' : (p.session?p.session.displayName:'Professor')); }
   else if(act==='roleta-dar-fichas'){ roletaDarFichas(); }
   else if(act==='roleta-reiniciar-rodada'){ roletaReiniciarRodada(); }
   else if(act==='roleta-toggle-presentation'){ p.roleta.presentationMode = !p.roleta.presentationMode; render(); resetIdleLogoutTimer(); }
+  else if(act==='duelo-sortear-dupla'){ dueloSortearDupla(); }
+  else if(act==='duelo-add-option'){ p.duelo.options.push(''); render(); }
+  else if(act==='duelo-remove-option'){
+    const oidx = parseInt(btn.dataset.idx);
+    p.duelo.options.splice(oidx,1);
+    if(p.duelo.correctIndex>=p.duelo.options.length) p.duelo.correctIndex = 0;
+    else if(p.duelo.correctIndex>oidx) p.duelo.correctIndex--;
+    render();
+  }
+  else if(act==='duelo-start'){ startDuelo(state.view==='coordenador' ? 'Coordenação' : (p.session?p.session.displayName:'Professor')); }
+  else if(act==='duelo-reveal'){ dueloRevealAnswer(); }
+  else if(act==='duelo-clear'){ dueloClear(); }
+  else if(act==='duelo-toggle-presentation'){ p.duelo.presentationMode = !p.duelo.presentationMode; render(); resetIdleLogoutTimer(); }
+  else if(act==='duelo-answer'){ submitDueloAnswer(parseInt(btn.dataset.idx)); }
   else if(act==='roleta-enviar-resposta'){ submitRoletaResposta(); }
   else if(act==='roleta-confirmar-participacao'){ confirmarParticipacaoOralRoleta(); }
   else if(act==='slides-selecionar-deck'){ p.slides.selectedDeckId = (p.slides.selectedDeckId===btn.dataset.id ? null : btn.dataset.id); render(); }
@@ -11796,6 +13835,9 @@ document.addEventListener('click', (e) => {
   else if(act==='delete-response'){ deleteResponse(Number(btn.dataset.idx)); }
   else if(act==='open-correct-response'){ p.correctingResponseIdx = Number(btn.dataset.idx); render(); }
   else if(act==='close-correct-response'){ p.correctingResponseIdx = null; render(); }
+  else if(act==='open-comment-response'){ p.commentingResponseIdx = Number(btn.dataset.idx); render(); }
+  else if(act==='close-comment-response'){ p.commentingResponseIdx = null; render(); }
+  else if(act==='save-comment-response'){ saveCommentResponse(Number(btn.dataset.idx)); }
   else if(act==='save-correct-response'){ saveCorrectResponse(Number(btn.dataset.idx)); }
   else if(act==='export-pdf'){ exportAssessmentPdf(btn.dataset.code); }
   else if(act==='print-personal-gabaritos'){ printPersonalAnswerCards(btn.dataset.code); }
@@ -11922,7 +13964,7 @@ document.addEventListener('click', (e) => {
   else if(act==='chamada-exportar-xlsx'){ chamadaExportarXlsx(); }
   else if(act==='chamada-buscar-periodo'){ loadChamadaHistorico(); }
   else if(act==='chamada-exportar-xlsx-periodo'){ chamadaExportarXlsxPeriodo(); }
-  else if(act==='award-ficha-manual'){ awardFichas(btn.dataset.tid, btn.dataset.sid, 1, 'Participação em sala (professor)').then(()=>render()); }
+  else if(act==='award-ficha-manual'){ awardFichas(btn.dataset.tid, btn.dataset.sid, 1, 'Participação em sala (professor)', 'participacao').then(()=>render()); }
   else if(act==='delete-turma'){ deleteTurma(btn.dataset.tid); }
   else if(act==='print-signature-list'){ printTurmaSignatureList(btn.dataset.tid); }
   else if(act==='calc-final-grades'){ calcFinalGrades(); }
@@ -11933,6 +13975,7 @@ document.addEventListener('click', (e) => {
   else if(act==='export-coord-notas-xlsx'){ exportCoordNotasXlsx(); }
   else if(act==='imprimir-notas-finais'){ imprimirNotasFinais(btn.dataset.modo); }
   else if(act==='imprimir-boletim-aluno'){ imprimirBoletimAluno(btn.dataset.name); }
+  else if(act==='imprimir-boletim-completo'){ imprimirBoletimCompletoAluno(btn.dataset.name); }
 
   // disciplinas
   else if(act==='open-new-disciplina'){ p.newDisciplinaOpen = true; p.newDisciplinaName=''; p.newDisciplinaTurmaIds=[]; render(); ensureDisciplinaNamesCache(); }
@@ -11967,7 +14010,7 @@ document.addEventListener('click', (e) => {
   }
   else if(act==='goto-code-entry'){ al.stage='code'; al.error=''; render(); }
   else if(act==='back-to-entrada'){ al.stage='entrada'; al.error=''; al.matriculaStage='input'; render(); }
-  else if(act==='student-logout'){ exitFullscreenSafe(); stopAlunoEnquetePoll(); al.turma=null; al.name=''; al.studentLoggedIn=false; al.loginTurmaId=''; al.matriculaStage='input'; al.matriculaTurmaId=null; al.matriculaStudentId=null; al.matriculaName=''; al.enqueteAtiva=null; al.slidesAtivo=null; al.slidesCurrentImg=null; al.materiaisSlides=[]; al.materialDeck=null; al.isNewStudentSetup=false; al.stage='entrada'; state.view='landing'; render(); }
+  else if(act==='student-logout'){ exitFullscreenSafe(); stopAlunoEnquetePoll(); al.turma=null; al.name=''; al.studentLoggedIn=false; al.loginTurmaId=''; al.matriculaStage='input'; al.matriculaTurmaId=null; al.matriculaStudentId=null; al.matriculaName=''; al.enqueteAtiva=null; al.slidesAtivo=null; al.slidesCurrentImg=null; al.materiaisSlides=[]; al.materialDeck=null; al.isNewStudentSetup=false; al.tarefasTurma=[]; al.tarefaEntregasProprias={}; al.enviandoTarefaId=null; al.tarefaSubmitFile=null; al.tarefaSubmitFileName=''; al.tarefaSubmitLink=''; al.tarefaSubmitComentario=''; al.tarefaSubmitError=''; al.duvidaFormOpen=false; al.newDuvidaTexto=''; al.duvidaError=''; al.novidades=null; al.stage='entrada'; state.view='landing'; render(); }
   else if(act==='goto-aluno-livros'){ stopAlunoEnquetePoll(); al.stage='aluno-livros'; if(state.professor.livrosLoading){ loadLivros(); } render(); }
   else if(act==='back-to-student-dashboard'){ loadStudentDashboard(); }
   else if(act==='dashboard-start-exam'){ stopAlunoEnquetePoll(); dashboardStartExam(btn.dataset.code); }
@@ -11979,7 +14022,7 @@ document.addEventListener('click', (e) => {
   else if(act==='responder-proxima'){ responderProxima(); }
   else if(act==='responder-anterior'){ responderAnterior(); }
   else if(act==='check-release'){ if(resultReleased(al.assessment)){ al.stage='resultado'; } render(); }
-  else if(act==='reset-aluno'){ exitFullscreenSafe(); stopUnlockPolling(); disarmAwayTimer(); stopAlunoEnquetePoll(); state.aluno = { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false }; render(); }
+  else if(act==='reset-aluno'){ exitFullscreenSafe(); stopUnlockPolling(); disarmAwayTimer(); stopAlunoEnquetePoll(); state.aluno = { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, dueloAtivo:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false, tarefasTurma:[], tarefaEntregasProprias:{}, enviandoTarefaId:null, tarefaSubmitFile:null, tarefaSubmitFileName:'', tarefaSubmitLink:'', tarefaSubmitComentario:'', tarefaSubmitError:'', tarefaSubmitUploading:false, duvidaFormOpen:false, newDuvidaTexto:'', duvidaError:'', novidades:null, duvidaIaLoadingId:null, duvidaIaErro:'' }; render(); }
 });
 
 document.addEventListener('input', (e) => {
@@ -12022,6 +14065,23 @@ document.addEventListener('input', (e) => {
   else if(el.id==='material-title-input'){ p.newMaterialTitle = el.value; }
   else if(el.id==='material-url-input'){ p.newMaterialUrl = el.value; }
   else if(el.id==='material-descricao-input'){ p.newMaterialDescricao = el.value; }
+  else if(el.id==='ra-title-input'){ p.newRaTitle = el.value; }
+  else if(el.id==='ra-model-url-input'){ p.newRaModelUrl = el.value; }
+  else if(el.id==='ra-poster-url-input'){ p.newRaPosterUrl = el.value; }
+  else if(el.id==='ra-descricao-input'){ p.newRaDescricao = el.value; }
+  else if(el.id==='tarefa-title-input'){ p.newTarefaTitle = el.value; }
+  else if(el.id==='tarefa-descricao-input'){ p.newTarefaDescricao = el.value; }
+  else if(el.id==='tarefa-prazo-input'){ p.newTarefaPrazo = el.value; }
+  else if(act==='tarefa-nota-input'){ const cache = p.tarefaEntregas[el.dataset.tid]; const item = cache && cache.list.find(x=>x.studentId===el.dataset.sid); if(item) item.draftNota = el.value; }
+  else if(act==='tarefa-feedback-input'){ const cache = p.tarefaEntregas[el.dataset.tid]; const item = cache && cache.list.find(x=>x.studentId===el.dataset.sid); if(item) item.draftFeedback = el.value; }
+  else if(el.id==='tarefa-link-input'){ al.tarefaSubmitLink = el.value; }
+  else if(el.id==='tarefa-comentario-input'){ al.tarefaSubmitComentario = el.value; }
+  else if(el.id==='tarefa-file-input'){ if(el.files[0]) handleTarefaFileUpload(el.files[0]); }
+  else if(el.id==='cronograma-data-input'){ p.newCronogramaData = el.value; }
+  else if(el.id==='cronograma-conteudo-input'){ p.newCronogramaConteudo = el.value; }
+  else if(act==='duvida-resposta-input'){ const d = p.duvidas.find(x=>x.id===el.dataset.id); if(d) d.draftResposta = el.value; }
+  else if(el.id==='duvida-texto-input'){ al.newDuvidaTexto = el.value; }
+  else if(act==='comment-response-input'){ const r = p.responses[parseInt(el.dataset.idx)]; if(r) r.commentDraft = el.value; }
   else if(el.id==='enquete-question-input'){ p.enquete.formQuestion = el.value; }
   else if(act==='enquete-option-input'){ p.enquete.formOptions[parseInt(el.dataset.idx)] = el.value; }
   else if(act==='quiz-team-name-input'){ p.quiz.setup.teams[parseInt(el.dataset.idx)].name = el.value; }
@@ -12029,6 +14089,10 @@ document.addEventListener('input', (e) => {
   else if(act==='quiz-option-text'){ p.quiz.setup.questions[parseInt(el.dataset.qidx)].options[parseInt(el.dataset.oidx)] = el.value; }
   else if(act==='quiz-question-duration'){ p.quiz.setup.questions[parseInt(el.dataset.qidx)].durationSeconds = parseInt(el.value)||30; }
   else if(el.id==='roleta-pergunta-input'){ p.roleta.pergunta = el.value; }
+  else if(el.id==='my-ia-key-input'){ p.myIaKeyInput = el.value; }
+  else if(el.id==='duelo-question-input'){ p.duelo.questionText = el.value; }
+  else if(act==='duelo-option-text'){ p.duelo.options[parseInt(el.dataset.idx)] = el.value; }
+  else if(el.id==='duelo-duration-input'){ p.duelo.durationSeconds = parseInt(el.value)||20; }
   else if(el.id==='avulso-titulo-input'){ p.avulso.form.titulo = el.value; }
   else if(el.id==='avulso-data-input'){ p.avulso.form.dataProva = el.value; }
   else if(el.id==='avulso-numquestoes-input'){ p.avulso.form.numQuestoes = parseInt(el.value)||0; }
@@ -12067,6 +14131,10 @@ document.addEventListener('change', (e) => {
   if(el.id==='quiz-turma-select'){ p.quiz.setup.turmaId = el.value; p.quiz.setup.teams = []; render(); return; }
   if(el.id==='quiz-num-teams-input'){ p.quiz.setup.numTeams = parseInt(el.value)||2; return; }
   if(el.id==='roleta-turma-select'){ p.roleta.turmaId = el.value; render(); return; }
+  if(el.id==='duelo-turma-select'){ p.duelo.turmaId = el.value; p.duelo.studentAId=''; p.duelo.studentBId=''; render(); return; }
+  if(el.id==='duelo-student-a-select'){ p.duelo.studentAId = el.value; render(); return; }
+  if(el.id==='duelo-student-b-select'){ p.duelo.studentBId = el.value; render(); return; }
+  if(act==='duelo-set-correct'){ p.duelo.correctIndex = parseInt(el.dataset.idx); render(); return; }
   if(el.id==='slides-turma-select'){ p.slides.turmaId = el.value; return; }
   if(el.id==='slides-title-input'){ p.slides.uploadTitle = el.value; return; }
   if(act==='quiz-assign-student-team'){ quizAssignStudentTeam(el.dataset.sid, parseInt(el.value)); return; }
