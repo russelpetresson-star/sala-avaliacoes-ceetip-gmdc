@@ -8093,7 +8093,10 @@ function renderCoordProfessores(){
           <strong>${pr.displayName ? esc(pr.displayName) : esc(pr.email)}</strong><br>
           <span class="muted">${esc(pr.email)}${pr.disciplina?' · '+esc(pr.disciplina):''} · ${pr.activatedAt ? 'ativo' : 'pendente (aguardando primeiro acesso)'}${pr.coordNote?' · ⚠ recado pendente':''}</span>
         </div>
-        <button class="btn btn-danger btn-sm" data-action="coord-remove-professor" data-id="${pr.id}">Remover</button>
+        <div class="row" style="flex:0 0 auto; gap:6px;">
+          ${pr.passwordHash ? `<button class="btn btn-ghost btn-sm" data-action="coord-reset-professor-password" data-id="${pr.id}">Redefinir senha</button>` : ''}
+          <button class="btn btn-danger btn-sm" data-action="coord-remove-professor" data-id="${pr.id}">Remover</button>
+        </div>
       </div>
     `).join('');
   }
@@ -9029,6 +9032,19 @@ async function removeProfessor(id){
   await saveProfessoresListRaw(filtered);
   c.professores = filtered;
   if(rec) await moveToTrash('professor', rec.displayName || rec.email || 'Professor', rec);
+  render();
+}
+async function resetProfessorPassword(id){
+  const c = state.coordenador;
+  const list = await fetchProfessoresList();
+  const pr = list.find(p=>p.id===id);
+  if(!pr) return;
+  if(!confirm(`Redefinir a senha de ${pr.displayName || pr.email}? Ele(a) vai precisar escolher o nome e criar uma senha nova no próximo acesso com esse e-mail.`)) return;
+  pr.passwordHash = null;
+  pr.passwordSalt = null;
+  pr.activatedAt = null;
+  await saveProfessoresListRaw(list);
+  c.professores = list;
   render();
 }
 async function saveCoordPassword(){
@@ -13648,6 +13664,7 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-save-periodos'){ saveCoordPeriodos(); }
   else if(act==='coord-add-professor'){ addProfessor(); }
   else if(act==='coord-remove-professor'){ removeProfessor(btn.dataset.id); }
+  else if(act==='coord-reset-professor-password'){ resetProfessorPassword(btn.dataset.id); }
   else if(act==='coord-save-password'){ saveCoordPassword(); }
   else if(act==='coord-save-freq-password'){ saveFreqMonitorPassword(); }
   else if(act==='cancelar-importacao-notas-csv'){ cancelarImportacaoNotasCsv(); }
