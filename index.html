@@ -12475,7 +12475,20 @@ async function syncAvulsoVinculoAssessment(gab, bloco, vinculo, totalVinculosDoB
   if(!assessment && vinculo.id.endsWith('-legacy')){
     assessment = assessmentsExistentes.find(a => a.importadoAvulso && a.avulsoCode===gab.code && a.avulsoDisciplinaBlockId===bloco.id && !a.avulsoVinculoId);
   }
-  if(porAluno.length===0 && !assessment) return; // nada lançado ainda pra esse vínculo
+  if(porAluno.length===0){
+    // Nenhum aluno bate com esse vínculo nessa passada (turma removida do vínculo, disciplina
+    // recriada com outro id, etc.). Se já existia uma avaliação sintética, ela é REMOVIDA em vez
+    // de sobrescrita com notas zeradas — sobrescrever faria o painel do(a) professor(a) mostrar
+    // "0" pra turma inteira e disparar recuperação paralela geral, mesmo as notas reais existindo
+    // (visíveis em Desempenho), só porque essa sincronização específica não achou ninguém.
+    if(assessment){
+      try{ await window.storage.delete(`assessment:${assessment.code}`, true); }catch(e){}
+      try{ await window.storage.delete(`responses:${assessment.code}`, true); }catch(e){}
+      state.professor.assessments = state.professor.assessments.filter(a=>a.code!==assessment.code);
+      state.coordenador.assessments = state.coordenador.assessments.filter(a=>a.code!==assessment.code);
+    }
+    return;
+  }
   const code = assessment ? assessment.code : genCode();
   const turmaIds = turmaIdsSet.size>0 ? [...turmaIdsSet] : (assessment ? (assessment.turmaIds||[]) : (vinculo.turmaIds||[]));
   assessment = {
