@@ -865,6 +865,7 @@ function ensureStudentGamification(s){
   if(!s.avatarColor) s.avatarColor = null;
   if(!Array.isArray(s.loginLog)) s.loginLog = [];
   if(!s.contadores || typeof s.contadores!=='object') s.contadores = {};
+  if(!s.temporadaXp || typeof s.temporadaXp!=='object') s.temporadaXp = { seasonId:null, xp:0 };
   return s;
 }
 const NIVEL_LIMIARES = [0, 20, 50, 100, 180, 300, 450, 650, 900, 1200];
@@ -955,6 +956,22 @@ function professorAvatarHtml(session, size){
   const color = (session && session.avatarColor) || 'var(--board)';
   return `<span style="display:inline-flex; align-items:center; justify-content:center; width:${sz}px; height:${sz}px; border-radius:50%; background:${color}; font-size:${Math.round(sz*0.55)}px; flex:0 0 auto;">${emoji}</span>`;
 }
+async function getTemporadaAtual(){
+  try{ const r = await window.storage.get('temporada-atual', true); return JSON.parse(r.value); }
+  catch(e){ return null; }
+}
+function isTemporadaAtiva(temporada){
+  if(!temporada) return false;
+  const agora = Date.now();
+  return agora >= temporada.startAt && agora <= temporada.endAt;
+}
+function statusTemporada(temporada){
+  if(!temporada) return 'inexistente';
+  const agora = Date.now();
+  if(agora < temporada.startAt) return 'agendada';
+  if(agora > temporada.endAt) return 'encerrada';
+  return 'ativa';
+}
 async function awardFichas(turmaId, studentId, amount, motivo, categoria){
   let turmasFresh;
   try{ const r = await window.storage.get('turmas', true); turmasFresh = JSON.parse(r.value); }catch(e){ turmasFresh = state.professor.turmas; }
@@ -967,6 +984,14 @@ async function awardFichas(turmaId, studentId, amount, motivo, categoria){
   s.fichasHistorico.unshift({ motivo, amount, at: Date.now() });
   s.fichasHistorico = s.fichasHistorico.slice(0,20);
   if(categoria) s.contadores[categoria] = (s.contadores[categoria]||0) + 1;
+  // Temporada de desafios: soma o XP ganho à temporada em andamento, se houver.
+  try{
+    const temporada = await getTemporadaAtual();
+    if(isTemporadaAtiva(temporada)){
+      if(s.temporadaXp.seasonId !== temporada.id) s.temporadaXp = { seasonId: temporada.id, xp: 0 };
+      s.temporadaXp.xp += amount;
+    }
+  }catch(e){}
   await window.storage.set('turmas', JSON.stringify(turmasFresh), true);
   state.professor.turmas = turmasFresh;
   if(state.aluno.turma && state.aluno.turma.id===turmaId){
@@ -1087,6 +1112,7 @@ let state = {
     cronograma: [], cronogramaLoading: true, newCronogramaOpen:false, newCronogramaData:'', newCronogramaConteudo:'', newCronogramaTurmaIds:[], cronogramaError:'',
     duvidas: [], duvidasLoading: true,
     raItems: [], raItemsLoading: true, newRaOpen:false, newRaTitle:'', newRaModelUrl:'', newRaPosterUrl:'', newRaDescricao:'', newRaTurmaIds:[], raError:'', editingRaId:null,
+    temporada: null, temporadaLoading: true,
     enquete: { turmaId:'', current:null, loading:false, formQuestion:'', formOptions:['',''] },
     quiz: { current:null, presentationMode:false, setup: null },
     roleta: { turmaId:'', pergunta:'', historico:[], current:null, spinning:false, spinDisplay:null, presentationMode:false },
@@ -1120,7 +1146,8 @@ let state = {
     periodosDraft: null,
     changingFreqPassword:false, errorFreq:'',
     freqConfig: { mesCalendario: new Date().toISOString().slice(0,7), horariosDraft:null, errorHorarios:'' },
-    importCsv: { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false }
+    importCsv: { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false },
+    temporadaForm: null, temporadaError:''
   },
   freqMonitor: {
     session:false, senhaInput:'', error:'',
@@ -3001,23 +3028,99 @@ function computeDisciplinaTrilhas(al){
   }));
   return porDisciplina;
 }
+// Desempenho médio (%) do aluno em cada disciplina, a partir das provas já realizadas.
+// É a base da adaptação real: decide a ordem da trilha e as recomendações da próxima seção.
+function computeDesempenhoPorDisciplina(al){
+  const porDisciplina = {};
+  (al.dashboardRealizadas||[]).forEach(r => {
+    const a = r.assessment;
+    const nome = a.disciplinaName || 'Sem disciplina';
+    const max = (a.questions||[]).reduce((s,q)=>s+(q.points||0),0);
+    const pct = max>0 ? (r.response.total/max)*100 : 0;
+    if(!porDisciplina[nome]) porDisciplina[nome] = [];
+    porDisciplina[nome].push(pct);
+  });
+  const resultado = {};
+  Object.keys(porDisciplina).forEach(nome => {
+    const arr = porDisciplina[nome];
+    const media = arr.reduce((s,v)=>s+v,0)/arr.length;
+    let nivel = 'forte';
+    if(media<60) nivel = 'fraca';
+    else if(media<80) nivel = 'media';
+    resultado[nome] = { media: Math.round(media), nivel, qtdAvaliacoes: arr.length };
+  });
+  return resultado;
+}
+// Recomendações adaptativas: aponta, na ordem certa, em quais disciplinas o aluno deve focar
+// (as de pior desempenho primeiro) e o que fazer a seguir — uma prova pendente daquela
+// disciplina, se houver, ou pedir ajuda (dúvida/IA) enquanto não há avaliação nova disponível.
+function computeRecomendacoesAdaptativas(al){
+  const desempenho = computeDesempenhoPorDisciplina(al);
+  const alvo = Object.keys(desempenho)
+    .filter(nome => desempenho[nome].nivel !== 'forte')
+    .sort((a,b) => desempenho[a].media - desempenho[b].media);
+  return alvo.slice(0,3).map(nome => {
+    const d = desempenho[nome];
+    const pendente = (al.dashboardPendentes||[]).find(p => p.assessment.disciplinaName===nome && p.status==='aberta');
+    return {
+      disciplina: nome,
+      media: d.media,
+      nivel: d.nivel,
+      pendenteCode: pendente ? pendente.assessment.code : null,
+      pendenteTitle: pendente ? (pendente.assessment.title||computeAssessmentTitle(pendente.assessment)) : null
+    };
+  });
+}
+function renderAlunoRecomendacoesBlock(){
+  const al = state.aluno;
+  if(!al.turma || al.dashboardLoading) return '';
+  const recomendacoes = computeRecomendacoesAdaptativas(al);
+  if(recomendacoes.length===0) return '';
+  return `
+    <div class="card" style="margin-top:16px;">
+      <h2 style="margin-top:0;">🎯 Recomendado pra você</h2>
+      <p class="muted">Baseado no seu desempenho nas provas já feitas — aponta onde vale mais a pena focar primeiro.</p>
+      ${recomendacoes.map(r => `
+        <div class="list-item" style="align-items:flex-start; flex-wrap:wrap; gap:8px;">
+          <div>
+            <strong>${r.nivel==='fraca'?'⚠️':'📈'} ${esc(r.disciplina)}</strong><br>
+            <span class="muted" style="font-size:.85rem;">Média até agora: ${r.media}% ${r.nivel==='fraca' ? '— sua maior oportunidade de melhorar' : '— dá pra reforçar um pouco mais'}</span>
+          </div>
+          ${r.pendenteCode
+            ? `<button class="btn btn-primary btn-sm" data-action="dashboard-start-exam" data-code="${r.pendenteCode}">Fazer agora: ${esc(r.pendenteTitle)}</button>`
+            : `<span class="muted" style="font-size:.8rem;">💬 Poste uma dúvida ou peça uma dica pra IA sobre esse tema, no Mural de Dúvidas</span>`}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
 function renderAlunoTrilhaIndividualBlock(){
   const al = state.aluno;
   if(!al.turma || al.dashboardLoading) return '';
   const trilhas = computeDisciplinaTrilhas(al);
-  const disciplinas = Object.keys(trilhas).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const desempenho = computeDesempenhoPorDisciplina(al);
+  // Trilha adaptativa: as disciplinas com pior desempenho aparecem primeiro,
+  // não apenas em ordem alfabética — o aluno vê logo de cara onde precisa focar.
+  const disciplinas = Object.keys(trilhas).sort((a,b) => {
+    const da = desempenho[a] ? desempenho[a].media : 101;
+    const db = desempenho[b] ? desempenho[b].media : 101;
+    if(da!==db) return da-db;
+    return a.localeCompare(b,'pt-BR');
+  });
   if(disciplinas.length===0) return '';
   return `
     <div class="card" style="margin-top:16px;">
       <h2 style="margin-top:0;">🗺️ Minha Trilha de Progresso</h2>
-      <p class="muted">Cada etapa é uma avaliação da disciplina — vá completando a trilha ao longo do bimestre.</p>
+      <p class="muted">A ordem se adapta ao seu desempenho — as disciplinas que mais precisam de atenção aparecem primeiro.</p>
       ${disciplinas.map(nome => {
         const steps = trilhas[nome];
         const feitas = steps.filter(s=>s.status==='feita').length;
+        const d = desempenho[nome];
+        const tagHtml = d ? `<span class="pill" style="font-size:.7rem; padding:1px 8px;${d.nivel==='fraca'?' background:var(--tint-vinho);':''}">${d.nivel==='fraca'?'⚠️ ':''}${d.media}% de média</span>` : '';
         return `
           <div style="margin-top:18px;">
-            <div class="row" style="justify-content:space-between; align-items:center;">
-              <strong>${esc(nome)}</strong>
+            <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
+              <span><strong>${esc(nome)}</strong> ${tagHtml}</span>
               <span class="muted" style="font-size:.8rem;">${feitas}/${steps.length} concluída(s)</span>
             </div>
             <div class="trilha-track">
@@ -7359,7 +7462,7 @@ function renderNovoAvulso(){
   return `
     <div class="card">
       <h2>${editando ? 'Editar configuração do gabarito' : 'Novo gabarito avulso'}</h2>
-      ${editando ? '<p class="muted" style="font-size:.85rem;">A quantidade de questões, alternativas e os intervalos de cada disciplina não podem ser alterados aqui (já podem estar impressos/aplicados). Você pode ajustar título, unidade, o instrumento substituído e o vínculo de professor(a)/disciplina de cada bloco.</p>' : ''}
+      ${editando ? '<p class="muted" style="font-size:.85rem;">A quantidade de questões e de alternativas não podem ser alteradas aqui (já podem estar impressas/aplicadas). Você pode ajustar título, unidade, o instrumento substituído, o vínculo de professor(a)/disciplina de cada bloco e também o intervalo de questões de cada disciplina — se algum aluno já tiver resposta lançada, as notas por disciplina são recalculadas automaticamente ao salvar.</p>' : ''}
       <label>Título / nome da prova</label>
       <input type="text" id="avulso-titulo-input" class="input" value="${esc(f.titulo)}" placeholder="Ex: Prova Integrada I Unidade">
       <div class="row" style="gap:10px; margin-top:8px;">
@@ -7408,9 +7511,9 @@ function renderNovoAvulso(){
           <div class="row" style="gap:8px; align-items:center; flex-wrap:wrap;">
             <input type="text" class="input" style="flex:2; min-width:140px;" data-action="avulso-disc-nome" data-id="${d.id}" value="${esc(d.nome)}" placeholder="Nome da disciplina (aparece no cartão impresso)">
             <span class="muted">questão</span>
-            <input type="number" class="input" style="flex:0 0 65px;" min="1" max="${f.numQuestoes}" data-action="avulso-disc-inicio" data-id="${d.id}" value="${d.inicio}" ${editando?'disabled':''}>
+            <input type="number" class="input" style="flex:0 0 65px;" min="1" max="${f.numQuestoes}" data-action="avulso-disc-inicio" data-id="${d.id}" value="${d.inicio}">
             <span class="muted">a</span>
-            <input type="number" class="input" style="flex:0 0 65px;" min="1" max="${f.numQuestoes}" data-action="avulso-disc-fim" data-id="${d.id}" value="${d.fim}" ${editando?'disabled':''}>
+            <input type="number" class="input" style="flex:0 0 65px;" min="1" max="${f.numQuestoes}" data-action="avulso-disc-fim" data-id="${d.id}" value="${d.fim}">
             ${editando ? '' : `<button class="btn btn-ghost btn-sm" data-action="avulso-disc-remover" data-id="${d.id}">✕</button>`}
           </div>
           ${vinculos.map((v, vidx) => {
@@ -7840,6 +7943,7 @@ function renderCoordenador(){
     { action:'coord-sub-view', sub:'slides', icon:'🖥️', label:'Apresentação de Slides' },
     { action:'coord-sub-view', sub:'lixeira', icon:'🗑️', label:'Lixeira' },
     { action:'coord-sub-view', sub:'ia', icon:'🤖', label:'Configurações de IA' },
+    { action:'coord-sub-view', sub:'temporada', icon:'🏆', label:'Temporada de Desafios' },
   ];
   let content;
   if(c.subview==='dashboard') content = renderCoordDashboard();
@@ -7864,6 +7968,7 @@ function renderCoordenador(){
   else if(c.subview==='slides') content = renderSlides();
   else if(c.subview==='lixeira') content = renderLixeira();
   else if(c.subview==='ia') content = renderCoordIA();
+  else if(c.subview==='temporada') content = renderCoordTemporada();
   else content = c.mode==='results' ? renderCoordResults() : renderCoordAssessments();
   return `<div class="app-topbar">${topBar}</div><div class="app-shell">${renderSidebar(sidebarItems, c.subview, 'coordenador')}<div class="app-main">${content}</div></div>`;
 }
@@ -8431,6 +8536,7 @@ function ensureCoordDataLoaded(){
   if(state.professor.periodosLoading) loadPeriodos();
   if(state.professor.livrosLoading) loadLivros();
   if(state.professor.avisosLoading) loadAvisos();
+  if(state.professor.temporadaLoading) loadTemporada();
 }
 async function saveCoordPeriodos(){
   const periodos = {};
@@ -9047,6 +9153,229 @@ async function resetProfessorPassword(id){
   c.professores = list;
   render();
 }
+/* ---------------- TEMPORADA DE DESAFIOS (season pass) ---------------- */
+
+async function loadTemporada(){
+  const p = state.professor;
+  p.temporadaLoading = true;
+  try{ p.temporada = await getTemporadaAtual(); }
+  catch(e){ p.temporada = null; }
+  p.temporadaLoading = false;
+  render();
+}
+function abrirFormTemporada(){
+  const c = state.coordenador;
+  const t = state.professor.temporada;
+  if(t){
+    c.temporadaForm = {
+      title: t.title,
+      startDate: new Date(t.startAt).toISOString().slice(0,10),
+      endDate: new Date(t.endAt).toISOString().slice(0,10),
+      tiers: t.tiers.map(x=>({...x}))
+    };
+  } else {
+    c.temporadaForm = {
+      title: '',
+      startDate: new Date().toISOString().slice(0,10),
+      endDate: new Date(Date.now()+30*86400000).toISOString().slice(0,10),
+      tiers: [
+        { xpNecessario:20, recompensa:'Emblema Bronze', emoji:'🥉' },
+        { xpNecessario:50, recompensa:'Emblema Prata', emoji:'🥈' },
+        { xpNecessario:100, recompensa:'Emblema Ouro', emoji:'🥇' }
+      ]
+    };
+  }
+  c.temporadaError = '';
+  render();
+}
+function cancelarFormTemporada(){
+  state.coordenador.temporadaForm = null;
+  render();
+}
+function addTemporadaTier(){
+  state.coordenador.temporadaForm.tiers.push({ xpNecessario:0, recompensa:'', emoji:'🏅' });
+  render();
+}
+function removeTemporadaTier(idx){
+  state.coordenador.temporadaForm.tiers.splice(idx,1);
+  render();
+}
+async function salvarTemporada(){
+  const c = state.coordenador;
+  const f = c.temporadaForm;
+  const title = f.title.trim();
+  if(!title){ c.temporadaError = 'Dê um nome para a temporada.'; render(); return; }
+  const startAt = new Date(f.startDate+'T00:00:00').getTime();
+  const endAt = new Date(f.endDate+'T23:59:59').getTime();
+  if(isNaN(startAt) || isNaN(endAt)){ c.temporadaError = 'Datas inválidas.'; render(); return; }
+  if(endAt<=startAt){ c.temporadaError = 'A data de término deve ser depois da data de início.'; render(); return; }
+  if(f.tiers.length===0){ c.temporadaError = 'Adicione pelo menos um nível de recompensa.'; render(); return; }
+  for(const tier of f.tiers){
+    if(!tier.recompensa || !String(tier.recompensa).trim()){ c.temporadaError = 'Preencha a recompensa de todos os níveis.'; render(); return; }
+    if(tier.xpNecessario===''||tier.xpNecessario===null||isNaN(Number(tier.xpNecessario))||Number(tier.xpNecessario)<0){ c.temporadaError = 'O XP necessário deve ser um número válido.'; render(); return; }
+  }
+  const tiersOrdenados = [...f.tiers].sort((a,b)=>Number(a.xpNecessario)-Number(b.xpNecessario)).map((tr,i) => ({ ordem:i+1, xpNecessario:Number(tr.xpNecessario), recompensa:String(tr.recompensa).trim(), emoji:tr.emoji||'🏅' }));
+  const existente = state.professor.temporada;
+  const temporada = {
+    id: existente ? existente.id : cryptoId(),
+    title,
+    startAt,
+    endAt,
+    tiers: tiersOrdenados,
+    createdAt: existente ? existente.createdAt : Date.now()
+  };
+  await window.storage.set('temporada-atual', JSON.stringify(temporada), true);
+  state.professor.temporada = temporada;
+  c.temporadaForm = null;
+  c.temporadaError = '';
+  render();
+}
+async function excluirTemporada(){
+  if(!confirm('Excluir a temporada atual? Os alunos deixarão de ver a trilha de desafios. O progresso de XP da temporada não pode ser recuperado depois.')) return;
+  await window.storage.delete('temporada-atual', true);
+  state.professor.temporada = null;
+  render();
+}
+function computeTemporadaRanking(temporada){
+  const ranking = [];
+  (state.professor.turmas||[]).forEach(t => {
+    (t.students||[]).forEach(s => {
+      ensureStudentGamification(s);
+      if(s.temporadaXp && s.temporadaXp.seasonId===temporada.id && s.temporadaXp.xp>0){
+        ranking.push({ name:s.name, turmaName:t.name, xp:s.temporadaXp.xp });
+      }
+    });
+  });
+  return ranking.sort((a,b)=>b.xp-a.xp).slice(0,10);
+}
+function tierAtualIndex(temporada, xp){
+  let idx = -1;
+  temporada.tiers.forEach((tier,i) => { if(xp>=tier.xpNecessario) idx = i; });
+  return idx;
+}
+function renderCoordTemporada(){
+  const c = state.coordenador;
+  const p = state.professor;
+  if(p.temporadaLoading) return `<div class="card"><h2>🏆 Temporada de Desafios</h2><div class="spinner"></div></div>`;
+  if(c.temporadaForm){
+    const f = c.temporadaForm;
+    return `
+      <div class="card">
+        <h2>${p.temporada ? 'Editar temporada' : 'Nova temporada'}</h2>
+        <label>Nome da temporada</label>
+        <input type="text" id="temporada-title-input" value="${esc(f.title)}" placeholder="Ex: Temporada 1 — Desafio de Outubro">
+        <div class="row" style="gap:14px;">
+          <div style="flex:1;">
+            <label>Início</label>
+            <input type="date" id="temporada-start-input" value="${esc(f.startDate)}">
+          </div>
+          <div style="flex:1;">
+            <label>Término</label>
+            <input type="date" id="temporada-end-input" value="${esc(f.endDate)}">
+          </div>
+        </div>
+        <h3 style="margin-top:18px;">Níveis de recompensa</h3>
+        <p class="muted" style="font-size:.82rem;">Cada nível é desbloqueado quando o aluno acumula a quantidade de fichas (XP) indicada, ganhas durante o período da temporada.</p>
+        ${f.tiers.map((tier,i) => `
+          <div class="row" style="gap:8px; align-items:center; margin-bottom:6px;">
+            <input type="text" data-action="temporada-tier-emoji" data-idx="${i}" value="${esc(tier.emoji)}" style="width:50px; text-align:center;" maxlength="2">
+            <input type="number" min="0" data-action="temporada-tier-xp" data-idx="${i}" value="${tier.xpNecessario}" placeholder="XP" style="width:90px;">
+            <input type="text" data-action="temporada-tier-recompensa" data-idx="${i}" value="${esc(tier.recompensa)}" placeholder="Recompensa (ex: Emblema Ouro)" style="flex:1;">
+            <button class="btn btn-danger btn-sm" data-action="remove-temporada-tier" data-idx="${i}">✕</button>
+          </div>
+        `).join('')}
+        <button class="btn btn-ghost btn-sm" data-action="add-temporada-tier" style="margin-top:6px;">+ Adicionar nível</button>
+        ${c.temporadaError ? `<p class="err">${esc(c.temporadaError)}</p>` : ''}
+        <div class="row" style="margin-top:16px;">
+          <button class="btn btn-ghost" data-action="cancelar-form-temporada">Cancelar</button>
+          <button class="btn btn-primary" data-action="salvar-temporada">Salvar temporada</button>
+        </div>
+      </div>
+    `;
+  }
+  if(!p.temporada){
+    return `
+      <div class="card">
+        <h2>🏆 Temporada de Desafios</h2>
+        <p class="muted">Crie um período especial (uma "temporada", como em jogos) com níveis de recompensa que os alunos desbloqueiam ganhando fichas. Dá um motivo extra pra participar das atividades por um tempo limitado.</p>
+        <button class="btn btn-primary" data-action="abrir-form-temporada">+ Criar temporada</button>
+      </div>
+    `;
+  }
+  const t = p.temporada;
+  const status = statusTemporada(t);
+  const statusLabel = { agendada:'📅 Agendada', ativa:'🟢 Em andamento', encerrada:'🏁 Encerrada' }[status];
+  const ranking = computeTemporadaRanking(t);
+  return `
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <h2 style="margin:0;">🏆 ${esc(t.title)}</h2>
+        <span class="pill">${statusLabel}</span>
+      </div>
+      <p class="muted">${new Date(t.startAt).toLocaleDateString('pt-BR')} até ${new Date(t.endAt).toLocaleDateString('pt-BR')} · ${t.tiers.length} nível(is) de recompensa</p>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-ghost btn-sm" data-action="abrir-form-temporada">Editar</button>
+        <button class="btn btn-danger btn-sm" data-action="excluir-temporada">Excluir temporada</button>
+      </div>
+      <h3 style="margin-top:20px;">Níveis</h3>
+      ${t.tiers.map(tier => `<div class="list-item"><span>${esc(tier.emoji)} Nível ${tier.ordem} · ${tier.xpNecessario} XP</span><span class="muted">${esc(tier.recompensa)}</span></div>`).join('')}
+      <h3 style="margin-top:20px;">🏅 Ranking da temporada</h3>
+      ${ranking.length===0 ? '<p class="muted">Ainda ninguém pontuou nesta temporada.</p>' : ranking.map((r,i) => `
+        <div class="list-item"><span>${i+1}º · ${esc(r.name)} <span class="muted">(${esc(r.turmaName)})</span></span><span class="muted">${r.xp} XP</span></div>
+      `).join('')}
+    </div>
+  `;
+}
+function renderAlunoTemporadaBlock(){
+  const al = state.aluno;
+  const t = state.professor.temporada;
+  if(!t) return '';
+  const status = statusTemporada(t);
+  if(status==='encerrada') return '';
+  const turma = al.turma;
+  let student = null;
+  if(turma && turma.students) student = turma.students.find(s=>s.id===al.matriculaStudentId);
+  if(student) ensureStudentGamification(student);
+  const xp = (student && student.temporadaXp && student.temporadaXp.seasonId===t.id) ? student.temporadaXp.xp : 0;
+  if(status==='agendada'){
+    const dias = Math.ceil((t.startAt - Date.now())/86400000);
+    return `
+      <div class="card inicio-card accent-teal">
+        <strong>🏆 ${esc(t.title)}</strong>
+        <p style="margin:4px 0 0;">Começa em ${dias<=0?'breve':dias+' dia(s)'} — ${t.tiers.length} nível(is) de recompensa esperando por você!</p>
+      </div>
+    `;
+  }
+  const idxAtual = tierAtualIndex(t, xp);
+  const proximoTier = t.tiers[idxAtual+1];
+  const baseXp = idxAtual>=0 ? t.tiers[idxAtual].xpNecessario : 0;
+  const pctFaixa = proximoTier ? Math.min(100, Math.max(0, Math.round(((xp-baseXp)/((proximoTier.xpNecessario-baseXp)||1))*100))) : 100;
+  const diasRestantes = Math.max(0, Math.ceil((t.endAt - Date.now())/86400000));
+  const trackHtml = t.tiers.map((tier,i) => {
+    const desbloqueado = i<=idxAtual;
+    return `
+      <div class="trilha-step ${desbloqueado?'feita':'bloqueada'}">
+        <div class="trilha-node" title="${esc(tier.recompensa)}">${esc(tier.emoji)}</div>
+        <span class="trilha-label">${tier.xpNecessario} XP</span>
+      </div>
+      ${i<t.tiers.length-1 ? `<div class="trilha-linha ${i<idxAtual?'feita':''}"></div>` : ''}
+    `;
+  }).join('');
+  return `
+    <div class="card">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <h3 style="margin:0;">🏆 ${esc(t.title)}</h3>
+        <span class="muted" style="font-size:.8rem;">⏳ ${diasRestantes} dia(s) restante(s)</span>
+      </div>
+      <div class="trilha-track" style="margin-top:12px;">${trackHtml}</div>
+      ${proximoTier ? `
+        <p class="muted" style="margin:10px 0 4px; font-size:.85rem;">Faltam ${proximoTier.xpNecessario - xp} XP para o próximo nível: ${esc(proximoTier.emoji)} ${esc(proximoTier.recompensa)}</p>
+        <div class="chart-track"><div class="chart-fill" style="width:${pctFaixa}%;"></div></div>
+      ` : `<p class="muted" style="margin:10px 0 0; font-size:.85rem;">🎉 Você desbloqueou todos os níveis desta temporada!</p>`}
+    </div>
+  `;
+}
+
 async function saveCoordPassword(){
   const c = state.coordenador;
   c.changingPassword = true;
@@ -9613,6 +9942,10 @@ function renderStudentDashboard(){
     </div>
 
     ${renderAlunoNovidadesBanner()}
+
+    ${renderAlunoRecomendacoesBlock()}
+
+    ${renderAlunoTemporadaBlock()}
 
     ${renderAlunoRankingTrilhaBlock()}
 
@@ -10345,6 +10678,7 @@ async function ensureProfessorDataLoaded(){
   if(p.cronogramaLoading) loadCronograma();
   if(p.duvidasLoading) loadDuvidas();
   if(p.raItemsLoading) loadRaItems();
+  if(p.temporadaLoading) loadTemporada();
   if(p.freqHoje.loading) loadFreqHoje();
 
   // Meu Painel virou a tela principal e depende de avaliações, turmas e disciplinas
@@ -11625,10 +11959,16 @@ async function salvarEdicaoAvulso(){
   if(!gabOriginal){ setErr('Este gabarito não foi encontrado.'); return; }
   for(const d of f.disciplinas){
     if(!d.nome || !d.nome.trim()){ setErr('Preencha o nome de todas as disciplinas.'); return; }
+    const ini = parseInt(d.inicio), fim = parseInt(d.fim);
+    if(!ini || !fim || ini<1 || fim>gabOriginal.numQuestoes || ini>fim){ setErr(`Intervalo de questões inválido para "${d.nome}" (deve estar entre 1 e ${gabOriginal.numQuestoes}).`); return; }
   }
   if(f.instrumento && !f.unidade){ setErr('Para substituir um instrumento avaliativo, selecione a unidade.'); return; }
   const disciplinasAtualizadas = construirDisciplinasComVinculos(f, setErr);
   if(!disciplinasAtualizadas) return;
+  const faixasMudaram = disciplinasAtualizadas.some(dNovo => {
+    const dOriginal = gabOriginal.disciplinas.find(x=>x.id===dNovo.id);
+    return !dOriginal || dOriginal.inicio!==dNovo.inicio || dOriginal.fim!==dNovo.fim;
+  });
   const gabAtualizado = {
     ...gabOriginal,
     titulo: (f.titulo||'').trim() || 'Gabarito Avulso',
@@ -11649,12 +11989,24 @@ async function salvarEdicaoAvulso(){
   const idx = p.avulso.list.findIndex(x=>x.id===gabAtualizado.id);
   if(idx>=0) p.avulso.list[idx] = gabAtualizado;
   await saveAvulsosToStorage();
+  // Se o intervalo de questões de alguma disciplina mudou e já existem respostas lançadas,
+  // recalcula a nota por disciplina de cada aluno com o novo intervalo antes de sincronizar
+  // com o painel do(a) professor(a) — senão a nota que aparece lá ficaria desatualizada.
+  if(gabAtualizado.gabarito && faixasMudaram){
+    let respostasExistentes = [];
+    try{ const r = await window.storage.get(`avulso-respostas:${gabAtualizado.code}`, true); respostasExistentes = JSON.parse(r.value) || []; }catch(e){ respostasExistentes = []; }
+    if(respostasExistentes.length>0){
+      const recalculadas = respostasExistentes.map(r => ({ ...r, ...gradeAvulsoRespostas(gabAtualizado, r.respostas) }));
+      await window.storage.set(`avulso-respostas:${gabAtualizado.code}`, JSON.stringify(recalculadas), true);
+      if(p.avulso.current && p.avulso.current.code===gabAtualizado.code) p.avulso.respostas = recalculadas;
+    }
+  }
   await syncAvulsoInstrumento(gabAtualizado);
   p.avulso.mode = 'detalhe';
   p.avulso.current = gabAtualizado;
   p.avulso.form = null;
   render();
-  alert('Configuração do gabarito atualizada.');
+  alert(faixasMudaram ? 'Configuração do gabarito atualizada. As notas por disciplina já lançadas foram recalculadas com o novo intervalo de questões.' : 'Configuração do gabarito atualizada.');
 }
 async function cleanupAvulsoVinculo(code, vinculoId, blockId){
   const all = [...state.professor.assessments, ...state.coordenador.assessments];
@@ -13310,6 +13662,7 @@ async function loadStudentDashboard(){
   if(state.professor.cronogramaLoading) loadCronograma();
   if(state.professor.duvidasLoading) loadDuvidas();
   if(state.professor.raItemsLoading) loadRaItems();
+  if(state.professor.temporadaLoading) loadTemporada();
   if(al.matriculaStudentId && al.turma) registerStudentLogin(al.turma.id, al.matriculaStudentId);
   stopAlunoEnquetePoll();
   pollAlunoAtividadesAoVivo();
@@ -13665,6 +14018,12 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-add-professor'){ addProfessor(); }
   else if(act==='coord-remove-professor'){ removeProfessor(btn.dataset.id); }
   else if(act==='coord-reset-professor-password'){ resetProfessorPassword(btn.dataset.id); }
+  else if(act==='abrir-form-temporada'){ abrirFormTemporada(); }
+  else if(act==='cancelar-form-temporada'){ cancelarFormTemporada(); }
+  else if(act==='add-temporada-tier'){ addTemporadaTier(); }
+  else if(act==='remove-temporada-tier'){ removeTemporadaTier(parseInt(btn.dataset.idx)); }
+  else if(act==='salvar-temporada'){ salvarTemporada(); }
+  else if(act==='excluir-temporada'){ excluirTemporada(); }
   else if(act==='coord-save-password'){ saveCoordPassword(); }
   else if(act==='coord-save-freq-password'){ saveFreqMonitorPassword(); }
   else if(act==='cancelar-importacao-notas-csv'){ cancelarImportacaoNotasCsv(); }
@@ -14109,6 +14468,12 @@ document.addEventListener('input', (e) => {
   else if(el.id==='my-ia-key-input'){ p.myIaKeyInput = el.value; }
   else if(el.id==='duelo-question-input'){ p.duelo.questionText = el.value; }
   else if(act==='duelo-option-text'){ p.duelo.options[parseInt(el.dataset.idx)] = el.value; }
+  else if(el.id==='temporada-title-input'){ state.coordenador.temporadaForm.title = el.value; }
+  else if(el.id==='temporada-start-input'){ state.coordenador.temporadaForm.startDate = el.value; }
+  else if(el.id==='temporada-end-input'){ state.coordenador.temporadaForm.endDate = el.value; }
+  else if(act==='temporada-tier-emoji'){ state.coordenador.temporadaForm.tiers[parseInt(el.dataset.idx)].emoji = el.value; }
+  else if(act==='temporada-tier-xp'){ state.coordenador.temporadaForm.tiers[parseInt(el.dataset.idx)].xpNecessario = el.value; }
+  else if(act==='temporada-tier-recompensa'){ state.coordenador.temporadaForm.tiers[parseInt(el.dataset.idx)].recompensa = el.value; }
   else if(el.id==='duelo-duration-input'){ p.duelo.durationSeconds = parseInt(el.value)||20; }
   else if(el.id==='avulso-titulo-input'){ p.avulso.form.titulo = el.value; }
   else if(el.id==='avulso-data-input'){ p.avulso.form.dataProva = el.value; }
