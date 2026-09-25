@@ -578,7 +578,7 @@
 </div>
 <div id="print-area"></div>
 
-<!-- Firebase (banco de dados e arquivos) -->
+<!-- Firebase (banco de dados) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
@@ -595,6 +595,53 @@ const firebaseConfig = {
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+
+/* ==== Cloudinary (armazenamento de arquivos: PDFs, modelos .glb/.gltf) ====
+   Preencha os dois valores abaixo com os dados da SUA conta gratuita do Cloudinary
+   (cloudinary.com — não pede cartão de crédito):
+     1) CLOUDINARY_CLOUD_NAME: aparece no topo do painel (Dashboard) assim que você entra.
+     2) CLOUDINARY_UPLOAD_PRESET: crie em Settings → Upload → "Upload presets" → "Add upload
+        preset", e marque "Signing Mode: Unsigned". Dá pra restringir lá quais formatos são
+        aceitos (pdf, doc, docx, ppt, pptx, glb, gltf) e o tamanho máximo, por segurança.
+   Enquanto esses dois campos estiverem vazios, o envio de arquivo do computador fica
+   indisponível (mas o resto do app continua funcionando normalmente, com upload por link). */
+const CLOUDINARY_CLOUD_NAME = 'zefawjzn';
+const CLOUDINARY_UPLOAD_PRESET = 'Sala_avaliacoes_CEETIP_MDC';
+
+/* Envio de arquivos "de verdade" (PDF, modelos 3D .glb) pro Cloudinary — usado por
+   Material da Turma e Realidade Aumentada. O Firestore (window.storage acima) só guarda
+   textos pequenos, então arquivos maiores precisam ir pra um serviço de arquivos e a
+   gente guarda só o link. Mantém o mesmo nome/assinatura de antes (uploadFileToStorage)
+   pra não precisar mexer em mais nada no resto do código. */
+function uploadFileToStorage(file, folder, onProgress){
+  return new Promise((resolve, reject) => {
+    if(!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET){ reject(new Error('storage-indisponivel')); return; }
+    try{
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const publicId = `${folder}/${Date.now()}-${cryptoId()}-${safeName}`;
+      const form = new FormData();
+      form.append('file', file);
+      form.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+      form.append('public_id', publicId);
+      const xhr = new XMLHttpRequest();
+      // resource_type "raw" cobre PDF, doc, ppt e modelos .glb/.gltf (arquivos que não são
+      // imagem nem vídeo). Se um dia precisar de imagens/vídeos aqui, trocar pra "auto".
+      xhr.open('POST', `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/raw/upload`);
+      xhr.upload.onprogress = (e) => {
+        if(onProgress && e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        try{
+          const resp = JSON.parse(xhr.responseText);
+          if(xhr.status >= 200 && xhr.status < 300 && resp.secure_url){ resolve(resp.secure_url); }
+          else{ reject(new Error(resp.error?.message || 'cloudinary-erro')); }
+        }catch(e){ reject(e); }
+      };
+      xhr.onerror = () => reject(new Error('cloudinary-rede'));
+      xhr.send(form);
+    }catch(e){ reject(e); }
+  });
+}
 
 /* Camada de compatibilidade: reproduz a mesma interface window.storage.get/set/delete/list
    que todo o restante do código já usa, só que gravando de verdade no Firestore. */
@@ -1106,12 +1153,12 @@ let state = {
     painel: null, painelTab: 'notas', // 'notas' | 'desempenho' | 'conteudo' | 'alunos'
     painelDisciplinaFiltro: '', // '' = todas as disciplinas; senão, id de uma disciplina do professor
     avisos: [], avisosLoading: true, newAvisoText: '', newAvisoTurmaIds: [], newAvisoPinned: false,
-    materiais: [], materiaisLoading: true, newMaterialOpen:false, newMaterialTitle:'', newMaterialUrl:'', newMaterialDescricao:'', newMaterialTurmaIds:[], materialError:'',
+    materiais: [], materiaisLoading: true, newMaterialOpen:false, newMaterialTitle:'', newMaterialUrl:'', newMaterialDescricao:'', newMaterialTurmaIds:[], materialError:'', materialUploading:false, materialUploadProgress:0,
     tarefas: [], tarefasLoading: true, newTarefaOpen:false, newTarefaTitle:'', newTarefaDescricao:'', newTarefaPrazo:'', newTarefaTurmaIds:[], tarefaError:'',
     viewingTarefaId: null, tarefaEntregas: {}, gradingEntregaId: null, gradeNotaInput:'', gradeFeedbackInput:'',
     cronograma: [], cronogramaLoading: true, newCronogramaOpen:false, newCronogramaData:'', newCronogramaConteudo:'', newCronogramaTurmaIds:[], cronogramaError:'',
     duvidas: [], duvidasLoading: true,
-    raItems: [], raItemsLoading: true, newRaOpen:false, newRaTitle:'', newRaModelUrl:'', newRaPosterUrl:'', newRaDescricao:'', newRaTurmaIds:[], raError:'', editingRaId:null,
+    raItems: [], raItemsLoading: true, newRaOpen:false, newRaTitle:'', newRaModelUrl:'', newRaPosterUrl:'', newRaDescricao:'', newRaTurmaIds:[], raError:'', editingRaId:null, raUploading:false, raUploadProgress:0,
     temporada: null, temporadaLoading: true,
     enquete: { turmaId:'', current:null, loading:false, formQuestion:'', formOptions:['',''] },
     quiz: { current:null, presentationMode:false, setup: null },
@@ -1846,6 +1893,32 @@ function abrirNovoMaterial(){
   p.newMaterialDescricao = '';
   p.newMaterialTurmaIds = [];
   p.materialError = '';
+  p.materialUploading = false;
+  p.materialUploadProgress = 0;
+  render();
+}
+const MATERIAL_MAX_UPLOAD_MB = 25;
+async function handleMaterialFileUpload(file){
+  const p = state.professor;
+  if(!file) return;
+  if(file.size > MATERIAL_MAX_UPLOAD_MB * 1024 * 1024){
+    p.materialError = `Esse arquivo tem mais de ${MATERIAL_MAX_UPLOAD_MB}MB. Envie um arquivo menor ou cole um link (Google Drive, por exemplo).`;
+    render(); return;
+  }
+  p.materialUploading = true;
+  p.materialUploadProgress = 0;
+  p.materialError = '';
+  render();
+  try{
+    const url = await uploadFileToStorage(file, 'materiais', (pct) => { p.materialUploadProgress = pct; render(); });
+    p.newMaterialUrl = url;
+    if(!p.newMaterialTitle.trim()) p.newMaterialTitle = file.name.replace(/\.[^.]+$/, '');
+  }catch(e){
+    p.materialError = e && e.message==='storage-indisponivel'
+      ? 'O envio de arquivo do computador não está disponível no momento. Cole um link (Google Drive, por exemplo) por enquanto.'
+      : 'Não foi possível enviar o arquivo agora. Verifique sua conexão e tente de novo, ou cole um link.';
+  }
+  p.materialUploading = false;
   render();
 }
 function cancelarNovoMaterial(){
@@ -1904,9 +1977,13 @@ function renderMateriais(){
       <h3 style="margin-top:0;">Novo material</h3>
       <label>Título</label>
       <input type="text" id="material-title-input" value="${esc(p.newMaterialTitle)}" placeholder="Ex: Apostila de Circuitos Elétricos — Cap. 3">
+      <label>Enviar arquivo do computador (PDF, imagem, etc. — até ${MATERIAL_MAX_UPLOAD_MB}MB)</label>
+      <input type="file" id="material-file-input" accept="application/pdf,image/*,.doc,.docx,.ppt,.pptx" ${p.materialUploading?'disabled':''}>
+      ${p.materialUploading ? `<div class="chart-track" style="margin-top:6px;"><div class="chart-fill" style="width:${p.materialUploadProgress}%;"></div></div><p class="muted" style="font-size:.78rem;">Enviando... ${p.materialUploadProgress}%</p>` : ''}
+      <p class="muted" style="font-size:.8rem; margin:6px 0;">— ou —</p>
       <label>Link (Google Drive, YouTube, site etc.)</label>
       <input type="text" id="material-url-input" value="${esc(p.newMaterialUrl)}" placeholder="Cole aqui o link de compartilhamento">
-      <p class="muted" style="font-size:.8rem; margin-top:2px;">Se for um arquivo do Google Drive, ative o compartilhamento "qualquer pessoa com o link" antes de colar aqui.</p>
+      <p class="muted" style="font-size:.8rem; margin-top:2px;">Se for um arquivo do Google Drive, ative o compartilhamento "qualquer pessoa com o link" antes de colar aqui. Se você enviou um arquivo acima, esse campo é preenchido sozinho.</p>
       <label>Observação (opcional)</label>
       <textarea id="material-descricao-input" placeholder="Ex: Leiam antes da próxima aula.">${esc(p.newMaterialDescricao)}</textarea>
       <label style="margin-top:10px;">Para quais turmas?</label>
@@ -2722,6 +2799,35 @@ function abrirNovoRa(){
   p.newRaDescricao = '';
   p.newRaTurmaIds = [];
   p.raError = '';
+  p.raUploading = false;
+  p.raUploadProgress = 0;
+  render();
+}
+const RA_MAX_UPLOAD_MB = 30;
+async function handleRaModelFileUpload(file){
+  const p = state.professor;
+  if(!file) return;
+  if(!/\.(glb|gltf)$/i.test(file.name)){
+    p.raError = 'Envie um arquivo .glb ou .gltf.';
+    render(); return;
+  }
+  if(file.size > RA_MAX_UPLOAD_MB * 1024 * 1024){
+    p.raError = `Esse modelo tem mais de ${RA_MAX_UPLOAD_MB}MB. Tente uma versão mais leve do modelo (a maioria dos editores 3D tem uma opção de "compactar"/"otimizar" ao exportar).`;
+    render(); return;
+  }
+  p.raUploading = true;
+  p.raUploadProgress = 0;
+  p.raError = '';
+  render();
+  try{
+    const url = await uploadFileToStorage(file, 'ra-modelos', (pct) => { p.raUploadProgress = pct; render(); });
+    p.newRaModelUrl = url;
+  }catch(e){
+    p.raError = e && e.message==='storage-indisponivel'
+      ? 'O envio de arquivo do computador não está disponível no momento. Cole um link direto do arquivo .glb por enquanto.'
+      : 'Não foi possível enviar o modelo agora. Verifique sua conexão e tente de novo, ou cole um link direto do arquivo.';
+  }
+  p.raUploading = false;
   render();
 }
 function editarRa(id){
@@ -2808,7 +2914,7 @@ function renderRealidadeAumentada(canManage){
     <div class="card" style="margin-bottom:14px;">
       <h2 style="margin-top:0;">🕶️ Realidade Aumentada</h2>
       <p style="margin:0 0 8px;">Nenhum aplicativo é necessário: os alunos abrem no celular pelo próprio navegador, giram o modelo 3D na tela e, tocando em "Ver em RA", projetam o objeto no ambiente real usando a câmera.</p>
-      <p class="muted" style="margin:0;">Cole abaixo o link direto de um arquivo <strong>.glb</strong> ou <strong>.gltf</strong>. Não sabe onde conseguir um? Veja os sites abaixo — a maioria tem modelos gratuitos para baixar e alguns permitem link direto.</p>
+      <p class="muted" style="margin:0;">Envie o arquivo <strong>.glb</strong> ou <strong>.gltf</strong> direto do seu computador, ou cole o link direto de um. Não tem um modelo ainda? Veja os sites abaixo — a maioria tem modelos gratuitos para baixar.</p>
       <div class="ra-sites-list">
         ${RA_SITES_MODELOS.map(s => `<a class="ra-site-link" href="${esc(s.url)}" target="_blank" rel="noopener">🔗 ${esc(s.nome)}</a>`).join('')}
       </div>
@@ -2819,6 +2925,10 @@ function renderRealidadeAumentada(canManage){
       <h3 style="margin-top:0;">${p.editingRaId ? 'Editar modelo' : 'Novo modelo em RA'}</h3>
       <label>Título</label>
       <input type="text" id="ra-title-input" value="${esc(p.newRaTitle)}" placeholder="Ex: Motor elétrico trifásico">
+      <label>Enviar arquivo do computador (.glb ou .gltf — até ${RA_MAX_UPLOAD_MB}MB)</label>
+      <input type="file" id="ra-model-file-input" accept=".glb,.gltf" ${p.raUploading?'disabled':''}>
+      ${p.raUploading ? `<div class="chart-track" style="margin-top:6px;"><div class="chart-fill" style="width:${p.raUploadProgress}%;"></div></div><p class="muted" style="font-size:.78rem;">Enviando... ${p.raUploadProgress}%</p>` : ''}
+      <p class="muted" style="font-size:.8rem; margin:6px 0;">— ou —</p>
       <label>Link do modelo 3D (.glb ou .gltf)</label>
       <input type="text" id="ra-model-url-input" value="${esc(p.newRaModelUrl)}" placeholder="Cole aqui o link direto do arquivo .glb">
       <label>Imagem de capa (opcional)</label>
@@ -14441,8 +14551,10 @@ document.addEventListener('input', (e) => {
   else if(el.id==='material-title-input'){ p.newMaterialTitle = el.value; }
   else if(el.id==='material-url-input'){ p.newMaterialUrl = el.value; }
   else if(el.id==='material-descricao-input'){ p.newMaterialDescricao = el.value; }
+  else if(el.id==='material-file-input'){ if(el.files[0]) handleMaterialFileUpload(el.files[0]); }
   else if(el.id==='ra-title-input'){ p.newRaTitle = el.value; }
   else if(el.id==='ra-model-url-input'){ p.newRaModelUrl = el.value; }
+  else if(el.id==='ra-model-file-input'){ if(el.files[0]) handleRaModelFileUpload(el.files[0]); }
   else if(el.id==='ra-poster-url-input'){ p.newRaPosterUrl = el.value; }
   else if(el.id==='ra-descricao-input'){ p.newRaDescricao = el.value; }
   else if(el.id==='tarefa-title-input'){ p.newTarefaTitle = el.value; }
