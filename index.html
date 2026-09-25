@@ -968,7 +968,7 @@ let state = {
   ui: { sidebarOpen: false, sidebarSearch: '', showPrivacy: false, tour: { active:false, role:null, step:0 }, lixeira: { loading:true, items:[] }, installPrompt: { show:false } },
   professor: {
     session: null, loginStage:'email', loginEmail:'', loginRecordId:null, loginError:'',
-    setupAvatarEmoji:null, setupAvatarColor:null,
+    setupAvatarEmoji:null, setupAvatarColor:null, setupName:'', setupPassword:'', setupPassword2:'',
     profileEditorOpen:false, avatarDraft:null,
     subview: 'inicio', // 'inicio' | 'painel' | 'avaliacoes' | 'banco' | 'turmas' | ...
     mode:'list', assessments: [], loadingList:true, newAssessment: freshAssessment(), resultsFor:null, responses:[], resultsLoading:false, editingCode:null, editingResponseCount:0, correctingResponseIdx:null,
@@ -1401,7 +1401,7 @@ function renderProfessor(){
   else if(p.subview==='banco') content = renderBanco();
   else if(p.subview==='turmas') content = renderTurmas();
   else if(p.subview==='chamada') content = renderChamada(null, true);
-  else if(p.subview==='freqpainel') content = renderFreqPainel(p.freqPainel, p.turmas);
+  else if(p.subview==='freqpainel') content = renderFreqPainel(p.freqPainel, professorTurmas());
   else if(p.subview==='disciplinas') content = renderDisciplinas();
   else if(p.subview==='pesos') content = renderPesos();
   else if(p.subview==='liberacoes') content = renderLiberacoes();
@@ -1441,11 +1441,11 @@ function renderProfessorLogin(){
         <h2>Primeiro acesso</h2>
         <p class="muted">E-mail: ${esc(p.loginEmail)}</p>
         <label>Como você quer ser chamado?</label>
-        <input type="text" id="setup-name-input" placeholder="Seu nome">
+        <input type="text" id="setup-name-input" placeholder="Seu nome" value="${esc(p.setupName||'')}">
         <label>Crie uma senha</label>
-        <input type="password" id="setup-password-input" placeholder="Mínimo 4 caracteres">
+        <input type="password" id="setup-password-input" placeholder="Mínimo 4 caracteres" value="${esc(p.setupPassword||'')}">
         <label>Confirme a senha</label>
-        <input type="password" id="setup-password2-input" placeholder="Repita a senha">
+        <input type="password" id="setup-password2-input" placeholder="Repita a senha" value="${esc(p.setupPassword2||'')}">
         <label style="margin-top:10px;">Escolha um avatar (dá para trocar depois, a qualquer momento, em "Meu perfil")</label>
         <div class="row" style="align-items:center; gap:12px; margin-bottom:8px;">
           <div style="width:48px;height:48px;border-radius:50%;background:${p.setupAvatarColor||AVATAR_COLORS[0]};display:flex;align-items:center;justify-content:center;font-size:1.5rem;flex:0 0 auto;">${p.setupAvatarEmoji||AVATAR_EMOJIS[0]}</div>
@@ -1553,12 +1553,13 @@ function renderProfessorList(){
       </div>
     `}).join('');
   }
-  const totalFichas = p.turmas.reduce((sum,t) => sum + t.students.reduce((s2,st) => s2 + (ensureStudentGamification(st).fichas||0), 0), 0);
+  const minhasTurmas = professorTurmas();
+  const totalFichas = minhasTurmas.reduce((sum,t) => sum + t.students.reduce((s2,st) => s2 + (ensureStudentGamification(st).fichas||0), 0), 0);
   return `
     ${renderGreetingHeader(p.session.displayName, 'Aqui está um resumo rápido da sua Sala de Avaliações.')}
     <div class="stat-row">
       ${renderStatTile('📝', myAssessments.length, 'Avaliações cadastradas', 'vinho')}
-      ${renderStatTile('👥', p.turmas.length, 'Turmas', 'teal')}
+      ${renderStatTile('👥', minhasTurmas.length, 'Turmas', 'teal')}
       ${renderStatTile('🎫', totalFichas, 'Fichas distribuídas', 'coral')}
     </div>
     ${renderPeriodosCard()}
@@ -1622,7 +1623,7 @@ function sortedAvisos(list){
 function renderMuralAvisos(canManage){
   const p = state.professor;
   if(p.avisosLoading) return `<div class="card"><h2>Mural de Avisos</h2><div class="spinner"></div></div>`;
-  const turmaCheckboxes = state.professor.turmas.map(t => `
+  const turmaCheckboxes = professorTurmas().map(t => `
     <label class="picker-item">
       <input type="checkbox" data-action="toggle-aviso-turma" data-tid="${t.id}" ${p.newAvisoTurmaIds.includes(t.id)?'checked':''}>
       <span>${esc(t.name)}</span>
@@ -1764,7 +1765,7 @@ function enqueteTally(poll){
 function renderEnqueteRelampago(){
   const p = state.professor;
   const e = p.enquete;
-  const turmaOptions = p.turmas.map(t=>`<option value="${t.id}" ${e.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
+  const turmaOptions = professorTurmas().map(t=>`<option value="${t.id}" ${e.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
   const cur = e.current;
   let resultBlock = '';
   if(cur){
@@ -2005,7 +2006,7 @@ function renderQuizSetupForm(){
   const p = state.professor;
   if(!p.quiz.setup) openQuizSetup();
   const s = p.quiz.setup;
-  const turmaOptions = p.turmas.map(t=>`<option value="${t.id}" ${s.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
+  const turmaOptions = professorTurmas().map(t=>`<option value="${t.id}" ${s.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
   const turma = p.turmas.find(t=>t.id===s.turmaId);
   let teamsBlock = '';
   if(turma){
@@ -2357,7 +2358,7 @@ async function confirmarParticipacaoOralRoleta(){
 function renderRoleta(){
   const p = state.professor;
   const rs = p.roleta;
-  const turmaOptions = p.turmas.map(t=>`<option value="${t.id}" ${rs.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
+  const turmaOptions = professorTurmas().map(t=>`<option value="${t.id}" ${rs.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
   const turma = p.turmas.find(t=>t.id===rs.turmaId);
   const cur = rs.current;
   let displayBlock = '';
@@ -2704,7 +2705,7 @@ async function encerrarApresentacaoSlides(){
 function renderSlides(){
   const p = state.professor;
   const s = p.slides;
-  const turmaOptions = p.turmas.map(t=>`<option value="${t.id}" ${s.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
+  const turmaOptions = professorTurmas().map(t=>`<option value="${t.id}" ${s.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
 
   if(s.current){
     const turma = p.turmas.find(t=>t.id===s.current.turmaId);
@@ -3085,7 +3086,8 @@ function renderNewAssessment(){
   const p = state.professor;
   const a = p.newAssessment;
   const qHtml = a.questions.map((q,idx) => renderQuestionEditor(q, idx, true)).join('');
-  const turmaOptions = p.turmas.map(t => `
+  const minhasTurmasNovaAval = professorTurmas();
+  const turmaOptions = minhasTurmasNovaAval.map(t => `
     <label class="picker-item">
       <input type="checkbox" data-action="toggle-assessment-turma" data-tid="${t.id}" ${(a.turmaIds||[]).includes(t.id)?'checked':''}>
       <span>${esc(t.name)} (${t.students.length} alunos)</span>
@@ -3127,7 +3129,7 @@ function renderNewAssessment(){
       </select>
       ${p.disciplinas.length===0 ? '<p class="muted" style="font-size:.82rem; margin-top:4px;">Nenhuma disciplina cadastrada ainda — cadastre na aba "Disciplinas".</p>' : ''}
       <label>Turmas (opcional — marque quantas quiser)</label>
-      ${p.turmas.length===0 ? '<p class="muted" style="font-size:.82rem;">Nenhuma turma cadastrada ainda.</p>' : `<div class="picker" style="margin-top:0;">${turmaOptions}</div>`}
+      ${minhasTurmasNovaAval.length===0 ? '<p class="muted" style="font-size:.82rem;">Nenhuma turma vinculada a uma disciplina sua ainda — vá em "Disciplinas" e marque em quais turmas você leciona.</p>' : `<div class="picker" style="margin-top:0;">${turmaOptions}</div>`}
       ${a.instrumento==='recuperacao' ? `
         <p class="muted" style="font-size:.85rem;">Esta avaliação substitui a Avaliação Mensal/Bimestral (NP1) na nota final apenas para os alunos que a responderem. Quem não fizer continua com o NP1 normal.</p>
       ` : ''}
@@ -3731,8 +3733,9 @@ function renderBookImport(){
 
 function renderTurmas(){
   const p = state.professor;
+  const minhasTurmas = turmasVisiveisProfessor();
   if(p.viewingTurmaId){
-    const t = p.turmas.find(x=>x.id===p.viewingTurmaId);
+    const t = minhasTurmas.find(x=>x.id===p.viewingTurmaId);
     if(!t){ p.viewingTurmaId=null; }
     else return renderTurmaDetail(t);
   }
@@ -3758,10 +3761,10 @@ function renderTurmas(){
   let body;
   if(p.turmasLoading){
     body = `<div class="spinner"></div>`;
-  } else if(p.turmas.length===0){
-    body = `<div class="empty">Nenhuma turma cadastrada ainda.</div>`;
+  } else if(minhasTurmas.length===0){
+    body = `<div class="empty">Nenhuma turma sua ainda. Cadastre uma nova turma abaixo ou vincule uma turma existente em uma disciplina sua, na aba "Disciplinas".</div>`;
   } else {
-    body = p.turmas.map(t => `
+    body = minhasTurmas.map(t => `
       <div class="list-item clickable" data-action="view-turma" data-tid="${t.id}">
         <div><strong>${esc(t.name)}</strong><br><span class="muted">${t.students.length} aluno(s)</span></div>
         <span class="muted">→</span>
@@ -3774,6 +3777,7 @@ function renderTurmas(){
         <h2>Turmas</h2>
         <button class="btn btn-primary" data-action="open-new-turma">+ Nova turma</button>
       </div>
+      <p class="muted" style="font-size:.82rem;">Mostrando apenas as turmas em que você leciona (vinculadas a alguma disciplina sua) ou que você mesmo cadastrou.</p>
       ${body}
     </div>
   `;
@@ -3782,7 +3786,7 @@ function renderTurmas(){
 /* ---------------- CHAMADA POR CÓDIGO DE BARRAS ---------------- */
 function getChamadaCtx(){
   if(state.view==='freqmonitor') return { ch: state.freqMonitor.chamada, turmas: state.freqMonitor.turmas };
-  return { ch: state.professor.chamada, turmas: state.professor.turmas };
+  return { ch: state.professor.chamada, turmas: professorTurmas() };
 }
 async function ensureDiasLetivosLoaded(){
   if(!state.diasLetivos.loading) return;
@@ -4505,7 +4509,7 @@ function renderListaBlocos(){
 function renderNovoBloco(pool){
   const p = state.professor;
   const b = p.bloco;
-  const turmaOptions = p.turmas.map(t => `<option value="${t.id}" ${b.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
+  const turmaOptions = professorTurmas().map(t => `<option value="${t.id}" ${b.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
   const matching = b.turmaId ? pool.filter(a => assessmentTurmaIds(a).includes(b.turmaId)) : [];
   const totalSelecionado = b.selectedCodes.reduce((sum,code) => { const a = pool.find(x=>x.code===code); return sum + (a ? a.questions.filter(q=>q.type==='mc'||q.type==='vf').length : 0); }, 0);
   return `
@@ -8242,7 +8246,7 @@ async function loadFreqHoje(){
     try{ const r = await window.storage.get('turmas', true); p.turmas = JSON.parse(r.value); }catch(e){ p.turmas = []; }
   }
   const hoje = new Date().toISOString().slice(0,10);
-  const turmasManha = p.turmas.filter(t=>t.turno==='Manhã');
+  const turmasManha = professorTurmas().filter(t=>t.turno==='Manhã');
   const linhas = [];
   for(const t of turmasManha){
     let presentes = [];
@@ -8630,6 +8634,7 @@ async function submitLoginEmail(){
   if(p.loginStage==='setup'){
     p.setupAvatarEmoji = AVATAR_EMOJIS[Math.floor(Math.random()*AVATAR_EMOJIS.length)];
     p.setupAvatarColor = AVATAR_COLORS[Math.floor(Math.random()*AVATAR_COLORS.length)];
+    p.setupName = ''; p.setupPassword = ''; p.setupPassword2 = '';
   }
   render();
 }
@@ -8676,9 +8681,9 @@ async function submitLoginPassword(){
 }
 async function submitLoginSetup(){
   const p = state.professor;
-  const name = document.getElementById('setup-name-input').value.trim();
-  const pass = document.getElementById('setup-password-input').value;
-  const pass2 = document.getElementById('setup-password2-input').value;
+  const name = (p.setupName||'').trim();
+  const pass = p.setupPassword||'';
+  const pass2 = p.setupPassword2||'';
   if(!name){ p.loginError = 'Escolha como quer ser chamado.'; render(); return; }
   if(pass.length<4){ p.loginError = 'A senha deve ter pelo menos 4 caracteres.'; render(); return; }
   if(pass!==pass2){ p.loginError = 'As senhas não coincidem.'; render(); return; }
@@ -8695,6 +8700,7 @@ async function submitLoginSetup(){
   await saveProfessoresListRaw(list);
   p.session = { id: rec.id, email: rec.email, displayName: name, disciplina: rec.disciplina, coordNote: rec.coordNote||null, coordNoteDismissed:false, avatarEmoji: rec.avatarEmoji, avatarColor: rec.avatarColor, photoUrl: rec.photoUrl };
   p.loginError = '';
+  p.setupName = ''; p.setupPassword = ''; p.setupPassword2 = '';
   render();
   resetIdleLogoutTimer();
   registerProfessorLogin(rec.id);
@@ -10566,7 +10572,7 @@ async function saveTurma(){
     const matricula = parts[1] ? parts[1].trim() : null;
     return { id:cryptoId(), name, matricula, passwordHash:null, activatedAt:null };
   });
-  const turma = { id: cryptoId(), name: p.newTurmaName.trim(), turno:'', students, createdAt: Date.now() };
+  const turma = { id: cryptoId(), name: p.newTurmaName.trim(), turno:'', students, createdAt: Date.now(), criadoPorId: p.session.id };
   p.turmas.unshift(turma);
   await saveTurmasToStorage();
   p.newTurmaOpen = false;
@@ -10907,6 +10913,14 @@ function professorTurmas(){
   const ids = new Set();
   p.disciplinas.forEach(d => (d.turmaIds||[]).forEach(tid => ids.add(tid)));
   return p.turmas.filter(t => ids.has(t.id));
+}
+// Turmas que devem aparecer pro professor na tela "Turmas" (gestão de matrícula/turno):
+// as que ele já vinculou a alguma disciplina, mais as que ele mesmo cadastrou (mesmo que
+// ainda não tenha vinculado a nenhuma disciplina — senão a turma "sumiria" assim que criada).
+function turmasVisiveisProfessor(){
+  const p = state.professor;
+  const meusIds = new Set(professorTurmas().map(t=>t.id));
+  return p.turmas.filter(t => meusIds.has(t.id) || t.criadoPorId===p.session.id);
 }
 
 async function deleteDisciplina(did){
@@ -11405,7 +11419,7 @@ document.addEventListener('click', (e) => {
   else if(act==='prof-login-email-submit'){ submitLoginEmail(); }
   else if(act==='prof-login-password-submit'){ submitLoginPassword(); }
   else if(act==='prof-login-setup-submit'){ submitLoginSetup(); }
-  else if(act==='prof-login-back-to-email'){ const p=state.professor; p.loginStage='email'; p.loginError=''; render(); }
+  else if(act==='prof-login-back-to-email'){ const p=state.professor; p.loginStage='email'; p.loginError=''; p.setupName=''; p.setupPassword=''; p.setupPassword2=''; render(); }
   else if(act==='prof-logout'){ logoutProfessor(); }
   else if(act==='dismiss-coord-note'){ state.professor.session.coordNoteDismissed = true; render(); }
   else if(act==='dismiss-diario-hoje'){ dismissDiarioHoje(); }
@@ -11813,6 +11827,9 @@ document.addEventListener('input', (e) => {
 
   if(el.id==='code-input'){ al.code = el.value; }
   else if(el.id==='name-input'){ al.name = el.value; }
+  else if(el.id==='setup-name-input'){ p.setupName = el.value; }
+  else if(el.id==='setup-password-input'){ p.setupPassword = el.value; }
+  else if(el.id==='setup-password2-input'){ p.setupPassword2 = el.value; }
   else if(el.id==='turma-name-input'){ p.newTurmaName = el.value; }
   else if(el.id==='turma-students-input'){ p.newTurmaStudentsText = el.value; }
   else if(el.id==='new-turma-roster-file'){
