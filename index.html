@@ -12163,12 +12163,16 @@ function construirDisciplinasComVinculos(f, setErr){
         }
       }
     }
-    const vinculosResolvidos = (d.vinculos||[]).map(v => {
+    const vinculosResolvidos = [];
+    for(const v of (d.vinculos||[])){
+      // vínculo em branco (nenhum professor escolhido ainda) — ignora silenciosamente, não é erro.
+      if(!v.professorId && !v.disciplinaId) continue;
       const prof = profCache.find(pr=>pr.id===v.professorId);
-      const disc = prof ? (prof.disciplinas||[]).find(x=>x.id===v.disciplinaId) : null;
-      if(!prof || !disc) return null;
-      return { id:v.id, professorId:v.professorId, professorName:prof.name, disciplinaId:v.disciplinaId, disciplinaName:disc.name, turmaIds:(v.turmaIds||[]).slice() };
-    }).filter(Boolean);
+      if(!v.professorId || !prof){ setErr(`Em "${d.nome||'disciplina'}", há um vínculo sem professor(a) selecionado(a) (ou o professor não está mais ativo). Selecione o(a) professor(a) ou remova esse vínculo antes de salvar.`); return null; }
+      const disc = (prof.disciplinas||[]).find(x=>x.id===v.disciplinaId);
+      if(!disc){ setErr(`Em "${d.nome||'disciplina'}", falta escolher a disciplina de ${prof.name} no segundo campo do vínculo — sem isso, essa disciplina não aparece no painel do professor(a). Selecione a disciplina antes de salvar.`); return null; }
+      vinculosResolvidos.push({ id:v.id, professorId:v.professorId, professorName:prof.name, disciplinaId:v.disciplinaId, disciplinaName:disc.name, turmaIds:(v.turmaIds||[]).slice() });
+    }
     resultado.push({ id:d.id, nome:d.nome.trim(), inicio:parseInt(d.inicio), fim:parseInt(d.fim), vinculos: vinculosResolvidos });
   }
   return resultado;
