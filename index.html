@@ -556,7 +556,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-09-28-1035</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-09-28-1215</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -1187,6 +1187,7 @@ let state = {
     profDisciplinasEditId:null, profDisciplinasList:[], profDisciplinasLoading:false, newProfDisciplinaNome:'', newProfDisciplinaTurmaIds:[],
     assessments:[], assessmentsLoading:true, filterProfessorId:'', filterDisciplina:'',
     resultsFor:null, responses:[], resultsLoading:false,
+    transferRespIdx:null, transferTargetCode:'', transferError:'',
     notasTurmaId:'', notasUnidade:'I Unidade', notasLoading:false, notasColunas:[], notasRows:[], boletimCompletoLoading:null,
     professorPesos:{}, professorPesosLoading:true,
     ia: { loading:true, key:'', keyInput:'', saved:false },
@@ -8564,10 +8565,41 @@ function renderCoordResults(){
     const max = a.questions.reduce((s,q)=>s+q.points,0);
     const scores = responses.map(r=>r.total);
     const avg = (scores.reduce((s,v)=>s+v,0)/scores.length);
+    const outrasAvaliacoes = (c.assessments||[]).filter(x=>x.code!==a.code);
     body = `
       ${renderStatCards(responses.length, avg, Math.max(...scores), Math.min(...scores), max)}
       ${renderQuestionChart(a, responses, max)}
       ${renderDistributionChart(responses, max)}
+      <h3 style="margin-top:18px;">Alunos que responderam</h3>
+      <p class="muted" style="font-size:.85rem;">Se um aluno foi lançado por engano nessa avaliação (ex.: com o gabarito de outra série/turma), use "🔀 Transferir" pra mover a resposta pra avaliação certa e recalcular a nota — sem precisar lançar tudo de novo.</p>
+      <div class="table-scroll">
+      <table>
+        <tr><th>Aluno</th><th>Nota</th><th></th></tr>
+        ${responses.map((r, idx) => `
+          <tr>
+            <td>${esc(r.studentName)}${r.transferidoDe?'<br><span class="muted" style="font-size:.75rem;">↪ transferido de outra avaliação</span>':''}</td>
+            <td>${r.total}/${max}</td>
+            <td><button class="btn btn-ghost btn-sm" data-action="coord-abrir-transferir-resposta" data-idx="${idx}">🔀 Transferir</button></td>
+          </tr>
+          ${c.transferRespIdx===idx ? `
+          <tr><td colspan="3" style="padding:0;">
+            <div class="card" style="background:var(--surface); margin:6px 0; padding:10px;">
+              <label style="font-size:.8rem;">Transferir a resposta de <strong>${esc(r.studentName)}</strong> pra qual avaliação (o gabarito correto)?</label>
+              <select id="coord-transfer-target-select" class="input">
+                <option value="">Selecione a avaliação correta...</option>
+                ${outrasAvaliacoes.map(x => `<option value="${x.code}" ${c.transferTargetCode===x.code?'selected':''}>${esc(x.title)}${x.disciplinaName?' · '+esc(x.disciplinaName):''} (${x.code})</option>`).join('')}
+              </select>
+              ${c.transferError ? `<p class="err" style="font-size:.82rem;">${esc(c.transferError)}</p>` : ''}
+              <div class="row" style="margin-top:8px;">
+                <button class="btn btn-ghost btn-sm" data-action="coord-cancelar-transferir-resposta">Cancelar</button>
+                <button class="btn btn-primary btn-sm" data-action="coord-confirmar-transferir-resposta">Confirmar transferência</button>
+              </div>
+            </div>
+          </td></tr>
+          ` : ''}
+        `).join('')}
+      </table>
+      </div>
     `;
   }
   return `
@@ -11039,6 +11071,106 @@ function gradeObjective(q, answer){
   if(q.type==='mc') return answer===q.correctOptionId ? q.points : 0;
   if(q.type==='vf') return answer===q.correctBool ? q.points : 0;
   return 0;
+}
+
+// Recalcula a resposta de um aluno como se ela tivesse sido lançada direto na avaliação de
+// destino, em vez da de origem — usado quando o(a) professor(a) aplicou o gabarito errado
+// (ex.: lançou respostas do 1º ano usando o gabarito do 2º ano) e o coordenador precisa
+// transferir a resposta já lançada pra avaliação certa, sem pedir pra lançar tudo de novo.
+// Funciona posição a posição: pega a LETRA que o aluno marcou em cada questão (independente do
+// id, que é só da avaliação de origem) e aplica essa mesma letra na questão correspondente da
+// avaliação de destino. Só é seguro quando as duas avaliações têm a mesma quantidade de questões,
+// na mesma ordem e do mesmo tipo — por isso a função recusa e explica o motivo quando não bate.
+function tentarRegradarResposta(response, fromAssessment, toAssessment){
+  const qsFrom = fromAssessment.questions || [];
+  const qsTo = toAssessment.questions || [];
+  if(qsFrom.length !== qsTo.length){
+    return { ok:false, motivo: `As duas avaliações têm quantidade de questões diferente (${qsFrom.length} na avaliação atual, ${qsTo.length} na de destino) — não dá pra saber com certeza qual questão corresponde a qual.` };
+  }
+  for(let i=0;i<qsFrom.length;i++){
+    if(qsFrom[i].type !== qsTo[i].type){
+      return { ok:false, motivo: `A questão ${i+1} é do tipo "${qsFrom[i].type}" numa avaliação e "${qsTo[i].type}" na outra — a ordem das questões não bate entre as duas avaliações.` };
+    }
+  }
+  const details = [];
+  let total = 0;
+  const answers = {};
+  for(let i=0;i<qsFrom.length;i++){
+    const qFrom = qsFrom[i], qTo = qsTo[i];
+    const respostaAntiga = response.answers ? response.answers[qFrom.id] : undefined;
+    let answerVal = null, score = 0;
+    if(qFrom.type==='mc'){
+      if(respostaAntiga!=null){
+        const letterIdx = (qFrom.options||[]).findIndex(o=>o.id===respostaAntiga);
+        if(letterIdx>=0 && qTo.options && qTo.options[letterIdx]){
+          answerVal = qTo.options[letterIdx].id;
+          score = gradeObjective(qTo, answerVal);
+        }
+      }
+      details.push({ questionId: qTo.id, score, feedback: null });
+      total += score;
+      answers[qTo.id] = answerVal;
+    } else if(qFrom.type==='vf'){
+      if(respostaAntiga!=null){ answerVal = respostaAntiga; score = gradeObjective(qTo, answerVal); }
+      details.push({ questionId: qTo.id, score, feedback: null });
+      total += score;
+      answers[qTo.id] = answerVal;
+    } else {
+      // dissertativa ou outro tipo não-objetivo: não dá pra recalcular automaticamente,
+      // mantém a nota e o comentário que já tinham sido dados pra essa questão.
+      const oldDetail = (response.details||[]).find(d=>d.questionId===qFrom.id);
+      score = oldDetail ? (oldDetail.score||0) : 0;
+      details.push({ questionId: qTo.id, score, feedback: oldDetail ? oldDetail.feedback : null });
+      total += score;
+      answers[qTo.id] = respostaAntiga;
+    }
+  }
+  const novoRegistro = { ...response, total, details, answers, transferidoDe: fromAssessment.code, transferidoEm: Date.now() };
+  return { ok:true, novoRegistro };
+}
+async function coordAbrirTransferirResposta(idx){
+  const c = state.coordenador;
+  c.transferRespIdx = idx;
+  c.transferTargetCode = '';
+  c.transferError = '';
+  render();
+}
+function coordCancelarTransferirResposta(){
+  const c = state.coordenador;
+  c.transferRespIdx = null;
+  c.transferTargetCode = '';
+  c.transferError = '';
+  render();
+}
+async function coordConfirmarTransferirResposta(){
+  const c = state.coordenador;
+  const idx = c.transferRespIdx;
+  if(idx==null || !c.responses[idx]) return;
+  const response = c.responses[idx];
+  const fromA = c.resultsFor;
+  const toCode = c.transferTargetCode;
+  if(!toCode){ c.transferError = 'Escolha a avaliação correta de destino.'; render(); return; }
+  if(toCode===fromA.code){ c.transferError = 'Escolha uma avaliação diferente da atual.'; render(); return; }
+  const toA = (c.assessments||[]).find(x=>x.code===toCode);
+  if(!toA){ c.transferError = 'Avaliação de destino não encontrada.'; render(); return; }
+  const resultado = tentarRegradarResposta(response, fromA, toA);
+  if(!resultado.ok){ c.transferError = resultado.motivo; render(); return; }
+  if(!confirm(`Transferir a resposta de "${response.studentName}" de "${fromA.title}" para "${toA.title}"? A nota é recalculada com o gabarito da avaliação de destino.`)) return;
+  let origemList = [];
+  try{ const r = await window.storage.get(`responses:${fromA.code}`, true); origemList = JSON.parse(r.value); }catch(e){ origemList = []; }
+  origemList = origemList.filter(x=>x.studentName!==response.studentName);
+  await window.storage.set(`responses:${fromA.code}`, JSON.stringify(origemList), true);
+  let destinoList = [];
+  try{ const r = await window.storage.get(`responses:${toA.code}`, true); destinoList = JSON.parse(r.value); }catch(e){ destinoList = []; }
+  destinoList = destinoList.filter(x=>x.studentName!==response.studentName);
+  destinoList.push(resultado.novoRegistro);
+  await window.storage.set(`responses:${toA.code}`, JSON.stringify(destinoList), true);
+  c.responses = origemList;
+  c.transferRespIdx = null;
+  c.transferTargetCode = '';
+  c.transferError = '';
+  render();
+  alert(`Resposta de ${response.studentName} transferida para "${toA.title}" e recalculada com sucesso.`);
 }
 
 async function gradeEssay(q, answer){
@@ -14253,6 +14385,9 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-fechar-disciplinas-prof'){ coordFecharDisciplinasProfessor(); }
   else if(act==='coord-adicionar-disciplina-prof'){ coordAdicionarDisciplinaProfessor(); }
   else if(act==='coord-remover-disciplina-prof'){ coordRemoverDisciplinaProfessor(btn.dataset.discid); }
+  else if(act==='coord-abrir-transferir-resposta'){ coordAbrirTransferirResposta(parseInt(btn.dataset.idx)); }
+  else if(act==='coord-cancelar-transferir-resposta'){ coordCancelarTransferirResposta(); }
+  else if(act==='coord-confirmar-transferir-resposta'){ coordConfirmarTransferirResposta(); }
   else if(act==='abrir-form-temporada'){ abrirFormTemporada(); }
   else if(act==='cancelar-form-temporada'){ cancelarFormTemporada(); }
   else if(act==='add-temporada-tier'){ addTemporadaTier(); }
@@ -14264,7 +14399,7 @@ document.addEventListener('click', (e) => {
   else if(act==='cancelar-importacao-notas-csv'){ cancelarImportacaoNotasCsv(); }
   else if(act==='confirmar-importacao-notas-csv'){ confirmarImportacaoNotasCsv(); }
   else if(act==='coord-open-results'){ openCoordResults(btn.dataset.code); }
-  else if(act==='coord-back-to-list'){ state.coordenador.mode='list'; render(); }
+  else if(act==='coord-back-to-list'){ state.coordenador.mode='list'; state.coordenador.transferRespIdx=null; state.coordenador.transferError=''; render(); }
   else if(act==='coord-calc-notas'){ calcCoordNotas(); }
   else if(act==='coord-send-note'){ sendCoordNote(btn.dataset.id); }
   else if(act==='coord-clear-note'){ clearCoordNote(btn.dataset.id); }
@@ -14741,6 +14876,7 @@ document.addEventListener('change', (e) => {
   const act = el.dataset ? el.dataset.action : null;
   const p = state.professor, al = state.aluno, c = state.coordenador;
   if(el.id==='coord-filter-professor'){ c.filterProfessorId = el.value; render(); return; }
+  if(el.id==='coord-transfer-target-select'){ c.transferTargetCode = el.value; c.transferError = ''; return; }
   if(el.id==='disciplina-name-input'){ p.newDisciplinaName = el.value; render(); return; }
   if(el.id==='painel-disciplina-select'){ p.painelDisciplinaFiltro = el.value; p.finalGrades = null; p.painel = null; render(); calcProfessorPainel(); return; }
   if(el.id==='bloco-turma-select'){ p.bloco.turmaId = el.value; p.bloco.selectedCodes = []; render(); return; }
