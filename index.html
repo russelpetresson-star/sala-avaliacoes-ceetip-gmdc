@@ -1188,6 +1188,7 @@ let state = {
     subview:'dashboard', mode:'list',
     professores:[], professoresLoading:true, newProfEmail:'', newProfDisciplina:'',
     profDisciplinasEditId:null, profDisciplinasList:[], profDisciplinasLoading:false, newProfDisciplinaNome:'', newProfDisciplinaTurmaIds:[],
+    profDisciplinaEditTurmasId:null, profDisciplinaEditTurmaIds:[],
     assessments:[], assessmentsLoading:true, filterProfessorId:'', filterDisciplina:'',
     resultsFor:null, responses:[], resultsLoading:false,
     transferRespIdx:null, transferTargetCode:'', transferError:'',
@@ -8414,10 +8415,26 @@ function renderCoordDisciplinasProfessor(pr){
       ${!pr.activatedAt ? `<p class="muted" style="font-size:.8rem;">Esse(a) professor(a) ainda não fez o primeiro acesso — pode cadastrar as disciplinas dele(a) normalmente aqui, já fica pronto pra quando ele(a) entrar.</p>` : ''}
       ${lista.length===0 ? '<p class="muted" style="font-size:.85rem;">Nenhuma disciplina cadastrada pra esse(a) professor(a) ainda.</p>' : lista.map(d => {
         const turmaNames = (state.professor.turmas||[]).filter(t=>(d.turmaIds||[]).includes(t.id)).map(t=>t.name);
+        if(c.profDisciplinaEditTurmasId===d.id){
+          return `
+          <div style="padding:6px 0; border-bottom:1px dashed #d8d2c8;">
+            <span style="font-weight:600;">${esc(d.name)}</span>
+            <label style="font-size:.75rem; margin-top:4px; display:block;">Turmas aplicadas</label>
+            ${renderTurmaChecklist(state.professor.turmas||[], c.profDisciplinaEditTurmaIds, 'toggle-coord-prof-disciplina-edit-turma')}
+            <div class="row" style="margin-top:4px;">
+              <button class="btn btn-ghost btn-sm" data-action="coord-cancelar-editar-turmas-disciplina-prof">Cancelar</button>
+              <button class="btn btn-primary btn-sm" data-action="coord-salvar-turmas-disciplina-prof">Salvar turmas</button>
+            </div>
+          </div>
+        `;
+        }
         return `
         <div class="row" style="justify-content:space-between; align-items:center; padding:4px 0;">
           <span>${esc(d.name)} <span class="muted" style="font-size:.78rem;">${turmaNames.length>0?'· '+turmaNames.map(esc).join(', '):'· nenhuma turma vinculada ainda'}</span></span>
-          <button class="btn btn-ghost btn-sm" data-action="coord-remover-disciplina-prof" data-discid="${d.id}">✕</button>
+          <div class="row" style="flex-wrap:nowrap; gap:4px;">
+            <button class="btn btn-ghost btn-sm" data-action="coord-abrir-editar-turmas-disciplina-prof" data-discid="${d.id}">✏️ Turmas</button>
+            <button class="btn btn-ghost btn-sm" data-action="coord-remover-disciplina-prof" data-discid="${d.id}">✕</button>
+          </div>
         </div>
       `; }).join('')}
       <div style="margin-top:10px;">
@@ -9411,6 +9428,8 @@ async function coordAbrirDisciplinasProfessor(id){
   c.profDisciplinasLoading = true;
   c.newProfDisciplinaNome = '';
   c.newProfDisciplinaTurmaIds = [];
+  c.profDisciplinaEditTurmasId = null;
+  c.profDisciplinaEditTurmaIds = [];
   render();
   let disciplinas = [];
   try{ const r = await window.storage.get(`disciplinas:${id}`, true); disciplinas = JSON.parse(r.value) || []; }catch(e){ disciplinas = []; }
@@ -9422,6 +9441,8 @@ function coordFecharDisciplinasProfessor(){
   const c = state.coordenador;
   c.profDisciplinasEditId = null;
   c.profDisciplinasList = [];
+  c.profDisciplinaEditTurmasId = null;
+  c.profDisciplinaEditTurmaIds = [];
   render();
 }
 async function coordSalvarDisciplinasProfessor(){
@@ -9451,6 +9472,36 @@ async function coordRemoverDisciplinaProfessor(discId){
   if(!confirm('Remover essa disciplina do(a) professor(a)? Isso não apaga notas já lançadas, só o vínculo pra novos gabaritos/avaliações.')) return;
   c.profDisciplinasList = c.profDisciplinasList.filter(d=>d.id!==discId);
   await coordSalvarDisciplinasProfessor();
+  await ensureAvulsoProfessoresCache(true);
+  render();
+}
+// Depois de cadastrada, a disciplina do professor pode ter as turmas ajustadas a qualquer momento
+// (ex.: a turma aplicada mudou, ou foi cadastrada errada no começo) — sem precisar remover e
+// recriar a disciplina, o que perderia os vínculos já feitos em gabaritos/avaliações existentes.
+function coordAbrirEditarTurmasDisciplinaProf(discId){
+  const c = state.coordenador;
+  const d = (c.profDisciplinasList||[]).find(x=>x.id===discId);
+  if(!d) return;
+  c.profDisciplinaEditTurmasId = discId;
+  c.profDisciplinaEditTurmaIds = (d.turmaIds||[]).slice();
+  render();
+}
+function coordCancelarEditarTurmasDisciplinaProf(){
+  const c = state.coordenador;
+  c.profDisciplinaEditTurmasId = null;
+  c.profDisciplinaEditTurmaIds = [];
+  render();
+}
+async function coordSalvarTurmasDisciplinaProf(){
+  const c = state.coordenador;
+  const discId = c.profDisciplinaEditTurmasId;
+  if(!discId) return;
+  const idx = (c.profDisciplinasList||[]).findIndex(x=>x.id===discId);
+  if(idx===-1){ c.profDisciplinaEditTurmasId = null; c.profDisciplinaEditTurmaIds = []; render(); return; }
+  c.profDisciplinasList[idx] = { ...c.profDisciplinasList[idx], turmaIds: c.profDisciplinaEditTurmaIds.slice() };
+  await coordSalvarDisciplinasProfessor();
+  c.profDisciplinaEditTurmasId = null;
+  c.profDisciplinaEditTurmaIds = [];
   await ensureAvulsoProfessoresCache(true);
   render();
 }
@@ -14638,6 +14689,9 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-fechar-disciplinas-prof'){ coordFecharDisciplinasProfessor(); }
   else if(act==='coord-adicionar-disciplina-prof'){ coordAdicionarDisciplinaProfessor(); }
   else if(act==='coord-remover-disciplina-prof'){ coordRemoverDisciplinaProfessor(btn.dataset.discid); }
+  else if(act==='coord-abrir-editar-turmas-disciplina-prof'){ coordAbrirEditarTurmasDisciplinaProf(btn.dataset.discid); }
+  else if(act==='coord-cancelar-editar-turmas-disciplina-prof'){ coordCancelarEditarTurmasDisciplinaProf(); }
+  else if(act==='coord-salvar-turmas-disciplina-prof'){ coordSalvarTurmasDisciplinaProf(); }
   else if(act==='coord-abrir-transferir-resposta'){ coordAbrirTransferirResposta(parseInt(btn.dataset.idx)); }
   else if(act==='coord-cancelar-transferir-resposta'){ coordCancelarTransferirResposta(); }
   else if(act==='coord-confirmar-transferir-resposta'){ coordConfirmarTransferirResposta(); }
@@ -15198,6 +15252,7 @@ document.addEventListener('change', (e) => {
   else if(act==='toggle-new-disciplina-turma'){ const tid = el.dataset.tid; const arr = p.newDisciplinaTurmaIds; const i = arr.indexOf(tid); if(i>=0) arr.splice(i,1); else arr.push(tid); }
   else if(act==='toggle-editing-disciplina-turma'){ const tid = el.dataset.tid; const arr = p.editingDisciplinaTurmaIds; const i = arr.indexOf(tid); if(i>=0) arr.splice(i,1); else arr.push(tid); }
   else if(act==='toggle-coord-prof-disciplina-turma'){ const tid = el.dataset.tid; const arr = state.coordenador.newProfDisciplinaTurmaIds; const i = arr.indexOf(tid); if(i>=0) arr.splice(i,1); else arr.push(tid); }
+  else if(act==='toggle-coord-prof-disciplina-edit-turma'){ const tid = el.dataset.tid; const arr = state.coordenador.profDisciplinaEditTurmaIds; const i = arr.indexOf(tid); if(i>=0) arr.splice(i,1); else arr.push(tid); }
   else if(el.id==='avulso-imprimir-turma-select'){ p.avulso.imprimirTurmaId = el.value; }
   else if(el.id==='avulso-lancar-turma-select'){ p.avulso.lancarTurmaId = el.value; p.avulso.lancarStudentId = ''; p.avulso.lancarRespostas = new Array(p.avulso.current.numQuestoes).fill(''); render(); }
   else if(el.id==='avulso-lancar-aluno-select'){ p.avulso.lancarStudentId = el.value; render(); }
