@@ -556,7 +556,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-09-25-1800</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-09-28-1035</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -1184,6 +1184,7 @@ let state = {
     session:false, senhaInput:'', error:'', changingPassword:false,
     subview:'dashboard', mode:'list',
     professores:[], professoresLoading:true, newProfEmail:'', newProfDisciplina:'',
+    profDisciplinasEditId:null, profDisciplinasList:[], profDisciplinasLoading:false, newProfDisciplinaNome:'', newProfDisciplinaTurmaIds:[],
     assessments:[], assessmentsLoading:true, filterProfessorId:'', filterDisciplina:'',
     resultsFor:null, responses:[], resultsLoading:false,
     notasTurmaId:'', notasUnidade:'I Unidade', notasLoading:false, notasColunas:[], notasRows:[], boletimCompletoLoading:null,
@@ -7635,7 +7636,7 @@ function renderNovoAvulso(){
                 <label style="font-size:.75rem;">${vinculos.length>1?`Professor(a) (vínculo ${vidx+1})`:'Professor(a) (opcional)'}</label>
                 <select class="input" data-action="avulso-vinc-prof" data-id="${d.id}" data-vid="${v.id}" ${p.avulso.professoresCacheLoading?'disabled':''}>
                   <option value="">— sem vínculo automático —</option>
-                  ${profCache.map(pr => `<option value="${pr.id}" ${v.professorId===pr.id?'selected':''}>${esc(pr.name)}</option>`).join('')}
+                  ${profCache.map(pr => `<option value="${pr.id}" ${v.professorId===pr.id?'selected':''}>${esc(pr.name)}${pr.ativo?'':' (aguardando 1º acesso)'}</option>`).join('')}
                 </select>
               </div>
               <div style="flex:1; min-width:160px;">
@@ -7644,6 +7645,7 @@ function renderNovoAvulso(){
                   <option value="">${v.professorId?'— selecionar —':'selecione o(a) professor(a) primeiro'}</option>
                   ${discOptions.map(disc => `<option value="${disc.id}" ${v.disciplinaId===disc.id?'selected':''}>${esc(disc.name)}</option>`).join('')}
                 </select>
+                ${(v.professorId && prof && discOptions.length===0) ? `<p class="muted" style="font-size:.78rem; margin-top:2px;">Esse(a) professor(a) ainda não tem disciplina cadastrada. Vá em <strong>Professores</strong> → <strong>📚 Disciplinas</strong> pra cadastrar antes de vincular aqui.</p>` : ''}
               </div>
               ${vinculos.length>1 ? `<button class="btn btn-ghost btn-sm" data-action="avulso-vinc-remover" data-id="${d.id}" data-vid="${v.id}" style="flex:0 0 auto;">✕ vínculo</button>` : ''}
               <div style="flex-basis:100%;">
@@ -8295,6 +8297,38 @@ function renderCoordDashboard(){
   `;
 }
 
+// Painel do coordenador pra cadastrar as disciplinas (e turmas) de um professor específico,
+// mesmo antes dele ter feito o primeiro login — assim já dá pra vincular no Gabarito Avulso
+// (ou em qualquer outro lugar que precise da lista de disciplinas do professor) sem depender
+// de esperar o professor entrar e se configurar sozinho.
+function renderCoordDisciplinasProfessor(pr){
+  const c = state.coordenador;
+  if(c.profDisciplinasLoading){
+    return `<div style="width:100%; margin-top:10px;"><div class="spinner"></div></div>`;
+  }
+  const lista = c.profDisciplinasList || [];
+  return `
+    <div style="width:100%; margin-top:10px; padding-top:10px; border-top:1px dashed #d8d2c8;">
+      ${!pr.activatedAt ? `<p class="muted" style="font-size:.8rem;">Esse(a) professor(a) ainda não fez o primeiro acesso — pode cadastrar as disciplinas dele(a) normalmente aqui, já fica pronto pra quando ele(a) entrar.</p>` : ''}
+      ${lista.length===0 ? '<p class="muted" style="font-size:.85rem;">Nenhuma disciplina cadastrada pra esse(a) professor(a) ainda.</p>' : lista.map(d => {
+        const turmaNames = (state.professor.turmas||[]).filter(t=>(d.turmaIds||[]).includes(t.id)).map(t=>t.name);
+        return `
+        <div class="row" style="justify-content:space-between; align-items:center; padding:4px 0;">
+          <span>${esc(d.name)} <span class="muted" style="font-size:.78rem;">${turmaNames.length>0?'· '+turmaNames.map(esc).join(', '):'· nenhuma turma vinculada ainda'}</span></span>
+          <button class="btn btn-ghost btn-sm" data-action="coord-remover-disciplina-prof" data-discid="${d.id}">✕</button>
+        </div>
+      `; }).join('')}
+      <div style="margin-top:10px;">
+        <label style="font-size:.75rem;">Nova disciplina</label>
+        <input type="text" id="coord-prof-disciplina-nome-input" class="input" value="${esc(c.newProfDisciplinaNome)}" placeholder="Ex: Segurança do Trabalho">
+        <label style="font-size:.75rem; margin-top:6px; display:block;">Turmas (opcional, dá pra ajustar depois)</label>
+        ${renderTurmaChecklist(state.professor.turmas||[], c.newProfDisciplinaTurmaIds, 'toggle-coord-prof-disciplina-turma')}
+        <div id="coord-prof-disciplina-err"></div>
+        <button class="btn btn-primary btn-sm" data-action="coord-adicionar-disciplina-prof" style="margin-top:6px;">+ Adicionar disciplina</button>
+      </div>
+    </div>
+  `;
+}
 function renderCoordProfessores(){
   const c = state.coordenador;
   let body;
@@ -8303,18 +8337,24 @@ function renderCoordProfessores(){
   } else if(c.professores.length===0){
     body = `<div class="empty">Nenhum professor cadastrado ainda.</div>`;
   } else {
-    body = c.professores.map(pr => `
-      <div class="list-item">
-        <div>
-          <strong>${pr.displayName ? esc(pr.displayName) : esc(pr.email)}</strong><br>
-          <span class="muted">${esc(pr.email)}${pr.disciplina?' · '+esc(pr.disciplina):''} · ${pr.activatedAt ? 'ativo' : 'pendente (aguardando primeiro acesso)'}${pr.coordNote?' · ⚠ recado pendente':''}</span>
+    body = c.professores.map(pr => {
+      const editandoDisciplinas = c.profDisciplinasEditId===pr.id;
+      return `
+      <div class="list-item" style="align-items:flex-start; flex-direction:column;">
+        <div class="row" style="width:100%; justify-content:space-between; align-items:center;">
+          <div>
+            <strong>${pr.displayName ? esc(pr.displayName) : esc(pr.email)}</strong><br>
+            <span class="muted">${esc(pr.email)}${pr.disciplina?' · '+esc(pr.disciplina):''} · ${pr.activatedAt ? 'ativo' : 'pendente (aguardando primeiro acesso)'}${pr.coordNote?' · ⚠ recado pendente':''}</span>
+          </div>
+          <div class="row" style="flex:0 0 auto; gap:6px;">
+            <button class="btn btn-ghost btn-sm" data-action="${editandoDisciplinas?'coord-fechar-disciplinas-prof':'coord-abrir-disciplinas-prof'}" data-id="${pr.id}">${editandoDisciplinas?'Fechar':'📚 Disciplinas'}</button>
+            ${pr.passwordHash ? `<button class="btn btn-ghost btn-sm" data-action="coord-reset-professor-password" data-id="${pr.id}">Redefinir senha</button>` : ''}
+            <button class="btn btn-danger btn-sm" data-action="coord-remove-professor" data-id="${pr.id}">Remover</button>
+          </div>
         </div>
-        <div class="row" style="flex:0 0 auto; gap:6px;">
-          ${pr.passwordHash ? `<button class="btn btn-ghost btn-sm" data-action="coord-reset-professor-password" data-id="${pr.id}">Redefinir senha</button>` : ''}
-          <button class="btn btn-danger btn-sm" data-action="coord-remove-professor" data-id="${pr.id}">Remover</button>
-        </div>
+        ${editandoDisciplinas ? renderCoordDisciplinasProfessor(pr) : ''}
       </div>
-    `).join('');
+    `; }).join('');
   }
   return `
     <div class="card">
@@ -9227,6 +9267,59 @@ async function submitCoordLogin(){
     if(!tourSeen) startTour('coordenador');
   }
   else { c.error = 'Senha incorreta.'; await registerLoginFailure('coordenador', 'global'); render(); }
+}
+// Permite ao coordenador cadastrar/editar as disciplinas (e turmas) de um professor mesmo que
+// ele nunca tenha feito login ainda — usa exatamente a mesma chave de armazenamento
+// (`disciplinas:${professorId}`) que o próprio professor usaria em "Minhas Disciplinas", então,
+// quando ele finalmente acessar, já encontra tudo pronto (e pode continuar ajustando por conta própria).
+async function coordAbrirDisciplinasProfessor(id){
+  const c = state.coordenador;
+  c.profDisciplinasEditId = id;
+  c.profDisciplinasLoading = true;
+  c.newProfDisciplinaNome = '';
+  c.newProfDisciplinaTurmaIds = [];
+  render();
+  let disciplinas = [];
+  try{ const r = await window.storage.get(`disciplinas:${id}`, true); disciplinas = JSON.parse(r.value) || []; }catch(e){ disciplinas = []; }
+  c.profDisciplinasList = disciplinas;
+  c.profDisciplinasLoading = false;
+  render();
+}
+function coordFecharDisciplinasProfessor(){
+  const c = state.coordenador;
+  c.profDisciplinasEditId = null;
+  c.profDisciplinasList = [];
+  render();
+}
+async function coordSalvarDisciplinasProfessor(){
+  const c = state.coordenador;
+  if(!c.profDisciplinasEditId) return;
+  await window.storage.set(`disciplinas:${c.profDisciplinasEditId}`, JSON.stringify(c.profDisciplinasList), true);
+}
+async function coordAdicionarDisciplinaProfessor(){
+  const c = state.coordenador;
+  const nome = (c.newProfDisciplinaNome||'').trim();
+  const errEl = document.getElementById('coord-prof-disciplina-err');
+  if(!nome){ if(errEl) errEl.innerHTML = '<p class="err">Informe o nome da disciplina.</p>'; return; }
+  if(c.profDisciplinasList.some(d => normalizeDisciplinaName(d.name)===normalizeDisciplinaName(nome))){
+    if(errEl) errEl.innerHTML = '<p class="err">Esse professor já tem essa disciplina cadastrada.</p>';
+    return;
+  }
+  c.profDisciplinasList.push({ id: cryptoId(), name: nome, turmaIds: c.newProfDisciplinaTurmaIds.slice(), createdAt: Date.now() });
+  await coordSalvarDisciplinasProfessor();
+  c.newProfDisciplinaNome = '';
+  c.newProfDisciplinaTurmaIds = [];
+  if(errEl) errEl.innerHTML = '';
+  await ensureAvulsoProfessoresCache(true);
+  render();
+}
+async function coordRemoverDisciplinaProfessor(discId){
+  const c = state.coordenador;
+  if(!confirm('Remover essa disciplina do(a) professor(a)? Isso não apaga notas já lançadas, só o vínculo pra novos gabaritos/avaliações.')) return;
+  c.profDisciplinasList = c.profDisciplinasList.filter(d=>d.id!==discId);
+  await coordSalvarDisciplinasProfessor();
+  await ensureAvulsoProfessoresCache(true);
+  render();
 }
 async function addProfessor(){
   const c = state.coordenador;
@@ -12236,11 +12329,13 @@ async function ensureAvulsoProfessoresCache(forceRefresh){
   let cache = [];
   try{
     const lista = await fetchProfessoresList();
-    const ativos = lista.filter(pr => pr.activatedAt);
-    cache = await Promise.all(ativos.map(async pr => {
+    // Inclui TODOS os professores cadastrados, mesmo quem ainda não fez o primeiro acesso —
+    // o coordenador já pode cadastrar as disciplinas dele(a) (ver renderCoordDisciplinasProfessor)
+    // e vincular normalmente aqui, sem precisar esperar o professor entrar no sistema.
+    cache = await Promise.all(lista.map(async pr => {
       let disciplinas = [];
       try{ const r = await window.storage.get(`disciplinas:${pr.id}`, true); disciplinas = JSON.parse(r.value) || []; }catch(e){ disciplinas = []; }
-      return { id: pr.id, name: pr.displayName || pr.email || 'Professor(a)', disciplinas };
+      return { id: pr.id, name: pr.displayName || pr.email || 'Professor(a)', disciplinas, ativo: !!pr.activatedAt };
     }));
     cache.sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
   }catch(e){ cache = []; }
@@ -14154,6 +14249,10 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-add-professor'){ addProfessor(); }
   else if(act==='coord-remove-professor'){ removeProfessor(btn.dataset.id); }
   else if(act==='coord-reset-professor-password'){ resetProfessorPassword(btn.dataset.id); }
+  else if(act==='coord-abrir-disciplinas-prof'){ coordAbrirDisciplinasProfessor(btn.dataset.id); }
+  else if(act==='coord-fechar-disciplinas-prof'){ coordFecharDisciplinasProfessor(); }
+  else if(act==='coord-adicionar-disciplina-prof'){ coordAdicionarDisciplinaProfessor(); }
+  else if(act==='coord-remover-disciplina-prof'){ coordRemoverDisciplinaProfessor(btn.dataset.discid); }
   else if(act==='abrir-form-temporada'){ abrirFormTemporada(); }
   else if(act==='cancelar-form-temporada'){ cancelarFormTemporada(); }
   else if(act==='add-temporada-tier'){ addTemporadaTier(); }
@@ -14558,6 +14657,7 @@ document.addEventListener('input', (e) => {
     }
   }
   else if(el.id==='disciplina-name-input'){ p.newDisciplinaName = el.value; }
+  else if(el.id==='coord-prof-disciplina-nome-input'){ state.coordenador.newProfDisciplinaNome = el.value; }
   else if(el.id==='new-student-input'){ p.newStudentName = el.value; }
   else if(act==='import-turma-roster-file'){ if(el.files[0]) importTurmaRoster(el.dataset.tid, el.files[0]); }
   else if(el.id==='start-input'){ p.newAssessment.startAt = el.value; }
@@ -14695,6 +14795,7 @@ document.addEventListener('change', (e) => {
   else if(act==='avulso-vinc-toggle-turma'){ avulsoVinculoToggleTurma(el.dataset.id, el.dataset.vid, el.dataset.tid); }
   else if(act==='toggle-new-disciplina-turma'){ const tid = el.dataset.tid; const arr = p.newDisciplinaTurmaIds; const i = arr.indexOf(tid); if(i>=0) arr.splice(i,1); else arr.push(tid); }
   else if(act==='toggle-editing-disciplina-turma'){ const tid = el.dataset.tid; const arr = p.editingDisciplinaTurmaIds; const i = arr.indexOf(tid); if(i>=0) arr.splice(i,1); else arr.push(tid); }
+  else if(act==='toggle-coord-prof-disciplina-turma'){ const tid = el.dataset.tid; const arr = state.coordenador.newProfDisciplinaTurmaIds; const i = arr.indexOf(tid); if(i>=0) arr.splice(i,1); else arr.push(tid); }
   else if(el.id==='avulso-imprimir-turma-select'){ p.avulso.imprimirTurmaId = el.value; }
   else if(el.id==='avulso-lancar-turma-select'){ p.avulso.lancarTurmaId = el.value; p.avulso.lancarStudentId = ''; p.avulso.lancarRespostas = new Array(p.avulso.current.numQuestoes).fill(''); render(); }
   else if(el.id==='avulso-lancar-aluno-select'){ p.avulso.lancarStudentId = el.value; render(); }
