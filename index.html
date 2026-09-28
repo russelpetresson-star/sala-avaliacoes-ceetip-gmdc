@@ -1173,7 +1173,9 @@ let state = {
       respostas:[], respostasLoading:false,
       editandoGabarito:false, gabaritoEditAnswers:[], gabaritoEditError:'',
       professoresCache:null, professoresCacheLoading:false,
-      transferRespName:null, transferTargetCode:'', transferError:'', transferBulk:false, selecionados:[] },
+      transferRespName:null, transferTargetCode:'', transferError:'', transferBulk:false, selecionados:[],
+      verRespostaAlunoName:null,
+      editandoRespostaAlunoName:null, editRespostaAlunoAnswers:[] },
     unlockRequests: [], unlockRequestsLoading: true,
     periodos: {}, periodosLoading: true,
     pickerOpen:false, pickerSelected:[],
@@ -7789,6 +7791,39 @@ function renderGabaritoGridBolinhas(gab, answers, actionName){
     </div>
   `;
 }
+// Mostra o gabarito impresso que o(a) aluno(a) marcou (ou o professor digitou), questão por questão,
+// agrupado por disciplina — com a letra certa ao lado e destaque de acerto/erro. Serve pro coordenador
+// conferir o que foi de fato lançado antes de confiar na nota, sem precisar abrir o cartão físico de novo.
+function renderGabaritoGridRespostaAluno(gab, respostas){
+  const columns = gabaritoColunasPorDisciplina(gab.disciplinas, gab.numQuestoes);
+  const temGabarito = !!(gab.gabarito && gab.gabarito.length>0);
+  return `
+    <div style="display:flex; gap:22px; flex-wrap:wrap; margin:10px 0;">
+      ${columns.map(col => `
+        <div style="min-width:130px;">
+          <div style="font-weight:700; font-size:.85rem; margin-bottom:6px;">${esc(col.label)}</div>
+          ${col.qs.map(qn => {
+            const marcada = (respostas||[])[qn-1] || null;
+            const certa = temGabarito ? gab.gabarito[qn-1] : null;
+            const acertou = temGabarito && marcada && certa && marcada===certa;
+            const errou = temGabarito && marcada && certa && marcada!==certa;
+            const cor = acertou ? '#1b7a3d' : (errou ? '#b3261e' : '#666');
+            return `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:.88rem; padding:2px 0; border-bottom:1px dotted #ccc;">
+              <span>Q${qn}</span>
+              <span style="display:flex; align-items:center; gap:6px;">
+                <strong style="color:${cor};">${marcada ? esc(marcada) : '<em style="color:#999; font-weight:400;">em branco</em>'}</strong>
+                ${errou ? `<span class="muted" style="font-size:.78rem;">(certa: ${esc(certa)})</span>` : ''}
+                ${acertou ? '<span style="font-size:.78rem;">✅</span>' : (errou ? '<span style="font-size:.78rem;">❌</span>' : '')}
+              </span>
+            </div>
+          `; }).join('')}
+        </div>
+      `).join('')}
+    </div>
+    ${!temGabarito ? '<p class="muted" style="font-size:.8rem;">Este gabarito ainda não tem a resposta correta cadastrada, então não dá pra marcar acerto/erro — só mostra o que foi lançado.</p>' : ''}
+  `;
+}
 function renderGabaritoGridSomenteLeitura(gab){
   const columns = gabaritoColunasPorDisciplina(gab.disciplinas, gab.numQuestoes);
   return `
@@ -7954,10 +7989,32 @@ function renderDetalheAvulso(){
                 ${(gab.disciplinas||[]).map(d => { const dd=(r.porDisciplina||[]).find(x=>x.disciplinaId===d.id); return `<td style="text-align:center;">${dd?dd.nota.toFixed(1)+' ('+dd.acertos+'/'+dd.total+')':'-'}</td>`; }).join('')}
                 <td style="text-align:center; font-weight:700;">${(r.mediaDisciplinas!==undefined?r.mediaDisciplinas:r.notaGeral).toFixed(1)}</td>
                 <td class="row" style="flex-wrap:nowrap; gap:4px;">
+                  <button class="btn btn-ghost btn-sm" data-action="avulso-ver-resposta-aluno" data-name="${esc(r.studentName)}" title="Ver o que o aluno marcou">👁️</button>
                   <button class="btn btn-ghost btn-sm" data-action="avulso-abrir-transferir-resposta" data-name="${esc(r.studentName)}">🔀</button>
                   <button class="btn btn-ghost btn-sm" data-action="avulso-excluir-resposta" data-name="${esc(r.studentName)}">✕</button>
                 </td>
               </tr>
+              ${av.verRespostaAlunoName===r.studentName ? `
+              <tr><td colspan="${4+(gab.disciplinas||[]).length}" style="padding:0;">
+                <div class="card" style="background:var(--surface); margin:6px 0; padding:10px;">
+                  <div class="row" style="justify-content:space-between; align-items:center;">
+                    <label style="font-size:.8rem; margin:0;">Gabarito marcado por <strong>${esc(r.studentName)}</strong>${r.scanned?' (lido por foto)':' (digitado)'}${r.transferidoDe?' · transferido de outro gabarito':''}</label>
+                    <button class="btn btn-ghost btn-sm" data-action="avulso-ver-resposta-aluno" data-name="${esc(r.studentName)}">Fechar</button>
+                  </div>
+                  ${av.editandoRespostaAlunoName===r.studentName ? `
+                    <p class="muted" style="font-size:.82rem; margin-top:6px;">Toque na letra certa pra corrigir o que foi lançado. A nota é recalculada ao salvar.</p>
+                    ${renderGabaritoGridBolinhas(gab, av.editRespostaAlunoAnswers, 'avulso-resposta-aluno-bolinha')}
+                    <div class="row" style="margin-top:8px;">
+                      <button class="btn btn-ghost btn-sm" data-action="avulso-cancelar-editar-resposta-aluno">Cancelar</button>
+                      <button class="btn btn-primary btn-sm" data-action="avulso-salvar-resposta-aluno">Salvar correção</button>
+                    </div>
+                  ` : `
+                    ${renderGabaritoGridRespostaAluno(gab, r.respostas)}
+                    <button class="btn btn-ghost btn-sm" data-action="avulso-editar-resposta-aluno" data-name="${esc(r.studentName)}">✏️ Editar respostas lançadas</button>
+                  `}
+                </div>
+              </td></tr>
+              ` : ''}
               ${av.transferRespName===r.studentName ? `
               <tr><td colspan="${4+(gab.disciplinas||[]).length}" style="padding:0;">
                 <div class="card" style="background:var(--surface); margin:6px 0; padding:10px;">
@@ -12659,7 +12716,8 @@ async function abrirAvulso(id){
   p.avulso.lancarModo = 'manual'; p.avulso.lancarNome = ''; p.avulso.lancarTurmaId = ''; p.avulso.lancarStudentId = ''; p.avulso.lancarSequencia = ''; p.avulso.lancarRespostas = new Array(gab.numQuestoes).fill('');
   p.avulso.scanLoading = false; p.avulso.scanError = ''; p.avulso.scanReview = null; p.avulso.scanAvulso = null;
   p.avulso.editandoGabarito = false; p.avulso.gabaritoEditAnswers = []; p.avulso.gabaritoEditError = '';
-  p.avulso.selecionados = []; p.avulso.transferRespName = null; p.avulso.transferBulk = false; p.avulso.transferTargetCode = ''; p.avulso.transferError = '';
+  p.avulso.selecionados = []; p.avulso.transferRespName = null; p.avulso.transferBulk = false; p.avulso.transferTargetCode = ''; p.avulso.transferError = ''; p.avulso.verRespostaAlunoName = null;
+  p.avulso.editandoRespostaAlunoName = null; p.avulso.editRespostaAlunoAnswers = [];
   loadAvulsoRespostas(gab.code);
   render();
 }
@@ -12705,6 +12763,51 @@ async function excluirRespostaAvulso(studentName){
 // Ao contrário das avaliações objetivas normais, aqui a resposta já é guardada como letra bruta
 // por posição (A/B/C...), então não precisa remapear id nenhum — só reaplicar gradeAvulsoRespostas
 // com o gabarito de destino, desde que a prova tenha a mesma quantidade de questões.
+function avulsoToggleVerRespostaAluno(studentName){
+  const p = state.professor;
+  const av = p.avulso;
+  av.verRespostaAlunoName = (av.verRespostaAlunoName===studentName) ? null : studentName;
+  av.editandoRespostaAlunoName = null;
+  av.editRespostaAlunoAnswers = [];
+  render();
+}
+// Permite ao professor (ou coordenador) corrigir o gabarito que foi lançado pra um aluno,
+// quando ele percebe um erro de digitação/leitura — sem precisar excluir e relançar do zero.
+function avulsoAbrirEditarRespostaAluno(studentName){
+  const p = state.professor;
+  const av = p.avulso;
+  const r = (av.respostas||[]).find(x=>x.studentName===studentName);
+  if(!r) return;
+  av.verRespostaAlunoName = studentName;
+  av.editandoRespostaAlunoName = studentName;
+  av.editRespostaAlunoAnswers = (r.respostas||[]).slice();
+  render();
+}
+function avulsoCancelarEditarRespostaAluno(){
+  const p = state.professor;
+  p.avulso.editandoRespostaAlunoName = null;
+  p.avulso.editRespostaAlunoAnswers = [];
+  render();
+}
+async function avulsoSalvarRespostaAlunoEditada(){
+  const p = state.professor;
+  const av = p.avulso;
+  const gab = av.current;
+  const studentName = av.editandoRespostaAlunoName;
+  if(!studentName || !gab) return;
+  const novasRespostas = av.editRespostaAlunoAnswers;
+  let lista = [];
+  try{ const r = await window.storage.get(`avulso-respostas:${gab.code}`, true); lista = JSON.parse(r.value); }catch(e){ lista = []; }
+  const idx = lista.findIndex(x=>x.studentName===studentName);
+  if(idx===-1){ av.editandoRespostaAlunoName = null; av.editRespostaAlunoAnswers = []; render(); return; }
+  lista[idx] = { ...lista[idx], respostas: novasRespostas.slice(), ...gradeAvulsoRespostas(gab, novasRespostas) };
+  await window.storage.set(`avulso-respostas:${gab.code}`, JSON.stringify(lista), true);
+  av.respostas = lista;
+  av.editandoRespostaAlunoName = null;
+  av.editRespostaAlunoAnswers = [];
+  await syncAvulsoInstrumento(gab);
+  render();
+}
 function coordAbrirTransferirRespostaAvulso(studentName){
   const p = state.professor;
   p.avulso.transferRespName = studentName;
@@ -14538,6 +14641,11 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-abrir-transferir-resposta'){ coordAbrirTransferirResposta(parseInt(btn.dataset.idx)); }
   else if(act==='coord-cancelar-transferir-resposta'){ coordCancelarTransferirResposta(); }
   else if(act==='coord-confirmar-transferir-resposta'){ coordConfirmarTransferirResposta(); }
+  else if(act==='avulso-ver-resposta-aluno'){ avulsoToggleVerRespostaAluno(btn.dataset.name); }
+  else if(act==='avulso-editar-resposta-aluno'){ avulsoAbrirEditarRespostaAluno(btn.dataset.name); }
+  else if(act==='avulso-cancelar-editar-resposta-aluno'){ avulsoCancelarEditarRespostaAluno(); }
+  else if(act==='avulso-salvar-resposta-aluno'){ avulsoSalvarRespostaAlunoEditada(); }
+  else if(act==='avulso-resposta-aluno-bolinha'){ p.avulso.editRespostaAlunoAnswers[parseInt(btn.dataset.idx)] = btn.dataset.letra; render(); }
   else if(act==='avulso-abrir-transferir-resposta'){ coordAbrirTransferirRespostaAvulso(btn.dataset.name); }
   else if(act==='avulso-cancelar-transferir-resposta'){ coordCancelarTransferirRespostaAvulso(); }
   else if(act==='avulso-confirmar-transferir-resposta'){ coordConfirmarTransferirRespostaAvulso(); }
@@ -14772,7 +14880,7 @@ document.addEventListener('click', (e) => {
   else if(act==='avulso-disc-remover'){ avulsoRemoveDisciplina(btn.dataset.id); }
   else if(act==='avulso-vinc-adicionar'){ avulsoVinculoAdicionar(btn.dataset.id); }
   else if(act==='avulso-vinc-remover'){ avulsoVinculoRemover(btn.dataset.id, btn.dataset.vid); }
-  else if(act==='avulso-voltar-lista'){ p.avulso.mode='list'; p.avulso.current=null; p.avulso.transferRespName=null; p.avulso.transferBulk=false; p.avulso.selecionados=[]; p.avulso.transferError=''; render(); }
+  else if(act==='avulso-voltar-lista'){ p.avulso.mode='list'; p.avulso.current=null; p.avulso.transferRespName=null; p.avulso.transferBulk=false; p.avulso.selecionados=[]; p.avulso.verRespostaAlunoName=null; p.avulso.editandoRespostaAlunoName=null; p.avulso.editRespostaAlunoAnswers=[]; p.avulso.transferError=''; render(); }
   else if(act==='avulso-imprimir-cartoes'){ imprimirCartoesAvulso(); }
   else if(act==='avulso-lancar-modo'){ p.avulso.lancarModo = btn.dataset.modo; p.avulso.scanReview=null; p.avulso.scanError=''; render(); }
   else if(act==='avulso-lancar-resposta-bolinha'){ p.avulso.lancarRespostas[parseInt(btn.dataset.idx)] = btn.dataset.letra; render(); }
