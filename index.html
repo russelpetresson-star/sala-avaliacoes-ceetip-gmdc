@@ -1175,7 +1175,8 @@ let state = {
       professoresCache:null, professoresCacheLoading:false,
       transferRespName:null, transferTargetCode:'', transferError:'', transferBulk:false, selecionados:[],
       verRespostaAlunoName:null,
-      editandoRespostaAlunoName:null, editRespostaAlunoAnswers:[] },
+      editandoRespostaAlunoName:null, editRespostaAlunoAnswers:[],
+      importPlanilha: { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false } },
     unlockRequests: [], unlockRequestsLoading: true,
     periodos: {}, periodosLoading: true,
     pickerOpen:false, pickerSelected:[],
@@ -7539,6 +7540,7 @@ function renderGabaritoAvulso(){
   if(av.listLoading) return `<div class="card"><h2>Gabarito Avulso</h2><div class="spinner"></div></div>`;
   if(av.mode==='novo' && av.form) return renderNovoAvulso();
   if(av.mode==='detalhe' && av.current) return renderDetalheAvulso();
+  if(av.mode==='importar') return renderImportarRespostasAvulso();
   return renderListaAvulsos();
 }
 
@@ -7547,9 +7549,12 @@ function renderListaAvulsos(){
   const list = p.avulso.list || [];
   return `
     <div class="card">
-      <div class="row" style="justify-content:space-between; align-items:center;">
+      <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
         <h2 style="margin:0;">Gabarito Avulso</h2>
-        <button class="btn btn-primary btn-sm" data-action="avulso-novo">+ Novo gabarito avulso</button>
+        <div class="row" style="flex:0 0 auto; gap:6px;">
+          <button class="btn btn-ghost btn-sm" data-action="avulso-abrir-importar-planilha">📥 Importar respostas de planilha</button>
+          <button class="btn btn-primary btn-sm" data-action="avulso-novo">+ Novo gabarito avulso</button>
+        </div>
       </div>
       <p class="muted">Crie um gabarito de múltipla escolha avulso, sem vínculo com uma avaliação do sistema — ideal para provas integradas em papel, com várias disciplinas no mesmo cartão-resposta.</p>
       ${list.length===0 ? '<p class="muted center">Nenhum gabarito avulso criado ainda.</p>' : list.map(g => `
@@ -7569,6 +7574,56 @@ function renderListaAvulsos(){
   `;
 }
 
+// Importa de uma vez as respostas já aplicadas em papel de várias provas (ex.: dias de prova
+// anteriores que ainda não estavam no sistema), a partir de uma planilha com uma linha por aluno,
+// uma coluna indicando a prova e uma coluna por questão. Cria um gabarito avulso novo pra cada
+// prova encontrada (sem o gabarito correto ainda — isso o professor/coordenador informa depois,
+// e as notas são recalculadas automaticamente nesse momento, igual já acontece hoje).
+function renderImportarRespostasAvulso(){
+  const p = state.professor;
+  const ip = p.avulso.importPlanilha || { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false };
+  let body;
+  if(ip.processando){
+    body = `<div class="spinner"></div>`;
+  } else if(!ip.resultado){
+    body = `
+      <p class="muted">Envie uma planilha (.csv ou .xlsx) com uma linha por aluno, contendo:</p>
+      <ul class="muted" style="font-size:.85rem; margin:0 0 10px 18px;">
+        <li>uma coluna <strong>Aluno</strong> (ou "Nome");</li>
+        <li>uma coluna indicando de qual prova é a linha — ex.: <strong>Prova</strong>, "Gabarito" ou "Dia" (obrigatório pra separar as provas diferentes);</li>
+        <li>uma coluna <strong>Turma</strong> (opcional, ajuda a identificar o aluno certo);</li>
+        <li>uma coluna por questão, com a letra marcada — ex.: <strong>Q1</strong>, <strong>Q2</strong>, <strong>Q3</strong>...</li>
+      </ul>
+      <input type="file" id="avulso-import-planilha-file" accept=".csv,.xlsx,.xls">
+      ${ip.erro ? `<p class="err" style="margin-top:8px;">${esc(ip.erro)}</p>` : ''}
+    `;
+  } else {
+    const r = ip.resultado;
+    body = `
+      <p class="muted">Encontrei <strong>${r.grupos.length}</strong> prova(s) diferente(s) na planilha. Confira (e ajuste se quiser) o título de cada gabarito antes de importar — um gabarito avulso novo é criado pra cada uma, <strong>ainda sem o gabarito correto</strong>: as notas ficam zeradas até você abrir o gabarito e informar as respostas certas.</p>
+      ${r.grupos.map((g, gi) => `
+        <div class="card" style="background:var(--surface); margin-top:10px; padding:10px;">
+          <label style="font-size:.75rem;">Título do gabarito avulso</label>
+          <input type="text" class="input" data-action="avulso-import-titulo-grupo" data-gi="${gi}" value="${esc(g.tituloEdit)}">
+          ${g.jaExisteGabaritoComMesmoTitulo ? `<p class="err" style="font-size:.78rem; margin-top:4px;">⚠️ Já existe um gabarito avulso com esse título — talvez seja melhor renomear pra não confundir os dois (a importação cria um gabarito novo, não junta com o existente).</p>` : ''}
+          <p class="muted" style="font-size:.82rem; margin-top:6px;">${g.numQuestoes} questões · ${g.numAlternativas} alternativas (A–${OPT_LETTERS[g.numAlternativas-1]}) · ${g.itens.length} aluno(s)${g.turmasEnvolvidas.length>0?' · turma(s): '+g.turmasEnvolvidas.map(esc).join(', '):''}</p>
+          ${g.semTurma>0 ? `<p class="muted" style="font-size:.8rem;">⚠️ ${g.semTurma} aluno(s) sem turma identificada na planilha — a resposta é lançada do mesmo jeito, só fica sem turma vinculada.</p>` : ''}
+        </div>
+      `).join('')}
+      <div class="row" style="margin-top:14px;">
+        <button class="btn btn-ghost" data-action="avulso-cancelar-importar-planilha" ${ip.importando?'disabled':''}>Cancelar</button>
+        <button class="btn btn-primary" data-action="avulso-confirmar-importar-planilha" ${ip.importando?'disabled':''}>${ip.importando?'Importando...':'Confirmar importação'}</button>
+      </div>
+    `;
+  }
+  return `
+    <div class="card">
+      <button class="btn btn-ghost btn-sm" data-action="avulso-cancelar-importar-planilha">← Voltar</button>
+      <h2>Importar respostas de planilha</h2>
+      ${body}
+    </div>
+  `;
+}
 function renderNovoAvulso(){
   const p = state.professor;
   const f = p.avulso.form;
@@ -12413,6 +12468,184 @@ function abrirNovoAvulso(){
   ensureAvulsoProfessoresCache();
   render();
 }
+
+/* ---------------- IMPORTAR RESPOSTAS DE GABARITO AVULSO POR PLANILHA ---------------- */
+function avulsoAbrirImportarPlanilha(){
+  const p = state.professor;
+  p.avulso.mode = 'importar';
+  p.avulso.importPlanilha = { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false };
+  render();
+}
+function avulsoCancelarImportarPlanilha(){
+  const p = state.professor;
+  p.avulso.mode = 'list';
+  p.avulso.importPlanilha = { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false };
+  render();
+}
+// Lê um .csv ou .xlsx e devolve as linhas como array de arrays (mesma técnica usada em
+// readRosterFile, reaproveitando a lib XLSX já carregada pro resto do app).
+function lerPlanilhaComoLinhas(file){
+  return new Promise((resolve, reject) => {
+    const isCsv = /\.csv$/i.test(file.name) || file.type==='text/csv';
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Falha ao ler o arquivo.'));
+    if(isCsv){
+      reader.onload = () => {
+        const texto = String(reader.result||'').replace(/^﻿/, '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+        const linhasTexto = texto.split('\n').filter(l=>l.trim()!=='');
+        if(linhasTexto.length===0){ resolve([]); return; }
+        const delim = detectDelimiterCsv(linhasTexto[0]);
+        resolve(linhasTexto.map(l => l.split(delim).map(c=>c.trim().replace(/^"|"$/g,''))));
+      };
+      reader.readAsText(file, 'utf-8');
+    } else {
+      reader.onload = () => {
+        try{
+          const wb = XLSX.read(reader.result, { type:'binary' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header:1, raw:false, defval:'' });
+          resolve(rows.map(row => row.map(c => (c===null||c===undefined)?'':String(c).trim())));
+        }catch(e){ reject(e); }
+      };
+      reader.readAsBinaryString(file);
+    }
+  });
+}
+// Tenta achar a turma/aluno certos entre as turmas já cadastradas, só pra exibir e registrar
+// junto da resposta — não bloqueia a importação se não encontrar (o nome lançado é sempre o que
+// veio na planilha, igual já acontece no lançamento manual e na leitura por foto).
+function avulsoMatchAlunoTurma(nomeAluno, turmaTexto){
+  const turmas = state.professor.turmas || [];
+  const nomeNorm = normalizeTexto(nomeAluno);
+  if(turmaTexto){
+    const turmaNorm = normalizeTexto(turmaTexto);
+    const turmaMatch = turmas.find(t => normalizeTexto(t.name)===turmaNorm);
+    if(turmaMatch) return { turmaId: turmaMatch.id, turmaName: turmaMatch.name };
+  }
+  const encontrados = turmas.filter(t => (t.students||[]).some(s=>normalizeTexto(s.name)===nomeNorm));
+  if(encontrados.length===1) return { turmaId: encontrados[0].id, turmaName: encontrados[0].name };
+  return { turmaId:'', turmaName: turmaTexto||'' };
+}
+function detectarNumAlternativasPlanilha(itens){
+  let maxIdx = 3; // mínimo 4 alternativas (A–D)
+  itens.forEach(it => (it.respostas||[]).forEach(r => {
+    const idx = OPT_LETTERS.indexOf(r);
+    if(idx > maxIdx) maxIdx = idx;
+  }));
+  return Math.min(maxIdx+1, OPT_LETTERS.length);
+}
+function parseRespostasPlanilha(rows){
+  if(!rows || rows.length<2) return { erro: 'O arquivo parece vazio ou não tem linhas de dados.' };
+  const header = rows[0].map(h=>String(h||'').trim());
+  const headerNorm = header.map(h=>normalizeTexto(h));
+  const idxAluno = headerNorm.findIndex(h=>h==='ALUNO' || h==='NOME' || h==='ESTUDANTE');
+  const idxTurma = headerNorm.findIndex(h=>h==='TURMA');
+  const idxProva = headerNorm.findIndex(h=>/PROVA|GABARITO|DIA/.test(h));
+  if(idxAluno===-1) return { erro: 'Não encontrei uma coluna "Aluno" (ou "Nome") no cabeçalho do arquivo.' };
+  if(idxProva===-1) return { erro: 'Não encontrei uma coluna indicando a prova de cada linha (ex: "Prova", "Gabarito" ou "Dia") — preciso dela pra separar as provas diferentes.' };
+  const colunasQuestao = [];
+  header.forEach((h, idx) => {
+    if(idx===idxAluno || idx===idxTurma || idx===idxProva) return;
+    const m = h.match(/^Q\s*0*([0-9]+)$/i) || h.match(/^QUEST(?:AO|ÃO)?\s*0*([0-9]+)$/i) || h.match(/^0*([0-9]+)$/);
+    if(!m) return;
+    colunasQuestao.push({ idx, qn: parseInt(m[1],10) });
+  });
+  if(colunasQuestao.length===0) return { erro: 'Não encontrei colunas de questão no cabeçalho (esperava algo como "Q1", "Q2", "Questão 1"...).' };
+  colunasQuestao.sort((a,b)=>a.qn-b.qn);
+  const numQuestoesTotal = colunasQuestao[colunasQuestao.length-1].qn;
+
+  const dataLines = rows.slice(1).filter(row => row.some(c => String(c||'').trim()!==''));
+  const porProva = {};
+  dataLines.forEach(cols => {
+    const nomeAluno = String(cols[idxAluno]||'').trim();
+    if(!nomeAluno) return;
+    const turmaTexto = idxTurma!==-1 ? String(cols[idxTurma]||'').trim() : '';
+    const provaTexto = String(cols[idxProva]||'').trim() || 'Prova sem nome';
+    const respostas = new Array(numQuestoesTotal).fill('');
+    colunasQuestao.forEach(cq => {
+      const v = String(cols[cq.idx]||'').trim().toUpperCase();
+      if(v) respostas[cq.qn-1] = v;
+    });
+    const chave = normalizeTexto(provaTexto);
+    if(!porProva[chave]) porProva[chave] = { provaTitulo: provaTexto, itens: [] };
+    porProva[chave].itens.push({ nomeAluno, turmaTexto, respostas });
+  });
+  return { grupos: Object.values(porProva), numQuestoesTotal };
+}
+async function processarArquivoRespostasAvulso(file){
+  const p = state.professor;
+  p.avulso.importPlanilha = { processando:true, erro:'', resultado:null, nomeArquivo:file.name, importando:false };
+  render();
+  let rows;
+  try{ rows = await lerPlanilhaComoLinhas(file); }
+  catch(e){ p.avulso.importPlanilha = { processando:false, erro:'Não foi possível ler esse arquivo. Confira se é um .csv ou .xlsx válido.', resultado:null, nomeArquivo:file.name, importando:false }; render(); return; }
+  const parsed = parseRespostasPlanilha(rows);
+  if(parsed.erro){
+    p.avulso.importPlanilha = { processando:false, erro:parsed.erro, resultado:null, nomeArquivo:file.name, importando:false };
+    render();
+    return;
+  }
+  const grupos = parsed.grupos.map(g => {
+    let maxQnComResposta = 0;
+    g.itens.forEach(it => it.respostas.forEach((r, i) => { if(r) maxQnComResposta = Math.max(maxQnComResposta, i+1); }));
+    const numQuestoes = maxQnComResposta>0 ? maxQnComResposta : parsed.numQuestoesTotal;
+    const itensResolvidos = g.itens.map(it => {
+      const m = avulsoMatchAlunoTurma(it.nomeAluno, it.turmaTexto);
+      return { studentName: it.nomeAluno, turmaId: m.turmaId, turmaName: m.turmaName, respostas: it.respostas.slice(0, numQuestoes) };
+    });
+    const turmasEnvolvidas = [];
+    const turmaIdsVistos = new Set();
+    itensResolvidos.forEach(it => { if(it.turmaId && !turmaIdsVistos.has(it.turmaId)){ turmaIdsVistos.add(it.turmaId); turmasEnvolvidas.push({ turmaId: it.turmaId, turmaName: it.turmaName }); } });
+    return {
+      tituloEdit: g.provaTitulo,
+      numQuestoes,
+      numAlternativas: detectarNumAlternativasPlanilha(itensResolvidos),
+      itens: itensResolvidos,
+      turmasEnvolvidas: turmasEnvolvidas.map(t=>t.turmaName),
+      turmasEnvolvidasObj: turmasEnvolvidas,
+      semTurma: itensResolvidos.filter(i=>!i.turmaId).length,
+      jaExisteGabaritoComMesmoTitulo: (p.avulso.list||[]).some(x => normalizeDisciplinaName(x.titulo)===normalizeDisciplinaName(g.provaTitulo))
+    };
+  });
+  p.avulso.importPlanilha = { processando:false, erro:'', resultado:{ grupos }, nomeArquivo:file.name, importando:false };
+  render();
+}
+async function confirmarImportarRespostasAvulso(){
+  const p = state.professor;
+  const resultado = p.avulso.importPlanilha.resultado;
+  if(!resultado) return;
+  p.avulso.importPlanilha.importando = true;
+  render();
+  let totalGabaritosCriados = 0, totalRespostasGravadas = 0;
+  for(const g of resultado.grupos){
+    if(g.itens.length===0) continue;
+    const discGeral = { id: cryptoId(), nome:'Geral', inicio:1, fim:g.numQuestoes, vinculos:[] };
+    const gab = {
+      id: cryptoId(), code: genCode(), titulo: (g.tituloEdit||'').trim() || 'Prova Importada',
+      unidade:'', instrumento:'', dataProva:'',
+      numQuestoes: g.numQuestoes, numAlternativas: g.numAlternativas,
+      gabarito: null,
+      disciplinas: [discGeral],
+      turmasAplicadas: (g.turmasEnvolvidasObj||[]).map(t => ({ turmaId: t.turmaId, turmaName: t.turmaName, appliedAt: Date.now() }))
+    };
+    p.avulso.list.push(gab);
+    totalGabaritosCriados++;
+    const registros = g.itens.map(it => ({
+      studentName: it.studentName, turmaId: it.turmaId||'', turmaName: it.turmaName||'',
+      submittedAt: Date.now(), respostas: it.respostas,
+      porDisciplina: [{ disciplinaId: discGeral.id, nome: discGeral.nome, acertos:0, total: g.numQuestoes, nota:0 }],
+      acertosTotal:0, notaGeral:0, mediaDisciplinas:0,
+      scanned:false, importadoPlanilha:true
+    }));
+    await window.storage.set(`avulso-respostas:${gab.code}`, JSON.stringify(registros), true);
+    totalRespostasGravadas += registros.length;
+  }
+  await saveAvulsosToStorage();
+  p.avulso.importPlanilha = { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false };
+  p.avulso.mode = 'list';
+  render();
+  alert(`Importação concluída! ${totalGabaritosCriados} gabarito(s) avulso(s) criado(s), com ${totalRespostasGravadas} resposta(s) lançada(s) no total.\n\nAs notas ainda aparecem zeradas — abra cada gabarito importado e informe o "Gabarito correto" pra calcular as notas automaticamente.`);
+}
 // Reabre um gabarito avulso já existente (inclusive um criado antes desse recurso de vínculo com
 // instrumento existir) na mesma tela de formulário, pra ajustar título/unidade/instrumento e o
 // vínculo professor+disciplina de cada bloco. Quantidade de questões, alternativas e os intervalos
@@ -14939,6 +15172,9 @@ document.addEventListener('click', (e) => {
   else if(act==='avulso-lancar-modo'){ p.avulso.lancarModo = btn.dataset.modo; p.avulso.scanReview=null; p.avulso.scanError=''; render(); }
   else if(act==='avulso-lancar-resposta-bolinha'){ p.avulso.lancarRespostas[parseInt(btn.dataset.idx)] = btn.dataset.letra; render(); }
   else if(act==='avulso-lancar-manual'){ lancarAvulsoManual(); }
+  else if(act==='avulso-abrir-importar-planilha'){ avulsoAbrirImportarPlanilha(); }
+  else if(act==='avulso-cancelar-importar-planilha'){ avulsoCancelarImportarPlanilha(); }
+  else if(act==='avulso-confirmar-importar-planilha'){ confirmarImportarRespostasAvulso(); }
   else if(act==='avulso-scan-cancel'){ p.avulso.scanReview=null; p.avulso.scanAvulso=null; p.avulso.scanError=''; p.avulso.scanQueue=null; render(); }
   else if(act==='avulso-scan-confirm'){ confirmAvulsoScan(); }
   else if(act==='avulso-scan-pular'){ avulsoScanAvancarFila(); }
@@ -15112,6 +15348,7 @@ document.addEventListener('input', (e) => {
   }
   else if(el.id==='disciplina-name-input'){ p.newDisciplinaName = el.value; }
   else if(el.id==='coord-prof-disciplina-nome-input'){ state.coordenador.newProfDisciplinaNome = el.value; }
+  else if(act==='avulso-import-titulo-grupo'){ p.avulso.importPlanilha.resultado.grupos[parseInt(el.dataset.gi)].tituloEdit = el.value; }
   else if(el.id==='new-student-input'){ p.newStudentName = el.value; }
   else if(act==='import-turma-roster-file'){ if(el.files[0]) importTurmaRoster(el.dataset.tid, el.files[0]); }
   else if(el.id==='start-input'){ p.newAssessment.startAt = el.value; }
@@ -15270,6 +15507,7 @@ document.addEventListener('change', (e) => {
   else if(el.id==='freq-painel-turma-select'){ const fp = state.view==='freqmonitor' ? state.freqMonitor.painel : state.professor.freqPainel; fp.turmaId = el.value; render(); }
   else if(el.id==='chamada-data-input'){ const {ch}=getChamadaCtx(); ch.data = el.value; ch.presentes = []; ch.mensagem=''; if(ch.turmaId) loadChamada(); else render(); }
   else if(el.id==='avulso-scan-file-input'){ if(el.files[0]) iniciarLeituraAvulso(el.files[0]); }
+  else if(el.id==='avulso-import-planilha-file'){ if(el.files[0]) processarArquivoRespostasAvulso(el.files[0]); }
   else if(el.id==='avulso-scan-turma-select'){ p.avulso.scanTurmaId = el.value; render(); }
   else if(el.id==='professor-photo-input'){ if(el.files[0]) handleProfessorPhotoUpload(el.files[0]); }
 });
