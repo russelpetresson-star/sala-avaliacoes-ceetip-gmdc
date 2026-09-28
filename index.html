@@ -7633,7 +7633,7 @@ function renderNovoAvulso(){
   return `
     <div class="card">
       <h2>${editando ? 'Editar configuração do gabarito' : 'Novo gabarito avulso'}</h2>
-      ${editando ? '<p class="muted" style="font-size:.85rem;">A quantidade de questões e de alternativas não podem ser alteradas aqui (já podem estar impressas/aplicadas). Você pode ajustar título, unidade, o instrumento substituído, o vínculo de professor(a)/disciplina de cada bloco e também o intervalo de questões de cada disciplina — se algum aluno já tiver resposta lançada, as notas por disciplina são recalculadas automaticamente ao salvar.</p>' : ''}
+      ${editando ? '<p class="muted" style="font-size:.85rem;">Você pode ajustar título, unidade, quantidade de questões/alternativas, o instrumento substituído, o vínculo de professor(a)/disciplina de cada bloco, e adicionar, remover ou mudar o intervalo de questões das disciplinas. Se algum aluno já tiver resposta lançada: mudar só o intervalo de uma disciplina recalcula a nota por disciplina automaticamente; já mudar a <strong>quantidade de questões ou de alternativas</strong> zera o gabarito correto e as notas já lançadas (os cartões já impressos ficam com a contagem antiga, então confira se é isso mesmo que você quer antes de mudar).</p>' : ''}
       <label>Título / nome da prova</label>
       <input type="text" id="avulso-titulo-input" class="input" value="${esc(f.titulo)}" placeholder="Ex: Prova Integrada I Unidade">
       <div class="row" style="gap:10px; margin-top:8px;">
@@ -7652,11 +7652,11 @@ function renderNovoAvulso(){
       <div class="row" style="gap:10px; margin-top:8px;">
         <div style="flex:1;">
           <label>Quantidade de questões</label>
-          <input type="number" id="avulso-numquestoes-input" class="input" min="1" max="150" value="${f.numQuestoes}" ${editando?'disabled':''}>
+          <input type="number" id="avulso-numquestoes-input" class="input" min="1" max="150" value="${f.numQuestoes}">
         </div>
         <div style="flex:1;">
           <label>Alternativas por questão</label>
-          <select id="avulso-numalt-input" class="input" ${editando?'disabled':''}>
+          <select id="avulso-numalt-input" class="input">
             ${[2,3,4,5,6].map(n => `<option value="${n}" ${f.numAlternativas===n?'selected':''}>${n} (A–${OPT_LETTERS[n-1]})</option>`).join('')}
           </select>
         </div>
@@ -7685,7 +7685,7 @@ function renderNovoAvulso(){
             <input type="number" class="input" style="flex:0 0 65px;" min="1" max="${f.numQuestoes}" data-action="avulso-disc-inicio" data-id="${d.id}" value="${d.inicio}">
             <span class="muted">a</span>
             <input type="number" class="input" style="flex:0 0 65px;" min="1" max="${f.numQuestoes}" data-action="avulso-disc-fim" data-id="${d.id}" value="${d.fim}">
-            ${editando ? '' : `<button class="btn btn-ghost btn-sm" data-action="avulso-disc-remover" data-id="${d.id}">✕</button>`}
+            <button class="btn btn-ghost btn-sm" data-action="avulso-disc-remover" data-id="${d.id}">✕</button>
           </div>
           ${vinculos.map((v, vidx) => {
             const prof = profCache.find(pr=>pr.id===v.professorId);
@@ -7726,7 +7726,7 @@ function renderNovoAvulso(){
           </div>
         </div>
       `;}).join('')}
-      ${editando ? '' : '<button class="btn btn-ghost btn-sm" data-action="avulso-disc-adicionar">+ Adicionar disciplina</button>'}
+      <button class="btn btn-ghost btn-sm" data-action="avulso-disc-adicionar">+ Adicionar disciplina</button>
 
       ${editando ? '' : '<p class="muted" style="font-size:.85rem; margin-top:18px;">O gabarito correto é informado depois, já na tela do gabarito avulso — organizado por disciplina, em colunas, pra evitar erro de contagem. Você já pode imprimir os cartões-resposta assim que salvar aqui.</p>'}
 
@@ -12678,10 +12678,15 @@ async function salvarEdicaoAvulso(){
   const errEl = document.getElementById('avulso-err');
   const setErr = (msg) => { if(errEl) errEl.innerHTML = `<p class="err">${esc(msg)}</p>`; };
   if(!gabOriginal){ setErr('Este gabarito não foi encontrado.'); return; }
+  const n = parseInt(f.numQuestoes);
+  if(!n || n<1 || n>150){ setErr('Informe uma quantidade válida de questões (1 a 150).'); return; }
+  const numAlt = parseInt(f.numAlternativas);
+  if(!numAlt || numAlt<2 || numAlt>6){ setErr('Informe de 2 a 6 alternativas por questão.'); return; }
+  if(!f.disciplinas || f.disciplinas.length===0){ setErr('Adicione ao menos uma disciplina.'); return; }
   for(const d of f.disciplinas){
     if(!d.nome || !d.nome.trim()){ setErr('Preencha o nome de todas as disciplinas.'); return; }
     const ini = parseInt(d.inicio), fim = parseInt(d.fim);
-    if(!ini || !fim || ini<1 || fim>gabOriginal.numQuestoes || ini>fim){ setErr(`Intervalo de questões inválido para "${d.nome}" (deve estar entre 1 e ${gabOriginal.numQuestoes}).`); return; }
+    if(!ini || !fim || ini<1 || fim>n || ini>fim){ setErr(`Intervalo de questões inválido para "${d.nome}" (deve estar entre 1 e ${n}).`); return; }
   }
   if(f.instrumento && !f.unidade){ setErr('Para substituir um instrumento avaliativo, selecione a unidade.'); return; }
   const disciplinasAtualizadas = construirDisciplinasComVinculos(f, setErr);
@@ -12689,12 +12694,18 @@ async function salvarEdicaoAvulso(){
   const faixasMudaram = disciplinasAtualizadas.some(dNovo => {
     const dOriginal = gabOriginal.disciplinas.find(x=>x.id===dNovo.id);
     return !dOriginal || dOriginal.inicio!==dNovo.inicio || dOriginal.fim!==dNovo.fim;
-  });
+  }) || disciplinasAtualizadas.length!==gabOriginal.disciplinas.length;
+  // Mudar a quantidade de questões ou de alternativas invalida o gabarito correto que já estivesse
+  // informado (o tamanho não bate mais) — em vez de deixar notas erradas na tela, zera o gabarito
+  // correto e as notas já lançadas, pra forçar reinformar antes de confiar em qualquer nota de novo.
+  const contagemMudou = n!==gabOriginal.numQuestoes || numAlt!==gabOriginal.numAlternativas;
   const gabAtualizado = {
     ...gabOriginal,
     titulo: (f.titulo||'').trim() || 'Gabarito Avulso',
     unidade: (f.unidade||'').trim(), instrumento: f.instrumento || '', dataProva: f.dataProva || '',
-    disciplinas: disciplinasAtualizadas
+    numQuestoes: n, numAlternativas: numAlt,
+    disciplinas: disciplinasAtualizadas,
+    gabarito: contagemMudou ? null : gabOriginal.gabarito
   };
   // Limpa a avaliação sintética de qualquer vínculo que existia antes e deixou de existir
   // (removido, professor trocado, ou instrumento retirado por completo), pra não deixar nota
@@ -12713,11 +12724,28 @@ async function salvarEdicaoAvulso(){
   // Se o intervalo de questões de alguma disciplina mudou e já existem respostas lançadas,
   // recalcula a nota por disciplina de cada aluno com o novo intervalo antes de sincronizar
   // com o painel do(a) professor(a) — senão a nota que aparece lá ficaria desatualizada.
-  if(gabAtualizado.gabarito && faixasMudaram){
+  // Quando a quantidade de questões/alternativas mudou, o gabarito correto foi zerado acima —
+  // aqui as respostas já lançadas também voltam a ficar zeradas (sem gabarito não tem como
+  // saber o que está certo), até alguém informar o gabarito correto de novo.
+  if(faixasMudaram || contagemMudou){
     let respostasExistentes = [];
     try{ const r = await window.storage.get(`avulso-respostas:${gabAtualizado.code}`, true); respostasExistentes = JSON.parse(r.value) || []; }catch(e){ respostasExistentes = []; }
     if(respostasExistentes.length>0){
-      const recalculadas = respostasExistentes.map(r => ({ ...r, ...gradeAvulsoRespostas(gabAtualizado, r.respostas) }));
+      const recalculadas = respostasExistentes.map(r => {
+        let respostasArr = r.respostas || [];
+        if(contagemMudou){
+          respostasArr = respostasArr.slice(0, n);
+          while(respostasArr.length<n) respostasArr.push('');
+        }
+        if(gabAtualizado.gabarito){
+          return { ...r, respostas: respostasArr, ...gradeAvulsoRespostas(gabAtualizado, respostasArr) };
+        }
+        // Ainda não tem gabarito correto informado — mantém a nota zerada, só com a estrutura de
+        // disciplinas (e o tamanho das respostas) já batendo com a configuração nova.
+        return { ...r, respostas: respostasArr,
+          porDisciplina: gabAtualizado.disciplinas.map(d=>({ disciplinaId:d.id, nome:d.nome, acertos:0, total: Math.max(0,d.fim-d.inicio+1), nota:0 })),
+          acertosTotal:0, notaGeral:0, mediaDisciplinas:0 };
+      });
       await window.storage.set(`avulso-respostas:${gabAtualizado.code}`, JSON.stringify(recalculadas), true);
       if(p.avulso.current && p.avulso.current.code===gabAtualizado.code) p.avulso.respostas = recalculadas;
     }
@@ -12727,7 +12755,10 @@ async function salvarEdicaoAvulso(){
   p.avulso.current = gabAtualizado;
   p.avulso.form = null;
   render();
-  alert(faixasMudaram ? 'Configuração do gabarito atualizada. As notas por disciplina já lançadas foram recalculadas com o novo intervalo de questões.' : 'Configuração do gabarito atualizada.');
+  const msg = contagemMudou
+    ? 'Configuração do gabarito atualizada. Como a quantidade de questões ou alternativas mudou, o gabarito correto foi zerado (e as notas já lançadas também) — informe o gabarito correto de novo em "Gabarito correto" antes de confiar nas notas.'
+    : (faixasMudaram ? 'Configuração do gabarito atualizada. As notas por disciplina já lançadas foram recalculadas com o novo intervalo de questões.' : 'Configuração do gabarito atualizada.');
+  alert(msg);
 }
 async function cleanupAvulsoVinculo(code, vinculoId, blockId){
   const all = [...state.professor.assessments, ...state.coordenador.assessments];
