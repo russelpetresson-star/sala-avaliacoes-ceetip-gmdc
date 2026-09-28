@@ -1173,7 +1173,7 @@ let state = {
       respostas:[], respostasLoading:false,
       editandoGabarito:false, gabaritoEditAnswers:[], gabaritoEditError:'',
       professoresCache:null, professoresCacheLoading:false,
-      transferRespName:null, transferTargetCode:'', transferError:'' },
+      transferRespName:null, transferTargetCode:'', transferError:'', transferBulk:false, selecionados:[] },
     unlockRequests: [], unlockRequestsLoading: true,
     periodos: {}, periodosLoading: true,
     pickerOpen:false, pickerSelected:[],
@@ -7919,12 +7919,36 @@ function renderDetalheAvulso(){
         <button class="btn btn-ghost btn-sm" data-action="avulso-imprimir-lista">🖨️ Imprimir lista de notas</button>
       </div>
       ${rows.length===0 ? '<p class="muted center">Nenhuma nota lançada ainda.</p>' : `
+        ${(av.selecionados||[]).length>0 ? `
+        <div class="row" style="justify-content:space-between; align-items:center; background:var(--surface); padding:8px 10px; border-radius:6px; margin-top:8px;">
+          <span style="font-size:.85rem;"><strong>${av.selecionados.length}</strong> aluno(s) selecionado(s)</span>
+          <div class="row" style="gap:6px;">
+            <button class="btn btn-ghost btn-sm" data-action="avulso-limpar-selecao">Limpar seleção</button>
+            <button class="btn btn-primary btn-sm" data-action="avulso-abrir-transferir-selecionados">🔀 Transferir selecionados</button>
+          </div>
+        </div>
+        ` : ''}
+        ${av.transferBulk ? `
+        <div class="card" style="background:var(--surface); margin:8px 0; padding:10px;">
+          <label style="font-size:.8rem;">Transferir a resposta de <strong>${av.selecionados.length} aluno(s)</strong> (${av.selecionados.map(esc).join(', ')}) pra qual gabarito avulso (a prova certa)?</label>
+          <select id="avulso-transfer-target-select" class="input">
+            <option value="">Selecione o gabarito correto...</option>
+            ${(p.avulso.list||[]).filter(x=>x.code!==gab.code).map(x => `<option value="${x.code}" ${av.transferTargetCode===x.code?'selected':''}>${esc(x.titulo||'Gabarito Avulso')} · ${x.numQuestoes} questões (${x.code})</option>`).join('')}
+          </select>
+          ${av.transferError ? `<p class="err" style="font-size:.82rem;">${esc(av.transferError)}</p>` : ''}
+          <div class="row" style="margin-top:8px;">
+            <button class="btn btn-ghost btn-sm" data-action="avulso-cancelar-transferir-resposta">Cancelar</button>
+            <button class="btn btn-primary btn-sm" data-action="avulso-confirmar-transferir-resposta">Confirmar transferência</button>
+          </div>
+        </div>
+        ` : ''}
         <div class="table-scroll">
         <table class="pv-sign-table" style="margin-top:8px;">
-          <thead><tr><th>Aluno</th><th>Turma</th>${(gab.disciplinas||[]).map(d=>`<th style="text-align:center;">${esc(d.nome)}</th>`).join('')}<th style="text-align:center;">Média</th><th></th></tr></thead>
+          <thead><tr><th style="width:26px;"><input type="checkbox" data-action="avulso-toggle-selecionar-todos" ${rows.length>0 && rows.every(r=>(av.selecionados||[]).includes(r.studentName))?'checked':''}></th><th>Aluno</th><th>Turma</th>${(gab.disciplinas||[]).map(d=>`<th style="text-align:center;">${esc(d.nome)}</th>`).join('')}<th style="text-align:center;">Média</th><th></th></tr></thead>
           <tbody>
             ${rows.map(r => `
               <tr>
+                <td><input type="checkbox" data-action="avulso-toggle-selecionado" data-name="${esc(r.studentName)}" ${(av.selecionados||[]).includes(r.studentName)?'checked':''}></td>
                 <td>${esc(r.studentName)}${r.scanned?' <span class="muted" style="font-size:.75rem;">(leitura)</span>':''}${r.transferidoDe?'<br><span class="muted" style="font-size:.72rem;">↪ transferido de outro gabarito</span>':''}</td>
                 <td>${esc(r.turmaName||'-')}</td>
                 ${(gab.disciplinas||[]).map(d => { const dd=(r.porDisciplina||[]).find(x=>x.disciplinaId===d.id); return `<td style="text-align:center;">${dd?dd.nota.toFixed(1)+' ('+dd.acertos+'/'+dd.total+')':'-'}</td>`; }).join('')}
@@ -7935,7 +7959,7 @@ function renderDetalheAvulso(){
                 </td>
               </tr>
               ${av.transferRespName===r.studentName ? `
-              <tr><td colspan="${3+(gab.disciplinas||[]).length}" style="padding:0;">
+              <tr><td colspan="${4+(gab.disciplinas||[]).length}" style="padding:0;">
                 <div class="card" style="background:var(--surface); margin:6px 0; padding:10px;">
                   <label style="font-size:.8rem;">Transferir a resposta de <strong>${esc(r.studentName)}</strong> pra qual gabarito avulso (a prova certa)?</label>
                   <select id="avulso-transfer-target-select" class="input">
@@ -12635,6 +12659,7 @@ async function abrirAvulso(id){
   p.avulso.lancarModo = 'manual'; p.avulso.lancarNome = ''; p.avulso.lancarTurmaId = ''; p.avulso.lancarStudentId = ''; p.avulso.lancarSequencia = ''; p.avulso.lancarRespostas = new Array(gab.numQuestoes).fill('');
   p.avulso.scanLoading = false; p.avulso.scanError = ''; p.avulso.scanReview = null; p.avulso.scanAvulso = null;
   p.avulso.editandoGabarito = false; p.avulso.gabaritoEditAnswers = []; p.avulso.gabaritoEditError = '';
+  p.avulso.selecionados = []; p.avulso.transferRespName = null; p.avulso.transferBulk = false; p.avulso.transferTargetCode = ''; p.avulso.transferError = '';
   loadAvulsoRespostas(gab.code);
   render();
 }
@@ -12683,6 +12708,7 @@ async function excluirRespostaAvulso(studentName){
 function coordAbrirTransferirRespostaAvulso(studentName){
   const p = state.professor;
   p.avulso.transferRespName = studentName;
+  p.avulso.transferBulk = false;
   p.avulso.transferTargetCode = '';
   p.avulso.transferError = '';
   render();
@@ -12690,16 +12716,46 @@ function coordAbrirTransferirRespostaAvulso(studentName){
 function coordCancelarTransferirRespostaAvulso(){
   const p = state.professor;
   p.avulso.transferRespName = null;
+  p.avulso.transferBulk = false;
   p.avulso.transferTargetCode = '';
   p.avulso.transferError = '';
+  render();
+}
+// Seleção múltipla de alunos na tela de detalhe do gabarito avulso, pra transferir
+// vários de uma vez (ex.: vários alunos lançados por engano na prova errada).
+function avulsoToggleSelecionado(studentName){
+  const p = state.professor;
+  const av = p.avulso;
+  const set = new Set(av.selecionados||[]);
+  if(set.has(studentName)) set.delete(studentName); else set.add(studentName);
+  av.selecionados = Array.from(set);
+  render();
+}
+function avulsoToggleSelecionarTodos(){
+  const p = state.professor;
+  const av = p.avulso;
+  const nomes = (av.respostas||[]).map(r=>r.studentName);
+  const todosJaSelecionados = nomes.length>0 && nomes.every(n=>(av.selecionados||[]).includes(n));
+  av.selecionados = todosJaSelecionados ? [] : nomes;
+  render();
+}
+function coordAbrirTransferirSelecionadosAvulso(){
+  const p = state.professor;
+  const av = p.avulso;
+  if(!av.selecionados || av.selecionados.length===0) return;
+  av.transferRespName = null;
+  av.transferBulk = true;
+  av.transferTargetCode = '';
+  av.transferError = '';
   render();
 }
 async function coordConfirmarTransferirRespostaAvulso(){
   const p = state.professor;
   const av = p.avulso;
-  const studentName = av.transferRespName;
   const fromGab = av.current;
-  if(!studentName || !fromGab) return;
+  if(!fromGab) return;
+  const nomes = av.transferBulk ? (av.selecionados||[]).slice() : (av.transferRespName ? [av.transferRespName] : []);
+  if(nomes.length===0){ av.transferError = 'Nenhum aluno selecionado.'; render(); return; }
   const toCode = av.transferTargetCode;
   if(!toCode){ av.transferError = 'Escolha o gabarito avulso correto de destino.'; render(); return; }
   if(toCode===fromGab.code){ av.transferError = 'Escolha um gabarito diferente do atual.'; render(); return; }
@@ -12708,27 +12764,45 @@ async function coordConfirmarTransferirRespostaAvulso(){
   if(!toGab.gabarito){ av.transferError = `O gabarito "${toGab.titulo}" ainda não tem o gabarito correto cadastrado — cadastre-o antes de transferir notas pra ele.`; render(); return; }
   if(toGab.numQuestoes !== fromGab.numQuestoes){ av.transferError = `As duas provas têm quantidade de questões diferente (${fromGab.numQuestoes} na atual, ${toGab.numQuestoes} na de destino) — não dá pra transferir com segurança.`; render(); return; }
   if(toGab.numAlternativas !== fromGab.numAlternativas){ av.transferError = `As duas provas têm quantidade de alternativas por questão diferente (${fromGab.numAlternativas} na atual, ${toGab.numAlternativas} na de destino) — confira se é mesmo a prova certa antes de transferir.`; render(); return; }
-  const resposta = (av.respostas||[]).find(x=>x.studentName===studentName);
-  if(!resposta){ av.transferError = 'Resposta não encontrada.'; render(); return; }
-  if(!confirm(`Transferir a resposta de "${studentName}" de "${fromGab.titulo}" para "${toGab.titulo}"? A nota é recalculada com o gabarito de correção do destino.`)) return;
-  const novoRegistro = { ...resposta, ...gradeAvulsoRespostas(toGab, resposta.respostas), transferidoDe: fromGab.code, transferidoEm: Date.now() };
+
+  const confirmMsg = nomes.length>1
+    ? `Transferir as respostas de ${nomes.length} aluno(s) (${nomes.join(', ')}) de "${fromGab.titulo}" para "${toGab.titulo}"? A nota de cada um é recalculada com o gabarito de correção do destino.`
+    : `Transferir a resposta de "${nomes[0]}" de "${fromGab.titulo}" para "${toGab.titulo}"? A nota é recalculada com o gabarito de correção do destino.`;
+  if(!confirm(confirmMsg)) return;
+
   let origemList = [];
   try{ const r = await window.storage.get(`avulso-respostas:${fromGab.code}`, true); origemList = JSON.parse(r.value); }catch(e){ origemList = []; }
-  origemList = origemList.filter(x=>x.studentName!==studentName);
-  await window.storage.set(`avulso-respostas:${fromGab.code}`, JSON.stringify(origemList), true);
   let destinoList = [];
   try{ const r = await window.storage.get(`avulso-respostas:${toGab.code}`, true); destinoList = JSON.parse(r.value); }catch(e){ destinoList = []; }
-  destinoList = destinoList.filter(x=>x.studentName!==studentName);
-  destinoList.push(novoRegistro);
+
+  const transferidos = [];
+  const naoEncontrados = [];
+  for(const studentName of nomes){
+    const resposta = origemList.find(x=>x.studentName===studentName);
+    if(!resposta){ naoEncontrados.push(studentName); continue; }
+    const novoRegistro = { ...resposta, ...gradeAvulsoRespostas(toGab, resposta.respostas), transferidoDe: fromGab.code, transferidoEm: Date.now() };
+    origemList = origemList.filter(x=>x.studentName!==studentName);
+    destinoList = destinoList.filter(x=>x.studentName!==studentName);
+    destinoList.push(novoRegistro);
+    transferidos.push(studentName);
+  }
+
+  await window.storage.set(`avulso-respostas:${fromGab.code}`, JSON.stringify(origemList), true);
   await window.storage.set(`avulso-respostas:${toGab.code}`, JSON.stringify(destinoList), true);
   av.respostas = origemList;
   av.transferRespName = null;
+  av.transferBulk = false;
   av.transferTargetCode = '';
   av.transferError = '';
+  av.selecionados = [];
   await syncAvulsoInstrumento(fromGab);
   await syncAvulsoInstrumento(toGab);
   render();
-  alert(`Resposta de ${studentName} transferida para "${toGab.titulo}" e recalculada com sucesso.`);
+  const resumo = transferidos.length>0
+    ? `${transferidos.length} resposta(s) transferida(s) para "${toGab.titulo}" e recalculada(s) com sucesso.`
+    : 'Nenhuma resposta foi transferida.';
+  const aviso = naoEncontrados.length>0 ? ` (${naoEncontrados.length} não encontrada(s): ${naoEncontrados.join(', ')})` : '';
+  alert(resumo+aviso);
 }
 function gradeAvulsoRespostas(gab, respostas){
   const porDisciplina = (gab.disciplinas||[]).map(d => {
@@ -14467,6 +14541,10 @@ document.addEventListener('click', (e) => {
   else if(act==='avulso-abrir-transferir-resposta'){ coordAbrirTransferirRespostaAvulso(btn.dataset.name); }
   else if(act==='avulso-cancelar-transferir-resposta'){ coordCancelarTransferirRespostaAvulso(); }
   else if(act==='avulso-confirmar-transferir-resposta'){ coordConfirmarTransferirRespostaAvulso(); }
+  else if(act==='avulso-toggle-selecionado'){ avulsoToggleSelecionado(btn.dataset.name); }
+  else if(act==='avulso-toggle-selecionar-todos'){ avulsoToggleSelecionarTodos(); }
+  else if(act==='avulso-limpar-selecao'){ p.avulso.selecionados = []; render(); }
+  else if(act==='avulso-abrir-transferir-selecionados'){ coordAbrirTransferirSelecionadosAvulso(); }
   else if(act==='abrir-form-temporada'){ abrirFormTemporada(); }
   else if(act==='cancelar-form-temporada'){ cancelarFormTemporada(); }
   else if(act==='add-temporada-tier'){ addTemporadaTier(); }
@@ -14694,7 +14772,7 @@ document.addEventListener('click', (e) => {
   else if(act==='avulso-disc-remover'){ avulsoRemoveDisciplina(btn.dataset.id); }
   else if(act==='avulso-vinc-adicionar'){ avulsoVinculoAdicionar(btn.dataset.id); }
   else if(act==='avulso-vinc-remover'){ avulsoVinculoRemover(btn.dataset.id, btn.dataset.vid); }
-  else if(act==='avulso-voltar-lista'){ p.avulso.mode='list'; p.avulso.current=null; p.avulso.transferRespName=null; p.avulso.transferError=''; render(); }
+  else if(act==='avulso-voltar-lista'){ p.avulso.mode='list'; p.avulso.current=null; p.avulso.transferRespName=null; p.avulso.transferBulk=false; p.avulso.selecionados=[]; p.avulso.transferError=''; render(); }
   else if(act==='avulso-imprimir-cartoes'){ imprimirCartoesAvulso(); }
   else if(act==='avulso-lancar-modo'){ p.avulso.lancarModo = btn.dataset.modo; p.avulso.scanReview=null; p.avulso.scanError=''; render(); }
   else if(act==='avulso-lancar-resposta-bolinha'){ p.avulso.lancarRespostas[parseInt(btn.dataset.idx)] = btn.dataset.letra; render(); }
