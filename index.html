@@ -1199,6 +1199,7 @@ let state = {
     dashboard: { loading:true, stats:null },
     periodosDraft: null,
     changingFreqPassword:false, errorFreq:'',
+    changingBibliotecaPassword:false, errorBiblioteca:'',
     freqConfig: { mesCalendario: new Date().toISOString().slice(0,7), horariosDraft:null, errorHorarios:'' },
     importCsv: { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false },
     temporadaForm: null, temporadaError:''
@@ -1209,6 +1210,21 @@ let state = {
     subview: 'bipar', // 'bipar' | 'painel'
     chamada: { turmaId:'', data: new Date().toISOString().slice(0,10), loading:false, presentes:[], mensagem:'', mensagemTipo:'' },
     painel: { turmaId:'' }
+  },
+  biblioteca: {
+    session:false, senhaInput:'', error:'',
+    subview: 'catalogo', // 'catalogo' | 'emprestimos' | 'relatorio'
+    turmas:[], turmasLoading:false,
+    livros:[], livrosLoading:false,
+    emprestimos:[], emprestimosLoading:false,
+    formLivro:null, livroError:'', buscaLivro:'',
+    formEmprestimo:{ turmaId:'', studentId:'', livroId:'', dataEmprestimo: new Date().toISOString().slice(0,10), dataPrevista:'' },
+    emprestimoError:'', buscaEmprestimo:'', mostrarHistorico:false,
+    limiteEmprestimos:3, limiteEmprestimosLoading:false,
+    catalogoMode: 'list', // 'list' | 'importar'
+    importPlanilha: { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false },
+    reservas:[], reservasLoading:false, reservaError:'',
+    formReserva:{ turmaId:'', studentId:'', livroId:'' }
   },
   diasLetivos: { loading:true, map:{} },
   turnoHorarios: { loading:true, map:{} },
@@ -1456,6 +1472,11 @@ function renderLanding(){
         <h3>Frequência</h3>
         <p>Leitura da carteirinha</p>
       </button>
+      <button class="landing-card landing-plum" data-action="goto-landing-role" data-role="biblioteca">
+        <div class="landing-icon">📚</div>
+        <h3>Biblioteca</h3>
+        <p>Catalogação e empréstimos</p>
+      </button>
     </div>
     <p class="row" style="justify-content:center; margin-top:18px; flex-wrap:wrap;">
       <button class="btn btn-ghost btn-sm" data-action="open-privacy-notice" style="flex:0 0 auto;">🔒 Aviso de Privacidade</button>
@@ -1494,7 +1515,7 @@ function render(){
     if(wrapEl){ wrapEl.classList.remove('wide'); wrapEl.classList.remove('full'); }
     return;
   }
-  root.innerHTML = state.view==='professor' ? renderProfessor() : state.view==='coordenador' ? renderCoordenador() : state.view==='freqmonitor' ? renderFreqMonitor() : renderAluno();
+  root.innerHTML = state.view==='professor' ? renderProfessor() : state.view==='coordenador' ? renderCoordenador() : state.view==='freqmonitor' ? renderFreqMonitor() : state.view==='biblioteca' ? renderBiblioteca() : renderAluno();
   const wide = (state.view==='professor' && !!state.professor.session) || (state.view==='coordenador' && !!state.coordenador.session);
   const full = state.professor.quiz.presentationMode || state.professor.roleta.presentationMode || state.professor.duelo.presentationMode || state.professor.slides.presentationMode;
   const wrapEl = document.querySelector('.wrap');
@@ -3068,10 +3089,12 @@ function renderAlunoRankingTrilhaBlock(){
   const conquistas = computeConquistas(meStudent);
   const conquistadas = conquistas.filter(c=>c.achieved).length;
 
+  // Mostramos só o Top 5 pra turma inteira não ficar exposta pros colegas — o aluno sempre
+  // vê a própria posição em destaque logo abaixo, mesmo quando ela está fora do Top 5.
   const ranking = [...al.turma.students].map(s=>ensureStudentGamification(s)).sort((a,b)=>b.fichas-a.fichas);
   const minhaPosicao = ranking.findIndex(s=>s.id===al.matriculaStudentId) + 1;
-  const top10 = ranking.slice(0,10);
-  const meVisivel = top10.some(s=>s.id===al.matriculaStudentId);
+  const top5 = ranking.slice(0,5);
+  const meVisivel = top5.some(s=>s.id===al.matriculaStudentId);
 
   return `
     <div class="card" style="margin-top:16px;">
@@ -3093,8 +3116,9 @@ function renderAlunoRankingTrilhaBlock(){
         <span class="pill">🏆 ${conquistadas}/${conquistas.length} conquistas</span>
       </div>
 
-      <h3 style="margin-top:20px;">🏆 Ranking da Turma</h3>
-      ${top10.map((s,i) => `
+      <h3 style="margin-top:20px;">🏆 Top 5 da Turma</h3>
+      <p class="muted" style="font-size:.8rem; margin-top:-4px;">Pra preservar a privacidade dos colegas, só o Top 5 aparece aqui — mas sua posição você sempre vê.</p>
+      ${top5.map((s,i) => `
         <div class="list-item" style="${s.id===al.matriculaStudentId?'background:var(--surface); border-color:var(--board);':''}">
           <span>${i+1}º · ${studentAvatarHtml(s,26)} ${esc(s.name)}${s.id===al.matriculaStudentId?' <span class="muted">(você)</span>':''}</span>
           <span class="muted">${s.fichas} 🎫 · Nv.${computeNivelInfo(s.fichas).nivel}</span>
@@ -8557,6 +8581,15 @@ function renderCoordProfessores(){
       <input type="password" id="freq-new-password2-input" placeholder="Repita a nova senha">
       ${c.errorFreq && c.changingFreqPassword ? `<p class="err">${esc(c.errorFreq)}</p>` : ''}
       <button class="btn btn-ghost btn-sm" data-action="coord-save-freq-password" style="margin-top:10px;">Trocar senha da Frequência</button>
+
+      <h3 style="margin-top:26px;">Senha da Biblioteca</h3>
+      <p class="muted" style="font-size:.85rem;">Senha compartilhada usada para entrar na área "Biblioteca" (catalogação e empréstimos). Padrão de fábrica: <code>biblioteca123</code>.</p>
+      <label>Nova senha</label>
+      <input type="password" id="biblioteca-new-password-input" placeholder="Nova senha">
+      <label>Confirmar nova senha</label>
+      <input type="password" id="biblioteca-new-password2-input" placeholder="Repita a nova senha">
+      ${c.errorBiblioteca && c.changingBibliotecaPassword ? `<p class="err">${esc(c.errorBiblioteca)}</p>` : ''}
+      <button class="btn btn-ghost btn-sm" data-action="coord-save-biblioteca-password" style="margin-top:10px;">Trocar senha da Biblioteca</button>
     </div>
   `;
 }
@@ -9934,6 +9967,21 @@ async function saveFreqMonitorPassword(){
   render();
   alert('Senha do Controle de Frequência atualizada.');
 }
+async function saveBibliotecaPassword(){
+  const c = state.coordenador;
+  c.changingBibliotecaPassword = true;
+  const val = document.getElementById('biblioteca-new-password-input').value;
+  const val2 = document.getElementById('biblioteca-new-password2-input').value;
+  if(val.length<4){ c.errorBiblioteca='A nova senha deve ter pelo menos 4 caracteres.'; render(); return; }
+  if(val!==val2){ c.errorBiblioteca='As senhas não coincidem.'; render(); return; }
+  const newSalt = randomSaltHex();
+  await window.storage.set('biblioteca-senha-salt', newSalt, true);
+  await window.storage.set('biblioteca-senha', await hashTextSalted(val, newSalt), true);
+  c.errorBiblioteca='';
+  c.changingBibliotecaPassword=false;
+  render();
+  alert('Senha da Biblioteca atualizada.');
+}
 async function submitFreqMonitorLogin(){
   const f = state.freqMonitor;
   const val = document.getElementById('freq-senha-input').value;
@@ -10008,6 +10056,806 @@ function renderFreqMonitor(){
   }
   return topBar + content;
 }
+
+/* ---------------- BIBLIOTECA ---------------- */
+
+function bibliotecaFmtData(iso){
+  if(!iso) return '-';
+  const d = new Date(iso+'T00:00:00');
+  if(isNaN(d.getTime())) return '-';
+  return d.toLocaleDateString('pt-BR');
+}
+function bibliotecaPrazoPadrao(){
+  const d = new Date();
+  d.setDate(d.getDate()+14);
+  return d.toISOString().slice(0,10);
+}
+const BIBLIOTECA_MAX_RENOVACOES = 2;
+const BIBLIOTECA_DIAS_AVISO_PRAZO = 3;
+const BIBLIOTECA_FICHAS_DEVOLUCAO_PRAZO = 2;
+
+function bibliotecaEmprestimoStatus(emp){
+  if(emp.dataDevolucao) return 'devolvido';
+  const hoje = new Date().toISOString().slice(0,10);
+  if(emp.dataPrevista && emp.dataPrevista < hoje) return 'atrasado';
+  return 'emprestado';
+}
+function bibliotecaDiasAteVencer(emp){
+  if(!emp.dataPrevista) return null;
+  const hoje = new Date(new Date().toISOString().slice(0,10)+'T00:00:00');
+  const prazo = new Date(emp.dataPrevista+'T00:00:00');
+  return Math.round((prazo-hoje)/86400000);
+}
+function bibliotecaVenceEmBreve(emp){
+  if(bibliotecaEmprestimoStatus(emp)!=='emprestado') return false;
+  const dias = bibliotecaDiasAteVencer(emp);
+  return dias!==null && dias>=0 && dias<=BIBLIOTECA_DIAS_AVISO_PRAZO;
+}
+function bibliotecaStatusPill(status, dataDevolucao, venceEmBreve, dias){
+  if(status==='devolvido') return `<span class="pill" style="background:var(--green); color:#fff;">Devolvido${dataDevolucao?' em '+bibliotecaFmtData(dataDevolucao):''}</span>`;
+  if(status==='atrasado') return `<span class="pill" style="background:var(--red); color:#fff;">Atrasado</span>`;
+  if(venceEmBreve) return `<span class="pill" style="background:#c98a2b; color:#fff;">Vence em ${dias===0?'hoje':dias+' dia(s)'}</span>`;
+  return `<span class="pill">Emprestado</span>`;
+}
+function bibliotecaExemplaresDisponiveis(livro, emprestimos){
+  const emprestados = (emprestimos||[]).filter(e => e.livroId===livro.id && !e.dataDevolucao).length;
+  return Math.max(0, (parseInt(livro.exemplares)||0) - emprestados);
+}
+
+async function loadBibliotecaTurmas(){
+  const b = state.biblioteca;
+  b.turmasLoading = true; render();
+  try{ const r = await window.storage.get('turmas', true); b.turmas = JSON.parse(r.value); }
+  catch(e){ b.turmas = []; }
+  b.turmasLoading = false;
+  render();
+}
+async function loadBibliotecaLimite(){
+  const b = state.biblioteca;
+  b.limiteEmprestimosLoading = true; render();
+  try{ const r = await window.storage.get('biblioteca-limite-emprestimos', true); b.limiteEmprestimos = parseInt(r.value)||3; }
+  catch(e){ b.limiteEmprestimos = 3; }
+  b.limiteEmprestimosLoading = false;
+  render();
+}
+async function bibliotecaSalvarLimite(){
+  const b = state.biblioteca;
+  const val = parseInt(document.getElementById('biblioteca-limite-input').value) || 1;
+  b.limiteEmprestimos = val;
+  await window.storage.set('biblioteca-limite-emprestimos', String(val), true);
+  render();
+}
+async function loadBibliotecaLivros(){
+  const b = state.biblioteca;
+  b.livrosLoading = true; render();
+  try{ const r = await window.storage.get('biblioteca-livros', true); b.livros = JSON.parse(r.value); }
+  catch(e){ b.livros = []; }
+  b.livrosLoading = false;
+  render();
+}
+async function saveBibliotecaLivros(){
+  await window.storage.set('biblioteca-livros', JSON.stringify(state.biblioteca.livros), true);
+}
+async function loadBibliotecaEmprestimos(){
+  const b = state.biblioteca;
+  b.emprestimosLoading = true; render();
+  try{ const r = await window.storage.get('biblioteca-emprestimos', true); b.emprestimos = JSON.parse(r.value); }
+  catch(e){ b.emprestimos = []; }
+  b.emprestimosLoading = false;
+  render();
+}
+async function saveBibliotecaEmprestimos(){
+  await window.storage.set('biblioteca-emprestimos', JSON.stringify(state.biblioteca.emprestimos), true);
+}
+async function loadBibliotecaReservas(){
+  const b = state.biblioteca;
+  b.reservasLoading = true; render();
+  try{ const r = await window.storage.get('biblioteca-reservas', true); b.reservas = JSON.parse(r.value); }
+  catch(e){ b.reservas = []; }
+  b.reservasLoading = false;
+  render();
+}
+async function saveBibliotecaReservas(){
+  await window.storage.set('biblioteca-reservas', JSON.stringify(state.biblioteca.reservas), true);
+}
+
+async function submitBibliotecaLogin(){
+  const b = state.biblioteca;
+  const val = document.getElementById('biblioteca-senha-input').value;
+  const lockCheck = await checkLoginLock('biblioteca', 'global');
+  if(lockCheck.locked){ b.error = loginLockMessage(lockCheck.minutos); render(); return; }
+  let storedHash = null, storedSalt = null;
+  try{ const r = await window.storage.get('biblioteca-senha', true); storedHash = r.value; }catch(e){}
+  try{ const r2 = await window.storage.get('biblioteca-senha-salt', true); storedSalt = r2.value; }catch(e){}
+  let ok = false;
+  if(storedHash){
+    if(storedSalt){
+      ok = (await hashTextSalted(val, storedSalt)) === storedHash;
+    } else {
+      ok = (await hashText(val)) === storedHash;
+      if(ok){
+        const newSalt = randomSaltHex();
+        await window.storage.set('biblioteca-senha-salt', newSalt, true);
+        await window.storage.set('biblioteca-senha', await hashTextSalted(val, newSalt), true);
+      }
+    }
+  } else { ok = (val === 'biblioteca123'); }
+  if(ok){
+    await clearLoginFailures('biblioteca', 'global');
+    b.session = true; b.error='';
+    render();
+    resetIdleLogoutTimer();
+    loadBibliotecaTurmas();
+    loadBibliotecaLivros();
+    loadBibliotecaEmprestimos();
+    loadBibliotecaLimite();
+    loadBibliotecaReservas();
+  } else { b.error = 'Senha incorreta.'; await registerLoginFailure('biblioteca', 'global'); render(); }
+}
+
+function renderBibliotecaLogin(){
+  const b = state.biblioteca;
+  return `
+    <button class="btn btn-ghost btn-sm voltar-landing" data-action="goto-landing">← Voltar</button>
+    <div class="card">
+      <h2>Biblioteca</h2>
+      <p class="muted">Área da biblioteca para catalogar livros e controlar os empréstimos aos alunos.</p>
+      <label>Senha</label>
+      <input type="password" id="biblioteca-senha-input" placeholder="Senha">
+      ${b.error ? `<p class="err">${esc(b.error)}</p>` : ''}
+      <button class="btn btn-primary btn-block" style="margin-top:14px;" data-action="biblioteca-login-submit">Entrar</button>
+    </div>
+  `;
+}
+
+function renderBiblioteca(){
+  const b = state.biblioteca;
+  if(!b.session) return renderBibliotecaLogin();
+  const topBar = `
+    <div class="row" style="align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <span class="muted" style="font-size:.85rem;">Biblioteca</span>
+      <div class="row" style="flex:0 0 auto; gap:6px; flex-wrap:wrap;">
+        <button class="btn ${b.subview==='catalogo'?'btn-primary':'btn-ghost'} btn-sm" data-action="biblioteca-subview" data-sub="catalogo">📖 Catálogo</button>
+        <button class="btn ${b.subview==='emprestimos'?'btn-primary':'btn-ghost'} btn-sm" data-action="biblioteca-subview" data-sub="emprestimos">🔄 Empréstimos</button>
+        <button class="btn ${b.subview==='reservas'?'btn-primary':'btn-ghost'} btn-sm" data-action="biblioteca-subview" data-sub="reservas">⏳ Fila de espera${(b.reservas||[]).filter(r=>r.status==='ativa').length>0?` (${(b.reservas||[]).filter(r=>r.status==='ativa').length})`:''}</button>
+        <button class="btn ${b.subview==='relatorio'?'btn-primary':'btn-ghost'} btn-sm" data-action="biblioteca-subview" data-sub="relatorio">📊 Relatório</button>
+        <button class="btn btn-ghost btn-sm" data-action="biblioteca-logout">Sair</button>
+      </div>
+    </div>
+  `;
+  let content;
+  if(b.livrosLoading || b.turmasLoading || b.emprestimosLoading || b.limiteEmprestimosLoading || b.reservasLoading){
+    content = `<div class="card"><div class="spinner"></div></div>`;
+  } else if(b.subview==='emprestimos'){
+    content = renderBibliotecaEmprestimos();
+  } else if(b.subview==='reservas'){
+    content = renderBibliotecaReservas();
+  } else if(b.subview==='relatorio'){
+    content = renderBibliotecaRelatorio();
+  } else if(b.catalogoMode==='importar'){
+    content = renderBibliotecaImportarPlanilha();
+  } else {
+    content = renderBibliotecaCatalogo();
+  }
+  return topBar + content;
+}
+
+function renderBibliotecaCatalogo(){
+  const b = state.biblioteca;
+  const busca = (b.buscaLivro||'').trim().toLowerCase();
+  const livros = b.livros.filter(l => !busca || l.titulo.toLowerCase().includes(busca) || (l.autor||'').toLowerCase().includes(busca)).sort((x,y)=>x.titulo.localeCompare(y.titulo,'pt-BR'));
+  return `
+    <div class="card">
+      <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <h2 style="margin:0;">Catálogo de livros (${b.livros.length})</h2>
+        <div class="row" style="flex:0 0 auto; gap:6px;">
+          <button class="btn btn-ghost btn-sm" data-action="biblioteca-abrir-importar-planilha">📥 Importar planilha</button>
+          <button class="btn btn-primary btn-sm" data-action="biblioteca-livro-form-abrir">+ Novo livro</button>
+        </div>
+      </div>
+      <input type="text" id="biblioteca-busca-livro-input" placeholder="Buscar por título ou autor..." value="${esc(b.buscaLivro||'')}" style="margin-top:10px;">
+    </div>
+
+    ${b.formLivro ? renderBibliotecaFormLivro() : ''}
+
+    <div class="card">
+      ${livros.length===0 ? `<p class="muted center">Nenhum livro cadastrado${busca?' com essa busca':''}.</p>` : `
+        <div class="table-scroll">
+        <table class="pv-sign-table">
+          <thead><tr><th>Título</th><th>Autor</th><th>Categoria</th><th style="text-align:center;">Exemplares</th><th style="text-align:center;">Disponíveis</th><th></th></tr></thead>
+          <tbody>
+            ${livros.map(l => {
+              const disp = bibliotecaExemplaresDisponiveis(l, b.emprestimos);
+              const filaCount = (b.reservas||[]).filter(r=>r.livroId===l.id && r.status==='ativa').length;
+              return `
+              <tr>
+                <td><strong>${esc(l.titulo)}</strong>${l.isbn?`<br><span class="muted" style="font-size:.75rem;">ISBN ${esc(l.isbn)}</span>`:''}${filaCount>0?`<br><span class="pill" style="font-size:.7rem; padding:1px 8px;">⏳ ${filaCount} na fila</span>`:''}</td>
+                <td>${esc(l.autor||'-')}</td>
+                <td>${esc(l.categoria||'-')}</td>
+                <td style="text-align:center;">${l.exemplares}</td>
+                <td style="text-align:center;">${disp===0?'<span class="err" style="margin:0;">0</span>':disp}</td>
+                <td class="row" style="flex-wrap:nowrap; gap:4px;">
+                  <button class="btn btn-ghost btn-sm" data-action="biblioteca-livro-form-abrir" data-id="${l.id}">✏️</button>
+                  <button class="btn btn-ghost btn-sm" data-action="biblioteca-livro-excluir" data-id="${l.id}">✕</button>
+                </td>
+              </tr>
+            `;}).join('')}
+          </tbody>
+        </table>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+function renderBibliotecaFormLivro(){
+  const f = state.biblioteca.formLivro;
+  return `
+    <div class="card">
+      <h3 style="margin-top:0;">${f.id?'Editar livro':'Novo livro'}</h3>
+      <label>Título</label>
+      <input type="text" id="biblioteca-livro-titulo-input" value="${esc(f.titulo||'')}">
+      <label>Autor</label>
+      <input type="text" id="biblioteca-livro-autor-input" value="${esc(f.autor||'')}">
+      <label>Categoria <span class="muted" style="text-transform:none; font-weight:400;">(opcional)</span></label>
+      <input type="text" id="biblioteca-livro-categoria-input" value="${esc(f.categoria||'')}" placeholder="Ex.: Literatura, Técnico, Didático...">
+      <label>ISBN <span class="muted" style="text-transform:none; font-weight:400;">(opcional)</span></label>
+      <input type="text" id="biblioteca-livro-isbn-input" value="${esc(f.isbn||'')}">
+      <label>Quantidade de exemplares</label>
+      <input type="number" min="1" step="1" id="biblioteca-livro-exemplares-input" value="${f.exemplares||1}">
+      ${state.biblioteca.livroError ? `<p class="err">${esc(state.biblioteca.livroError)}</p>` : ''}
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-ghost" data-action="biblioteca-livro-form-cancelar">Cancelar</button>
+        <button class="btn btn-primary" data-action="biblioteca-livro-salvar">Salvar</button>
+      </div>
+    </div>
+  `;
+}
+
+function bibliotecaAbrirFormLivro(id){
+  const b = state.biblioteca;
+  if(id){
+    const l = b.livros.find(x=>x.id===id);
+    if(!l) return;
+    b.formLivro = { id:l.id, titulo:l.titulo, autor:l.autor, categoria:l.categoria, isbn:l.isbn, exemplares:l.exemplares };
+  } else {
+    b.formLivro = { id:null, titulo:'', autor:'', categoria:'', isbn:'', exemplares:1 };
+  }
+  b.livroError = '';
+  render();
+}
+function bibliotecaCancelarFormLivro(){
+  state.biblioteca.formLivro = null;
+  state.biblioteca.livroError = '';
+  render();
+}
+async function bibliotecaSalvarLivro(){
+  const b = state.biblioteca;
+  const f = b.formLivro;
+  const titulo = document.getElementById('biblioteca-livro-titulo-input').value.trim();
+  const autor = document.getElementById('biblioteca-livro-autor-input').value.trim();
+  const categoria = document.getElementById('biblioteca-livro-categoria-input').value.trim();
+  const isbn = document.getElementById('biblioteca-livro-isbn-input').value.trim();
+  const exemplares = parseInt(document.getElementById('biblioteca-livro-exemplares-input').value) || 0;
+  if(!titulo){ b.livroError = 'Informe o título do livro.'; render(); return; }
+  if(exemplares < 1){ b.livroError = 'Informe pelo menos 1 exemplar.'; render(); return; }
+  if(f.id){
+    const l = b.livros.find(x=>x.id===f.id);
+    Object.assign(l, { titulo, autor, categoria, isbn, exemplares });
+  } else {
+    b.livros.push({ id: cryptoId(), titulo, autor, categoria, isbn, exemplares, createdAt: Date.now() });
+  }
+  await saveBibliotecaLivros();
+  b.formLivro = null;
+  b.livroError = '';
+  render();
+}
+async function bibliotecaExcluirLivro(id){
+  const b = state.biblioteca;
+  const ativos = b.emprestimos.filter(e => e.livroId===id && !e.dataDevolucao);
+  if(ativos.length>0){ alert('Esse livro tem empréstimo(s) em aberto — registre a devolução antes de excluir.'); return; }
+  if(!confirm('Excluir este livro do catálogo?')) return;
+  b.livros = b.livros.filter(l=>l.id!==id);
+  await saveBibliotecaLivros();
+  render();
+}
+
+function renderBibliotecaEmprestimos(){
+  const b = state.biblioteca;
+  const f = b.formEmprestimo;
+  if(!f.dataEmprestimo) f.dataEmprestimo = new Date().toISOString().slice(0,10);
+  if(!f.dataPrevista) f.dataPrevista = bibliotecaPrazoPadrao();
+  const turmaSel = b.turmas.find(t=>t.id===f.turmaId);
+  const alunosDaTurma = turmaSel ? turmaSel.students : [];
+  const livrosDisponiveis = b.livros.filter(l => bibliotecaExemplaresDisponiveis(l, b.emprestimos) > 0);
+
+  const busca = (b.buscaEmprestimo||'').trim().toLowerCase();
+  const todos = b.emprestimos.map(e => ({ ...e, status: bibliotecaEmprestimoStatus(e), venceEmBreve: bibliotecaVenceEmBreve(e), dias: bibliotecaDiasAteVencer(e) }));
+  const lista = (b.mostrarHistorico ? todos : todos.filter(e=>e.status!=='devolvido'))
+    .filter(e => !busca || e.studentName.toLowerCase().includes(busca) || e.livroTitulo.toLowerCase().includes(busca) || (e.turmaName||'').toLowerCase().includes(busca))
+    .sort((x,y) => {
+      const rank = e => e.status==='atrasado'?0 : (e.status==='emprestado' && e.venceEmBreve)?1 : e.status==='emprestado'?2 : 3;
+      if(rank(x)!==rank(y)) return rank(x)-rank(y);
+      return (y.createdAt||0)-(x.createdAt||0);
+    });
+  const atrasadosCount = todos.filter(e=>e.status==='atrasado').length;
+  const venceEmBreveCount = todos.filter(e=>e.status==='emprestado' && e.venceEmBreve).length;
+  const emprestimosAtivosDoAluno = f.studentId ? b.emprestimos.filter(e=>e.studentId===f.studentId && !e.dataDevolucao).length : 0;
+
+  return `
+    <div class="card">
+      <h2 style="margin-top:0;">Registrar empréstimo</h2>
+      <label>Turma</label>
+      <select id="biblioteca-emp-turma-select">
+        <option value="">— selecione a turma —</option>
+        ${b.turmas.map(t=>`<option value="${t.id}" ${f.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+      </select>
+      <label style="margin-top:8px;">Aluno</label>
+      <select id="biblioteca-emp-aluno-select" ${!f.turmaId?'disabled':''}>
+        <option value="">— selecione o aluno —</option>
+        ${alunosDaTurma.map(s=>`<option value="${s.id}" ${f.studentId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}
+      </select>
+      ${f.studentId ? `<p class="muted" style="font-size:.78rem; margin-top:2px;">${emprestimosAtivosDoAluno} de ${b.limiteEmprestimos} livro(s) já emprestado(s) por esse aluno.</p>` : ''}
+      <label style="margin-top:8px;">Livro</label>
+      <select id="biblioteca-emp-livro-select">
+        <option value="">— selecione o livro —</option>
+        ${livrosDisponiveis.map(l=>`<option value="${l.id}" ${f.livroId===l.id?'selected':''}>${esc(l.titulo)} · ${bibliotecaExemplaresDisponiveis(l,b.emprestimos)} disponível(is)</option>`).join('')}
+      </select>
+      ${livrosDisponiveis.length===0 ? '<p class="muted" style="font-size:.82rem;">Nenhum livro com exemplar disponível no momento.</p>' : ''}
+      <div class="row" style="margin-top:8px;">
+        <div style="flex:1;">
+          <label>Data do empréstimo</label>
+          <input type="date" id="biblioteca-emp-data-input" value="${f.dataEmprestimo}">
+        </div>
+        <div style="flex:1;">
+          <label>Devolução prevista</label>
+          <input type="date" id="biblioteca-emp-prazo-input" value="${f.dataPrevista}">
+        </div>
+      </div>
+      ${b.emprestimoError ? `<p class="err">${esc(b.emprestimoError)}</p>` : ''}
+      <button class="btn btn-primary" style="margin-top:10px;" data-action="biblioteca-emprestimo-registrar">Registrar empréstimo</button>
+      <p class="muted" style="font-size:.78rem; margin-top:10px;">
+        Limite de livros por aluno ao mesmo tempo:
+        <input type="number" min="1" step="1" id="biblioteca-limite-input" value="${b.limiteEmprestimos}" style="width:56px; display:inline-block; padding:2px 6px; margin:0 4px;">
+        <button class="btn btn-ghost btn-sm" data-action="biblioteca-salvar-limite" style="padding:2px 10px;">Salvar</button>
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <h2 style="margin:0;">Empréstimos ${b.mostrarHistorico?'':'em aberto'} (${lista.length})</h2>
+        <div class="row" style="flex:0 0 auto; gap:6px;">
+          ${atrasadosCount>0 ? `<span class="pill" style="background:var(--red); color:#fff;">⚠️ ${atrasadosCount} atrasado(s)</span>` : ''}
+          ${venceEmBreveCount>0 ? `<span class="pill" style="background:#c98a2b; color:#fff;">⏳ ${venceEmBreveCount} vencendo em breve</span>` : ''}
+          <button class="btn btn-ghost btn-sm" data-action="biblioteca-toggle-historico">${b.mostrarHistorico?'Ver só em aberto':'Ver histórico completo'}</button>
+        </div>
+      </div>
+      <input type="text" id="biblioteca-busca-emprestimo-input" placeholder="Buscar por aluno, livro ou turma..." value="${esc(b.buscaEmprestimo||'')}" style="margin-top:10px;">
+      ${lista.length===0 ? '<p class="muted center" style="margin-top:12px;">Nenhum empréstimo encontrado.</p>' : `
+        <div class="table-scroll">
+        <table class="pv-sign-table" style="margin-top:10px;">
+          <thead><tr><th>Aluno</th><th>Turma</th><th>Livro</th><th>Empréstimo</th><th>Devolução prevista</th><th>Situação</th><th></th></tr></thead>
+          <tbody>
+            ${lista.map(e => `
+              <tr>
+                <td>${esc(e.studentName)}</td>
+                <td>${esc(e.turmaName||'-')}</td>
+                <td>${esc(e.livroTitulo)}</td>
+                <td>${bibliotecaFmtData(e.dataEmprestimo)}</td>
+                <td>${bibliotecaFmtData(e.dataPrevista)}${e.renovacoes?`<br><span class="muted" style="font-size:.72rem;">renovado ${e.renovacoes}x</span>`:''}</td>
+                <td>${bibliotecaStatusPill(e.status, e.dataDevolucao, e.venceEmBreve, e.dias)}</td>
+                <td class="row" style="flex-wrap:nowrap; gap:4px;">
+                  ${e.status!=='devolvido' ? `
+                    ${(e.renovacoes||0) < BIBLIOTECA_MAX_RENOVACOES ? `<button class="btn btn-ghost btn-sm" data-action="biblioteca-emprestimo-renovar" data-id="${e.id}" title="Renova por mais 14 dias">🔄 Renovar</button>` : ''}
+                    <button class="btn btn-primary btn-sm" data-action="biblioteca-emprestimo-devolver" data-id="${e.id}">Registrar devolução</button>
+                  ` : `<button class="btn btn-ghost btn-sm" data-action="biblioteca-emprestimo-excluir" data-id="${e.id}">✕</button>`}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        </div>
+      `}
+    </div>
+  `;
+}
+
+async function bibliotecaRegistrarEmprestimo(){
+  const b = state.biblioteca;
+  const f = b.formEmprestimo;
+  const turma = b.turmas.find(t=>t.id===f.turmaId);
+  const aluno = turma ? turma.students.find(s=>s.id===f.studentId) : null;
+  const livro = b.livros.find(l=>l.id===f.livroId);
+  if(!turma || !aluno){ b.emprestimoError = 'Selecione a turma e o aluno.'; render(); return; }
+  if(!livro){ b.emprestimoError = 'Selecione o livro.'; render(); return; }
+  if(bibliotecaExemplaresDisponiveis(livro, b.emprestimos) <= 0){ b.emprestimoError = 'Não há exemplares disponíveis desse livro no momento.'; render(); return; }
+  if(!f.dataEmprestimo || !f.dataPrevista){ b.emprestimoError = 'Informe as duas datas.'; render(); return; }
+  if(f.dataPrevista < f.dataEmprestimo){ b.emprestimoError = 'A devolução prevista não pode ser antes da data do empréstimo.'; render(); return; }
+  const jaTem = b.emprestimos.some(e => e.livroId===livro.id && e.studentId===aluno.id && !e.dataDevolucao);
+  if(jaTem){ b.emprestimoError = `${aluno.name} já está com um exemplar desse livro emprestado.`; render(); return; }
+  const ativosDoAluno = b.emprestimos.filter(e => e.studentId===aluno.id && !e.dataDevolucao).length;
+  if(ativosDoAluno >= b.limiteEmprestimos){ b.emprestimoError = `${aluno.name} já atingiu o limite de ${b.limiteEmprestimos} livro(s) emprestado(s) ao mesmo tempo.`; render(); return; }
+
+  b.emprestimos.push({
+    id: cryptoId(), livroId: livro.id, livroTitulo: livro.titulo,
+    studentId: aluno.id, studentName: aluno.name, turmaId: turma.id, turmaName: turma.name,
+    dataEmprestimo: f.dataEmprestimo, dataPrevista: f.dataPrevista, dataDevolucao: null,
+    renovacoes: 0, createdAt: Date.now()
+  });
+  await saveBibliotecaEmprestimos();
+  b.formEmprestimo = { turmaId: turma.id, studentId:'', livroId:'', dataEmprestimo: new Date().toISOString().slice(0,10), dataPrevista: bibliotecaPrazoPadrao() };
+  b.emprestimoError = '';
+  render();
+}
+async function bibliotecaRenovarEmprestimo(id){
+  const b = state.biblioteca;
+  const e = b.emprestimos.find(x=>x.id===id);
+  if(!e || e.dataDevolucao) return;
+  if((e.renovacoes||0) >= BIBLIOTECA_MAX_RENOVACOES){ alert(`Esse empréstimo já atingiu o limite de ${BIBLIOTECA_MAX_RENOVACOES} renovações — registre a devolução.`); return; }
+  e.dataPrevista = bibliotecaPrazoPadrao();
+  e.renovacoes = (e.renovacoes||0) + 1;
+  await saveBibliotecaEmprestimos();
+  render();
+}
+async function bibliotecaRegistrarDevolucao(id){
+  const b = state.biblioteca;
+  const e = b.emprestimos.find(x=>x.id===id);
+  if(!e) return;
+  if(!confirm(`Registrar a devolução de "${e.livroTitulo}" por ${e.studentName}?`)) return;
+  const hoje = new Date().toISOString().slice(0,10);
+  const foiNoPrazo = !e.dataPrevista || hoje <= e.dataPrevista;
+  e.dataDevolucao = hoje;
+  await saveBibliotecaEmprestimos();
+  // Recompensa a devolução em dia com fichas, ligando a biblioteca à gamificação já usada no resto do app.
+  if(foiNoPrazo && e.turmaId && e.studentId){
+    try{ await awardFichas(e.turmaId, e.studentId, BIBLIOTECA_FICHAS_DEVOLUCAO_PRAZO, `Devolveu "${e.livroTitulo}" no prazo`, 'biblioteca'); }catch(err){}
+  }
+  // Se alguém está na fila de espera desse livro, avisa a bibliotecária pra chamar o próximo.
+  const proximaReserva = (b.reservas||[]).filter(r=>r.livroId===e.livroId && r.status==='ativa').sort((x,y)=>x.createdAt-y.createdAt)[0];
+  if(proximaReserva){
+    proximaReserva.notificada = true;
+    await saveBibliotecaReservas();
+    alert(`📚 Esse livro tem fila de espera!\n\nAvise ${proximaReserva.studentName} (${proximaReserva.turmaName}) que já tem um exemplar disponível.`);
+  }
+  render();
+}
+async function bibliotecaExcluirEmprestimo(id){
+  const b = state.biblioteca;
+  if(!confirm('Excluir este registro do histórico de empréstimos?')) return;
+  b.emprestimos = b.emprestimos.filter(e=>e.id!==id);
+  await saveBibliotecaEmprestimos();
+  render();
+}
+
+/* ---------------- BIBLIOTECA: FILA DE ESPERA (RESERVAS) ---------------- */
+
+function renderBibliotecaReservas(){
+  const b = state.biblioteca;
+  const f = b.formReserva;
+  const turmaSel = b.turmas.find(t=>t.id===f.turmaId);
+  const alunosDaTurma = turmaSel ? [...turmaSel.students].sort((x,y)=>x.name.localeCompare(y.name,'pt-BR')) : [];
+  const livrosOrdenados = [...b.livros].sort((x,y)=>x.titulo.localeCompare(y.titulo,'pt-BR'));
+  const ativas = b.reservas.filter(r=>r.status==='ativa').sort((x,y)=>(x.createdAt||0)-(y.createdAt||0));
+  return `
+    <div class="card">
+      <h2 style="margin-top:0;">Colocar aluno na fila de espera</h2>
+      <p class="muted" style="font-size:.85rem;">Use quando todos os exemplares de um livro já estiverem emprestados. Ao registrar a devolução, avisamos automaticamente quem é o próximo da fila.</p>
+      <label>Turma</label>
+      <select id="biblioteca-res-turma-select">
+        <option value="">— selecione a turma —</option>
+        ${b.turmas.map(t=>`<option value="${t.id}" ${f.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
+      </select>
+      <label style="margin-top:8px;">Aluno</label>
+      <select id="biblioteca-res-aluno-select" ${!f.turmaId?'disabled':''}>
+        <option value="">— selecione o aluno —</option>
+        ${alunosDaTurma.map(s=>`<option value="${s.id}" ${f.studentId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}
+      </select>
+      <label style="margin-top:8px;">Livro</label>
+      <select id="biblioteca-res-livro-select">
+        <option value="">— selecione o livro —</option>
+        ${livrosOrdenados.map(l=>`<option value="${l.id}" ${f.livroId===l.id?'selected':''}>${esc(l.titulo)}${bibliotecaExemplaresDisponiveis(l,b.emprestimos)>0?' (já tem exemplar disponível)':''}</option>`).join('')}
+      </select>
+      ${b.reservaError ? `<p class="err">${esc(b.reservaError)}</p>` : ''}
+      <button class="btn btn-primary" style="margin-top:10px;" data-action="biblioteca-reserva-registrar">+ Adicionar à fila</button>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0;">Fila de espera (${ativas.length})</h2>
+      ${ativas.length===0 ? '<p class="muted center">Nenhum aluno na fila de espera no momento.</p>' : `
+        <div class="table-scroll">
+        <table class="pv-sign-table">
+          <thead><tr><th>Livro</th><th>Aluno</th><th>Turma</th><th>Na fila desde</th><th></th></tr></thead>
+          <tbody>
+            ${ativas.map(r => `
+              <tr>
+                <td><strong>${esc(r.livroTitulo)}</strong></td>
+                <td>${esc(r.studentName)}${r.notificada?' <span class="pill" style="background:#c98a2b; color:#fff;">Disponível — avisar</span>':''}</td>
+                <td>${esc(r.turmaName||'-')}</td>
+                <td>${bibliotecaFmtData(new Date(r.createdAt||Date.now()).toISOString().slice(0,10))}</td>
+                <td class="row" style="flex-wrap:nowrap; gap:4px;">
+                  <button class="btn btn-ghost btn-sm" data-action="biblioteca-reserva-converter" data-id="${r.id}">Emprestar agora</button>
+                  <button class="btn btn-ghost btn-sm" data-action="biblioteca-reserva-cancelar" data-id="${r.id}">✕</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        </div>
+      `}
+    </div>
+  `;
+}
+async function bibliotecaRegistrarReserva(){
+  const b = state.biblioteca;
+  const f = b.formReserva;
+  const turma = b.turmas.find(t=>t.id===f.turmaId);
+  const aluno = turma ? turma.students.find(s=>s.id===f.studentId) : null;
+  const livro = b.livros.find(l=>l.id===f.livroId);
+  if(!turma || !aluno){ b.reservaError = 'Selecione a turma e o aluno.'; render(); return; }
+  if(!livro){ b.reservaError = 'Selecione o livro.'; render(); return; }
+  const jaTemReserva = b.reservas.some(r => r.livroId===livro.id && r.studentId===aluno.id && r.status==='ativa');
+  if(jaTemReserva){ b.reservaError = `${aluno.name} já está na fila de espera desse livro.`; render(); return; }
+  const jaEmprestado = b.emprestimos.some(e => e.livroId===livro.id && e.studentId===aluno.id && !e.dataDevolucao);
+  if(jaEmprestado){ b.reservaError = `${aluno.name} já está com esse livro emprestado.`; render(); return; }
+  b.reservas.push({
+    id: cryptoId(), livroId: livro.id, livroTitulo: livro.titulo,
+    studentId: aluno.id, studentName: aluno.name, turmaId: turma.id, turmaName: turma.name,
+    status:'ativa', notificada:false, createdAt: Date.now()
+  });
+  await saveBibliotecaReservas();
+  b.formReserva = { turmaId: turma.id, studentId:'', livroId:'' };
+  b.reservaError = '';
+  render();
+}
+async function bibliotecaCancelarReserva(id){
+  const b = state.biblioteca;
+  if(!confirm('Remover esse aluno da fila de espera?')) return;
+  b.reservas = b.reservas.filter(r=>r.id!==id);
+  await saveBibliotecaReservas();
+  render();
+}
+async function bibliotecaConverterReservaEmprestimo(id){
+  const b = state.biblioteca;
+  const r = b.reservas.find(x=>x.id===id);
+  if(!r) return;
+  const livro = b.livros.find(l=>l.id===r.livroId);
+  if(!livro || bibliotecaExemplaresDisponiveis(livro, b.emprestimos) <= 0){ alert('Não há exemplar disponível desse livro no momento.'); return; }
+  r.status = 'atendida';
+  await saveBibliotecaReservas();
+  b.formEmprestimo = { turmaId: r.turmaId, studentId: r.studentId, livroId: r.livroId, dataEmprestimo: new Date().toISOString().slice(0,10), dataPrevista: bibliotecaPrazoPadrao() };
+  b.subview = 'emprestimos';
+  render();
+}
+
+/* ---------------- BIBLIOTECA: RELATÓRIO PARA A COORDENAÇÃO ---------------- */
+
+function renderBibliotecaRelatorio(){
+  const b = state.biblioteca;
+  const porLivro = {}, porAluno = {}, porTurma = {};
+  b.emprestimos.forEach(e => {
+    if(!porLivro[e.livroId]) porLivro[e.livroId] = { titulo: e.livroTitulo, count:0 };
+    porLivro[e.livroId].count++;
+    if(!porAluno[e.studentId]) porAluno[e.studentId] = { nome: e.studentName, turma: e.turmaName, count:0 };
+    porAluno[e.studentId].count++;
+    const chaveTurma = e.turmaId || e.turmaName || '-';
+    if(!porTurma[chaveTurma]) porTurma[chaveTurma] = { nome: e.turmaName || 'Sem turma', count:0 };
+    porTurma[chaveTurma].count++;
+  });
+  const topLivros = Object.values(porLivro).sort((x,y)=>y.count-x.count).slice(0,8);
+  const topAlunos = Object.values(porAluno).sort((x,y)=>y.count-x.count).slice(0,8);
+  const topTurmas = Object.values(porTurma).sort((x,y)=>y.count-x.count).slice(0,8);
+  const totalEmprestimos = b.emprestimos.length;
+  const totalAtivos = b.emprestimos.filter(e=>!e.dataDevolucao).length;
+  const totalAtrasados = b.emprestimos.filter(e=>bibliotecaEmprestimoStatus(e)==='atrasado').length;
+  const anoAtual = new Date().getFullYear();
+  const devolvidosEsteAno = b.emprestimos.filter(e=>e.dataDevolucao && new Date(e.dataDevolucao+'T00:00:00').getFullYear()===anoAtual).length;
+  return `
+    <div class="card">
+      <h2 style="margin-top:0;">Relatório para a coordenação</h2>
+      <p class="muted" style="font-size:.85rem;">Resumo do uso da biblioteca até o momento — útil pra compartilhar com a coordenação.</p>
+      <div class="row" style="flex-wrap:wrap; gap:10px; margin-top:6px;">
+        <span class="pill">${totalEmprestimos} empréstimo(s) no total</span>
+        <span class="pill">${totalAtivos} em andamento</span>
+        <span class="pill" style="${totalAtrasados>0?'background:var(--red); color:#fff;':''}">${totalAtrasados} atrasado(s)</span>
+        <span class="pill">${devolvidosEsteAno} devolvido(s) em ${anoAtual}</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">📚 Livros mais emprestados</h3>
+      ${topLivros.length===0 ? '<p class="muted">Sem dados ainda.</p>' : `
+        <div class="table-scroll"><table class="pv-sign-table">
+          <thead><tr><th>Livro</th><th style="text-align:center;">Empréstimos</th></tr></thead>
+          <tbody>${topLivros.map(l=>`<tr><td>${esc(l.titulo)}</td><td style="text-align:center;">${l.count}</td></tr>`).join('')}</tbody>
+        </table></div>
+      `}
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">🏅 Alunos mais ativos</h3>
+      ${topAlunos.length===0 ? '<p class="muted">Sem dados ainda.</p>' : `
+        <div class="table-scroll"><table class="pv-sign-table">
+          <thead><tr><th>Aluno</th><th>Turma</th><th style="text-align:center;">Livros lidos</th></tr></thead>
+          <tbody>${topAlunos.map(a=>`<tr><td>${esc(a.nome)}</td><td>${esc(a.turma||'-')}</td><td style="text-align:center;">${a.count}</td></tr>`).join('')}</tbody>
+        </table></div>
+      `}
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">🏫 Turmas que mais leem</h3>
+      ${topTurmas.length===0 ? '<p class="muted">Sem dados ainda.</p>' : `
+        <div class="table-scroll"><table class="pv-sign-table">
+          <thead><tr><th>Turma</th><th style="text-align:center;">Empréstimos</th></tr></thead>
+          <tbody>${topTurmas.map(t=>`<tr><td>${esc(t.nome||'-')}</td><td style="text-align:center;">${t.count}</td></tr>`).join('')}</tbody>
+        </table></div>
+      `}
+    </div>
+  `;
+}
+
+/* ---------------- BIBLIOTECA: IMPORTAR ACERVO POR PLANILHA ---------------- */
+
+function bibliotecaAbrirImportarPlanilha(){
+  const b = state.biblioteca;
+  b.catalogoMode = 'importar';
+  b.importPlanilha = { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false };
+  render();
+}
+function bibliotecaCancelarImportarPlanilha(){
+  const b = state.biblioteca;
+  b.catalogoMode = 'list';
+  b.importPlanilha = { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false };
+  render();
+}
+// Aceita um cabeçalho com colunas Título/Autor/Categoria/ISBN/Exemplares (nomes flexíveis);
+// só o título é obrigatório — exemplares assume 1 se vier vazio ou inválido.
+function parseLivrosPlanilha(rows){
+  if(!rows || rows.length<2) return { erro: 'O arquivo parece vazio ou não tem linhas de dados.' };
+  const header = rows[0].map(h=>String(h||'').trim());
+  const headerNorm = header.map(h=>normalizeTexto(h));
+  const idxTitulo = headerNorm.findIndex(h=>/^(TITULO|LIVRO|OBRA)$/.test(h));
+  const idxAutor = headerNorm.findIndex(h=>h==='AUTOR');
+  const idxCategoria = headerNorm.findIndex(h=>/^(CATEGORIA|GENERO|ASSUNTO)$/.test(h));
+  const idxIsbn = headerNorm.findIndex(h=>h==='ISBN');
+  const idxExemplares = headerNorm.findIndex(h=>/^(EXEMPLARES|QUANTIDADE|QTD|QTDE)$/.test(h));
+  if(idxTitulo===-1) return { erro: 'Não encontrei uma coluna "Título" (ou "Livro") no cabeçalho do arquivo.' };
+  const dataLines = rows.slice(1).filter(row => row.some(c => String(c||'').trim()!==''));
+  const livros = dataLines.map(cols => {
+    const titulo = String(cols[idxTitulo]||'').trim();
+    const autor = idxAutor!==-1 ? String(cols[idxAutor]||'').trim() : '';
+    const categoria = idxCategoria!==-1 ? String(cols[idxCategoria]||'').trim() : '';
+    const isbn = idxIsbn!==-1 ? String(cols[idxIsbn]||'').trim() : '';
+    const exemplaresRaw = idxExemplares!==-1 ? parseInt(String(cols[idxExemplares]||'').trim()) : NaN;
+    const exemplares = (!isNaN(exemplaresRaw) && exemplaresRaw>=1) ? exemplaresRaw : 1;
+    return { titulo, autor, categoria, isbn, exemplares };
+  }).filter(l => l.titulo);
+  if(livros.length===0) return { erro: 'Não encontrei nenhuma linha com título preenchido.' };
+  return { livros };
+}
+async function processarArquivoLivrosPlanilha(file){
+  const b = state.biblioteca;
+  b.importPlanilha = { processando:true, erro:'', resultado:null, nomeArquivo:file.name, importando:false };
+  render();
+  let rows;
+  try{ rows = await lerPlanilhaComoLinhas(file); }
+  catch(e){ b.importPlanilha = { processando:false, erro:'Não foi possível ler esse arquivo. Confira se é um .csv ou .xlsx válido.', resultado:null, nomeArquivo:file.name, importando:false }; render(); return; }
+  const parsed = parseLivrosPlanilha(rows);
+  if(parsed.erro){
+    b.importPlanilha = { processando:false, erro:parsed.erro, resultado:null, nomeArquivo:file.name, importando:false };
+    render();
+    return;
+  }
+  const livros = parsed.livros.map(l => ({
+    ...l,
+    jaExiste: b.livros.some(existente => normalizeTexto(existente.titulo)===normalizeTexto(l.titulo))
+  }));
+  b.importPlanilha = { processando:false, erro:'', resultado:{ livros }, nomeArquivo:file.name, importando:false };
+  render();
+}
+async function confirmarImportarLivrosPlanilha(){
+  const b = state.biblioteca;
+  const resultado = b.importPlanilha.resultado;
+  if(!resultado) return;
+  b.importPlanilha.importando = true;
+  render();
+  resultado.livros.forEach(l => {
+    b.livros.push({ id: cryptoId(), titulo: l.titulo, autor: l.autor, categoria: l.categoria, isbn: l.isbn, exemplares: l.exemplares, createdAt: Date.now() });
+  });
+  await saveBibliotecaLivros();
+  const total = resultado.livros.length;
+  b.importPlanilha = { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false };
+  b.catalogoMode = 'list';
+  render();
+  alert(`Importação concluída! ${total} livro(s) adicionado(s) ao catálogo.`);
+}
+function renderBibliotecaImportarPlanilha(){
+  const b = state.biblioteca;
+  const ip = b.importPlanilha;
+  let body;
+  if(ip.processando){
+    body = `<div class="spinner"></div>`;
+  } else if(!ip.resultado){
+    body = `
+      <p class="muted">Envie uma planilha (.csv ou .xlsx) com uma linha por livro, contendo:</p>
+      <ul class="muted" style="font-size:.85rem; margin:0 0 10px 18px;">
+        <li>uma coluna <strong>Título</strong> (ou "Livro") — obrigatória;</li>
+        <li>uma coluna <strong>Autor</strong> (opcional);</li>
+        <li>uma coluna <strong>Categoria</strong> (opcional);</li>
+        <li>uma coluna <strong>ISBN</strong> (opcional);</li>
+        <li>uma coluna <strong>Exemplares</strong> (opcional — assume 1 se não vier preenchida).</li>
+      </ul>
+      <input type="file" id="biblioteca-import-planilha-file" accept=".csv,.xlsx,.xls">
+      ${ip.erro ? `<p class="err" style="margin-top:8px;">${esc(ip.erro)}</p>` : ''}
+    `;
+  } else {
+    const r = ip.resultado;
+    const jaExistemCount = r.livros.filter(l=>l.jaExiste).length;
+    body = `
+      <p class="muted">Encontrei <strong>${r.livros.length}</strong> livro(s) na planilha.${jaExistemCount>0?` <span class="err" style="margin:0;">⚠️ ${jaExistemCount} já parece(m) existir no catálogo (título igual) — serão adicionados como registro(s) novo(s) mesmo assim.</span>`:''}</p>
+      <div class="table-scroll" style="margin-top:8px;">
+        <table class="pv-sign-table">
+          <thead><tr><th>Título</th><th>Autor</th><th>Categoria</th><th style="text-align:center;">Exemplares</th></tr></thead>
+          <tbody>
+            ${r.livros.map(l => `
+              <tr>
+                <td>${esc(l.titulo)}${l.jaExiste?' <span class="muted" style="font-size:.72rem;">(já existe)</span>':''}</td>
+                <td>${esc(l.autor||'-')}</td>
+                <td>${esc(l.categoria||'-')}</td>
+                <td style="text-align:center;">${l.exemplares}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="row" style="margin-top:14px;">
+        <button class="btn btn-ghost" data-action="biblioteca-cancelar-importar-planilha" ${ip.importando?'disabled':''}>Cancelar</button>
+        <button class="btn btn-primary" data-action="biblioteca-confirmar-importar-planilha" ${ip.importando?'disabled':''}>${ip.importando?'Importando...':'Confirmar importação'}</button>
+      </div>
+    `;
+  }
+  return `
+    <div class="card">
+      <button class="btn btn-ghost btn-sm" data-action="biblioteca-cancelar-importar-planilha">← Voltar</button>
+      <h2>Importar acervo de planilha</h2>
+      ${body}
+    </div>
+  `;
+}
+
+/* ---------------- BIBLIOTECA NO PAINEL DO ALUNO ---------------- */
+
+async function loadAlunoBiblioteca(){
+  const al = state.aluno;
+  try{
+    const r = await window.storage.get('biblioteca-emprestimos', true);
+    const todos = JSON.parse(r.value);
+    al.bibliotecaEmprestimos = todos.filter(e => e.studentId===al.matriculaStudentId);
+  }catch(e){ al.bibliotecaEmprestimos = []; }
+  if(al.stage==='dashboard') render();
+}
+function renderAlunoBibliotecaBlock(){
+  const al = state.aluno;
+  const emprestimos = (al.bibliotecaEmprestimos || []).map(e => ({ ...e, status: bibliotecaEmprestimoStatus(e), venceEmBreve: bibliotecaVenceEmBreve(e), dias: bibliotecaDiasAteVencer(e) }));
+  if(emprestimos.length===0) return '';
+  const ativos = emprestimos.filter(e => e.status!=='devolvido').sort((a,b) => (a.status==='atrasado'?0:1) - (b.status==='atrasado'?0:1));
+  const anoAtual = new Date().getFullYear();
+  const lidosNoAno = emprestimos.filter(e => e.status==='devolvido' && e.dataDevolucao && new Date(e.dataDevolucao+'T00:00:00').getFullYear()===anoAtual).length;
+  return `
+    <div class="card">
+      <h3 style="margin-top:0;">📚 Biblioteca</h3>
+      <p class="muted" style="margin-top:-4px;">Você já leu <strong>${lidosNoAno}</strong> livro(s) este ano.</p>
+      ${ativos.length===0 ? '<p class="muted">Nenhum livro emprestado no momento.</p>' : ativos.map(e => `
+        <div class="list-item" style="align-items:flex-start; flex-wrap:wrap;">
+          <div>
+            <strong>${esc(e.livroTitulo)}</strong><br>
+            <span class="muted" style="font-size:.8rem;">Emprestado em ${bibliotecaFmtData(e.dataEmprestimo)} · devolução prevista em ${bibliotecaFmtData(e.dataPrevista)}</span>
+          </div>
+          ${e.status==='atrasado' ? '<span class="pill" style="background:var(--red); color:#fff;">Atrasado — devolva o quanto antes</span>'
+            : e.venceEmBreve ? `<span class="pill" style="background:#c98a2b; color:#fff;">Vence em ${e.dias===0?'hoje':e.dias+' dia(s)'}</span>`
+            : '<span class="pill">Emprestado</span>'}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 async function loadCoordProfessorPesos(){
   const c = state.coordenador;
   c.professorPesosLoading = true;
@@ -10401,6 +11249,8 @@ function renderStudentDashboard(){
     ${renderAlunoMateriaisTurmaBlock()}
 
     ${renderAlunoTarefasBlock()}
+
+    ${renderAlunoBibliotecaBlock()}
 
     ${renderAlunoCronogramaBlock()}
 
@@ -14628,6 +15478,7 @@ async function loadStudentDashboard(){
   render();
   loadMateriaisSlidesDaTurma(al.turma.id);
   loadTarefasParaAluno();
+  loadAlunoBiblioteca();
   computeNovidadesAluno();
 }
 async function loadTarefasParaAluno(){
@@ -14774,6 +15625,32 @@ async function unlockExam(){
   }
 }
 
+// Busca a lista de respostas já gravadas pra essa prova, tentando algumas vezes se a rede
+// falhar no meio do caminho. Um "not-found" é normal (ainda não tem nenhuma resposta) e não
+// conta como falha — só um erro de rede de verdade (offline, timeout etc.) é que precisa de
+// nova tentativa, porque tratar rede instável como "lista vazia" apagaria as respostas dos
+// outros alunos já enviadas quando a gente regravar a lista completa.
+async function fetchRespostasComRetentativas(code, tentativas){
+  for(let i=0;i<tentativas;i++){
+    try{
+      const r = await window.storage.get(`responses:${code}`, true);
+      let arr; try{ arr = JSON.parse(r.value); }catch(e){ arr = []; }
+      return { ok:true, list: Array.isArray(arr) ? arr : [] };
+    }catch(e){
+      const msg = (e && e.message) || '';
+      if(msg.startsWith('not-found')) return { ok:true, list: [] };
+      if(i < tentativas-1) await new Promise(res=>setTimeout(res, 1200*(i+1)));
+    }
+  }
+  return { ok:false, list: [] };
+}
+async function salvarRespostasComRetentativas(code, list, tentativas){
+  for(let i=0;i<tentativas;i++){
+    try{ await window.storage.set(`responses:${code}`, JSON.stringify(list), true); return true; }
+    catch(e){ if(i < tentativas-1) await new Promise(res=>setTimeout(res, 1200*(i+1))); }
+  }
+  return false;
+}
 async function submitAnswers(){
   const al = state.aluno;
   const a = al.assessment;
@@ -14804,16 +15681,37 @@ async function submitAnswers(){
     }
   }
   const result = { studentName: al.name, submittedAt: Date.now(), total, details, answers: {...al.answers}, tabSwitches: al.tabSwitchCount||0, fullscreenExits: al.fullscreenExits||0 };
-  let existing = [];
-  try{ const r = await window.storage.get(`responses:${a.code}`, true); existing = JSON.parse(r.value); }catch(e){ existing = []; }
-  existing.push(result);
-  try{ await window.storage.set(`responses:${a.code}`, JSON.stringify(existing), true); }catch(e){}
+
+  // Grava a resposta de verdade antes de dizer ao aluno que terminou — se a internet cair bem
+  // na hora de enviar, NÃO podemos fingir que deu certo: isso faria a prova sumir sem ficar
+  // salva em lugar nenhum, e o aluno ainda ficaria travado como se já tivesse respondido (a
+  // tela de "enviada" ficaria presa na aba dele, sem nada gravado no servidor). Em caso de
+  // falha, mantemos o aluno na prova (respostas preservadas) pra ele tentar enviar de novo.
+  const busca = await fetchRespostasComRetentativas(a.code, 4);
+  if(!busca.ok){
+    al.stage = 'responder';
+    al.error = 'Não consegui enviar sua prova por falta de conexão. Suas respostas continuam preenchidas — confira sua internet e toque em "Enviar respostas" de novo.';
+    render();
+    return;
+  }
+  const existing = busca.list;
+  const jaGravado = existing.find(r => r.studentName===result.studentName);
+  let salvouOk = true;
+  if(!jaGravado){
+    salvouOk = await salvarRespostasComRetentativas(a.code, [...existing, result], 4);
+  }
+  if(!salvouOk){
+    al.stage = 'responder';
+    al.error = 'Não consegui enviar sua prova por falta de conexão. Suas respostas continuam preenchidas — confira sua internet e toque em "Enviar respostas" de novo.';
+    render();
+    return;
+  }
   if(al.lockKey){ try{ await window.storage.delete(al.lockKey, true); }catch(e){} }
   stopUnlockPolling();
   disarmAwayTimer();
   stopResponderTick();
   exitFullscreenSafe();
-  al.result = result;
+  al.result = jaGravado || result;
   al.stage = resultReleased(a) ? 'resultado' : 'enviado';
   render();
 }
@@ -14881,6 +15779,25 @@ document.addEventListener('click', (e) => {
   else if(act==='freq-logout'){ state.freqMonitor.session=false; state.freqMonitor.error=''; state.freqMonitor.senhaInput=''; state.view='landing'; render(); resetIdleLogoutTimer(); }
   else if(act==='freq-monitor-subview'){ state.freqMonitor.subview = btn.dataset.sub; render(); }
   else if(act==='freq-painel-atualizar'){ const tid = btn.dataset.tid; const turma = state.professor.turmas.find(x=>x.id===tid) || state.freqMonitor.turmas.find(x=>x.id===tid); if(turma) ensureFreqStats(tid, turma, true); }
+  else if(act==='biblioteca-login-submit'){ submitBibliotecaLogin(); }
+  else if(act==='biblioteca-logout'){ state.biblioteca.session=false; state.biblioteca.error=''; state.biblioteca.senhaInput=''; state.view='landing'; render(); resetIdleLogoutTimer(); }
+  else if(act==='biblioteca-subview'){ state.biblioteca.subview = btn.dataset.sub; render(); }
+  else if(act==='biblioteca-livro-form-abrir'){ bibliotecaAbrirFormLivro(btn.dataset.id||null); }
+  else if(act==='biblioteca-livro-form-cancelar'){ bibliotecaCancelarFormLivro(); }
+  else if(act==='biblioteca-livro-salvar'){ bibliotecaSalvarLivro(); }
+  else if(act==='biblioteca-livro-excluir'){ bibliotecaExcluirLivro(btn.dataset.id); }
+  else if(act==='biblioteca-emprestimo-registrar'){ bibliotecaRegistrarEmprestimo(); }
+  else if(act==='biblioteca-emprestimo-devolver'){ bibliotecaRegistrarDevolucao(btn.dataset.id); }
+  else if(act==='biblioteca-emprestimo-renovar'){ bibliotecaRenovarEmprestimo(btn.dataset.id); }
+  else if(act==='biblioteca-salvar-limite'){ bibliotecaSalvarLimite(); }
+  else if(act==='biblioteca-emprestimo-excluir'){ bibliotecaExcluirEmprestimo(btn.dataset.id); }
+  else if(act==='biblioteca-toggle-historico'){ state.biblioteca.mostrarHistorico = !state.biblioteca.mostrarHistorico; render(); }
+  else if(act==='biblioteca-abrir-importar-planilha'){ bibliotecaAbrirImportarPlanilha(); }
+  else if(act==='biblioteca-cancelar-importar-planilha'){ bibliotecaCancelarImportarPlanilha(); }
+  else if(act==='biblioteca-confirmar-importar-planilha'){ confirmarImportarLivrosPlanilha(); }
+  else if(act==='biblioteca-reserva-registrar'){ bibliotecaRegistrarReserva(); }
+  else if(act==='biblioteca-reserva-cancelar'){ bibliotecaCancelarReserva(btn.dataset.id); }
+  else if(act==='biblioteca-reserva-converter'){ bibliotecaConverterReservaEmprestimo(btn.dataset.id); }
   else if(act==='salvar-turno-horarios'){ salvarTurnoHorarios(); }
   else if(act==='toggle-dia-letivo'){ toggleDiaLetivo(btn.dataset.date); }
   else if(act==='freq-calendario-mes'){ const c=state.coordenador; const [a,m]=c.freqConfig.mesCalendario.split('-').map(Number); const d=new Date(a, m-1+parseInt(btn.dataset.dir), 1); c.freqConfig.mesCalendario = d.toISOString().slice(0,7); render(); }
@@ -14982,6 +15899,7 @@ document.addEventListener('click', (e) => {
   else if(act==='excluir-temporada'){ excluirTemporada(); }
   else if(act==='coord-save-password'){ saveCoordPassword(); }
   else if(act==='coord-save-freq-password'){ saveFreqMonitorPassword(); }
+  else if(act==='coord-save-biblioteca-password'){ saveBibliotecaPassword(); }
   else if(act==='cancelar-importacao-notas-csv'){ cancelarImportacaoNotasCsv(); }
   else if(act==='confirmar-importacao-notas-csv'){ confirmarImportacaoNotasCsv(); }
   else if(act==='coord-open-results'){ openCoordResults(btn.dataset.code); }
@@ -15345,7 +16263,7 @@ document.addEventListener('click', (e) => {
   }
   else if(act==='goto-code-entry'){ al.stage='code'; al.error=''; render(); }
   else if(act==='back-to-entrada'){ al.stage='entrada'; al.error=''; al.matriculaStage='input'; render(); }
-  else if(act==='student-logout'){ exitFullscreenSafe(); stopAlunoEnquetePoll(); al.turma=null; al.name=''; al.studentLoggedIn=false; al.loginTurmaId=''; al.matriculaStage='input'; al.matriculaTurmaId=null; al.matriculaStudentId=null; al.matriculaName=''; al.enqueteAtiva=null; al.slidesAtivo=null; al.slidesCurrentImg=null; al.materiaisSlides=[]; al.materialDeck=null; al.isNewStudentSetup=false; al.tarefasTurma=[]; al.tarefaEntregasProprias={}; al.enviandoTarefaId=null; al.tarefaSubmitFile=null; al.tarefaSubmitFileName=''; al.tarefaSubmitLink=''; al.tarefaSubmitComentario=''; al.tarefaSubmitError=''; al.duvidaFormOpen=false; al.newDuvidaTexto=''; al.duvidaError=''; al.novidades=null; al.stage='entrada'; state.view='landing'; render(); }
+  else if(act==='student-logout'){ exitFullscreenSafe(); stopAlunoEnquetePoll(); al.turma=null; al.name=''; al.studentLoggedIn=false; al.loginTurmaId=''; al.matriculaStage='input'; al.matriculaTurmaId=null; al.matriculaStudentId=null; al.matriculaName=''; al.enqueteAtiva=null; al.slidesAtivo=null; al.slidesCurrentImg=null; al.materiaisSlides=[]; al.materialDeck=null; al.isNewStudentSetup=false; al.tarefasTurma=[]; al.tarefaEntregasProprias={}; al.enviandoTarefaId=null; al.tarefaSubmitFile=null; al.tarefaSubmitFileName=''; al.tarefaSubmitLink=''; al.tarefaSubmitComentario=''; al.tarefaSubmitError=''; al.duvidaFormOpen=false; al.newDuvidaTexto=''; al.duvidaError=''; al.novidades=null; al.bibliotecaEmprestimos=[]; al.stage='entrada'; state.view='landing'; render(); }
   else if(act==='goto-aluno-livros'){ stopAlunoEnquetePoll(); al.stage='aluno-livros'; if(state.professor.livrosLoading){ loadLivros(); } render(); }
   else if(act==='back-to-student-dashboard'){ loadStudentDashboard(); }
   else if(act==='dashboard-start-exam'){ stopAlunoEnquetePoll(); dashboardStartExam(btn.dataset.code); }
@@ -15459,6 +16377,22 @@ document.addEventListener('input', (e) => {
     const el2 = document.getElementById('sidebar-search-input');
     if(el2){ el2.focus(); try{ el2.setSelectionRange(selStart, selEnd); }catch(err){} }
   }
+  else if(el.id==='biblioteca-emp-data-input'){ state.biblioteca.formEmprestimo.dataEmprestimo = el.value; }
+  else if(el.id==='biblioteca-emp-prazo-input'){ state.biblioteca.formEmprestimo.dataPrevista = el.value; }
+  else if(el.id==='biblioteca-busca-livro-input'){
+    state.biblioteca.buscaLivro = el.value;
+    const selStart = el.selectionStart, selEnd = el.selectionEnd;
+    render();
+    const el2 = document.getElementById('biblioteca-busca-livro-input');
+    if(el2){ el2.focus(); try{ el2.setSelectionRange(selStart, selEnd); }catch(err){} }
+  }
+  else if(el.id==='biblioteca-busca-emprestimo-input'){
+    state.biblioteca.buscaEmprestimo = el.value;
+    const selStart = el.selectionStart, selEnd = el.selectionEnd;
+    render();
+    const el2 = document.getElementById('biblioteca-busca-emprestimo-input');
+    if(el2){ el2.focus(); try{ el2.setSelectionRange(selStart, selEnd); }catch(err){} }
+  }
 });
 
 document.addEventListener('change', (e) => {
@@ -15544,6 +16478,13 @@ document.addEventListener('change', (e) => {
   else if(el.id==='avulso-import-planilha-file'){ if(el.files[0]) processarArquivoRespostasAvulso(el.files[0]); }
   else if(el.id==='avulso-scan-turma-select'){ p.avulso.scanTurmaId = el.value; render(); }
   else if(el.id==='professor-photo-input'){ if(el.files[0]) handleProfessorPhotoUpload(el.files[0]); }
+  else if(el.id==='biblioteca-emp-turma-select'){ state.biblioteca.formEmprestimo.turmaId = el.value; state.biblioteca.formEmprestimo.studentId = ''; render(); }
+  else if(el.id==='biblioteca-emp-aluno-select'){ state.biblioteca.formEmprestimo.studentId = el.value; }
+  else if(el.id==='biblioteca-emp-livro-select'){ state.biblioteca.formEmprestimo.livroId = el.value; }
+  else if(el.id==='biblioteca-import-planilha-file'){ if(el.files[0]) processarArquivoLivrosPlanilha(el.files[0]); }
+  else if(el.id==='biblioteca-res-turma-select'){ state.biblioteca.formReserva.turmaId = el.value; state.biblioteca.formReserva.studentId = ''; render(); }
+  else if(el.id==='biblioteca-res-aluno-select'){ state.biblioteca.formReserva.studentId = el.value; }
+  else if(el.id==='biblioteca-res-livro-select'){ state.biblioteca.formReserva.livroId = el.value; }
 });
 
 // Leitor de código de barras se comporta como teclado: digita os caracteres e manda Enter.
