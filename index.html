@@ -14134,6 +14134,9 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
       try{ const r = await window.storage.get(`responses:${a.code}`, true); responses = JSON.parse(r.value); }catch(e){}
       const respondedNames = new Set();
       responses.forEach(resp => {
+        // Uma mesma avaliação pode estar aplicada a várias turmas ao mesmo tempo — só entram aqui
+        // os alunos da turma selecionada (roster); quem respondeu mas é de outra turma fica de fora.
+        if(roster.length>0 && !roster.includes(resp.studentName)) return;
         if(!acc[resp.studentName]) acc[resp.studentName] = { avaliacaoScores:[], diagnosticaScores:[], exerciciosScores:[], recuperacaoScores:[], exerciciosEntregues:0 };
         respondedNames.add(resp.studentName);
         const norm = max>0 ? resp.total/max : 0;
