@@ -1319,6 +1319,8 @@ let state = {
   turnoHorarios: { loading:true, map:{} },
   freqStatsCache: {},
   aluno: { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, dueloAtivo:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false, tarefasTurma:[], tarefaEntregasProprias:{}, enviandoTarefaId:null, tarefaSubmitFile:null, tarefaSubmitFileName:'', tarefaSubmitLink:'', tarefaSubmitComentario:'', tarefaSubmitError:'', tarefaSubmitUploading:false, duvidaFormOpen:false, newDuvidaTexto:'', duvidaError:'', novidades:null, duvidaIaLoadingId:null, duvidaIaErro:'',
+    subview:'inicio',
+    boletim: { loaded:false, loading:false, porUnidade:[], detalheDisciplina:'', detalheUnidade:'' },
     monitoria: {
       loaded:false, loading:false, grupos:[], vinculos:[], meuGrupoId:null,
       view:'inicio', criarTurmaId:'', criarSelecionados:[], entrarGrupoId:'',
@@ -1623,7 +1625,7 @@ function render(){
     return;
   }
   root.innerHTML = state.view==='professor' ? renderProfessor() : state.view==='coordenador' ? renderCoordenador() : state.view==='freqmonitor' ? renderFreqMonitor() : state.view==='biblioteca' ? renderBiblioteca() : renderAluno();
-  const wide = (state.view==='professor' && !!state.professor.session) || (state.view==='coordenador' && !!state.coordenador.session);
+  const wide = (state.view==='professor' && !!state.professor.session) || (state.view==='coordenador' && !!state.coordenador.session) || (state.view==='aluno' && state.aluno.stage==='dashboard');
   const full = state.professor.quiz.presentationMode || state.professor.roleta.presentationMode || state.professor.duelo.presentationMode || state.professor.slides.presentationMode;
   const wrapEl = document.querySelector('.wrap');
   if(wrapEl){ wrapEl.classList.toggle('wide', wide); wrapEl.classList.toggle('full', full); }
@@ -11463,21 +11465,68 @@ async function calcColunasParaUnidade(turmaId, unidade, turma){
     return pesos;
   }
 
-  const colunas = [];
-  for(const key of Object.keys(groups)){
+  // Cada grupo (disciplina+professor) busca seus próprios pesos/overrides/respostas no banco —
+  // isso é feito em paralelo (Promise.all) em vez de um de cada vez, porque um boletim ou
+  // relatório com várias disciplinas fazendo essas buscas em série fica visivelmente lento
+  // num banco de verdade (cada ida ao Firestore tem sua própria latência de rede).
+  const colunas = await Promise.all(Object.keys(groups).map(async key => {
     const g = groups[key];
     const pesos = await getPesos(g.professorId);
     const disciplinaIdDoGrupo = g.assessments[0] ? g.assessments[0].disciplinaId : null;
     const overrides = await getNotasManuais(g.professorId, turmaId, unidade, disciplinaIdDoGrupo);
     const { rows, total } = await computeGradesForAssessments(g.assessments, pesos, turma, unidade, overrides);
     const grades = {};
-    rows.forEach(r => { grades[r.name] = { final: r.final, precisaRecuperacao: r.precisaRecuperacao, temRecuperacao: r.temRecuperacao }; });
-    colunas.push({ disciplinaName: g.disciplinaName, professorName: g.professorName, total, grades });
-  }
+    rows.forEach(r => { grades[r.name] = {
+      final: r.final, precisaRecuperacao: r.precisaRecuperacao, temRecuperacao: r.temRecuperacao,
+      // detalhamento por instrumento, usado no boletim do aluno ("ver detalhamento da nota")
+      np1: r.np1, diag: r.diag, exerc: r.exerc, auto: r.auto, recuperacao: r.recuperacao,
+      np2: r.np2, finalSemRecuperacao: r.finalSemRecuperacao,
+    }; });
+    return { disciplinaName: g.disciplinaName, professorName: g.professorName, total, pesos, grades };
+  }));
   colunas.sort((a,b)=>a.disciplinaName.localeCompare(b.disciplinaName, 'pt-BR'));
   return colunas;
 }
 
+// Boletim do próprio aluno logado (menu "Boletim" no painel dele) — mesma lógica de
+// cálculo usada pra coordenação (calcColunasParaUnidade), só que já filtrada pra ele.
+async function computeAlunoBoletim(){
+  const al = state.aluno;
+  if(al.boletim.loaded || al.boletim.loading) return;
+  al.boletim.loading = true;
+  render();
+  if(state.professor.turmas.length===0){ await loadTurmas(); }
+  if(state.coordenador.assessments.length===0){ await loadCoordAssessments(); }
+  const turma = state.professor.turmas.find(t=>t.id===al.turma.id) || al.turma;
+  // As 4 unidades são independentes entre si — calcula todas em paralelo em vez de uma
+  // de cada vez, que é o que deixava o Boletim demorado pra abrir num banco de verdade.
+  const porUnidade = await Promise.all(UNIDADES.map(async unidade => {
+    const colunas = await calcColunasParaUnidade(turma.id, unidade, turma);
+    return { unidade, colunas };
+  }));
+  al.boletim.porUnidade = porUnidade;
+  al.boletim.loaded = true;
+  al.boletim.loading = false;
+  render();
+}
+function alunoBoletimDisciplinas(){
+  const al = state.aluno;
+  const map = {};
+  al.boletim.porUnidade.forEach(({colunas}) => {
+    colunas.forEach(col => {
+      if(!map[col.disciplinaName]) map[col.disciplinaName] = { disciplinaName: col.disciplinaName, professorName: col.professorName };
+    });
+  });
+  return Object.values(map).sort((a,b)=>a.disciplinaName.localeCompare(b.disciplinaName, 'pt-BR'));
+}
+// Encontra a coluna (disciplina) já calculada pra uma unidade específica, ou null se
+// essa disciplina não teve avaliação lançada naquela unidade.
+function alunoBoletimColuna(unidade, disciplinaName){
+  const al = state.aluno;
+  const bloco = al.boletim.porUnidade.find(u=>u.unidade===unidade);
+  if(!bloco) return null;
+  return bloco.colunas.find(c=>c.disciplinaName===disciplinaName) || null;
+}
 async function calcCoordNotas(){
   const c = state.coordenador;
   const turmaId = document.getElementById('coord-notas-turma-select').value;
@@ -11511,9 +11560,9 @@ async function imprimirBoletimCompletoAluno(studentName){
   render();
   try{
     const porUnidade = {};
-    for(const u of UNIDADES){
-      porUnidade[u] = await calcColunasParaUnidade(turmaId, u, t);
-    }
+    // Unidades são independentes — calcula em paralelo (ver mesmo comentário em computeAlunoBoletim).
+    const resultadosPorUnidade = await Promise.all(UNIDADES.map(u => calcColunasParaUnidade(turmaId, u, t)));
+    UNIDADES.forEach((u, i) => { porUnidade[u] = resultadosPorUnidade[i]; });
     // union of disciplinas across all unidades, preserving alphabetical order
     const disciplinasMap = {};
     UNIDADES.forEach(u => {
@@ -11692,90 +11741,101 @@ function renderAvatarEdit(){
   `;
 }
 
-function renderStudentDashboard(){
+function renderAlunoBoletimScreen(){
   const al = state.aluno;
-  if(al.dashboardLoading){
-    return `<div class="card"><h2>Minhas provas</h2><div class="spinner"></div></div>`;
+  const bo = al.boletim;
+  if(!bo.loaded && !bo.loading){ computeAlunoBoletim(); }
+  if(bo.loading){
+    return `<div class="card"><h2>🧮 Boletim</h2><div class="spinner"></div></div>`;
   }
-  const pendentes = al.dashboardPendentes || [];
-  const realizadas = al.dashboardRealizadas || [];
-  const meStudent = al.turma.students.find(s=>s.id===al.matriculaStudentId);
-  if(meStudent) ensureStudentGamification(meStudent);
+  const disciplinas = alunoBoletimDisciplinas();
+  const rows = disciplinas.map(d => {
+    const notasPorUnidade = UNIDADES.map(u => {
+      const col = alunoBoletimColuna(u, d.disciplinaName);
+      const g = col ? col.grades[al.name] : undefined;
+      return g!==undefined ? g.final : null;
+    });
+    const validas = notasPorUnidade.filter(n=>n!==null);
+    const media = validas.length ? (validas.reduce((a,b)=>a+b,0)/validas.length) : null;
+    return { disciplinaName: d.disciplinaName, professorName: d.professorName, notasPorUnidade, media };
+  });
+
+  // Seleção pra "ver detalhamento da nota"
+  const discSelecionada = bo.detalheDisciplina && disciplinas.some(d=>d.disciplinaName===bo.detalheDisciplina) ? bo.detalheDisciplina : '';
+  const unidSelecionada = bo.detalheUnidade || '';
+  const colunaDetalhe = (discSelecionada && unidSelecionada) ? alunoBoletimColuna(unidSelecionada, discSelecionada) : null;
+  const notaDetalhe = colunaDetalhe ? colunaDetalhe.grades[al.name] : null;
+
   return `
-    <div class="greeting-header">
-      <div class="row" style="align-items:center; justify-content:space-between; position:relative; z-index:1; flex-wrap:wrap; gap:12px;">
-        <div class="row" style="align-items:center; gap:12px;">
-          ${meStudent ? `<button data-action="goto-avatar-edit" style="border:none; background:rgba(255,255,255,0.18); border-radius:50%; padding:3px; cursor:pointer;" title="Trocar avatar">${studentAvatarHtml(meStudent,52)}</button>` : ''}
-          <div>
-            <h2 style="margin:0;">${saudacaoDoDia()}, ${esc(firstName(al.name))}! 👋</h2>
-            <p style="margin:2px 0 0;">${esc(al.turma.name)}${meStudent?' · 🎫 '+meStudent.fichas+' ficha(s)':''}</p>
-          </div>
-        </div>
-        <div class="row" style="flex:0 0 auto; gap:8px;">
-          <button class="btn btn-ghost btn-sm" data-action="start-tour" data-role="aluno" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.5);">🧭 Tour</button>
-          <button class="btn btn-ghost btn-sm" data-action="goto-aluno-livros" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.5);">📘 Livro Didático</button>
-          <button class="btn btn-ghost btn-sm" data-action="student-logout" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.5);">Sair</button>
-        </div>
-      </div>
+    <div class="card">
+      <h2>🧮 Boletim</h2>
+      <p class="muted">Suas notas por disciplina em cada unidade.</p>
+      ${rows.length===0 ? '<p class="muted">Nenhuma nota lançada ainda.</p>' : `
+        <table>
+          <tr>
+            <th>Disciplina</th><th>Professor</th>
+            ${UNIDADES.map(u=>`<th style="text-align:center;">${esc(u)}</th>`).join('')}
+            <th style="text-align:center;">Média</th>
+          </tr>
+          ${rows.map(r => `
+            <tr>
+              <td>${esc(r.disciplinaName)}</td>
+              <td>${esc(r.professorName||'-')}</td>
+              ${r.notasPorUnidade.map(n=>`<td style="text-align:center;">${n!==null?n.toFixed(1):'-'}</td>`).join('')}
+              <td style="text-align:center;"><strong>${r.media!==null?r.media.toFixed(1):'-'}</strong></td>
+            </tr>
+          `).join('')}
+        </table>
+      `}
     </div>
 
-    ${renderAlunoNovidadesBanner()}
+    <div class="card">
+      <h3 style="margin-top:0;">🔍 Ver detalhamento da nota</h3>
+      <p class="muted" style="font-size:.85rem;">Escolha a disciplina e a unidade pra ver como sua nota foi composta (avaliação, exercícios, autoavaliação etc.).</p>
+      <label>Disciplina</label>
+      <select id="boletim-disciplina-select">
+        <option value="">Selecione...</option>
+        ${disciplinas.map(d=>`<option value="${esc(d.disciplinaName)}" ${d.disciplinaName===discSelecionada?'selected':''}>${esc(d.disciplinaName)}</option>`).join('')}
+      </select>
+      <label style="margin-top:8px;">Unidade</label>
+      <select id="boletim-unidade-select">
+        <option value="">Selecione...</option>
+        ${UNIDADES.map(u=>`<option value="${esc(u)}" ${u===unidSelecionada?'selected':''}>${esc(u)}</option>`).join('')}
+      </select>
 
-    ${renderAlunoRecomendacoesBlock()}
-
-    ${renderAlunoTemporadaBlock()}
-
-    ${renderAlunoRankingTrilhaBlock()}
-
-    ${renderAlunoTrilhaIndividualBlock()}
-
-    ${renderAlunoSlidesBlock()}
-
-    ${renderAlunoMateriaisSlidesBlock()}
-
-    ${renderAlunoMateriaisTurmaBlock()}
-
-    ${renderAlunoTarefasBlock()}
-
-    ${renderAlunoBibliotecaBlock()}
-
-    ${renderAlunoCronogramaBlock()}
-
-    ${renderAlunoDuvidasBlock()}
-
-    ${renderAlunoRABlock()}
-
-    ${renderAlunoMonitoriaBlock()}
-
-    ${renderAlunoRoletaBlock()}
-
-    ${renderAlunoDueloBlock()}
-
-    ${renderAlunoQuizBlock()}
-
-    ${renderAlunoEnqueteBlock()}
-
+      ${discSelecionada && unidSelecionada ? (!colunaDetalhe || !notaDetalhe ? `
+        <p class="muted" style="margin-top:12px;">Nenhuma avaliação lançada pra ${esc(discSelecionada)} na ${esc(unidSelecionada)} ainda.</p>
+      ` : `
+        <div class="card" style="background:var(--surface); margin-top:12px;">
+          <div class="list-item"><span>📝 Avaliação (NP1)</span><strong>${notaDetalhe.np1.toFixed(1)} / ${(colunaDetalhe.pesos.avaliacao||0).toFixed(1)}</strong></div>
+          <div class="list-item"><span>🔎 Avaliação Diagnóstica</span><strong>${notaDetalhe.diag.toFixed(1)} / ${(colunaDetalhe.pesos.diagnostica||0).toFixed(1)}</strong></div>
+          <div class="list-item"><span>✏️ Exercícios de Fixação</span><strong>${notaDetalhe.exerc.toFixed(1)} / ${(colunaDetalhe.pesos.exercicios||0).toFixed(1)}</strong></div>
+          <div class="list-item"><span>🙋 Autoavaliação (engajamento)</span><strong>${notaDetalhe.auto.toFixed(1)} / ${(colunaDetalhe.pesos.autoavaliacao||0).toFixed(1)}</strong></div>
+          ${notaDetalhe.temRecuperacao ? `
+            <div class="list-item"><span>♻️ Recuperação Paralela <span class="muted" style="font-size:.75rem;">(substituiu o NP1)</span></span><strong>${notaDetalhe.recuperacao.toFixed(1)} / ${(colunaDetalhe.pesos.avaliacao||0).toFixed(1)}</strong></div>
+          ` : ''}
+          <div class="list-item" style="border-top:2px solid var(--paper-line); margin-top:6px; padding-top:10px;">
+            <span><strong>Nota final na unidade</strong></span>
+            <strong style="font-size:1.1rem; color:${notaDetalhe.precisaRecuperacao && !notaDetalhe.temRecuperacao?'var(--red)':'var(--ink)'};">${notaDetalhe.final.toFixed(1)} / ${colunaDetalhe.total.toFixed(1)}</strong>
+          </div>
+          ${notaDetalhe.precisaRecuperacao && !notaDetalhe.temRecuperacao ? `
+            <p style="margin:8px 0 0; font-size:.85rem; color:var(--red);">⚠️ Nota abaixo de 5,0 antes da recuperação — fique de olho na recuperação paralela dessa unidade.</p>
+          ` : ''}
+        </div>
+      `) : ''}
+    </div>
+  `;
+}
+// Card "Minhas provas" (agendadas/disponíveis + realizadas) — sem o Mural de Avisos,
+// que foi pro Início.
+function renderAlunoProvasBlock(){
+  const al = state.aluno;
+  const pendentes = al.dashboardPendentes || [];
+  const realizadas = al.dashboardRealizadas || [];
+  return `
     <div class="card">
       <h2>Minhas provas</h2>
-
-      ${(() => {
-        const meus = sortedAvisos((state.professor.avisos||[]).filter(a => !a.turmaIds || a.turmaIds.length===0 || a.turmaIds.includes(al.turma.id)));
-        if(meus.length===0) return '';
-        return `
-          <h3 style="margin-top:20px;">📌 Mural de Avisos</h3>
-          ${meus.slice(0,6).map(a => `
-            <div class="list-item" style="align-items:flex-start;">
-              <div>
-                ${a.pinned ? '<span class="pill" style="font-size:.7rem; padding:1px 8px;">Fixado</span> ' : ''}
-                <span class="muted" style="font-size:.78rem;">${esc(a.authorName)} · ${new Date(a.createdAt).toLocaleDateString('pt-BR')}</span><br>
-                ${esc(a.text)}
-              </div>
-            </div>
-          `).join('')}
-        `;
-      })()}
-
-      <h3 style="margin-top:20px;">Agendadas / disponíveis</h3>
+      <h3 style="margin-top:0;">Agendadas / disponíveis</h3>
       ${pendentes.length===0 ? '<p class="muted">Nenhuma prova pendente no momento.</p>' : pendentes.map(p => {
         const a = p.assessment;
         const aberta = p.status==='aberta';
@@ -11807,6 +11867,105 @@ function renderStudentDashboard(){
       ${al.error ? `<p class="err" style="margin-top:10px;">${esc(al.error)}</p>` : ''}
     </div>
   `;
+}
+// Mural de Avisos da turma, extraído do antigo card "Minhas provas" — agora mora no Início.
+function renderAlunoMuralAvisosBlock(){
+  const al = state.aluno;
+  const meus = sortedAvisos((state.professor.avisos||[]).filter(a => !a.turmaIds || a.turmaIds.length===0 || a.turmaIds.includes(al.turma.id)));
+  if(meus.length===0) return '';
+  return `
+    <div class="card">
+      <h3 style="margin-top:0;">📌 Mural de Avisos</h3>
+      ${meus.slice(0,6).map(a => `
+        <div class="list-item" style="align-items:flex-start;">
+          <div>
+            ${a.pinned ? '<span class="pill" style="font-size:.7rem; padding:1px 8px;">Fixado</span> ' : ''}
+            <span class="muted" style="font-size:.78rem;">${esc(a.authorName)} · ${new Date(a.createdAt).toLocaleDateString('pt-BR')}</span><br>
+            ${esc(a.text)}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+// Aba "Início": visão geral — recomendações, temporada/gamificação, ranking, trilha e avisos.
+function renderAlunoInicioBlock(){
+  const blocos = [
+    renderAlunoRecomendacoesBlock(),
+    renderAlunoTemporadaBlock(),
+    renderAlunoRankingTrilhaBlock(),
+    renderAlunoTrilhaIndividualBlock(),
+    renderAlunoMuralAvisosBlock(),
+  ].filter(h => h && h.trim());
+  if(blocos.length===0){
+    return `<div class="card"><p class="muted">Bem-vindo(a)! Use o menu ao lado pra ver suas provas, boletim, tarefas e muito mais.</p></div>`;
+  }
+  return blocos.join('\n');
+}
+function alunoSubviewOuVazio(html, msg){
+  return (html && html.trim()) ? html : `<div class="card"><p class="muted">${esc(msg)}</p></div>`;
+}
+function renderStudentDashboard(){
+  const al = state.aluno;
+  if(al.dashboardLoading){
+    return `<div class="card"><h2>Minhas provas</h2><div class="spinner"></div></div>`;
+  }
+  const meStudent = al.turma.students.find(s=>s.id===al.matriculaStudentId);
+  if(meStudent) ensureStudentGamification(meStudent);
+  const topBar = `
+    <div class="greeting-header">
+      <div class="row" style="align-items:center; justify-content:space-between; position:relative; z-index:1; flex-wrap:wrap; gap:12px;">
+        <div class="row" style="align-items:center; gap:12px;">
+          ${meStudent ? `<button data-action="goto-avatar-edit" style="border:none; background:rgba(255,255,255,0.18); border-radius:50%; padding:3px; cursor:pointer;" title="Trocar avatar">${studentAvatarHtml(meStudent,52)}</button>` : ''}
+          <div>
+            <h2 style="margin:0;">${saudacaoDoDia()}, ${esc(firstName(al.name))}! 👋</h2>
+            <p style="margin:2px 0 0;">${esc(al.turma.name)}${meStudent?' · 🎫 '+meStudent.fichas+' ficha(s)':''}</p>
+          </div>
+        </div>
+        <div class="row" style="flex:0 0 auto; gap:8px;">
+          <button class="btn btn-ghost btn-sm" data-action="start-tour" data-role="aluno" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.5);">🧭 Tour</button>
+          <button class="btn btn-ghost btn-sm" data-action="goto-aluno-livros" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.5);">📘 Livro Didático</button>
+          <button class="btn btn-ghost btn-sm" data-action="student-logout" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.5);">Sair</button>
+        </div>
+      </div>
+    </div>
+
+    ${renderAlunoNovidadesBanner()}
+    ${renderAlunoSlidesBlock()}
+    ${renderAlunoEnqueteBlock()}
+    ${renderAlunoQuizBlock()}
+    ${renderAlunoRoletaBlock()}
+    ${renderAlunoDueloBlock()}
+  `;
+
+  const sidebarItems = [
+    { action:'aluno-sub-view', sub:'inicio', icon:'🏠', label:'Início', group:'📊 Painel' },
+    { action:'aluno-sub-view', sub:'provas', icon:'📝', label:'Minhas provas', group:'📊 Painel' },
+    { action:'aluno-sub-view', sub:'boletim', icon:'🧮', label:'Boletim', group:'📊 Painel' },
+
+    { action:'aluno-sub-view', sub:'tarefas', icon:'🗂️', label:'Tarefas', group:'📚 Estudos' },
+    { action:'aluno-sub-view', sub:'materiais', icon:'📎', label:'Materiais', group:'📚 Estudos' },
+    { action:'aluno-sub-view', sub:'biblioteca', icon:'📚', label:'Biblioteca', group:'📚 Estudos' },
+    { action:'aluno-sub-view', sub:'cronograma', icon:'📅', label:'Cronograma de Aulas', group:'📚 Estudos' },
+    { action:'aluno-sub-view', sub:'ra', icon:'🕶️', label:'Realidade Aumentada', group:'📚 Estudos' },
+
+    { action:'aluno-sub-view', sub:'duvidas', icon:'❓', label:'Mural de Dúvidas', group:'💬 Comunidade' },
+    { action:'aluno-sub-view', sub:'monitoria', icon:'🧑‍🏫', label:'Monitoria de Desempenho', group:'💬 Comunidade' },
+  ];
+
+  let content;
+  if(al.subview==='provas') content = renderAlunoProvasBlock();
+  else if(al.subview==='boletim') content = renderAlunoBoletimScreen();
+  else if(al.subview==='tarefas') content = alunoSubviewOuVazio(renderAlunoTarefasBlock(), 'Nenhuma tarefa por aqui ainda.');
+  else if(al.subview==='materiais') content = alunoSubviewOuVazio(renderAlunoMateriaisSlidesBlock() + renderAlunoMateriaisTurmaBlock(), 'Nenhum material disponível ainda.');
+  else if(al.subview==='biblioteca') content = alunoSubviewOuVazio(renderAlunoBibliotecaBlock(), 'Você ainda não tem empréstimos na biblioteca.');
+  else if(al.subview==='cronograma') content = alunoSubviewOuVazio(renderAlunoCronogramaBlock(), 'Nenhuma aula agendada no cronograma ainda.');
+  else if(al.subview==='ra') content = alunoSubviewOuVazio(renderAlunoRABlock(), 'Nenhum conteúdo de Realidade Aumentada disponível ainda.');
+  else if(al.subview==='duvidas') content = renderAlunoDuvidasBlock();
+  else if(al.subview==='monitoria') content = renderAlunoMonitoriaBlock();
+  else content = renderAlunoInicioBlock();
+
+  return `<div class="app-topbar">${topBar}</div><div class="app-shell">${renderSidebar(sidebarItems, al.subview, 'aluno')}<div class="app-main">${content}</div></div>`;
 }
 
 function renderExamLocked(){
@@ -12308,11 +12467,11 @@ async function computeMonitoriaNotas(turmaId, studentName){
   if(state.professor.turmas.length===0){ await loadTurmas(); }
   if(state.coordenador.assessments.length===0){ await loadCoordAssessments(); }
   const turma = state.professor.turmas.find(t=>t.id===turmaId);
-  const porUnidade = [];
-  for(const unidade of UNIDADES){
+  // Unidades são independentes — calcula em paralelo (ver mesmo comentário em computeAlunoBoletim).
+  const porUnidade = await Promise.all(UNIDADES.map(async unidade => {
     const colunas = await calcColunasParaUnidade(turmaId, unidade, turma);
-    porUnidade.push({ unidade, colunas });
-  }
+    return { unidade, colunas };
+  }));
   al.monitoria.notasCache[cacheKey] = porUnidade;
   al.monitoria.notasLoading = false;
   render();
@@ -15649,36 +15808,45 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
   const acc = {};
   roster.forEach(name => { acc[name] = { avaliacaoScores:[], diagnosticaScores:[], exerciciosScores:[], recuperacaoScores:[], exerciciosEntregues:0 }; });
 
-  async function collect(list, bucketKey, zeroFillRoster){
-    for(const a of list){
+  // Busca as respostas de TODAS as avaliações (dos 4 instrumentos) em paralelo, em vez de uma
+  // de cada vez — com várias avaliações lançadas numa unidade, buscar em série fica bem lento
+  // num banco de verdade (cada ida ao Firestore tem sua própria latência de rede). O resultado
+  // final é idêntico: só o processamento (síncrono, depois que tudo já chegou) que decide o
+  // que vai em cada "bucket", igual antes.
+  const buckets = [
+    { list: byInstrumento.avaliacao, bucketKey: 'avaliacaoScores', zeroFill: false },
+    { list: byInstrumento.diagnostica, bucketKey: 'diagnosticaScores', zeroFill: false },
+    { list: byInstrumento.exercicios, bucketKey: 'exerciciosScores', zeroFill: true },
+    { list: byInstrumento.recuperacao, bucketKey: 'recuperacaoScores', zeroFill: false },
+  ];
+  const fetchedResults = await Promise.all(
+    buckets.flatMap(b => b.list.map(async a => {
       const max = a.questions.reduce((s,q)=>s+q.points,0);
       let responses = [];
       try{ const r = await window.storage.get(`responses:${a.code}`, true); responses = JSON.parse(r.value); }catch(e){}
-      const respondedNames = new Set();
-      responses.forEach(resp => {
-        // Uma mesma avaliação pode estar aplicada a várias turmas ao mesmo tempo — só entram aqui
-        // os alunos da turma selecionada (roster); quem respondeu mas é de outra turma fica de fora.
-        if(roster.length>0 && !roster.includes(resp.studentName)) return;
-        if(!acc[resp.studentName]) acc[resp.studentName] = { avaliacaoScores:[], diagnosticaScores:[], exerciciosScores:[], recuperacaoScores:[], exerciciosEntregues:0 };
-        respondedNames.add(resp.studentName);
-        const norm = max>0 ? resp.total/max : 0;
-        acc[resp.studentName][bucketKey].push(norm);
-        if(bucketKey==='exerciciosScores') acc[resp.studentName].exerciciosEntregues++;
+      return { bucketKey: b.bucketKey, zeroFill: b.zeroFill, max, responses };
+    }))
+  );
+  fetchedResults.forEach(({ bucketKey, zeroFill, max, responses }) => {
+    const respondedNames = new Set();
+    responses.forEach(resp => {
+      // Uma mesma avaliação pode estar aplicada a várias turmas ao mesmo tempo — só entram aqui
+      // os alunos da turma selecionada (roster); quem respondeu mas é de outra turma fica de fora.
+      if(roster.length>0 && !roster.includes(resp.studentName)) return;
+      if(!acc[resp.studentName]) acc[resp.studentName] = { avaliacaoScores:[], diagnosticaScores:[], exerciciosScores:[], recuperacaoScores:[], exerciciosEntregues:0 };
+      respondedNames.add(resp.studentName);
+      const norm = max>0 ? resp.total/max : 0;
+      acc[resp.studentName][bucketKey].push(norm);
+      if(bucketKey==='exerciciosScores') acc[resp.studentName].exerciciosEntregues++;
+    });
+    if(zeroFill){
+      roster.forEach(name => {
+        if(respondedNames.has(name)) return;
+        if(!acc[name]) acc[name] = { avaliacaoScores:[], diagnosticaScores:[], exerciciosScores:[], recuperacaoScores:[], exerciciosEntregues:0 };
+        acc[name][bucketKey].push(0);
       });
-      if(zeroFillRoster){
-        zeroFillRoster.forEach(name => {
-          if(respondedNames.has(name)) return;
-          if(!acc[name]) acc[name] = { avaliacaoScores:[], diagnosticaScores:[], exerciciosScores:[], recuperacaoScores:[], exerciciosEntregues:0 };
-          acc[name][bucketKey].push(0);
-        });
-      }
     }
-  }
-
-  await collect(byInstrumento.avaliacao, 'avaliacaoScores');
-  await collect(byInstrumento.diagnostica, 'diagnosticaScores');
-  await collect(byInstrumento.exercicios, 'exerciciosScores', roster);
-  await collect(byInstrumento.recuperacao, 'recuperacaoScores');
+  });
 
   const range = getPeriodoRange(unidade);
   const fichasPorAluno = {};
@@ -16473,6 +16641,11 @@ document.addEventListener('click', (e) => {
   else if(act==='salvar-turno-horarios'){ salvarTurnoHorarios(); }
   else if(act==='toggle-dia-letivo'){ toggleDiaLetivo(btn.dataset.date); }
   else if(act==='freq-calendario-mes'){ const c=state.coordenador; const [a,m]=c.freqConfig.mesCalendario.split('-').map(Number); const d=new Date(a, m-1+parseInt(btn.dataset.dir), 1); c.freqConfig.mesCalendario = d.toISOString().slice(0,7); render(); }
+  else if(act==='aluno-sub-view'){
+    al.subview = btn.dataset.sub;
+    state.ui.sidebarSearch = '';
+    render();
+  }
   else if(act==='coord-sub-view'){
     state.coordenador.subview = btn.dataset.sub;
     state.coordenador.mode='list';
@@ -16980,6 +17153,8 @@ document.addEventListener('click', (e) => {
   else if(act==='monitoria-indicar-alunos'){ monitoriaIndicarAlunos(); }
   else if(act==='monitoria-remover-indicado'){ monitoriaRemoverIndicado(btn.dataset.sid); }
   else if(act==='reset-aluno'){ exitFullscreenSafe(); stopUnlockPolling(); disarmAwayTimer(); stopAlunoEnquetePoll(); state.aluno = { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, dueloAtivo:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false, tarefasTurma:[], tarefaEntregasProprias:{}, enviandoTarefaId:null, tarefaSubmitFile:null, tarefaSubmitFileName:'', tarefaSubmitLink:'', tarefaSubmitComentario:'', tarefaSubmitError:'', tarefaSubmitUploading:false, duvidaFormOpen:false, newDuvidaTexto:'', duvidaError:'', novidades:null, duvidaIaLoadingId:null, duvidaIaErro:'',
+    subview:'inicio',
+    boletim: { loaded:false, loading:false, porUnidade:[], detalheDisciplina:'', detalheUnidade:'' },
     monitoria: {
       loaded:false, loading:false, grupos:[], vinculos:[], meuGrupoId:null,
       view:'inicio', criarTurmaId:'', criarSelecionados:[], entrarGrupoId:'',
@@ -17124,6 +17299,8 @@ document.addEventListener('change', (e) => {
     return;
   }
   if(el.id==='monitoria-status-select'){ al.monitoria.registroStatus = el.value; return; }
+  if(el.id==='boletim-disciplina-select'){ al.boletim.detalheDisciplina = el.value; render(); return; }
+  if(el.id==='boletim-unidade-select'){ al.boletim.detalheUnidade = el.value; render(); return; }
   if(el.id==='monitoria-indicar-turma-select'){ c.monitoria.indicarTurmaId = el.value; c.monitoria.indicarSelecionados = []; c.monitoria.indicarError=''; render(); return; }
   if(act==='monitoria-toggle-indicar-aluno'){
     const sid = el.dataset.sid;
