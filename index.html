@@ -29,6 +29,7 @@
   :root{
     --board: #5c1a2b;
     --board-dark: #3d0f1c;
+    --board-light: #5c1a2b;
     --chalk: #f5ece9;
     --chalk-dim: #d9bcc2;
     --paper: #fbf8f0;
@@ -54,6 +55,12 @@
   :root[data-theme="dark"]{
     --board: #7a2942;
     --board-dark: #2a0a12;
+    /* --board-light: usado só como TEXTO/BORDA de destaque direto sobre o
+       fundo escuro (títulos, pontuação, fichas, bordas de destaque). O
+       --board original fica escuro demais pra isso e alunos reclamaram de
+       dificuldade de leitura; --board continua igual, só pra fundos sólidos
+       com texto branco em cima (botões, etiquetas), onde já tem contraste. */
+    --board-light: #d7708a;
     --paper: #211d20;
     --paper-line: #3c363a;
     --ink: #ece7e2;
@@ -69,6 +76,15 @@
     --accent-teal-bg: #1c2f2d;
     --accent-red-bg: #3a2426;
   }
+  /* No modo escuro, o vinho vira branco especificamente na tela de entrada
+     (cabeçalho, timbre da escola e o selo animado) — o resto do app mantém
+     o vinho claro (--board) já usado nos demais elementos. */
+  :root[data-theme="dark"] header h1{ color:#ffffff; }
+  :root[data-theme="dark"] .school-name-sm{ color:#ffffff; }
+  :root[data-theme="dark"] .logo-badge{ border-color:#ffffff; }
+  :root[data-theme="dark"] .landing-intro h2{ color:#ffffff; }
+  :root[data-theme="dark"] .login-logo-base{ fill:#ffffff; }
+  :root[data-theme="dark"] .login-logo-check{ stroke:#5c1a2b; }
   *{box-sizing:border-box;}
   body{
     margin:0;
@@ -185,15 +201,15 @@
   .tabs{ display:flex; gap:10px; justify-content:center; margin: 20px 0 16px; }
   .tab-btn{
     font-family:'Caveat', cursive; font-size:1.4rem; font-weight:700;
-    background: transparent; border: 2px solid var(--board); color: var(--board);
+    background: transparent; border: 2px solid var(--board-light); color: var(--board-light);
     padding: 6px 22px; border-radius: 8px; cursor:pointer;
   }
   .tab-btn.active{ background: var(--board); color: #fff; border-color: var(--board); }
 
   .subnav{ display:flex; gap:8px; justify-content:center; margin-bottom:18px; flex-wrap:wrap; }
   .pill-btn{
-    font-size:.85rem; font-weight:600; background:transparent; border:1px solid var(--board);
-    color: var(--board); padding:5px 14px; border-radius:16px; cursor:pointer;
+    font-size:.85rem; font-weight:600; background:transparent; border:1px solid var(--board-light);
+    color: var(--board-light); padding:5px 14px; border-radius:16px; cursor:pointer;
   }
   .pill-btn.active{ background: var(--board); border-color: var(--board); color: #fff; }
 
@@ -252,6 +268,37 @@
   .stat-tile.tint-gold{ background:var(--tint-gold); } .stat-tile.tint-gold .stat-icon{ background:var(--yellow-dark); color:#fff; }
   .stat-tile.tint-plum{ background:var(--tint-plum); } .stat-tile.tint-plum .stat-icon{ background:var(--plum); color:#fff; }
 
+  .login-logo-wrap{ display:flex; justify-content:center; margin:4px auto 6px; }
+  .login-logo{ width:112px; height:112px; animation: login-logo-in .55s ease-out both, login-logo-pulse 3.4s ease-in-out 1.1s infinite; }
+  .login-logo .login-logo-ring{ transform-origin:256px 256px; }
+  .login-logo .login-logo-check{
+    stroke-dasharray: 1; stroke-dashoffset: 1;
+    animation: login-logo-draw .5s .35s cubic-bezier(.65,.05,.36,1) forwards;
+  }
+  .login-logo .login-logo-dot{
+    transform-origin:372px 140px; opacity:0; transform:scale(0);
+    animation: login-logo-dot-pop .45s .78s cubic-bezier(.34,1.56,.64,1) forwards;
+  }
+  @keyframes login-logo-in{
+    from{ opacity:0; transform:scale(.72); }
+    to{ opacity:1; transform:scale(1); }
+  }
+  @keyframes login-logo-draw{ to{ stroke-dashoffset:0; } }
+  @keyframes login-logo-dot-pop{
+    0%{ opacity:0; transform:scale(0); }
+    65%{ opacity:1; transform:scale(1.25); }
+    100%{ opacity:1; transform:scale(1); }
+  }
+  @keyframes login-logo-pulse{
+    0%,100%{ transform:scale(1); }
+    50%{ transform:scale(1.035); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .login-logo, .login-logo .login-logo-check, .login-logo .login-logo-dot{ animation:none !important; }
+    .login-logo .login-logo-check{ stroke-dashoffset:0; }
+    .login-logo .login-logo-dot{ opacity:1; transform:scale(1); }
+  }
+
   .landing-intro{ text-align:center; max-width:520px; margin:6px auto 26px; }
   .landing-intro h2{ font-size:2rem; }
   .landing-intro p{ color:var(--ink-soft); }
@@ -273,7 +320,7 @@
   }
   .landing-card h3{ font-size:1.25rem; margin:0; }
   .landing-card p{ margin:0; font-size:.82rem; color:var(--ink-soft); line-height:1.4; }
-  .landing-card.landing-vinho{ background:var(--tint-vinho); } .landing-card.landing-vinho .landing-icon{ background:var(--board); } .landing-card.landing-vinho h3{ color:var(--board); }
+  .landing-card.landing-vinho{ background:var(--tint-vinho); } .landing-card.landing-vinho .landing-icon{ background:var(--board); } .landing-card.landing-vinho h3{ color:var(--board-light); }
   .landing-card.landing-teal{ background:var(--tint-teal); } .landing-card.landing-teal .landing-icon{ background:var(--teal); } .landing-card.landing-teal h3{ color:var(--teal); }
   .landing-card.landing-plum{ background:var(--tint-plum); } .landing-card.landing-plum .landing-icon{ background:var(--plum); } .landing-card.landing-plum h3{ color:var(--plum); }
   .voltar-landing{ margin-bottom:14px; }
@@ -303,8 +350,8 @@
   .tour-dot.active{ background:var(--board); }
   body.has-conn-banner .wrap{ padding-top:38px; }
 
-  h2{ font-family:'Caveat', cursive; font-size:2rem; margin:0 0 4px; font-weight:700; color: var(--board); }
-  h3{ font-size:1.05rem; margin: 0 0 10px; color: var(--board); }
+  h2{ font-family:'Caveat', cursive; font-size:2rem; margin:0 0 4px; font-weight:700; color: var(--board-light); }
+  h3{ font-size:1.05rem; margin: 0 0 10px; color: var(--board-light); }
 
   label{ display:block; font-size:.82rem; font-weight:600; color: var(--ink-soft); margin: 14px 0 5px; text-transform: uppercase; letter-spacing:.03em;}
   label:first-child{ margin-top:0; }
@@ -316,7 +363,7 @@
     background-image: repeating-linear-gradient(var(--paper-line) 0 1px, transparent 1px 28px);
     background-attachment: local; line-height:28px; padding-top:4px;
   }
-  input:focus, textarea:focus, select:focus{ outline:2px solid var(--board); outline-offset:1px; }
+  input:focus, textarea:focus, select:focus{ outline:2px solid var(--board-light); outline-offset:1px; }
 
   .btn{
     display:inline-block; border:none; border-radius:7px; padding:10px 18px; font-size:.95rem;
@@ -357,7 +404,7 @@
     padding:0; transition: background .1s ease, border-color .1s ease, color .1s ease, transform .1s ease;
     font-family:'Source Sans 3', sans-serif;
   }
-  .gabarito-bolinha:hover{ border-color:var(--board); transform:scale(1.08); }
+  .gabarito-bolinha:hover{ border-color:var(--board-light); transform:scale(1.08); }
   .gabarito-bolinha.selected{ background:var(--board); border-color:var(--board); color:#fff; }
   .gabarito-bolinha-limpar{
     width:24px; height:24px; border-radius:50%; border:1px dashed var(--paper-line); background:transparent;
@@ -372,7 +419,7 @@
     padding:14px 16px; cursor:pointer; text-align:left; font-family:'Source Sans 3', sans-serif;
     color:var(--ink); transition: background .12s, border-color .12s;
   }
-  .quick-shortcut-tile:hover{ background:var(--tint-vinho); border-color:var(--board); }
+  .quick-shortcut-tile:hover{ background:var(--tint-vinho); border-color:var(--board-light); }
   .quick-shortcut-tile .qs-icon{ font-size:1.5rem; flex:0 0 auto; }
   .quick-shortcut-tile .qs-label{ font-weight:600; font-size:.9rem; }
   .quick-shortcut-tile .qs-sub{ display:block; font-weight:400; font-size:.78rem; color:var(--ink-soft); margin-top:2px; }
@@ -385,7 +432,7 @@
   .list-item:last-child{ border-bottom:none; }
   .list-item.clickable{ cursor:pointer; }
   .pill{ display:inline-block; background:var(--board); color:#fff; font-family:'Caveat',cursive; font-weight:700; font-size:1.15rem; padding:1px 10px; border-radius:5px; letter-spacing:.1em;}
-  .score-big{ font-family:'Caveat', cursive; font-size:3.4rem; font-weight:700; color: var(--board); text-align:center; margin: 6px 0 0;}
+  .score-big{ font-family:'Caveat', cursive; font-size:3.4rem; font-weight:700; color: var(--board-light); text-align:center; margin: 6px 0 0;}
   .score-sub{ text-align:center; color:var(--ink-soft); margin-bottom:18px; }
   .fb{ font-size:.85rem; color: var(--ink-soft); margin-top:4px; font-style:italic; }
   .err{ color: var(--red); font-size:.9rem; margin-top:6px; }
@@ -396,7 +443,7 @@
   .disclaimer-details summary::-webkit-details-marker{ display:none; }
   .disclaimer-details summary:hover{ opacity:1; }
   .disclaimer-details p{ color:var(--ink-soft); font-size:.78rem; max-width:520px; margin:8px auto 0; }
-  .spinner{ width:26px;height:26px;border:3px solid var(--paper-line); border-top-color:var(--board); border-radius:50%; margin:20px auto; animation: spin 0.8s linear infinite;}
+  .spinner{ width:26px;height:26px;border:3px solid var(--paper-line); border-top-color:var(--board-light); border-radius:50%; margin:20px auto; animation: spin 0.8s linear infinite;}
   @keyframes spin{ to{ transform: rotate(360deg);} }
   .quiz-timer-urgente{ animation: quiz-pulse 1s ease-in-out infinite; }
   @keyframes quiz-pulse{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.12); } }
@@ -426,7 +473,7 @@
   .ra-site-link:hover{ filter:brightness(0.95); }
   .stat-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:14px; }
   .stat-card{ background:var(--surface); border:1px solid var(--paper-line); border-radius:8px; padding:12px 8px; text-align:center; }
-  .stat-value{ font-family:'Caveat',cursive; font-size:1.7rem; font-weight:700; color:var(--board); line-height:1.1;}
+  .stat-value{ font-family:'Caveat',cursive; font-size:1.7rem; font-weight:700; color:var(--board-light); line-height:1.1;}
   .stat-label{ font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-soft); margin-top:2px;}
   @media (max-width:520px){ .stat-grid{ grid-template-columns:repeat(2,1fr); } }
   .chart-row{ display:flex; align-items:center; gap:10px; margin:10px 0; }
@@ -1058,7 +1105,7 @@ function avatarPickerBlock(){
     <label>Ícone</label>
     <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">
       ${AVATAR_EMOJIS.map(em => `
-        <button type="button" class="btn btn-ghost btn-sm" data-action="pick-avatar-emoji" data-emoji="${em}" style="font-size:1.3rem; padding:6px 10px; ${em===emoji?'border-color:var(--board); border-width:2px;':''}">${em}</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-action="pick-avatar-emoji" data-emoji="${em}" style="font-size:1.3rem; padding:6px 10px; ${em===emoji?'border-color:var(--board-light); border-width:2px;':''}">${em}</button>
       `).join('')}
     </div>
     <label>Cor de fundo</label>
@@ -1447,6 +1494,14 @@ const tabsEl = document.getElementById('tabs');
 function renderLanding(){
   if(state.ui.showPrivacy) return renderPrivacyNotice();
   return `
+    <div class="login-logo-wrap">
+      <svg class="login-logo" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle class="login-logo-ring" cx="256" cy="256" r="248" fill="#e9c15c"/>
+        <circle class="login-logo-base" cx="256" cy="256" r="230" fill="#5c1a2b"/>
+        <path class="login-logo-check" pathLength="1" d="M 140 268 L 222 348 L 388 168" fill="none" stroke="#fbf8f0" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle class="login-logo-dot" cx="372" cy="140" r="24" fill="#e9c15c"/>
+      </svg>
+    </div>
     <div class="landing-intro">
       <h2>Bem-vindo(a)! 👋</h2>
       <p>Escolha como você vai entrar na Sala de Avaliações.</p>
@@ -3119,13 +3174,13 @@ function renderAlunoRankingTrilhaBlock(){
       <h3 style="margin-top:20px;">🏆 Top 5 da Turma</h3>
       <p class="muted" style="font-size:.8rem; margin-top:-4px;">Pra preservar a privacidade dos colegas, só o Top 5 aparece aqui — mas sua posição você sempre vê.</p>
       ${top5.map((s,i) => `
-        <div class="list-item" style="${s.id===al.matriculaStudentId?'background:var(--surface); border-color:var(--board);':''}">
+        <div class="list-item" style="${s.id===al.matriculaStudentId?'background:var(--surface); border-color:var(--board-light);':''}">
           <span>${i+1}º · ${studentAvatarHtml(s,26)} ${esc(s.name)}${s.id===al.matriculaStudentId?' <span class="muted">(você)</span>':''}</span>
           <span class="muted">${s.fichas} 🎫 · Nv.${computeNivelInfo(s.fichas).nivel}</span>
         </div>
       `).join('')}
       ${!meVisivel ? `
-        <div class="list-item" style="background:var(--surface); border-color:var(--board);">
+        <div class="list-item" style="background:var(--surface); border-color:var(--board-light);">
           <span>${minhaPosicao}º · ${studentAvatarHtml(meStudent,26)} ${esc(meStudent.name)} <span class="muted">(você)</span></span>
           <span class="muted">${meStudent.fichas} 🎫 · Nv.${nivelInfo.nivel}</span>
         </div>
@@ -3449,7 +3504,7 @@ function renderAlunoEnqueteBlock(){
   const { counts, total } = enqueteTally(poll);
   const showResults = poll.closed || jaRespondeu;
   return `
-    <div class="card" style="border:2px solid var(--board); margin-top:16px;">
+    <div class="card" style="border:2px solid var(--board-light); margin-top:16px;">
       <h3 style="margin-top:0;">${poll.closed ? '📊 Enquete encerrada' : '🔴 Enquete relâmpago'}</h3>
       <p style="font-weight:600;">${esc(poll.question)}</p>
       ${!showResults ? `
@@ -4233,7 +4288,7 @@ function renderRoleta(){
     `;
   } else if(cur && cur.turmaId===rs.turmaId){
     displayBlock = `
-      <div style="text-align:center; margin:20px 0; border:3px solid var(--board); border-radius:14px; padding:20px;">
+      <div style="text-align:center; margin:20px 0; border:3px solid var(--board-light); border-radius:14px; padding:20px;">
         ${studentAvatarHtml({avatarEmoji:cur.selectedAvatarEmoji, avatarColor:cur.selectedAvatarColor}, 90)}
         <h2 style="margin-top:10px;">🎉 ${esc(cur.selectedStudentName)}</h2>
         ${cur.pergunta ? `<p style="font-weight:600;">${esc(cur.pergunta)}</p>` : ''}
@@ -4285,7 +4340,7 @@ function renderRoletaPresentation(){
         <div style="font-size:7rem;">${esc(cur.selectedAvatarEmoji||'🙂')}</div>
         <h1 style="font-size:2.6rem;">🎉 ${esc(cur.selectedStudentName)}</h1>
         ${cur.pergunta ? `<p style="font-size:1.4rem; margin-top:10px;">${esc(cur.pergunta)}</p>` : ''}
-        ${cur.resposta ? `<p style="font-size:1.2rem; color:var(--board); margin-top:10px;">"${esc(cur.resposta)}"</p>` : ''}
+        ${cur.resposta ? `<p style="font-size:1.2rem; color:var(--board-light); margin-top:10px;">"${esc(cur.resposta)}"</p>` : ''}
       </div>
     `;
   } else {
@@ -4635,7 +4690,7 @@ function renderAlunoDueloBlock(){
     body = `<p style="font-weight:600; margin-top:6px;">Resposta certa: ${esc(d.question.options[d.question.correctIndex])}</p>`;
   }
   return `
-    <div class="card" style="border:2px solid var(--board); margin-top:16px;">
+    <div class="card" style="border:2px solid var(--board-light); margin-top:16px;">
       <h3 style="margin-top:0;">⚔️ Duelo em andamento</h3>
       <div class="row" style="justify-content:center; gap:18px; margin-bottom:8px;">
         ${dueloStudentCardHtml(d.studentA, { destaque:souA, vencedor: d.status==='reveal' && d.winnerId===d.studentA.id })}
@@ -5041,7 +5096,7 @@ function renderAlunoSlidesBlock(){
   const s = al.slidesAtivo;
   if(!s) return '';
   return `
-    <div class="card" style="border:2px solid var(--board); margin-bottom:16px; text-align:center;">
+    <div class="card" style="border:2px solid var(--board-light); margin-bottom:16px; text-align:center;">
       <h3 style="margin-top:0;">🖥️ ${esc(s.professorName)} iniciou uma apresentação de slides</h3>
       <p class="muted">${esc(s.deckTitle)} · slide ${s.currentIndex+1} de ${s.totalSlides}</p>
       <button class="btn btn-primary btn-block" data-action="entrar-apresentacao-slides">Entrar em tela cheia</button>
@@ -7455,7 +7510,7 @@ function renderProfessorPainel(){
         const alunos = porAlunoPorTurma[turmaName];
         if(!alunos || alunos.length===0) return '';
         return `
-          <h4 style="margin:16px 0 6px; font-size:.95rem; color: var(--board); border-bottom:1px solid var(--paper-line); padding-bottom:4px;">${esc(turmaName)}</h4>
+          <h4 style="margin:16px 0 6px; font-size:.95rem; color: var(--board-light); border-bottom:1px solid var(--paper-line); padding-bottom:4px;">${esc(turmaName)}</h4>
           <div class="table-scroll">
           <table>
             <tr><th>Aluno</th><th>Média</th><th>Avaliações</th></tr>
@@ -7470,7 +7525,7 @@ function renderProfessorPainel(){
         const ausentes = ausentesPorTurma[turmaName];
         if(!ausentes || ausentes.length===0) return '';
         return `
-          <h4 style="margin:16px 0 6px; font-size:.95rem; color: var(--board); border-bottom:1px solid var(--paper-line); padding-bottom:4px;">${esc(turmaName)}</h4>
+          <h4 style="margin:16px 0 6px; font-size:.95rem; color: var(--board-light); border-bottom:1px solid var(--paper-line); padding-bottom:4px;">${esc(turmaName)}</h4>
           <div class="table-scroll">
           <table>
             <tr><th>Aluno</th><th>Ausências</th></tr>
@@ -7832,7 +7887,7 @@ function renderGabaritoGridEditavel(gab, answers, actionName){
     <div style="display:flex; gap:22px; flex-wrap:wrap; margin:10px 0;">
       ${columns.map(col => `
         <div style="min-width:150px;">
-          <h4 style="margin:0 0 8px; font-size:.85rem; color:var(--board);">${esc(col.label)}${col.qs.length>0?` (Q${col.qs[0]}–${col.qs[col.qs.length-1]})`:''}</h4>
+          <h4 style="margin:0 0 8px; font-size:.85rem; color:var(--board-light);">${esc(col.label)}${col.qs.length>0?` (Q${col.qs[0]}–${col.qs[col.qs.length-1]})`:''}</h4>
           ${col.qs.map(qn => `
             <div class="row" style="align-items:center; gap:8px; margin-bottom:5px; flex-wrap:nowrap;">
               <span style="width:32px; font-weight:600; font-size:.85rem; flex:0 0 auto;">Q${qn}</span>
@@ -7854,7 +7909,7 @@ function renderGabaritoGridBolinhas(gab, answers, actionName){
     <div style="display:flex; gap:22px; flex-wrap:wrap; margin:10px 0;">
       ${columns.map(col => `
         <div style="min-width:150px;">
-          <h4 style="margin:0 0 8px; font-size:.85rem; color:var(--board);">${esc(col.label)}${col.qs.length>0?` (Q${col.qs[0]}–${col.qs[col.qs.length-1]})`:''}</h4>
+          <h4 style="margin:0 0 8px; font-size:.85rem; color:var(--board-light);">${esc(col.label)}${col.qs.length>0?` (Q${col.qs[0]}–${col.qs[col.qs.length-1]})`:''}</h4>
           ${col.qs.map(qn => `
             <div class="row" style="align-items:center; gap:8px; margin-bottom:7px; flex-wrap:nowrap;">
               <span style="width:28px; font-weight:600; font-size:.85rem; flex:0 0 auto;">Q${qn}</span>
