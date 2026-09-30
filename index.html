@@ -1320,7 +1320,7 @@ let state = {
   freqStatsCache: {},
   aluno: { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, dueloAtivo:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false, tarefasTurma:[], tarefaEntregasProprias:{}, enviandoTarefaId:null, tarefaSubmitFile:null, tarefaSubmitFileName:'', tarefaSubmitLink:'', tarefaSubmitComentario:'', tarefaSubmitError:'', tarefaSubmitUploading:false, duvidaFormOpen:false, newDuvidaTexto:'', duvidaError:'', novidades:null, duvidaIaLoadingId:null, duvidaIaErro:'',
     subview:'inicio',
-    boletim: { loaded:false, loading:false, porUnidade:[], detalheDisciplina:'', detalheUnidade:'' },
+    boletim: { loaded:false, loading:false, erro:'', porUnidade:[], detalheDisciplina:'', detalheUnidade:'' },
     monitoria: {
       loaded:false, loading:false, grupos:[], vinculos:[], meuGrupoId:null,
       view:'inicio', criarTurmaId:'', criarSelecionados:[], entrarGrupoId:'',
@@ -11552,24 +11552,33 @@ async function computeAlunoBoletim(){
   const al = state.aluno;
   if(al.boletim.loaded || al.boletim.loading) return;
   al.boletim.loading = true;
+  al.boletim.erro = '';
   render();
   // Sem essa pausa, o navegador não chega a pintar o spinner na tela antes do cálculo
   // pesado começar (que às vezes roda quase inteiro em memória, sem uma espera real de
   // rede no meio) — o painel parece "travado" em vez de mostrar o carregando.
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-  if(state.professor.turmas.length===0){ await loadTurmas(); }
-  if(state.coordenador.assessments.length===0){ await loadCoordAssessments(); }
-  const turma = state.professor.turmas.find(t=>t.id===al.turma.id) || al.turma;
-  // As 4 unidades são independentes entre si — calcula todas em paralelo em vez de uma
-  // de cada vez, que é o que deixava o Boletim demorado pra abrir num banco de verdade.
-  const porUnidade = await Promise.all(UNIDADES.map(async unidade => {
-    const colunas = await calcColunasParaUnidade(turma.id, unidade, turma);
-    return { unidade, colunas };
-  }));
-  al.boletim.porUnidade = porUnidade;
-  al.boletim.loaded = true;
-  al.boletim.loading = false;
-  render();
+  try{
+    if(state.professor.turmas.length===0){ await loadTurmas(); }
+    if(state.coordenador.assessments.length===0){ await loadCoordAssessments(); }
+    const turma = state.professor.turmas.find(t=>t.id===al.turma.id) || al.turma;
+    // As 4 unidades são independentes entre si — calcula todas em paralelo em vez de uma
+    // de cada vez, que é o que deixava o Boletim demorado pra abrir num banco de verdade.
+    const porUnidade = await Promise.all(UNIDADES.map(async unidade => {
+      const colunas = await calcColunasParaUnidade(turma.id, unidade, turma);
+      return { unidade, colunas };
+    }));
+    al.boletim.porUnidade = porUnidade;
+    al.boletim.loaded = true;
+    al.boletim.loading = false;
+    render();
+  }catch(e){
+    // Sem isso, um erro de rede/permissão no meio do cálculo deixava o boletim preso no
+    // "carregando" pra sempre, sem nenhuma explicação — parecia que "não abria mais nada".
+    al.boletim.loading = false;
+    al.boletim.erro = 'Não foi possível calcular o boletim agora. Verifique sua internet e tente de novo.';
+    render();
+  }
 }
 function alunoBoletimDisciplinas(){
   const al = state.aluno;
@@ -11806,9 +11815,12 @@ function renderAvatarEdit(){
 function renderAlunoBoletimScreen(){
   const al = state.aluno;
   const bo = al.boletim;
-  if(!bo.loaded && !bo.loading){ computeAlunoBoletim(); }
+  if(!bo.loaded && !bo.loading && !bo.erro){ computeAlunoBoletim(); }
   if(bo.loading){
-    return `<div class="card"><h2>🧮 Boletim</h2><div class="spinner"></div></div>`;
+    return `<div class="card"><h2>🧮 Boletim</h2><div class="spinner"></div><p class="muted center" style="margin-top:10px;">Calculando suas notas... isso pode levar alguns segundos.</p></div>`;
+  }
+  if(bo.erro){
+    return `<div class="card"><h2>🧮 Boletim</h2><p class="err">${esc(bo.erro)}</p><button class="btn btn-primary btn-sm" data-action="boletim-tentar-de-novo">Tentar de novo</button></div>`;
   }
   const disciplinas = alunoBoletimDisciplinas();
   const rows = disciplinas.map(d => {
@@ -12527,18 +12539,25 @@ async function computeMonitoriaNotas(turmaId, studentName){
   al.monitoria.notasLoading = true;
   render();
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-  if(state.professor.turmas.length===0){ await loadTurmas(); }
-  if(state.coordenador.assessments.length===0){ await loadCoordAssessments(); }
-  const turma = state.professor.turmas.find(t=>t.id===turmaId);
-  // Unidades são independentes — calcula em paralelo (ver mesmo comentário em computeAlunoBoletim).
-  const porUnidade = await Promise.all(UNIDADES.map(async unidade => {
-    const colunas = await calcColunasParaUnidade(turmaId, unidade, turma);
-    return { unidade, colunas };
-  }));
-  al.monitoria.notasCache[cacheKey] = porUnidade;
-  al.monitoria.notasLoading = false;
-  render();
-  return porUnidade;
+  try{
+    if(state.professor.turmas.length===0){ await loadTurmas(); }
+    if(state.coordenador.assessments.length===0){ await loadCoordAssessments(); }
+    const turma = state.professor.turmas.find(t=>t.id===turmaId);
+    // Unidades são independentes — calcula em paralelo (ver mesmo comentário em computeAlunoBoletim).
+    const porUnidade = await Promise.all(UNIDADES.map(async unidade => {
+      const colunas = await calcColunasParaUnidade(turmaId, unidade, turma);
+      return { unidade, colunas };
+    }));
+    al.monitoria.notasCache[cacheKey] = porUnidade;
+    al.monitoria.notasLoading = false;
+    render();
+    return porUnidade;
+  }catch(e){
+    // Sem isso, um erro no meio do cálculo deixava a tela presa em "carregando" pra sempre.
+    al.monitoria.notasLoading = false;
+    render();
+    return null;
+  }
 }
 
 async function loadDisciplinas(){
@@ -16721,6 +16740,7 @@ document.addEventListener('click', (e) => {
     state.ui.sidebarSearch = '';
     render();
   }
+  else if(act==='boletim-tentar-de-novo'){ al.boletim.erro = ''; computeAlunoBoletim(); }
   else if(act==='coord-sub-view'){
     state.coordenador.subview = btn.dataset.sub;
     state.coordenador.mode='list';
@@ -17229,7 +17249,7 @@ document.addEventListener('click', (e) => {
   else if(act==='monitoria-remover-indicado'){ monitoriaRemoverIndicado(btn.dataset.sid); }
   else if(act==='reset-aluno'){ exitFullscreenSafe(); stopUnlockPolling(); disarmAwayTimer(); stopAlunoEnquetePoll(); state.aluno = { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, dueloAtivo:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false, tarefasTurma:[], tarefaEntregasProprias:{}, enviandoTarefaId:null, tarefaSubmitFile:null, tarefaSubmitFileName:'', tarefaSubmitLink:'', tarefaSubmitComentario:'', tarefaSubmitError:'', tarefaSubmitUploading:false, duvidaFormOpen:false, newDuvidaTexto:'', duvidaError:'', novidades:null, duvidaIaLoadingId:null, duvidaIaErro:'',
     subview:'inicio',
-    boletim: { loaded:false, loading:false, porUnidade:[], detalheDisciplina:'', detalheUnidade:'' },
+    boletim: { loaded:false, loading:false, erro:'', porUnidade:[], detalheDisciplina:'', detalheUnidade:'' },
     monitoria: {
       loaded:false, loading:false, grupos:[], vinculos:[], meuGrupoId:null,
       view:'inicio', criarTurmaId:'', criarSelecionados:[], entrarGrupoId:'',
