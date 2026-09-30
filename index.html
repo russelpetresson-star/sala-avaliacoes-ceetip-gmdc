@@ -1306,7 +1306,7 @@ let state = {
     turmas:[], turmasLoading:false,
     livros:[], livrosLoading:false,
     emprestimos:[], emprestimosLoading:false,
-    formLivro:null, livroError:'', buscaLivro:'',
+    formLivro:null, livroError:'', buscaLivro:'', livroIaLoading:false, livroIaError:'',
     formEmprestimo:{ turmaId:'', studentId:'', livroId:'', dataEmprestimo: new Date().toISOString().slice(0,10), dataPrevista:'' },
     emprestimoError:'', buscaEmprestimo:'', mostrarHistorico:false,
     limiteEmprestimos:3, limiteEmprestimosLoading:false,
@@ -6060,6 +6060,7 @@ function renderBanco(){
       <hr style="margin:16px 0; border:none; border-top:1px solid var(--paper-line);">
       <h3 style="margin:0 0 8px;">🤖 Criar questões com IA</h3>
       <p class="muted" style="font-size:.85rem;">A IA gera as questões pra você revisar antes de adicionar ao banco — sempre confira o gabarito.</p>
+      <p class="muted" style="font-size:.8rem;">Essa IA usa uma chave compartilhada por toda a escola, com limite baixo — se der erro de "limite excedido" com frequência, <a href="#" data-action="open-professor-profile">cadastre sua própria chave gratuita em Meu perfil</a> (leva 1 minuto).</p>
       <div class="type-pick">
         <button class="btn btn-ghost btn-sm" data-action="open-ai-gen">🤖 Gerar por tema</button>
         <button class="btn btn-ghost btn-sm" data-action="open-book-import">📖 Importar de um PDF (livro/lista)</button>
@@ -9807,7 +9808,7 @@ async function resolveGeminiKeyForTurma(turmaId){
   }catch(e){}
   try{ const r = await window.storage.get('gemini-api-key', true); return (r.value||'').trim(); }catch(e){ return ''; }
 }
-async function callGeminiJSONOnce(prompt, keyOverride){
+async function callGeminiJSONOnce(prompt, keyOverride, imagePart){
   const key = keyOverride || await getGeminiApiKey();
   if(!key) throw new Error('IA_NAO_CONFIGURADA');
   let resp, data;
@@ -9815,11 +9816,13 @@ async function callGeminiJSONOnce(prompt, keyOverride){
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 45000);
     try{
+      const parts = [{ text: prompt }];
+      if(imagePart) parts.push({ inlineData: { mimeType: imagePart.mimeType, data: imagePart.base64 } });
       resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${encodeURIComponent(key)}`, {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
+          contents: [{ parts }],
           generationConfig: { responseMimeType: 'application/json', temperature: 0.7 }
         }),
         signal: controller.signal
@@ -9858,13 +9861,13 @@ async function callGeminiJSONOnce(prompt, keyOverride){
 // Chamadas à IA (Gemini) falham de forma intermitente por natureza (limite de uso por minuto,
 // sobrecarga momentânea do modelo gratuito, resposta mal formatada). Em vez de mostrar erro na
 // primeira falha, tenta de novo automaticamente algumas vezes antes de desistir.
-async function callGeminiJSON(prompt, keyOverride){
+async function callGeminiJSON(prompt, keyOverride, imagePart){
   const retryDelaysMs = [1500, 3500, 6000];
   const retryableErrors = ['IA_REDE','IA_INDISPONIVEL','IA_JSON_INVALIDO','IA_SEM_RESPOSTA','IA_LIMITE_EXCEDIDO'];
   let lastErr;
   for(let attempt=0; attempt<=retryDelaysMs.length; attempt++){
     try{
-      return await callGeminiJSONOnce(prompt, keyOverride);
+      return await callGeminiJSONOnce(prompt, keyOverride, imagePart);
     }catch(e){
       lastErr = e;
       const isLast = attempt===retryDelaysMs.length;
@@ -9878,7 +9881,7 @@ function iaErrorMessage(e){
   const m = (e && e.message) || '';
   if(m==='IA_NAO_CONFIGURADA') return 'A IA ainda não foi configurada. Peça à coordenação para cadastrar a chave gratuita em "Configurações de IA".';
   if(m==='IA_CHAVE_INVALIDA') return 'A chave de IA configurada parece inválida ou expirada. Avise a coordenação para verificar em "Configurações de IA".';
-  if(m==='IA_LIMITE_EXCEDIDO') return 'O limite gratuito de uso da IA foi atingido por agora (já tentamos de novo automaticamente algumas vezes). Espere alguns minutos e tente de novo.';
+  if(m==='IA_LIMITE_EXCEDIDO') return 'O limite gratuito de uso da IA foi atingido por agora (já tentamos de novo automaticamente algumas vezes). Espere alguns minutos e tente de novo — ou cadastre sua própria chave gratuita em "Meu perfil" pra não depender do limite compartilhado da escola.';
   if(m==='IA_REDE') return 'Não foi possível conectar à IA agora (já tentamos de novo automaticamente). Verifique sua internet e tente novamente.';
   if(m==='IA_INDISPONIVEL') return 'O serviço de IA está sobrecarregado no momento (já tentamos de novo automaticamente algumas vezes). Tente novamente em instantes.';
   if(m==='IA_BLOQUEADO') return 'A IA não conseguiu responder a esse conteúdo. Tente reformular ou usar um trecho diferente.';
@@ -10783,10 +10786,18 @@ function renderBibliotecaCatalogo(){
 }
 
 function renderBibliotecaFormLivro(){
-  const f = state.biblioteca.formLivro;
+  const b = state.biblioteca;
+  const f = b.formLivro;
   return `
     <div class="card">
       <h3 style="margin-top:0;">${f.id?'Editar livro':'Novo livro'}</h3>
+      <div style="border:1px dashed var(--paper-line); border-radius:10px; padding:10px 12px; margin-bottom:12px;">
+        <label style="margin-top:0;">🤖 Preencher com foto da capa</label>
+        <p class="muted" style="font-size:.8rem; margin:0 0 8px;">Tire uma foto (ou envie uma imagem) da capa do livro — a IA lê o título, autor, categoria e ISBN pra você conferir antes de salvar.</p>
+        <input type="file" id="biblioteca-capa-input" accept="image/*" capture="environment" ${b.livroIaLoading?'disabled':''}>
+        ${b.livroIaLoading ? `<p class="muted" style="font-size:.82rem; margin-top:6px;"><span class="spinner" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:6px;"></span>Lendo a capa...</p>` : ''}
+        ${b.livroIaError ? `<p class="err" style="font-size:.82rem;">${esc(b.livroIaError)}</p>` : ''}
+      </div>
       <label>Título</label>
       <input type="text" id="biblioteca-livro-titulo-input" value="${esc(f.titulo||'')}">
       <label>Autor</label>
@@ -10805,6 +10816,46 @@ function renderBibliotecaFormLivro(){
     </div>
   `;
 }
+// Lê uma foto/imagem da capa do livro e pede pra IA (mesma infraestrutura de IA já usada
+// pelo resto do app — chave configurada pela coordenação em "Configurações de IA") extrair
+// título, autor, categoria e ISBN. Preenche o formulário pro coordenador só conferir e salvar
+// — nunca salva direto, porque a leitura pode errar (letra pequena, reflexo na capa etc.).
+async function bibliotecaPreencherComIAFoto(file){
+  const b = state.biblioteca;
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ b.livroIaError = 'Selecione uma foto ou imagem da capa.'; render(); return; }
+  if(!b.formLivro) return;
+  b.livroIaLoading = true;
+  b.livroIaError = '';
+  render();
+  // Dá ao navegador a chance de pintar o spinner antes da leitura do arquivo + chamada à IA
+  // (mesmo motivo do ajuste feito no Boletim do aluno).
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  try{
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('leitura-arquivo'));
+      reader.readAsDataURL(file);
+    });
+    const m = /^data:([^;]+);base64,(.*)$/.exec(dataUrl || '');
+    if(!m) throw new Error('leitura-arquivo');
+    const prompt = `Você está vendo a foto da capa de um livro. Identifique os dados abaixo, o melhor que conseguir a partir do que está escrito e visível na capa. Responda em JSON com exatamente estas chaves: {"titulo": string, "autor": string, "categoria": string, "isbn": string}. Regras: "titulo" é o título principal do livro (sem subtítulo, a menos que faça parte do nome). "autor" é o(s) nome(s) do(s) autor(es), separados por vírgula se houver mais de um; use "" se não estiver visível. "categoria" é um gênero/área curto (ex.: Literatura, Técnico, Didático, Infantil, História) com base no que a capa sugere; use "" se não for possível saber. "isbn" é o código ISBN (só números e hífens) se estiver visível na capa; a maioria das capas de frente não mostra ISBN (ele costuma estar na contracapa) — nesse caso use "". Não invente informação que não esteja de fato visível ou claramente indicada na imagem.`;
+    const dados = await callGeminiJSON(prompt, null, { mimeType: m[1], base64: m[2] });
+    const f = b.formLivro;
+    if(!f){ b.livroIaLoading = false; render(); return; }
+    if(dados.titulo) f.titulo = dados.titulo;
+    if(dados.autor) f.autor = dados.autor;
+    if(dados.categoria) f.categoria = dados.categoria;
+    if(dados.isbn) f.isbn = dados.isbn;
+    b.livroIaLoading = false;
+    render();
+  }catch(e){
+    b.livroIaLoading = false;
+    b.livroIaError = e && e.message==='leitura-arquivo' ? 'Não foi possível ler essa imagem. Tente outra foto.' : iaErrorMessage(e);
+    render();
+  }
+}
 
 function bibliotecaAbrirFormLivro(id){
   const b = state.biblioteca;
@@ -10816,6 +10867,8 @@ function bibliotecaAbrirFormLivro(id){
     b.formLivro = { id:null, titulo:'', autor:'', categoria:'', isbn:'', exemplares:1 };
   }
   b.livroError = '';
+  b.livroIaError = '';
+  b.livroIaLoading = false;
   render();
 }
 function bibliotecaCancelarFormLivro(){
@@ -17406,6 +17459,7 @@ document.addEventListener('change', (e) => {
   else if(el.id==='freq-painel-turma-select'){ const fp = state.view==='freqmonitor' ? state.freqMonitor.painel : state.professor.freqPainel; fp.turmaId = el.value; render(); }
   else if(el.id==='chamada-data-input'){ const {ch}=getChamadaCtx(); ch.data = el.value; ch.presentes = []; ch.mensagem=''; if(ch.turmaId) loadChamada(); else render(); }
   else if(el.id==='avulso-scan-file-input'){ if(el.files[0]) iniciarLeituraAvulso(el.files[0]); }
+  else if(el.id==='biblioteca-capa-input'){ if(el.files[0]) bibliotecaPreencherComIAFoto(el.files[0]); }
   else if(el.id==='avulso-import-planilha-file'){ if(el.files[0]) processarArquivoRespostasAvulso(el.files[0]); }
   else if(el.id==='avulso-scan-turma-select'){ p.avulso.scanTurmaId = el.value; render(); }
   else if(el.id==='professor-photo-input'){ if(el.files[0]) handleProfessorPhotoUpload(el.files[0]); }
