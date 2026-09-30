@@ -3689,14 +3689,12 @@ async function submitEnqueteResposta(optionIndex){
 }
 async function pollEnqueteForAluno(){
   const al = state.aluno;
-  if(al.stage !== 'dashboard' || !al.turma) return;
+  if(al.stage !== 'dashboard' || !al.turma) return false;
   const poll = await loadEnqueteAtiva();
-  if(poll && poll.turmaId === al.turma.id){
-    al.enqueteAtiva = poll;
-  } else {
-    al.enqueteAtiva = null;
-  }
-  render();
+  const novo = (poll && poll.turmaId === al.turma.id) ? poll : null;
+  const changed = JSON.stringify(novo) !== JSON.stringify(al.enqueteAtiva);
+  al.enqueteAtiva = novo;
+  return changed;
 }
 function enqueteTally(poll){
   const counts = (poll.options||[]).map(()=>0);
@@ -4106,10 +4104,11 @@ async function quizClear(){
 }
 async function pollQuizForAluno(){
   const al = state.aluno;
-  if(al.stage !== 'dashboard' || !al.turma) return;
+  if(al.stage !== 'dashboard' || !al.turma) return false;
   const prev = al.quizAtivo;
   const q = await loadQuizAtivo();
   al.quizAtivo = (q && q.turmaId === al.turma.id) ? q : null;
+  const changed = JSON.stringify(al.quizAtivo) !== JSON.stringify(prev);
   if(al.quizAtivo && al.quizAtivo.status==='reveal' && (!prev || prev.status!=='reveal' || prev.currentIndex!==al.quizAtivo.currentIndex)){
     const myTeam = findMyQuizTeam(al.quizAtivo, al.matriculaStudentId);
     if(myTeam){
@@ -4119,7 +4118,7 @@ async function pollQuizForAluno(){
       if(minhaResposta){ meAcertei ? quizPlayCorrect() : quizPlayWrong(); }
     }
   }
-  render();
+  return changed;
 }
 async function submitQuizAnswer(optionIndex){
   const al = state.aluno;
@@ -4508,10 +4507,11 @@ function roletaReiniciarRodada(){
 }
 async function pollRoletaForAluno(){
   const al = state.aluno;
-  if(al.stage !== 'dashboard' || !al.turma) return;
+  if(al.stage !== 'dashboard' || !al.turma) return false;
+  const prev = al.roletaAtiva;
   const r = await loadRoletaAtiva();
   al.roletaAtiva = (r && r.turmaId === al.turma.id) ? r : null;
-  render();
+  return JSON.stringify(al.roletaAtiva) !== JSON.stringify(prev);
 }
 async function submitRoletaResposta(){
   const al = state.aluno;
@@ -4760,17 +4760,18 @@ async function dueloClear(){
 }
 async function pollDueloForAluno(){
   const al = state.aluno;
-  if(al.stage !== 'dashboard' || !al.turma) return;
+  if(al.stage !== 'dashboard' || !al.turma) return false;
   const prev = al.dueloAtivo;
   const d = await loadDueloAtivo();
   al.dueloAtivo = (d && d.turmaId === al.turma.id) ? d : null;
+  const changed = JSON.stringify(al.dueloAtivo) !== JSON.stringify(prev);
   if(al.dueloAtivo && al.dueloAtivo.status==='reveal' && (!prev || prev.status!=='reveal' || prev.id!==al.dueloAtivo.id)){
     const souParticipante = al.dueloAtivo.studentA.id===al.matriculaStudentId || al.dueloAtivo.studentB.id===al.matriculaStudentId;
     if(souParticipante){
       al.dueloAtivo.winnerId===al.matriculaStudentId ? quizPlayCorrect() : quizPlayWrong();
     }
   }
-  render();
+  return changed;
 }
 async function submitDueloAnswer(optionIndex){
   const al = state.aluno;
@@ -5395,16 +5396,19 @@ function renderSlidesApresentacaoAluno(){
 }
 async function pollSlidesForAluno(){
   const al = state.aluno;
-  if((al.stage!=='dashboard' && al.stage!=='apresentacao') || !al.turma) return;
+  if((al.stage!=='dashboard' && al.stage!=='apresentacao') || !al.turma) return false;
+  const stageAntes = al.stage;
   const s = await loadSlidesSessaoAtiva();
+  let changed = false;
   if(s && s.turmaId === al.turma.id){
     const idxChanged = !al.slidesAtivo || al.slidesAtivo.id!==s.id || al.slidesAtivo.currentIndex!==s.currentIndex;
     al.slidesAtivo = s;
-    if(idxChanged){ al.slidesCurrentImg = await getSlideImg(s.deckId, s.currentIndex); }
+    if(idxChanged){ al.slidesCurrentImg = await getSlideImg(s.deckId, s.currentIndex); changed = true; }
     if(al.stage==='apresentacao'){
       sendSlidesHeartbeat(s.turmaId, al.matriculaStudentId, al.name, isFullscreenActive());
     }
   } else {
+    if(al.slidesAtivo !== null) changed = true;
     al.slidesAtivo = null;
     al.slidesCurrentImg = null;
     if(al.stage==='apresentacao'){
@@ -5412,7 +5416,8 @@ async function pollSlidesForAluno(){
       al.stage = 'dashboard';
     }
   }
-  render();
+  if(al.stage !== stageAntes) changed = true;
+  return changed;
 }
 function entrarApresentacaoSlides(){
   const al = state.aluno;
@@ -16270,11 +16275,17 @@ function stopAlunoEnquetePoll(){
   if(alunoEnquetePollInterval){ clearInterval(alunoEnquetePollInterval); alunoEnquetePollInterval = null; }
 }
 async function pollAlunoAtividadesAoVivo(){
-  await pollEnqueteForAluno();
-  await pollQuizForAluno();
-  await pollRoletaForAluno();
-  await pollDueloForAluno();
-  await pollSlidesForAluno();
+  const resultados = await Promise.all([
+    pollEnqueteForAluno(),
+    pollQuizForAluno(),
+    pollRoletaForAluno(),
+    pollDueloForAluno(),
+    pollSlidesForAluno(),
+  ]);
+  // Só re-renderiza se algo de fato mudou — antes cada poll (5x a cada 2.5s) chamava
+  // render() incondicionalmente, o que reconstruía a tela inteira o tempo todo e
+  // interrompia qualquer interação em andamento (ex: um <select> aberto).
+  if(resultados.some(Boolean)) render();
 }
 async function loadStudentDashboard(){
   const al = state.aluno;
@@ -16294,14 +16305,20 @@ async function loadStudentDashboard(){
   let allAssessments = [];
   try{
     const list = await window.storage.list('assessment:', true);
-    for(const k of (list.keys||[])){ try{ const r = await window.storage.get(k, true); allAssessments.push(JSON.parse(r.value)); }catch(e){} }
+    const fetched = await Promise.all((list.keys||[]).map(async k => {
+      try{ const r = await window.storage.get(k, true); return JSON.parse(r.value); }catch(e){ return null; }
+    }));
+    allAssessments = fetched.filter(Boolean);
   }catch(e){}
   const mine = allAssessments.filter(a => assessmentTurmaIds(a).includes(al.turma.id));
   const realizadas = [];
   const pendentes = [];
-  for(const a of mine){
+  const comResponses = await Promise.all(mine.map(async a => {
     let responses = [];
     try{ const r = await window.storage.get(`responses:${a.code}`, true); responses = JSON.parse(r.value); }catch(e){}
+    return { a, responses };
+  }));
+  for(const { a, responses } of comResponses){
     const mineResp = responses.find(r=>r.studentName===al.name);
     if(mineResp){
       realizadas.push({ assessment:a, response:mineResp });
