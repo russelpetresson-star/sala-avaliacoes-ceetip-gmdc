@@ -852,6 +852,47 @@ const INSTRUMENTOS = [
   {key:'recuperacao', label:'Recuperação Paralela (substitui o Simulado/NP1)', baseTitle:'Recuperação Paralela'},
 ];
 const DEFAULT_PESOS = { avaliacao:5, diagnostica:2, exercicios:2, autoavaliacao:1 };
+const MONITORIA_MAX_MONITORES = 4;
+const MONITORIA_MAX_MONITORANDOS = 10;
+const MONITORIA_STATUS = [
+  {key:'avancando', emoji:'🟢', label:'Evoluindo bem', cor:'green'},
+  {key:'nao_aceita_ajuda', emoji:'🟡', label:'Engajamento parcial', cor:'gold'},
+  {key:'nao_participa', emoji:'🟠', label:'Baixa adesão às reuniões', cor:'coral'},
+  {key:'intervencao_direcao', emoji:'🔴', label:'Requer intervenção da Direção', cor:'red'},
+];
+function monitoriaStatusInfo(key){ return MONITORIA_STATUS.find(s=>s.key===key) || MONITORIA_STATUS[0]; }
+/* -------- Contador de casos de intervenção "novos" no painel do coordenador -------- */
+function monitoriaVistosGet(){
+  try{ return JSON.parse(localStorage.getItem('sala-monitoria-vistos-coord')||'[]'); }
+  catch(e){ return []; }
+}
+function monitoriaVistosSet(ids){
+  try{ localStorage.setItem('sala-monitoria-vistos-coord', JSON.stringify(ids)); }catch(e){}
+}
+// Retorna os vínculos cujo último registro é "intervenção da Direção" e ainda não foi visto.
+function monitoriaIntervencaoNaoVistos(){
+  const c = state.coordenador;
+  if(!c.monitoria || !c.monitoria.loaded) return [];
+  const vistos = new Set(monitoriaVistosGet());
+  return c.monitoria.vinculos.filter(v => {
+    const ultimo = v.registros && v.registros[0];
+    return ultimo && ultimo.status==='intervencao_direcao' && !vistos.has(ultimo.id);
+  });
+}
+function monitoriaIntervencaoNaoVistosCount(){
+  return monitoriaIntervencaoNaoVistos().length;
+}
+// Marca todos os casos de intervenção atualmente exibidos como vistos, pra sumir do contador.
+function monitoriaMarcarIntervencaoVista(){
+  const c = state.coordenador;
+  if(!c.monitoria || !c.monitoria.loaded) return;
+  const vistos = new Set(monitoriaVistosGet());
+  c.monitoria.vinculos.forEach(v => {
+    const ultimo = v.registros && v.registros[0];
+    if(ultimo && ultimo.status==='intervencao_direcao') vistos.add(ultimo.id);
+  });
+  monitoriaVistosSet([...vistos]);
+}
 const AVATAR_EMOJIS = ['🦁','🐯','🐼','🦊','🐸','🐵','🦉','🐺','🐨','🦄','🐙','🦅','🐢','🐬','🦋','🐰','🐱','🐶','🐷','🐔'];
 const AVATAR_COLORS = ['#5c1a2b','#2b6f76','#c98a2c','#3a6b35','#4a4a8a','#a83279','#1f6f5c','#8a4b2b','#3b6ea5','#7a3b8a'];
 
@@ -1249,7 +1290,8 @@ let state = {
     changingBibliotecaPassword:false, errorBiblioteca:'',
     freqConfig: { mesCalendario: new Date().toISOString().slice(0,7), horariosDraft:null, errorHorarios:'' },
     importCsv: { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false },
-    temporadaForm: null, temporadaError:''
+    temporadaForm: null, temporadaError:'',
+    monitoria: { loaded:false, loading:false, grupos:[], vinculos:[], indicados:[], indicarTurmaId:'', indicarSelecionados:[], indicarError:'', turmasCarregadas:false }
   },
   freqMonitor: {
     session:false, senhaInput:'', error:'',
@@ -1276,7 +1318,17 @@ let state = {
   diasLetivos: { loading:true, map:{} },
   turnoHorarios: { loading:true, map:{} },
   freqStatsCache: {},
-  aluno: { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, dueloAtivo:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false, tarefasTurma:[], tarefaEntregasProprias:{}, enviandoTarefaId:null, tarefaSubmitFile:null, tarefaSubmitFileName:'', tarefaSubmitLink:'', tarefaSubmitComentario:'', tarefaSubmitError:'', tarefaSubmitUploading:false, duvidaFormOpen:false, newDuvidaTexto:'', duvidaError:'', novidades:null, duvidaIaLoadingId:null, duvidaIaErro:'' }
+  aluno: { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, dueloAtivo:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false, tarefasTurma:[], tarefaEntregasProprias:{}, enviandoTarefaId:null, tarefaSubmitFile:null, tarefaSubmitFileName:'', tarefaSubmitLink:'', tarefaSubmitComentario:'', tarefaSubmitError:'', tarefaSubmitUploading:false, duvidaFormOpen:false, newDuvidaTexto:'', duvidaError:'', novidades:null, duvidaIaLoadingId:null, duvidaIaErro:'',
+    monitoria: {
+      loaded:false, loading:false, grupos:[], vinculos:[], meuGrupoId:null,
+      view:'inicio', criarTurmaId:'', criarSelecionados:[], entrarGrupoId:'',
+      detalheVinculoId:null, novoVinculoMonitorandoId:null, novoVinculoHorario:'',
+      editHorarioVinculoId:null, editHorarioValor:'',
+      registroStatus:'avancando', registroObs:'',
+      notasCache:{}, notasLoading:false, error:'', turmasCarregadas:false,
+      indicados:[]
+    }
+  }
 };
 
 
@@ -3058,6 +3110,224 @@ function renderRealidadeAumentada(canManage){
       </div>
       ${formBlock}
       ${gridBlock}
+    </div>
+  `;
+}
+function renderAlunoMonitoriaBlock(){
+  const al = state.aluno;
+  const mo = al.monitoria;
+  // "Seus monitores": visível pra qualquer aluno que esteja sendo acompanhado por um
+  // monitor, independente de ele próprio ser ou não monitor de outra pessoa.
+  const souMonitorandoDe = mo.loaded ? mo.vinculos.filter(v=>v.monitorandoId===al.matriculaStudentId) : [];
+  const cardMeusMonitores = souMonitorandoDe.length===0 ? '' : `
+    <div class="card">
+      <h3 style="margin-top:0;">🧑‍🏫 Seus monitores</h3>
+      <p class="muted" style="margin:0 0 8px;">Colegas monitores acompanhando você nesse período.</p>
+      ${souMonitorandoDe.map(v => `
+        <div class="list-item">
+          <div><strong>${esc(v.monitorName)}</strong><br><span class="muted" style="font-size:.8rem;">📅 Reunião semanal: ${esc(v.horarioReuniao)}</span></div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  return cardMeusMonitores + renderAlunoMonitoriaBlockGrupo();
+}
+function renderAlunoMonitoriaBlockGrupo(){
+  const al = state.aluno;
+  const mo = al.monitoria;
+  if(!mo.loaded && !mo.loading){ loadMonitoria(); }
+  if(mo.loading){
+    return `<div class="card"><h3 style="margin-top:0;">🧑‍🏫 Monitoria de Desempenho</h3><div class="spinner"></div></div>`;
+  }
+  const grupo = monitoriaMeuGrupo();
+  const souIndicado = monitoriaSouIndicado();
+
+  if(!grupo){
+    if(!souIndicado){
+      return `
+        <div class="card">
+          <h3 style="margin-top:0;">🧑‍🏫 Monitoria de Desempenho</h3>
+          <p class="muted">Você ainda não foi indicado(a) pela coordenação como monitor(a) de desempenho. Quem já é monitor pode acompanhar colegas em risco de reprovação, com notas, reuniões semanais e observações simples.</p>
+        </div>
+      `;
+    }
+    if(mo.view==='entrar'){
+      const disponiveis = mo.grupos.filter(g => (g.monitores||[]).length < MONITORIA_MAX_MONITORES);
+      return `
+        <div class="card">
+          <h3 style="margin-top:0;">🧑‍🏫 Entrar em um grupo de monitoria</h3>
+          ${disponiveis.length===0 ? '<p class="muted">Nenhum grupo com vaga no momento. Que tal criar o seu?</p>' : disponiveis.map(g => `
+            <div class="list-item" style="align-items:flex-start;">
+              <div>
+                <strong>${g.monitores.map(m=>esc(m.studentName)).join(', ')}</strong><br>
+                <span class="muted" style="font-size:.8rem;">${g.monitores.length}/${MONITORIA_MAX_MONITORES} monitores · ${g.monitorandos.length}/${MONITORIA_MAX_MONITORANDOS} monitorandos${g.monitorandos.length ? ' ('+g.monitorandos.slice(0,3).map(m=>esc(m.studentName)).join(', ')+(g.monitorandos.length>3?'…':'')+')' : ''}</span>
+              </div>
+              <button class="btn btn-primary btn-sm" data-action="monitoria-confirmar-entrar" data-gid="${g.id}">Entrar</button>
+            </div>
+          `).join('')}
+          ${mo.error ? `<p class="err">${esc(mo.error)}</p>` : ''}
+          <button class="btn btn-ghost btn-sm" style="margin-top:10px;" data-action="monitoria-nav-voltar-inicio">← Voltar</button>
+        </div>
+      `;
+    }
+    return `
+      <div class="card">
+        <h3 style="margin-top:0;">🧑‍🏫 Monitoria de Desempenho</h3>
+        <p class="muted">Quer ajudar colegas que estão em risco de reprovação? Como monitor, você acompanha as notas e a frequência deles ao longo das unidades, com reuniões semanais e observações simples.</p>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-primary" data-action="monitoria-nav-criar">Criar um grupo</button>
+          <button class="btn btn-ghost" data-action="monitoria-nav-entrar">Entrar em um grupo existente</button>
+        </div>
+      </div>
+    `;
+  }
+
+  if(mo.view==='criar-alunos'){
+    if(!mo.turmasCarregadas){
+      mo.turmasCarregadas = true;
+      loadTurmas().then(()=>render());
+      return `<div class="card"><h3 style="margin-top:0;">Adicionar monitorandos</h3><div class="spinner"></div></div>`;
+    }
+    const turma = state.professor.turmas.find(t=>t.id===mo.criarTurmaId);
+    const vagas = MONITORIA_MAX_MONITORANDOS - grupo.monitorandos.length;
+    return `
+      <div class="card">
+        <h3 style="margin-top:0;">Adicionar monitorandos</h3>
+        <p class="muted">Escolha a turma e marque até ${vagas} aluno(s) (o grupo já tem ${grupo.monitorandos.length}/${MONITORIA_MAX_MONITORANDOS}).</p>
+        <label>Turma</label>
+        <select id="monitoria-turma-select">
+          <option value="">Selecione...</option>
+          ${state.professor.turmas.map(t=>`<option value="${t.id}" ${t.id===mo.criarTurmaId?'selected':''}>${esc(t.name)}</option>`).join('')}
+        </select>
+        ${turma ? turma.students.filter(s=>!grupo.monitorandos.some(m=>m.studentId===s.id)).map(s => `
+          <label class="row" style="align-items:center; gap:8px; font-weight:400; margin-top:8px;">
+            <input type="checkbox" data-action="monitoria-toggle-aluno" data-sid="${s.id}" ${mo.criarSelecionados.includes(s.id)?'checked':''}>
+            ${esc(s.name)}
+          </label>
+        `).join('') : ''}
+        ${mo.error ? `<p class="err">${esc(mo.error)}</p>` : ''}
+        <div class="row" style="margin-top:14px;">
+          <button class="btn btn-ghost" data-action="monitoria-voltar-painel">← Voltar</button>
+          <button class="btn btn-primary" data-action="monitoria-confirmar-alunos">Adicionar</button>
+        </div>
+      </div>
+    `;
+  }
+
+  if(mo.view==='detalhe'){
+    const vinculo = mo.vinculos.find(v=>v.id===mo.detalheVinculoId);
+    if(!vinculo) { mo.view='painel'; return renderAlunoMonitoriaBlock(); }
+    const editando = mo.editHorarioVinculoId===vinculo.id;
+    const notas = mo.notasCache[vinculo.monitorandoTurmaId];
+    return `
+      <div class="card">
+        <button class="btn btn-ghost btn-sm" data-action="monitoria-voltar-painel">← Voltar</button>
+        <h3 style="margin-top:10px;">${esc(vinculo.monitorandoName)}</h3>
+        <p class="muted" style="margin-top:-4px;">${esc(vinculo.monitorandoTurmaName)}</p>
+
+        <div class="list-item" style="align-items:center;">
+          ${editando ? `
+            <input type="text" id="monitoria-edit-horario-input" value="${esc(vinculo.horarioReuniao)}" placeholder="Ex.: Segunda-feira, 14h" style="max-width:260px;">
+            <div class="row" style="flex:0 0 auto;">
+              <button class="btn btn-ghost btn-sm" data-action="monitoria-editar-horario-cancelar">Cancelar</button>
+              <button class="btn btn-primary btn-sm" data-action="monitoria-editar-horario-salvar" data-vid="${vinculo.id}">Salvar</button>
+            </div>
+          ` : `
+            <span>📅 Reunião semanal: <strong>${esc(vinculo.horarioReuniao)}</strong></span>
+            <button class="btn btn-ghost btn-sm" data-action="monitoria-editar-horario-abrir" data-vid="${vinculo.id}">Editar</button>
+          `}
+        </div>
+
+        <h3 style="margin-top:18px;">Notas nos instrumentais</h3>
+        ${!notas ? `
+          <button class="btn btn-ghost btn-sm" data-action="monitoria-ver-notas" data-tid="${vinculo.monitorandoTurmaId}" data-name="${esc(vinculo.monitorandoName)}">${mo.notasLoading?'Carregando...':'Ver notas por unidade'}</button>
+        ` : notas.map(u => {
+          const linhas = u.colunas.map(c => ({ disciplina:c.disciplinaName, g:c.grades[vinculo.monitorandoName], total:c.total })).filter(l=>l.g);
+          return `
+            <div style="margin-top:8px;">
+              <strong style="font-size:.85rem;">${esc(u.unidade)}</strong>
+              ${linhas.length===0 ? '<p class="muted" style="font-size:.82rem; margin:2px 0;">Sem lançamentos ainda.</p>' : linhas.map(l => `
+                <div class="list-item" style="padding:6px 10px;">
+                  <span style="font-size:.85rem;">${esc(l.disciplina)}</span>
+                  <span style="font-size:.85rem; font-weight:700; color:${l.g.precisaRecuperacao?'var(--red)':'var(--ink)'};">${l.g.final.toFixed(1)} / ${l.total}</span>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }).join('')}
+
+        <h3 style="margin-top:18px;">Novo registro</h3>
+        <label>Status</label>
+        <select id="monitoria-status-select">
+          ${MONITORIA_STATUS.map(s=>`<option value="${s.key}" ${s.key===mo.registroStatus?'selected':''}>${s.emoji} ${s.label}</option>`).join('')}
+        </select>
+        <label style="margin-top:8px;">Observação (opcional)</label>
+        <textarea id="monitoria-obs-input" rows="2" placeholder="Ex.: participou bem da reunião de hoje...">${esc(mo.registroObs)}</textarea>
+        <button class="btn btn-primary btn-sm" style="margin-top:10px;" data-action="monitoria-salvar-registro">Salvar registro</button>
+
+        <h3 style="margin-top:18px;">Histórico</h3>
+        ${vinculo.registros.length===0 ? '<p class="muted">Nenhum registro ainda.</p>' : vinculo.registros.map(r => {
+          const info = monitoriaStatusInfo(r.status);
+          return `
+            <div class="list-item" style="align-items:flex-start;">
+              <div>
+                <span>${info.emoji} <strong>${esc(info.label)}</strong></span><br>
+                <span class="muted" style="font-size:.78rem;">${new Date(r.data+'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                ${r.observacao ? `<p style="margin:4px 0 0;">${esc(r.observacao)}</p>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  // view === 'painel' (padrão quando já faz parte de um grupo)
+  const meusVinculos = monitoriaMeusVinculos();
+  return `
+    <div class="card">
+      <h3 style="margin-top:0;">🧑‍🏫 Monitoria de Desempenho</h3>
+      <p class="muted" style="margin:0 0 8px;">Colegas do grupo: ${grupo.monitores.map(m=>esc(m.studentName)).join(', ')} (${grupo.monitores.length}/${MONITORIA_MAX_MONITORES})</p>
+
+      <h4 style="margin:14px 0 6px;">Meus monitorandos</h4>
+      ${meusVinculos.length===0 ? '<p class="muted">Você ainda não está acompanhando ninguém — escolha abaixo.</p>' : meusVinculos.map(v => {
+        const ultimo = v.registros[0];
+        const info = ultimo ? monitoriaStatusInfo(ultimo.status) : null;
+        return `
+          <div class="list-item">
+            <div>
+              <strong>${esc(v.monitorandoName)}</strong><br>
+              <span class="muted" style="font-size:.8rem;">📅 ${esc(v.horarioReuniao)}${info?' · último registro: '+info.emoji+' '+esc(info.label):''}</span>
+            </div>
+            <button class="btn btn-ghost btn-sm" data-action="monitoria-abrir-detalhe" data-vid="${v.id}">Ver</button>
+          </div>
+        `;
+      }).join('')}
+
+      <h4 style="margin:14px 0 6px;">Monitorandos do grupo</h4>
+      ${grupo.monitorandos.length===0 ? '<p class="muted">Nenhum monitorando ainda.</p>' : grupo.monitorandos.filter(s => !meusVinculos.some(v=>v.monitorandoId===s.studentId)).map(s => `
+        <div class="list-item">
+          <div><strong>${esc(s.studentName)}</strong><br><span class="muted" style="font-size:.8rem;">${esc(s.turmaName)}</span></div>
+          <button class="btn btn-primary btn-sm" data-action="monitoria-abrir-vinculo-form" data-sid="${s.studentId}">Acompanhar</button>
+        </div>
+      `).join('')}
+
+      ${mo.novoVinculoMonitorandoId ? `
+        <div class="card" style="background:var(--surface); margin-top:10px;">
+          <label>Horário da reunião semanal com ${esc((grupo.monitorandos.find(s=>s.studentId===mo.novoVinculoMonitorandoId)||{}).studentName||'')}</label>
+          <input type="text" id="monitoria-horario-input" placeholder="Ex.: Segunda-feira, 14h" value="${esc(mo.novoVinculoHorario)}">
+          ${mo.error ? `<p class="err">${esc(mo.error)}</p>` : ''}
+          <div class="row" style="margin-top:10px;">
+            <button class="btn btn-ghost btn-sm" data-action="monitoria-cancelar-vinculo-form">Cancelar</button>
+            <button class="btn btn-primary btn-sm" data-action="monitoria-salvar-vinculo">Confirmar</button>
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="row" style="margin-top:14px;">
+        ${grupo.monitorandos.length < MONITORIA_MAX_MONITORANDOS ? `<button class="btn btn-ghost btn-sm" data-action="monitoria-nav-add-alunos">+ Adicionar monitorandos</button>` : ''}
+        <button class="btn btn-ghost btn-sm" data-action="monitoria-sair-grupo">Sair do grupo</button>
+      </div>
     </div>
   `;
 }
@@ -8247,6 +8517,9 @@ function minutesAgo(ts){
 function renderCoordenador(){
   const c = state.coordenador;
   if(!c.session) return renderCoordLogin();
+  // Carrega os dados de Monitoria de Desempenho cedo (mesmo fora da tela de Monitoria)
+  // só pra manter o contador de "casos novos de intervenção" no menu lateral em dia.
+  if(!c.monitoria.loaded && !c.monitoria.loading){ loadCoordMonitoria(); }
   if(c.subview==='quiz' && state.professor.quiz.presentationMode && state.professor.quiz.current){
     return renderQuizPresentation();
   }
@@ -8279,6 +8552,7 @@ function renderCoordenador(){
     { action:'coord-sub-view', sub:'freqpainel', icon:'📊', label:'Painel de Frequência' },
     { action:'coord-sub-view', sub:'freqconfig', icon:'⏰', label:'Config. de Frequência' },
     { action:'coord-sub-view', sub:'notas', icon:'🧮', label:'Notas finais' },
+    { action:'coord-sub-view', sub:'monitoria', icon:'🧑‍🏫', label:'Monitoria de Desempenho', badge: monitoriaIntervencaoNaoVistosCount() },
     { action:'coord-sub-view', sub:'importarnotas', icon:'📥', label:'Importar Notas (CSV)' },
     { action:'coord-sub-view', sub:'pesosprof', icon:'⚖️', label:'Pesos dos professores' },
     { action:'coord-sub-view', sub:'periodos', icon:'📅', label:'Períodos' },
@@ -8304,6 +8578,7 @@ function renderCoordenador(){
   else if(c.subview==='freqpainel') content = renderFreqPainel(state.professor.freqPainel, state.professor.turmas);
   else if(c.subview==='freqconfig') content = renderCoordFreqConfig();
   else if(c.subview==='notas') content = renderCoordNotas();
+  else if(c.subview==='monitoria') content = renderCoordMonitoria();
   else if(c.subview==='importarnotas') content = renderImportarNotasCsv();
   else if(c.subview==='pesosprof') content = renderCoordPesosProf();
   else if(c.subview==='periodos') content = renderCoordPeriodos();
@@ -8981,6 +9256,163 @@ function ensureCoordDataLoaded(){
   if(state.professor.livrosLoading) loadLivros();
   if(state.professor.avisosLoading) loadAvisos();
   if(state.professor.temporadaLoading) loadTemporada();
+}
+async function loadCoordMonitoria(){
+  const c = state.coordenador;
+  c.monitoria.loading = true;
+  render();
+  try{
+    const r = await window.storage.get('monitoria-desempenho', true);
+    const data = JSON.parse(r.value);
+    c.monitoria.grupos = data.grupos || [];
+    c.monitoria.vinculos = data.vinculos || [];
+  }catch(e){
+    c.monitoria.grupos = [];
+    c.monitoria.vinculos = [];
+  }
+  try{
+    const r2 = await window.storage.get('monitoria-indicados', true);
+    c.monitoria.indicados = JSON.parse(r2.value) || [];
+  }catch(e){
+    c.monitoria.indicados = [];
+  }
+  c.monitoria.loaded = true;
+  c.monitoria.loading = false;
+  render();
+}
+async function saveMonitoriaIndicados(){
+  const c = state.coordenador;
+  await window.storage.set('monitoria-indicados', JSON.stringify(c.monitoria.indicados), true);
+}
+async function monitoriaIndicarAlunos(){
+  const c = state.coordenador;
+  const turma = state.professor.turmas.find(t=>t.id===c.monitoria.indicarTurmaId);
+  if(!turma || c.monitoria.indicarSelecionados.length===0){ c.monitoria.indicarError = 'Escolha ao menos um aluno.'; render(); return; }
+  c.monitoria.indicarSelecionados.forEach(studentId => {
+    if(c.monitoria.indicados.some(i=>i.studentId===studentId)) return;
+    const s = turma.students.find(x=>x.id===studentId);
+    if(!s) return;
+    c.monitoria.indicados.push({ studentId: s.id, studentName: s.name, turmaId: turma.id, turmaName: turma.name, indicadoEm: Date.now() });
+  });
+  c.monitoria.indicarError = '';
+  c.monitoria.indicarTurmaId = '';
+  c.monitoria.indicarSelecionados = [];
+  await saveMonitoriaIndicados();
+  render();
+}
+async function monitoriaRemoverIndicado(studentId){
+  const c = state.coordenador;
+  c.monitoria.indicados = c.monitoria.indicados.filter(i=>i.studentId!==studentId);
+  await saveMonitoriaIndicados();
+  render();
+}
+function renderCoordMonitoria(){
+  const c = state.coordenador;
+  if(!c.monitoria.loaded && !c.monitoria.loading){ loadCoordMonitoria(); }
+  if(c.monitoria.loading){
+    return `<div class="card"><h2>🧑‍🏫 Monitoria de Desempenho</h2><div class="spinner"></div></div>`;
+  }
+  if(!c.monitoria.turmasCarregadas){
+    c.monitoria.turmasCarregadas = true;
+    loadTurmas().then(()=>render());
+  }
+  // junta todos os vínculos com o status mais recente de cada um, pra destacar
+  // rapidamente quem precisa de intervenção da Direção.
+  const vistosAntes = new Set(monitoriaVistosGet());
+  const vinculosComStatus = c.monitoria.vinculos.map(v => {
+    const ultimo = v.registros && v.registros[0];
+    return { ...v, ultimoStatus: ultimo ? ultimo.status : null, ultimoData: ultimo ? ultimo.data : null, ultimoRegistroId: ultimo ? ultimo.id : null };
+  });
+  const intervencao = vinculosComStatus.filter(v=>v.ultimoStatus==='intervencao_direcao');
+  // Ao abrir esta tela, os casos de intervenção atuais deixam de contar como "novos"
+  // no contador do menu lateral (mas continuam marcados aqui na própria tela, pra
+  // quem estava acompanhando saber quais acabaram de aparecer).
+  monitoriaMarcarIntervencaoVista();
+
+  return `
+    <div class="card">
+      <h2>🧑‍🏫 Monitoria de Desempenho</h2>
+      <p class="muted">Grupos de alunos-monitores acompanhando colegas em risco de reprovação, com notas, frequência de reuniões e observações.</p>
+
+      <div class="card" style="margin-top:14px;">
+        <h3 style="margin-top:0;">Alunos indicados como monitor</h3>
+        <p class="muted" style="font-size:.85rem;">Só quem está nessa lista pode criar ou entrar em um grupo de monitoria.</p>
+        ${c.monitoria.indicados.length===0 ? '<p class="muted">Nenhum aluno indicado ainda.</p>' : `
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+            ${c.monitoria.indicados.map(i => `
+              <span style="display:inline-flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--paper-line); border-radius:16px; padding:4px 6px 4px 12px; font-size:.85rem;">
+                ${esc(i.studentName)} <span class="muted" style="font-size:.75rem;">(${esc(i.turmaName)})</span>
+                <button class="btn btn-ghost btn-sm" style="padding:0 6px;" data-action="monitoria-remover-indicado" data-sid="${i.studentId}" title="Remover indicação">✕</button>
+              </span>
+            `).join('')}
+          </div>
+        `}
+        <label>Turma</label>
+        <select id="monitoria-indicar-turma-select">
+          <option value="">Selecione...</option>
+          ${state.professor.turmas.map(t=>`<option value="${t.id}" ${t.id===c.monitoria.indicarTurmaId?'selected':''}>${esc(t.name)}</option>`).join('')}
+        </select>
+        ${(() => {
+          const turma = state.professor.turmas.find(t=>t.id===c.monitoria.indicarTurmaId);
+          if(!turma) return '';
+          const jaIndicados = new Set(c.monitoria.indicados.map(i=>i.studentId));
+          const disponiveis = turma.students.filter(s=>!jaIndicados.has(s.id));
+          if(disponiveis.length===0) return '<p class="muted" style="margin-top:8px;">Todos os alunos dessa turma já estão indicados.</p>';
+          return disponiveis.map(s => `
+            <label class="row" style="align-items:center; gap:8px; font-weight:400; margin-top:8px;">
+              <input type="checkbox" data-action="monitoria-toggle-indicar-aluno" data-sid="${s.id}" ${c.monitoria.indicarSelecionados.includes(s.id)?'checked':''}>
+              ${esc(s.name)}
+            </label>
+          `).join('');
+        })()}
+        ${c.monitoria.indicarError ? `<p class="err">${esc(c.monitoria.indicarError)}</p>` : ''}
+        ${c.monitoria.indicarTurmaId ? `<button class="btn btn-primary btn-sm" style="margin-top:10px;" data-action="monitoria-indicar-alunos">Indicar selecionados</button>` : ''}
+      </div>
+
+      ${intervencao.length>0 ? `
+        <div class="card" style="border:2px solid var(--red); margin-top:14px;">
+          <h3 style="margin-top:0; color:var(--red);">🚨 Precisam de intervenção da Direção</h3>
+          ${intervencao.map(v => {
+            const ehNovo = v.ultimoRegistroId && !vistosAntes.has(v.ultimoRegistroId);
+            return `
+            <div class="list-item" style="align-items:flex-start;">
+              <div>
+                <strong>${esc(v.monitorandoName)}</strong> <span class="muted">(${esc(v.monitorandoTurmaName)})</span>
+                ${ehNovo ? '<span style="background:var(--red); color:#fff; font-size:.68rem; font-weight:700; padding:1px 7px; border-radius:10px; margin-left:6px; vertical-align:middle;">NOVO</span>' : ''}<br>
+                <span class="muted" style="font-size:.8rem;">Monitor: ${esc(v.monitorName)} · registrado em ${new Date(v.ultimoData+'T00:00:00').toLocaleDateString('pt-BR')}</span>
+              </div>
+            </div>
+          `;
+          }).join('')}
+        </div>
+      ` : ''}
+
+      <h3 style="margin-top:20px;">Grupos</h3>
+      ${c.monitoria.grupos.length===0 ? '<p class="muted">Nenhum grupo de monitoria criado ainda.</p>' : c.monitoria.grupos.map(g => {
+        const vinculosDoGrupo = vinculosComStatus.filter(v=>v.grupoId===g.id);
+        return `
+          <div class="card" style="margin-top:10px;">
+            <strong>Monitores:</strong> ${g.monitores.map(m=>esc(m.studentName)+' ('+esc(m.turmaName)+')').join(', ') || '<span class="muted">nenhum</span>'}<br>
+            <strong>Monitorandos (${g.monitorandos.length}/${MONITORIA_MAX_MONITORANDOS}):</strong> ${g.monitorandos.map(m=>esc(m.studentName)).join(', ') || '<span class="muted">nenhum</span>'}
+            ${vinculosDoGrupo.length>0 ? `
+              <table style="margin-top:10px;">
+                <tr><th>Monitorando</th><th>Monitor</th><th>Horário</th><th>Último status</th></tr>
+                ${vinculosDoGrupo.map(v => {
+                  const info = v.ultimoStatus ? monitoriaStatusInfo(v.ultimoStatus) : null;
+                  return `<tr>
+                    <td>${esc(v.monitorandoName)}</td>
+                    <td>${esc(v.monitorName)}</td>
+                    <td>${esc(v.horarioReuniao)}</td>
+                    <td>${info ? info.emoji+' '+esc(info.label) : '<span class="muted">sem registro</span>'}</td>
+                  </tr>`;
+                }).join('')}
+              </table>
+            ` : '<p class="muted" style="margin-top:8px;">Nenhum monitor acompanhando um aluno específico ainda.</p>'}
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
 }
 async function saveCoordPeriodos(){
   const periodos = {};
@@ -11313,6 +11745,8 @@ function renderStudentDashboard(){
 
     ${renderAlunoRABlock()}
 
+    ${renderAlunoMonitoriaBlock()}
+
     ${renderAlunoRoletaBlock()}
 
     ${renderAlunoDueloBlock()}
@@ -11700,6 +12134,189 @@ function readRosterFile(file){
 }
 async function saveTurmasToStorage(){
   await window.storage.set('turmas', JSON.stringify(state.professor.turmas), true);
+}
+
+// ---------------------------------------------------------------------------
+// Monitoria de Desempenho: alunos-monitores acompanham colegas em risco de
+// reprovação (notas + frequência) ao longo das unidades. Um grupo tem até
+// MONITORIA_MAX_MONITORES monitores cuidando de até MONITORIA_MAX_MONITORANDOS
+// alunos. Cada monitor tem seu próprio horário de reunião e suas próprias
+// observações com cada monitorando (mesmo dividindo a lista com o grupo).
+// ---------------------------------------------------------------------------
+async function loadMonitoria(){
+  const al = state.aluno;
+  al.monitoria.loading = true;
+  render();
+  try{
+    const r = await window.storage.get('monitoria-desempenho', true);
+    const data = JSON.parse(r.value);
+    al.monitoria.grupos = data.grupos || [];
+    al.monitoria.vinculos = data.vinculos || [];
+  }catch(e){
+    al.monitoria.grupos = [];
+    al.monitoria.vinculos = [];
+  }
+  try{
+    const r2 = await window.storage.get('monitoria-indicados', true);
+    al.monitoria.indicados = JSON.parse(r2.value) || [];
+  }catch(e){
+    al.monitoria.indicados = [];
+  }
+  const meuGrupo = al.monitoria.grupos.find(g => (g.monitores||[]).some(m=>m.studentId===al.matriculaStudentId));
+  al.monitoria.meuGrupoId = meuGrupo ? meuGrupo.id : null;
+  al.monitoria.loaded = true;
+  al.monitoria.loading = false;
+  render();
+}
+async function saveMonitoria(){
+  const al = state.aluno;
+  await window.storage.set('monitoria-desempenho', JSON.stringify({ grupos: al.monitoria.grupos, vinculos: al.monitoria.vinculos }), true);
+}
+function monitoriaMeuGrupo(){
+  const al = state.aluno;
+  return al.monitoria.grupos.find(g=>g.id===al.monitoria.meuGrupoId) || null;
+}
+function monitoriaMeusVinculos(){
+  const al = state.aluno;
+  return al.monitoria.vinculos.filter(v=>v.monitorId===al.matriculaStudentId);
+}
+// Só alunos indicados pela coordenação podem atuar como monitor (criar ou entrar em um grupo).
+function monitoriaSouIndicado(){
+  const al = state.aluno;
+  return al.monitoria.indicados.some(i=>i.studentId===al.matriculaStudentId);
+}
+async function monitoriaCriarGrupo(){
+  const al = state.aluno;
+  if(!monitoriaSouIndicado()){ al.monitoria.error = 'Você ainda não foi indicado(a) pela coordenação como monitor(a).'; render(); return; }
+  const grupo = {
+    id: cryptoId(),
+    createdAt: Date.now(),
+    monitores: [{ studentId: al.matriculaStudentId, studentName: al.name, turmaId: al.turma.id, turmaName: al.turma.name, joinedAt: Date.now() }],
+    monitorandos: []
+  };
+  al.monitoria.grupos.push(grupo);
+  al.monitoria.meuGrupoId = grupo.id;
+  await saveMonitoria();
+  al.monitoria.view = 'criar-alunos';
+  render();
+}
+async function monitoriaEntrarGrupo(grupoId){
+  const al = state.aluno;
+  if(!monitoriaSouIndicado()){ al.monitoria.error = 'Você ainda não foi indicado(a) pela coordenação como monitor(a).'; render(); return; }
+  const grupo = al.monitoria.grupos.find(g=>g.id===grupoId);
+  if(!grupo){ al.monitoria.error = 'Grupo não encontrado.'; render(); return; }
+  if((grupo.monitores||[]).length >= MONITORIA_MAX_MONITORES){
+    al.monitoria.error = `Esse grupo já tem o máximo de ${MONITORIA_MAX_MONITORES} monitores.`;
+    render(); return;
+  }
+  if(grupo.monitores.some(m=>m.studentId===al.matriculaStudentId)){
+    al.monitoria.error = 'Você já faz parte desse grupo.'; render(); return;
+  }
+  grupo.monitores.push({ studentId: al.matriculaStudentId, studentName: al.name, turmaId: al.turma.id, turmaName: al.turma.name, joinedAt: Date.now() });
+  al.monitoria.meuGrupoId = grupo.id;
+  al.monitoria.error = '';
+  await saveMonitoria();
+  al.monitoria.view = 'painel';
+  render();
+}
+async function monitoriaSairGrupo(){
+  const al = state.aluno;
+  const grupo = monitoriaMeuGrupo();
+  if(!grupo) return;
+  if(!confirm('Sair do grupo de monitoria? Seus vínculos com monitorandos continuam salvos no histórico.')) return;
+  grupo.monitores = grupo.monitores.filter(m=>m.studentId!==al.matriculaStudentId);
+  al.monitoria.meuGrupoId = null;
+  await saveMonitoria();
+  al.monitoria.view = 'inicio';
+  render();
+}
+async function monitoriaAdicionarMonitorandos(){
+  const al = state.aluno;
+  const grupo = monitoriaMeuGrupo();
+  if(!grupo) return;
+  const turma = state.professor.turmas.find(t=>t.id===al.monitoria.criarTurmaId);
+  if(!turma || al.monitoria.criarSelecionados.length===0){ al.monitoria.error = 'Escolha ao menos um aluno.'; render(); return; }
+  const vagas = MONITORIA_MAX_MONITORANDOS - grupo.monitorandos.length;
+  if(al.monitoria.criarSelecionados.length > vagas){
+    al.monitoria.error = `Esse grupo só tem espaço pra mais ${vagas} monitorando(s) (máximo de ${MONITORIA_MAX_MONITORANDOS}).`;
+    render(); return;
+  }
+  al.monitoria.criarSelecionados.forEach(studentId => {
+    if(grupo.monitorandos.some(m=>m.studentId===studentId)) return;
+    const s = turma.students.find(x=>x.id===studentId);
+    if(!s) return;
+    grupo.monitorandos.push({ studentId: s.id, studentName: s.name, turmaId: turma.id, turmaName: turma.name, addedAt: Date.now(), addedBy: al.matriculaStudentId });
+  });
+  al.monitoria.error = '';
+  al.monitoria.criarTurmaId = '';
+  al.monitoria.criarSelecionados = [];
+  await saveMonitoria();
+  al.monitoria.view = 'painel';
+  render();
+}
+async function monitoriaCriarOuAtualizarVinculo(){
+  const al = state.aluno;
+  const grupo = monitoriaMeuGrupo();
+  const monitorandoId = al.monitoria.novoVinculoMonitorandoId;
+  const horario = (al.monitoria.novoVinculoHorario||'').trim();
+  if(!grupo || !monitorandoId){ return; }
+  if(!horario){ al.monitoria.error = 'Informe o horário da reunião semanal.'; render(); return; }
+  const monitorando = grupo.monitorandos.find(m=>m.studentId===monitorandoId);
+  if(!monitorando) return;
+  let vinculo = al.monitoria.vinculos.find(v=>v.grupoId===grupo.id && v.monitorId===al.matriculaStudentId && v.monitorandoId===monitorandoId);
+  if(vinculo){
+    vinculo.horarioReuniao = horario;
+  } else {
+    vinculo = {
+      id: cryptoId(), grupoId: grupo.id,
+      monitorId: al.matriculaStudentId, monitorName: al.name,
+      monitorandoId: monitorando.studentId, monitorandoName: monitorando.studentName,
+      monitorandoTurmaId: monitorando.turmaId, monitorandoTurmaName: monitorando.turmaName,
+      horarioReuniao: horario, createdAt: Date.now(), registros: []
+    };
+    al.monitoria.vinculos.push(vinculo);
+  }
+  al.monitoria.novoVinculoMonitorandoId = null;
+  al.monitoria.novoVinculoHorario = '';
+  al.monitoria.error = '';
+  await saveMonitoria();
+  al.monitoria.detalheVinculoId = vinculo.id;
+  al.monitoria.view = 'detalhe';
+  render();
+}
+async function monitoriaSalvarRegistro(){
+  const al = state.aluno;
+  const vinculo = al.monitoria.vinculos.find(v=>v.id===al.monitoria.detalheVinculoId);
+  if(!vinculo) return;
+  vinculo.registros.unshift({
+    id: cryptoId(),
+    data: new Date().toISOString().slice(0,10),
+    status: al.monitoria.registroStatus,
+    observacao: (al.monitoria.registroObs||'').trim(),
+    createdAt: Date.now()
+  });
+  al.monitoria.registroObs = '';
+  await saveMonitoria();
+  render();
+}
+async function computeMonitoriaNotas(turmaId, studentName){
+  const al = state.aluno;
+  const cacheKey = turmaId;
+  if(al.monitoria.notasCache[cacheKey]){ return al.monitoria.notasCache[cacheKey]; }
+  al.monitoria.notasLoading = true;
+  render();
+  if(state.professor.turmas.length===0){ await loadTurmas(); }
+  if(state.coordenador.assessments.length===0){ await loadCoordAssessments(); }
+  const turma = state.professor.turmas.find(t=>t.id===turmaId);
+  const porUnidade = [];
+  for(const unidade of UNIDADES){
+    const colunas = await calcColunasParaUnidade(turmaId, unidade, turma);
+    porUnidade.push({ unidade, colunas });
+  }
+  al.monitoria.notasCache[cacheKey] = porUnidade;
+  al.monitoria.notasLoading = false;
+  render();
+  return porUnidade;
 }
 
 async function loadDisciplinas(){
@@ -16330,7 +16947,49 @@ document.addEventListener('click', (e) => {
   else if(act==='responder-proxima'){ responderProxima(); }
   else if(act==='responder-anterior'){ responderAnterior(); }
   else if(act==='check-release'){ if(resultReleased(al.assessment)){ al.stage='resultado'; } render(); }
-  else if(act==='reset-aluno'){ exitFullscreenSafe(); stopUnlockPolling(); disarmAwayTimer(); stopAlunoEnquetePoll(); state.aluno = { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, dueloAtivo:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false, tarefasTurma:[], tarefaEntregasProprias:{}, enviandoTarefaId:null, tarefaSubmitFile:null, tarefaSubmitFileName:'', tarefaSubmitLink:'', tarefaSubmitComentario:'', tarefaSubmitError:'', tarefaSubmitUploading:false, duvidaFormOpen:false, newDuvidaTexto:'', duvidaError:'', novidades:null, duvidaIaLoadingId:null, duvidaIaErro:'' }; render(); }
+  else if(act==='monitoria-nav-criar'){ monitoriaCriarGrupo(); }
+  else if(act==='monitoria-nav-entrar'){ al.monitoria.view='entrar'; al.monitoria.error=''; render(); }
+  else if(act==='monitoria-nav-voltar-inicio'){ al.monitoria.view='inicio'; al.monitoria.error=''; render(); }
+  else if(act==='monitoria-nav-add-alunos'){ al.monitoria.view='criar-alunos'; al.monitoria.error=''; render(); }
+  else if(act==='monitoria-voltar-painel'){ al.monitoria.view='painel'; al.monitoria.detalheVinculoId=null; al.monitoria.novoVinculoMonitorandoId=null; al.monitoria.error=''; render(); }
+  else if(act==='monitoria-confirmar-alunos'){ monitoriaAdicionarMonitorandos(); }
+  else if(act==='monitoria-confirmar-entrar'){ monitoriaEntrarGrupo(btn.dataset.gid); }
+  else if(act==='monitoria-sair-grupo'){ monitoriaSairGrupo(); }
+  else if(act==='monitoria-abrir-vinculo-form'){ al.monitoria.novoVinculoMonitorandoId = btn.dataset.sid; al.monitoria.novoVinculoHorario=''; al.monitoria.error=''; render(); }
+  else if(act==='monitoria-cancelar-vinculo-form'){ al.monitoria.novoVinculoMonitorandoId = null; al.monitoria.error=''; render(); }
+  else if(act==='monitoria-salvar-vinculo'){ monitoriaCriarOuAtualizarVinculo(); }
+  else if(act==='monitoria-abrir-detalhe'){ al.monitoria.detalheVinculoId = btn.dataset.vid; al.monitoria.view='detalhe'; render(); }
+  else if(act==='monitoria-editar-horario-abrir'){
+    const v = al.monitoria.vinculos.find(x=>x.id===btn.dataset.vid);
+    al.monitoria.editHorarioVinculoId = btn.dataset.vid;
+    al.monitoria.editHorarioValor = v ? v.horarioReuniao : '';
+    render();
+  }
+  else if(act==='monitoria-editar-horario-cancelar'){ al.monitoria.editHorarioVinculoId = null; render(); }
+  else if(act==='monitoria-editar-horario-salvar'){
+    const v = al.monitoria.vinculos.find(x=>x.id===btn.dataset.vid);
+    if(v && al.monitoria.editHorarioValor.trim()){
+      v.horarioReuniao = al.monitoria.editHorarioValor.trim();
+      saveMonitoria();
+    }
+    al.monitoria.editHorarioVinculoId = null;
+    render();
+  }
+  else if(act==='monitoria-salvar-registro'){ monitoriaSalvarRegistro(); }
+  else if(act==='monitoria-ver-notas'){ computeMonitoriaNotas(btn.dataset.tid, btn.dataset.name); }
+  else if(act==='monitoria-indicar-alunos'){ monitoriaIndicarAlunos(); }
+  else if(act==='monitoria-remover-indicado'){ monitoriaRemoverIndicado(btn.dataset.sid); }
+  else if(act==='reset-aluno'){ exitFullscreenSafe(); stopUnlockPolling(); disarmAwayTimer(); stopAlunoEnquetePoll(); state.aluno = { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, dueloAtivo:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false, tarefasTurma:[], tarefaEntregasProprias:{}, enviandoTarefaId:null, tarefaSubmitFile:null, tarefaSubmitFileName:'', tarefaSubmitLink:'', tarefaSubmitComentario:'', tarefaSubmitError:'', tarefaSubmitUploading:false, duvidaFormOpen:false, newDuvidaTexto:'', duvidaError:'', novidades:null, duvidaIaLoadingId:null, duvidaIaErro:'',
+    monitoria: {
+      loaded:false, loading:false, grupos:[], vinculos:[], meuGrupoId:null,
+      view:'inicio', criarTurmaId:'', criarSelecionados:[], entrarGrupoId:'',
+      detalheVinculoId:null, novoVinculoMonitorandoId:null, novoVinculoHorario:'',
+      editHorarioVinculoId:null, editHorarioValor:'',
+      registroStatus:'avancando', registroObs:'',
+      notasCache:{}, notasLoading:false, error:'', turmasCarregadas:false,
+      indicados:[]
+    }
+  }; render(); }
 });
 
 document.addEventListener('input', (e) => {
@@ -16338,7 +16997,10 @@ document.addEventListener('input', (e) => {
   const act = el.dataset ? el.dataset.action : null;
   const p = state.professor, al = state.aluno;
 
-  if(el.id==='code-input'){ al.code = el.value; }
+  if(el.id==='monitoria-horario-input'){ al.monitoria.novoVinculoHorario = el.value; }
+  else if(el.id==='monitoria-edit-horario-input'){ al.monitoria.editHorarioValor = el.value; }
+  else if(el.id==='monitoria-obs-input'){ al.monitoria.registroObs = el.value; }
+  else if(el.id==='code-input'){ al.code = el.value; }
   else if(el.id==='name-input'){ al.name = el.value; }
   else if(el.id==='setup-name-input'){ p.setupName = el.value; }
   else if(el.id==='setup-password-input'){ p.setupPassword = el.value; }
@@ -16454,6 +17116,21 @@ document.addEventListener('change', (e) => {
   const el = e.target;
   const act = el.dataset ? el.dataset.action : null;
   const p = state.professor, al = state.aluno, c = state.coordenador;
+  if(el.id==='monitoria-turma-select'){ al.monitoria.criarTurmaId = el.value; al.monitoria.criarSelecionados = []; al.monitoria.error=''; render(); return; }
+  if(act==='monitoria-toggle-aluno'){
+    const sid = el.dataset.sid;
+    if(al.monitoria.criarSelecionados.includes(sid)) al.monitoria.criarSelecionados = al.monitoria.criarSelecionados.filter(x=>x!==sid);
+    else al.monitoria.criarSelecionados.push(sid);
+    return;
+  }
+  if(el.id==='monitoria-status-select'){ al.monitoria.registroStatus = el.value; return; }
+  if(el.id==='monitoria-indicar-turma-select'){ c.monitoria.indicarTurmaId = el.value; c.monitoria.indicarSelecionados = []; c.monitoria.indicarError=''; render(); return; }
+  if(act==='monitoria-toggle-indicar-aluno'){
+    const sid = el.dataset.sid;
+    if(c.monitoria.indicarSelecionados.includes(sid)) c.monitoria.indicarSelecionados = c.monitoria.indicarSelecionados.filter(x=>x!==sid);
+    else c.monitoria.indicarSelecionados.push(sid);
+    return;
+  }
   if(el.id==='coord-filter-professor'){ c.filterProfessorId = el.value; render(); return; }
   if(el.id==='coord-transfer-target-select'){ c.transferTargetCode = el.value; c.transferError = ''; return; }
   if(el.id==='avulso-transfer-target-select'){ p.avulso.transferTargetCode = el.value; p.avulso.transferError = ''; return; }
