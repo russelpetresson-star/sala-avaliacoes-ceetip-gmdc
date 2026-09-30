@@ -11500,6 +11500,10 @@ async function computeAlunoBoletim(){
   if(al.boletim.loaded || al.boletim.loading) return;
   al.boletim.loading = true;
   render();
+  // Sem essa pausa, o navegador não chega a pintar o spinner na tela antes do cálculo
+  // pesado começar (que às vezes roda quase inteiro em memória, sem uma espera real de
+  // rede no meio) — o painel parece "travado" em vez de mostrar o carregando.
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   if(state.professor.turmas.length===0){ await loadTurmas(); }
   if(state.coordenador.assessments.length===0){ await loadCoordAssessments(); }
   const turma = state.professor.turmas.find(t=>t.id===al.turma.id) || al.turma;
@@ -12469,6 +12473,7 @@ async function computeMonitoriaNotas(turmaId, studentName){
   if(al.monitoria.notasCache[cacheKey]){ return al.monitoria.notasCache[cacheKey]; }
   al.monitoria.notasLoading = true;
   render();
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   if(state.professor.turmas.length===0){ await loadTurmas(); }
   if(state.coordenador.assessments.length===0){ await loadCoordAssessments(); }
   const turma = state.professor.turmas.find(t=>t.id===turmaId);
