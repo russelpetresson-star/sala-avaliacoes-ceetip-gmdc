@@ -479,16 +479,33 @@
   .campanha-slide img{ width:100%; height:100%; object-fit:cover; display:block; cursor:pointer; }
   .campanha-play{ position:relative; width:100%; height:100%; cursor:pointer; }
   .campanha-play-icone{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:2.6rem; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.6); }
-  .campanha-slide-conquista{ width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
-  .campanha-slide-conquista.frequencia{ background:linear-gradient(135deg, #2e7d32, #66bb6a); }
-  .campanha-slide-conquista.destaque{ background:linear-gradient(135deg, #e65100, #ffb300); }
-  .campanha-slide-conquista-emoji{ font-size:3.4rem; filter:drop-shadow(0 2px 6px rgba(0,0,0,.35)); }
+  /* Banner de conquista do carrossel: pensado como um "quadro" de mural — mesma linguagem
+     chalkboard/giz do resto do app (fonte Caveat pros números/títulos, moldura tracejada,
+     textura de pó de giz), em vez de um cartão genérico com ícone centralizado e legenda por
+     cima da foto. Um selo circular tracejado carrega o símbolo (✓ frequência / ★ destaque); o
+     texto fica ao lado, não embaixo, pra não competir com o selo. */
+  .campanha-slide-conquista{ position:relative; width:100%; height:100%; box-sizing:border-box; overflow:hidden; border:2px dashed rgba(255,255,255,.3); }
+  .campanha-slide-conquista.frequencia{ background:linear-gradient(135deg, #1b4332, var(--green) 88%); }
+  .campanha-slide-conquista.destaque{ background:linear-gradient(135deg, var(--board-dark), var(--yellow) 90%); }
+  .campanha-slide-conquista::before{ content:''; position:absolute; inset:0; background-image:radial-gradient(rgba(255,255,255,.16) 1px, transparent 1.5px); background-size:15px 15px; }
+  .conquista-slide-content{ position:relative; z-index:1; height:100%; display:flex; align-items:center; gap:14px; padding:0 18px; }
+  .conquista-medal{ flex:0 0 auto; width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px dashed rgba(255,255,255,.75); background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.28), rgba(255,255,255,0) 65%); box-shadow:0 3px 10px rgba(0,0,0,.3), inset 0 0 0 1px rgba(255,255,255,.12); }
+  .conquista-medal-glyph{ font-size:1.4rem; font-weight:700; color:#fff; font-family:'Source Sans 3', sans-serif; text-shadow:0 1px 3px rgba(0,0,0,.35); }
+  .conquista-slide-text{ min-width:0; }
+  .conquista-slide-titulo{ display:block; font-family:'Caveat', cursive; font-weight:700; font-size:1.5rem; line-height:1.1; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .conquista-slide-turma{ display:block; font-family:'Source Sans 3', sans-serif; font-size:.74rem; font-weight:600; color:rgba(255,255,255,.82); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .conquista-slide-desc{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-top:5px; font-family:'Source Sans 3', sans-serif; font-size:.78rem; color:rgba(255,255,255,.92); }
   .mapa-tema-central{ font-weight:700; font-size:1.05rem; padding:8px 14px; background:var(--surface); border:1px solid var(--paper-line); border-radius:8px; display:inline-block; margin-bottom:10px; }
   .mapa-ramo-edit{ margin-top:12px; padding:10px 12px; border-left:3px solid var(--purple); background:var(--surface); border-radius:0 8px 8px 0; }
   .mapa-tree-view{ margin-top:8px; }
   .mapa-ramo-view{ margin-top:8px; padding-left:12px; border-left:3px solid var(--paper-line); }
   .mapa-subramos-view{ margin:4px 0 0; padding-left:18px; font-size:.85rem; }
   .mapa-subramos-view li{ margin-top:2px; }
+  .conquista-numero{ font-weight:700; font-size:.95rem; margin:8px 0 10px; }
+  .conquista-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:8px; }
+  .conquista-card{ background:var(--surface); border:1px solid var(--paper-line); border-radius:10px; padding:8px 10px; font-size:.82rem; font-weight:600; text-align:center; overflow-wrap:break-word; }
+  .conquista-card.freq{ border-left:4px solid var(--green); }
+  .conquista-card.destaque{ border-left:4px solid var(--yellow); }
   .campanha-caption{ position:absolute; left:0; right:0; bottom:0; padding:10px 14px; background:linear-gradient(transparent, rgba(0,0,0,.7)); color:#fff; font-size:.85rem; pointer-events:none; }
   .campanha-nav{ position:absolute; top:50%; transform:translateY(-50%); background:rgba(0,0,0,.4); color:#fff; border:none; width:30px; height:30px; border-radius:50%; cursor:pointer; font-size:1.1rem; display:flex; align-items:center; justify-content:center; z-index:2; line-height:1; }
   .campanha-nav.prev{ left:8px; }
@@ -3398,19 +3415,26 @@ async function computeConquistasTurma(turmaId){
   }
   return { turmaId, turmaName: turma.name, frequenciaExemplar, destaque };
 }
+// Pra não virar uma parede de nomes (fica ruim de ler tanto no celular quanto no computador
+// quando a turma tem muitos alunos em destaque), mostra primeiro um número grande e chamativo
+// com a contagem, e só depois os nomes — organizados numa grade de cartõezinhos compactos, que
+// quebram linha de forma organizada, em vez de uma fileira de pills que estoura o layout.
 function renderConquistasBody(data){
   if(!data) return '';
   const freqHtml = data.frequenciaExemplar.length===0
     ? `<p class="muted" style="margin-top:6px;">Ninguém com 100% de presença no mês ainda.</p>`
-    : `<div class="row" style="flex-wrap:wrap; gap:8px; margin-top:8px;">
-        ${data.frequenciaExemplar.map(s=>`<span class="pill" style="background:#dff0d8;">🎯 ${esc(s.name)}</span>`).join('')}
+    : `
+      <p class="conquista-numero">🎯 ${data.frequenciaExemplar.length} aluno${data.frequenciaExemplar.length>1?'s':''} com frequência perfeita este mês</p>
+      <div class="conquista-grid">
+        ${data.frequenciaExemplar.map(s=>`<div class="conquista-card freq">${esc(s.name)}</div>`).join('')}
       </div>`;
   const destaqueHtml = !data.destaque
     ? `<p class="muted" style="margin-top:6px;">Ainda não há notas suficientes lançadas pra calcular o destaque acadêmico.</p>`
-    : `<div class="row" style="flex-wrap:wrap; gap:8px; margin-top:8px;">
-        ${data.destaque.students.map(s=>`<span class="pill" style="background:#fff3cd;">🏆 ${esc(s.name)}</span>`).join('')}
-      </div>
-      <p class="muted" style="font-size:.78rem; margin-top:4px;">Média ${data.destaque.media.toFixed(1)} na ${esc(data.destaque.unidade)}</p>`;
+    : `
+      <p class="conquista-numero">🏆 ${data.destaque.students.length>1 ? data.destaque.students.length+' alunos empatados' : '1 aluno'} com a maior média — ${data.destaque.media.toFixed(1)} na ${esc(data.destaque.unidade)}</p>
+      <div class="conquista-grid">
+        ${data.destaque.students.map(s=>`<div class="conquista-card destaque">${esc(s.name)}</div>`).join('')}
+      </div>`;
   return `
     <div style="margin-top:16px;">
       <h3 style="margin:0 0 4px;">🎯 Frequência Exemplar do mês</h3>
@@ -3491,10 +3515,13 @@ async function loadMuralConquistas(){
   for(const turma of state.professor.turmas){
     const data = await computeConquistasTurma(turma.id);
     if(data.frequenciaExemplar.length>0){
+      // No carrossel o espaço é mínimo (é uma legenda de slide, não uma tela cheia), então aqui
+      // mostra só a contagem — a lista completa de nomes fica na tela do Hall de Conquistas.
+      const n = data.frequenciaExemplar.length;
       slides.push({
         tipo:'conquista', badge:'frequencia',
         titulo:`🎯 Frequência Exemplar — ${turma.name}`,
-        descricao: data.frequenciaExemplar.map(s=>s.name).join(', ')
+        descricao: `${n} aluno${n>1?'s':''} com frequência perfeita este mês`
       });
     }
     if(data.destaque){
@@ -4712,13 +4739,21 @@ function renderCarrosselCampanha(itensAprovados){
                </div>`
             : item.tipo==='conquista'
             ? `<div class="campanha-slide-conquista ${item.badge==='destaque'?'destaque':'frequencia'}">
-                 <span class="campanha-slide-conquista-emoji">${item.badge==='destaque'?'🏆':'🎯'}</span>
+                 <div class="conquista-slide-content">
+                   <div class="conquista-medal"><span class="conquista-medal-glyph">${item.badge==='destaque'?'★':'✓'}</span></div>
+                   <div class="conquista-slide-text">
+                     <strong class="conquista-slide-titulo">${esc(item.titulo.replace(/^\S+\s+/, '').split(' — ')[0])}</strong>
+                     <span class="conquista-slide-turma">${esc(item.titulo.split(' — ').slice(1).join(' — '))}</span>
+                     ${item.descricao ? `<span class="conquista-slide-desc">${esc(item.descricao)}</span>` : ''}
+                   </div>
+                 </div>
                </div>`
             : `<img src="${campanhaImgSrc(item, 600)}" alt="${esc(item.titulo)}" data-action="campanha-abrir-imagem" data-id="${esc(item.id)}">`}
+          ${item.tipo!=='conquista' ? `
           <div class="campanha-caption">
             <strong>${esc(item.titulo)}</strong>
             ${item.descricao ? `<br><span>${esc(item.descricao)}</span>` : ''}
-          </div>
+          </div>` : ''}
         </div>
       `).join('')}
       ${itensAprovados.length>1 ? `
