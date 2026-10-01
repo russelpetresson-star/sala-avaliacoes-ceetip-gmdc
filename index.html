@@ -1007,6 +1007,56 @@ function monitoriaMarcarIntervencaoVista(){
   });
   monitoriaVistosSet([...vistos]);
 }
+/* ---------------- BUSCA ATIVA E TRANSPORTE ESCOLAR ----------------
+   Alunos-monitores acompanham TODA a turma apadrinhada (frequência, contato dos
+   responsáveis e ações imediatas), modelado de perto na Monitoria de Desempenho acima,
+   mas com um registro por aluno (não por par monitor/monitorando) já que aqui o monitor
+   cuida da turma inteira. */
+const BUSCA_ATIVA_ACOES = [
+  {key:'ligou_familia', emoji:'📞', label:'Ligou para a família'},
+  {key:'visita_domiciliar', emoji:'🏠', label:'Visita domiciliar'},
+  {key:'problema_transporte', emoji:'🚌', label:'Problema no transporte escolar'},
+  {key:'acionou_direcao', emoji:'🔴', label:'Acionou a Direção'},
+];
+function buscaAtivaAcaoInfo(key){ return BUSCA_ATIVA_ACOES.find(a=>a.key===key) || BUSCA_ATIVA_ACOES[0]; }
+function buscaAtivaAlunoKey(studentId){ return `busca-ativa-aluno:${studentId}`; }
+/* -------- Contador de acionamentos "novos" no painel do coordenador -------- */
+function buscaAtivaVistosGet(){
+  try{ return JSON.parse(localStorage.getItem('sala-buscaativa-vistos-coord')||'[]'); }
+  catch(e){ return []; }
+}
+function buscaAtivaVistosSet(ids){
+  try{ localStorage.setItem('sala-buscaativa-vistos-coord', JSON.stringify(ids)); }catch(e){}
+}
+// Os registros de Busca Ativa ficam por aluno (não por vínculo), então pra achar os
+// acionamentos "novos" é preciso varrer os alunos das turmas apadrinhadas já carregadas
+// (mesma limitação aceita da Monitoria: o contador só fica em dia depois que a coordenação
+// visita cada turma apadrinhada pelo menos uma vez nesta sessão).
+function buscaAtivaAcionamentosNaoVistos(){
+  const c = state.coordenador;
+  if(!c.buscaAtiva || !c.buscaAtiva.turmaDetalhe) return [];
+  const vistos = new Set(buscaAtivaVistosGet());
+  const out = [];
+  Object.values(c.buscaAtiva.turmaDetalhe).forEach(det => {
+    if(!det || !det.loaded || !det.data) return;
+    (det.data.alunos||[]).forEach(a => {
+      (a.registros||[]).forEach(r => {
+        if(r.acao==='acionou_direcao' && !vistos.has(r.id)){
+          out.push({ ...r, studentId: a.studentId, studentName: a.studentName, turmaId: det.data.turmaId, turmaName: det.data.turmaName });
+        }
+      });
+    });
+  });
+  return out;
+}
+function buscaAtivaAcionamentosNaoVistosCount(){
+  return buscaAtivaAcionamentosNaoVistos().length;
+}
+function buscaAtivaMarcarAcionamentosVistos(){
+  const vistos = new Set(buscaAtivaVistosGet());
+  buscaAtivaAcionamentosNaoVistos().forEach(r => vistos.add(r.id));
+  buscaAtivaVistosSet([...vistos]);
+}
 const AVATAR_EMOJIS = ['🦁','🐯','🐼','🦊','🐸','🐵','🦉','🐺','🐨','🦄','🐙','🦅','🐢','🐬','🦋','🐰','🐱','🐶','🐷','🐔','🐻','🐹','🐭','🦝','🦔','🐿️','🦇','🐴','🦓','🦒','🐘','🦏','🦛','🐊','🐍','🦎','🐳','🐠','🦈','🦑','🦀','🐝','🐞','🦗','🕷️','🦂','🐌','🦚','🦜','🦢','🦩','🐧','🦃','🦆','🐦','🐲','🤖','👽','👻','🦖','🦕'];
 const AVATAR_COLORS = ['#5c1a2b','#2b6f76','#c98a2c','#3a6b35','#4a4a8a','#a83279','#1f6f5c','#8a4b2b','#3b6ea5','#7a3b8a','#2c2c54','#6b4226','#1f4e5f','#9a3b3b','#556b2f','#4b3869'];
 
@@ -1411,6 +1461,7 @@ let state = {
     importCsv: { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false },
     temporadaForm: null, temporadaError:'',
     monitoria: { loaded:false, loading:false, grupos:[], vinculos:[], indicados:[], indicarTurmaId:'', indicarSelecionados:[], indicarError:'', turmasCarregadas:false },
+    buscaAtiva: { loaded:false, loading:false, vinculos:[], turmaDetalhe:{}, turmasCarregadas:false, atribuirTurmaId:'', atribuirMonitorId:'', atribuirError:'', detalheTurmaId:null },
     campanha: { loaded:false, loading:false, itens:[], indicados:[], subview:'pendentes', indicarTurmaId:'', indicarSelecionados:[], indicarError:'', turmasCarregadas:false, recusarItemId:null, recusarMotivo:'' },
     diario: { loaded:false, loading:false, itens:[], filtroTurmaId:'', turmasCarregadas:false },
     portfolio: { turmaId:'', studentId:'', turmasCarregadas:false },
@@ -1454,6 +1505,7 @@ let state = {
       notasCache:{}, notasLoading:false, error:'', turmasCarregadas:false,
       indicados:[]
     },
+    buscaAtiva: { loaded:false, loading:false, vinculos:[], turmaDetalhe:{} },
     campanha: {
       loaded:false, loading:false, itens:[], indicados:[],
       novoTipo:'imagem', novoTitulo:'', novoDescricao:'', novoImagemUrl:'', novoImagemPreviewUrl:'', novoImagemUploading:false, novoYoutubeUrl:'',
@@ -10024,6 +10076,9 @@ function renderCoordenador(){
   if(!c.monitoria.loaded && !c.monitoria.loading){ loadCoordMonitoria(); }
   // Mesma lógica: carrega cedo pra manter o contador de pendentes do "Jovens Protagonistas" em dia.
   if(!c.campanha.loaded && !c.campanha.loading){ loadCampanhaCoord(); }
+  // Idem pra Busca Ativa (o contador de acionamentos só fica certo depois que cada turma
+  // apadrinhada for visitada pelo menos uma vez, mas carregar os vínculos cedo já ajuda).
+  if(!c.buscaAtiva.loaded && !c.buscaAtiva.loading){ loadCoordBuscaAtiva(); }
   if(c.subview==='quiz' && state.professor.quiz.presentationMode && state.professor.quiz.current){
     return renderQuizPresentation();
   }
@@ -10057,6 +10112,7 @@ function renderCoordenador(){
     { action:'coord-sub-view', sub:'freqconfig', icon:'⏰', label:'Config. de Frequência' },
     { action:'coord-sub-view', sub:'notas', icon:'🧮', label:'Notas finais' },
     { action:'coord-sub-view', sub:'monitoria', icon:'🧑‍🏫', label:'Monitoria de Desempenho', badge: monitoriaIntervencaoNaoVistosCount() },
+    { action:'coord-sub-view', sub:'buscaativa', icon:'🚌', label:'Busca Ativa e Transporte', badge: buscaAtivaAcionamentosNaoVistosCount() },
     { action:'coord-sub-view', sub:'campanha', icon:'📢', label:'Jovens Protagonistas', badge: campanhaPendentesCount() },
     { action:'coord-sub-view', sub:'diario', icon:'📷', label:'Diário de Bordo' },
     { action:'coord-sub-view', sub:'portfolio', icon:'🗂️', label:'Portfólio do Aluno' },
@@ -10087,6 +10143,7 @@ function renderCoordenador(){
   else if(c.subview==='freqconfig') content = renderCoordFreqConfig();
   else if(c.subview==='notas') content = renderCoordNotas();
   else if(c.subview==='monitoria') content = renderCoordMonitoria();
+  else if(c.subview==='buscaativa') content = renderCoordBuscaAtiva();
   else if(c.subview==='campanha') content = renderCoordCampanha();
   else if(c.subview==='diario') content = renderCoordDiario();
   else if(c.subview==='portfolio') content = renderCoordPortfolio();
@@ -10792,6 +10849,141 @@ async function loadCoordMonitoria(){
   c.monitoria.loading = false;
   render();
 }
+
+/* -------- Busca Ativa e Transporte Escolar -------- */
+// Único blob, escrito só pela coordenação (mesmo padrão de monitoria-desempenho) —
+// evita dois escritores concorrentes no mesmo documento. Vários vínculos podem
+// compartilhar a mesma turmaId (vários monitores numa turma apadrinhada).
+async function loadCoordBuscaAtiva(){
+  const c = state.coordenador;
+  c.buscaAtiva.loading = true;
+  render();
+  try{
+    const r = await window.storage.get('busca-ativa-vinculos', true);
+    const data = JSON.parse(r.value);
+    c.buscaAtiva.vinculos = data.vinculos || [];
+  }catch(e){
+    c.buscaAtiva.vinculos = [];
+  }
+  c.buscaAtiva.loaded = true;
+  c.buscaAtiva.loading = false;
+  render();
+}
+async function saveBuscaAtivaVinculos(){
+  const c = state.coordenador;
+  await window.storage.set('busca-ativa-vinculos', JSON.stringify({ vinculos: c.buscaAtiva.vinculos }), true);
+}
+async function atribuirMonitorBuscaAtiva(){
+  const c = state.coordenador;
+  const turma = state.professor.turmas.find(t=>t.id===c.buscaAtiva.atribuirTurmaId);
+  if(!turma || !c.buscaAtiva.atribuirMonitorId){
+    c.buscaAtiva.atribuirError = 'Escolha a turma apadrinhada e o aluno monitor.';
+    render(); return;
+  }
+  let monitor = null, monitorTurma = null;
+  for(const t of state.professor.turmas){
+    const s = (t.students||[]).find(x=>x.id===c.buscaAtiva.atribuirMonitorId);
+    if(s){ monitor = s; monitorTurma = t; break; }
+  }
+  if(!monitor){ c.buscaAtiva.atribuirError = 'Aluno monitor não encontrado.'; render(); return; }
+  if(c.buscaAtiva.vinculos.some(v=>v.monitorId===monitor.id && v.turmaId===turma.id)){
+    c.buscaAtiva.atribuirError = 'Esse aluno já é monitor dessa turma apadrinhada.';
+    render(); return;
+  }
+  c.buscaAtiva.vinculos.push({
+    id: cryptoId(), monitorId: monitor.id, monitorName: monitor.name,
+    monitorTurmaId: monitorTurma.id, monitorTurmaName: monitorTurma.name,
+    turmaId: turma.id, turmaName: turma.name, createdAt: Date.now()
+  });
+  c.buscaAtiva.atribuirTurmaId = '';
+  c.buscaAtiva.atribuirMonitorId = '';
+  c.buscaAtiva.atribuirError = '';
+  await saveBuscaAtivaVinculos();
+  render();
+}
+async function removerMonitorBuscaAtiva(vinculoId){
+  const c = state.coordenador;
+  if(!confirm('Remover esse aluno como monitor dessa turma apadrinhada?')) return;
+  c.buscaAtiva.vinculos = c.buscaAtiva.vinculos.filter(v=>v.id!==vinculoId);
+  await saveBuscaAtivaVinculos();
+  render();
+}
+// Helper compartilhado (coordenação E aluno monitor escrevem no mesmo documento por aluno,
+// que guarda contato dos responsáveis + histórico de ações — por isso cada chamada relê o
+// documento atual antes de aplicar o patch, em vez de supor que o cache local está completo).
+async function buscaAtivaSalvarAlunoDoc(studentId, patch){
+  let atual = { nomeResponsavel:'', telefone:'', registros:[] };
+  try{
+    const r = await window.storage.get(buscaAtivaAlunoKey(studentId), true);
+    const saved = JSON.parse(r.value);
+    atual = { nomeResponsavel: saved.nomeResponsavel||'', telefone: saved.telefone||'', registros: saved.registros||[] };
+  }catch(e){ /* aluno ainda sem documento salvo */ }
+  const novo = { ...atual, ...patch };
+  await window.storage.set(buscaAtivaAlunoKey(studentId), JSON.stringify(novo), true);
+  return novo;
+}
+function buscaAtivaAtualizarCache(role, turmaId, studentId, novo){
+  const store = role==='aluno' ? state.aluno.buscaAtiva : state.coordenador.buscaAtiva;
+  const det = store.turmaDetalhe[turmaId];
+  if(det && det.data){
+    const idx = det.data.alunos.findIndex(a=>a.studentId===studentId);
+    if(idx>=0) det.data.alunos[idx] = { ...det.data.alunos[idx], ...novo };
+  }
+}
+// Shared helper: carrega todos os alunos de uma turma apadrinhada (frequência via
+// ensureFreqStats, igual ao Hall de Conquistas, + o documento de cada aluno em
+// busca-ativa-aluno:<studentId>). Usado tanto pela coordenação quanto pelo aluno monitor,
+// por isso recebe `role` pra saber em qual cache (state.coordenador.buscaAtiva ou
+// state.aluno.buscaAtiva) guardar o resultado.
+async function loadBuscaAtivaAlunosDaTurma(turmaId, role, forceRefresh){
+  const store = role==='aluno' ? state.aluno.buscaAtiva : state.coordenador.buscaAtiva;
+  const turma = state.professor.turmas.find(t=>t.id===turmaId);
+  if(!turma) return;
+  const cacheAtual = store.turmaDetalhe[turmaId];
+  if(cacheAtual && cacheAtual.loaded && !forceRefresh) return;
+  store.turmaDetalhe[turmaId] = { loading:true, loaded:false, data: cacheAtual ? cacheAtual.data : null };
+  render();
+  await ensureFreqStats(turma.id, turma, forceRefresh);
+  const freqCache = state.freqStatsCache[turma.id];
+  const faltasPorAlunoId = (freqCache && freqCache.stats && freqCache.stats.faltasPorAlunoId) || {};
+  const alunos = await Promise.all((turma.students||[]).map(async s => {
+    let doc = { nomeResponsavel:'', telefone:'', registros:[] };
+    try{
+      const r = await window.storage.get(buscaAtivaAlunoKey(s.id), true);
+      const saved = JSON.parse(r.value);
+      doc = { nomeResponsavel: saved.nomeResponsavel||'', telefone: saved.telefone||'', registros: saved.registros||[] };
+    }catch(e){ /* ainda sem documento salvo pra esse aluno */ }
+    return { studentId: s.id, studentName: s.name, ...doc, faltas: faltasPorAlunoId[s.id] || null };
+  }));
+  store.turmaDetalhe[turmaId] = { loading:false, loaded:true, data: { turmaId: turma.id, turmaName: turma.name, alunos } };
+  render();
+}
+async function coordBuscaAtivaEditarContato(studentId, turmaId){
+  const nomeInput = document.getElementById(`busca-contato-nome-${studentId}`);
+  const telInput = document.getElementById(`busca-contato-tel-${studentId}`);
+  const nomeResponsavel = nomeInput ? nomeInput.value.trim() : '';
+  const telefone = telInput ? telInput.value.trim() : '';
+  const novo = await buscaAtivaSalvarAlunoDoc(studentId, { nomeResponsavel, telefone, updatedAt: Date.now(), updatedBy: 'coordenacao' });
+  buscaAtivaAtualizarCache('coord', turmaId, studentId, novo);
+  render();
+}
+async function coordBuscaAtivaRegistrarAcao(studentId, turmaId){
+  const c = state.coordenador;
+  const sel = document.getElementById(`busca-acao-select-${studentId}`);
+  const obsInput = document.getElementById(`busca-acao-obs-${studentId}`);
+  const acaoKey = sel ? sel.value : BUSCA_ATIVA_ACOES[0].key;
+  const observacao = obsInput ? obsInput.value.trim() : '';
+  const det = c.buscaAtiva.turmaDetalhe[turmaId];
+  const alunoAtual = det && det.data ? det.data.alunos.find(a=>a.studentId===studentId) : null;
+  const registros = [
+    { id: cryptoId(), data: new Date().toISOString().slice(0,10), acao: acaoKey, observacao, registradoPor: 'coordenacao', createdAt: Date.now() },
+    ...((alunoAtual && alunoAtual.registros) || [])
+  ];
+  const novo = await buscaAtivaSalvarAlunoDoc(studentId, { registros });
+  buscaAtivaAtualizarCache('coord', turmaId, studentId, novo);
+  if(obsInput) obsInput.value = '';
+  render();
+}
 async function saveMonitoriaIndicados(){
   const c = state.coordenador;
   await window.storage.set('monitoria-indicados', JSON.stringify(c.monitoria.indicados), true);
@@ -11289,6 +11481,179 @@ function renderCoordMonitoria(){
       }).join('')}
     </div>
   `;
+}
+
+/* -------- Busca Ativa e Transporte Escolar (lado da coordenação) -------- */
+function renderCoordBuscaAtiva(){
+  const c = state.coordenador;
+  if(!c.buscaAtiva.turmasCarregadas){
+    c.buscaAtiva.turmasCarregadas = true;
+    loadTurmas().then(()=>render());
+  }
+  if(c.buscaAtiva.loading){
+    return `<div class="card"><h2>🚌 Busca Ativa e Transporte Escolar</h2><div class="spinner"></div></div>`;
+  }
+  if(c.buscaAtiva.detalheTurmaId){
+    return renderCoordBuscaAtivaDetalheTurma(c.buscaAtiva.detalheTurmaId);
+  }
+  const vistosAntes = new Set(buscaAtivaVistosGet());
+  const acionamentos = buscaAtivaAcionamentosNaoVistos();
+  // Abrir esta tela marca como vistos os acionamentos já carregados (mesmo padrão da
+  // Monitoria de Desempenho), fazendo o "NOVO" sumir do contador do menu lateral.
+  if(acionamentos.length>0) buscaAtivaMarcarAcionamentosVistos();
+
+  const porTurma = {};
+  c.buscaAtiva.vinculos.forEach(v => {
+    if(!porTurma[v.turmaId]) porTurma[v.turmaId] = { turmaId:v.turmaId, turmaName:v.turmaName, monitores:[] };
+    porTurma[v.turmaId].monitores.push(v);
+  });
+
+  return `
+    <div class="card">
+      <h2>🚌 Busca Ativa e Transporte Escolar</h2>
+      <p class="muted">Alunos-monitores acompanham a frequência de toda a turma apadrinhada, registram o contato dos responsáveis e o que foi feito em cada caso — com alerta pra coordenação quando a Direção precisa ser acionada.</p>
+
+      <div class="card" style="margin-top:14px;">
+        <h3 style="margin-top:0;">Atribuir monitor a uma turma apadrinhada</h3>
+        <p class="muted" style="font-size:.85rem;">Mais de um aluno pode ser monitor da mesma turma.</p>
+        <label>Turma apadrinhada</label>
+        <select id="busca-atribuir-turma-select">
+          <option value="">Selecione...</option>
+          ${state.professor.turmas.map(t=>`<option value="${t.id}" ${t.id===c.buscaAtiva.atribuirTurmaId?'selected':''}>${esc(t.name)}</option>`).join('')}
+        </select>
+        <label style="margin-top:8px;">Aluno monitor</label>
+        <select id="busca-atribuir-monitor-select">
+          <option value="">Selecione...</option>
+          ${state.professor.turmas.map(t => (t.students||[]).map(s=>`<option value="${s.id}" ${s.id===c.buscaAtiva.atribuirMonitorId?'selected':''}>${esc(s.name)} (${esc(t.name)})</option>`).join('')).join('')}
+        </select>
+        ${c.buscaAtiva.atribuirError ? `<p class="err">${esc(c.buscaAtiva.atribuirError)}</p>` : ''}
+        <button class="btn btn-primary btn-sm" style="margin-top:10px;" data-action="busca-atribuir-monitor">Atribuir</button>
+      </div>
+
+      ${acionamentos.length>0 ? `
+        <div class="card" style="border:2px solid var(--red); margin-top:14px;">
+          <h3 style="margin-top:0; color:var(--red);">🚨 Acionamentos à Direção</h3>
+          ${acionamentos.map(r => {
+            const ehNovo = !vistosAntes.has(r.id);
+            return `
+            <div class="list-item" style="align-items:flex-start;">
+              <div>
+                <strong>${esc(r.studentName)}</strong> <span class="muted">(${esc(r.turmaName)})</span>
+                ${ehNovo ? '<span style="background:var(--red); color:#fff; font-size:.68rem; font-weight:700; padding:1px 7px; border-radius:10px; margin-left:6px; vertical-align:middle;">NOVO</span>' : ''}<br>
+                <span class="muted" style="font-size:.8rem;">registrado em ${new Date(r.data+'T00:00:00').toLocaleDateString('pt-BR')}${r.observacao ? ' · '+esc(r.observacao) : ''}</span>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      ` : ''}
+
+      <h3 style="margin-top:20px;">Turmas apadrinhadas</h3>
+      ${Object.keys(porTurma).length===0 ? '<p class="muted">Nenhuma turma apadrinhada atribuída ainda.</p>' : Object.values(porTurma).map(g => `
+        <div class="card" style="margin-top:10px;">
+          <div class="row" style="align-items:center; justify-content:space-between;">
+            <strong>${esc(g.turmaName)}</strong>
+            <button class="btn btn-ghost btn-sm" data-action="busca-ver-turma" data-tid="${g.turmaId}">Ver turma</button>
+          </div>
+          <p class="muted" style="margin:6px 0 0;">Monitor(es): ${g.monitores.map(v=>`${esc(v.monitorName)} <button class="btn btn-ghost btn-sm" style="padding:0 4px;" data-action="busca-remover-monitor" data-vid="${v.id}" title="Remover">✕</button>`).join(', ')}</p>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+function renderCoordBuscaAtivaDetalheTurma(turmaId){
+  const c = state.coordenador;
+  const det = c.buscaAtiva.turmaDetalhe[turmaId];
+  if(!det || (!det.loaded && !det.loading)){ loadBuscaAtivaAlunosDaTurma(turmaId, 'coord'); }
+  if(!det || det.loading){
+    return `<div class="card"><button class="btn btn-ghost btn-sm" data-action="busca-fechar-turma">← Voltar</button><div class="spinner"></div></div>`;
+  }
+  const data = det.data;
+  return `
+    <div class="card">
+      <button class="btn btn-ghost btn-sm" data-action="busca-fechar-turma">← Voltar</button>
+      <h3 style="margin-top:10px;">🚌 ${esc(data.turmaName)}</h3>
+      <p class="muted">Frequência, contato dos responsáveis e ações de busca ativa de todos os alunos da turma.</p>
+      ${data.alunos.map(a => renderBuscaAtivaAlunoCard(a, turmaId, 'coord')).join('')}
+    </div>
+  `;
+}
+// Cartão por aluno reaproveitado tanto na tela da coordenação quanto na do aluno monitor —
+// o prefixo do data-action muda conforme `role` pra chamar o handler duplicado de cada lado.
+function renderBuscaAtivaAlunoCard(a, turmaId, role){
+  const freq = a.faltas;
+  const freqTxt = (freq && freq.diasComputados>0) ? `${freq.faltas} falta(s) de ${freq.diasComputados} dia(s)` : 'sem dados de frequência';
+  const corFreq = (freq && freq.diasComputados>0 && freq.faltas===0) ? 'var(--green)' : ((freq && freq.diasComputados>0 && (freq.faltas/freq.diasComputados)>0.25) ? 'var(--red)' : 'var(--ink)');
+  const ultimo = (a.registros||[])[0];
+  const infoUltimo = ultimo ? buscaAtivaAcaoInfo(ultimo.acao) : null;
+  const prefixo = role==='aluno' ? 'busca-aluno' : 'busca-coord';
+  return `
+    <div class="card" style="margin-top:10px; background:var(--surface);">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <strong>${esc(a.studentName)}</strong>
+        <span class="muted" style="font-size:.78rem; color:${corFreq};">📅 ${freqTxt}</span>
+      </div>
+      <div class="row" style="margin-top:8px; gap:8px; flex-wrap:wrap;">
+        <input type="text" id="busca-contato-nome-${a.studentId}" placeholder="Nome do responsável" value="${esc(a.nomeResponsavel||'')}" style="flex:1 1 180px;">
+        <input type="text" id="busca-contato-tel-${a.studentId}" placeholder="Telefone" value="${esc(a.telefone||'')}" style="flex:1 1 140px;">
+        <button class="btn btn-ghost btn-sm" data-action="${prefixo}-salvar-contato" data-sid="${a.studentId}" data-tid="${turmaId}">Salvar contato</button>
+      </div>
+      <div class="row" style="margin-top:10px; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+        <div style="flex:1 1 200px;">
+          <label style="font-size:.78rem;">Ação imediata</label>
+          <select id="busca-acao-select-${a.studentId}">
+            ${BUSCA_ATIVA_ACOES.map(o=>`<option value="${o.key}">${o.emoji} ${o.label}</option>`).join('')}
+          </select>
+        </div>
+        <div style="flex:2 1 220px;">
+          <label style="font-size:.78rem;">Observação (opcional)</label>
+          <input type="text" id="busca-acao-obs-${a.studentId}" placeholder="Detalhe o que foi feito...">
+        </div>
+        <button class="btn btn-primary btn-sm" data-action="${prefixo}-registrar-acao" data-sid="${a.studentId}" data-tid="${turmaId}">Registrar</button>
+      </div>
+      ${ultimo ? `<p class="muted" style="font-size:.78rem; margin:8px 0 0;">Última ação: ${infoUltimo.emoji} ${esc(infoUltimo.label)} em ${new Date(ultimo.data+'T00:00:00').toLocaleDateString('pt-BR')}</p>` : ''}
+      ${(a.registros && a.registros.length>0) ? `
+        <details style="margin-top:6px;">
+          <summary style="cursor:pointer; font-size:.8rem;">Ver histórico (${a.registros.length})</summary>
+          ${a.registros.map(r => {
+            const info = buscaAtivaAcaoInfo(r.acao);
+            return `<div class="list-item" style="align-items:flex-start;">
+              <div>
+                <span>${info.emoji} <strong>${esc(info.label)}</strong></span><br>
+                <span class="muted" style="font-size:.76rem;">${new Date(r.data+'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                ${r.observacao ? `<p style="margin:2px 0 0;">${esc(r.observacao)}</p>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
+        </details>
+      ` : ''}
+    </div>
+  `;
+}
+// Lado do aluno monitor: mostra todas as turmas apadrinhadas em que ele é monitor.
+function renderAlunoBuscaAtivaBlock(){
+  const al = state.aluno;
+  if(!al.buscaAtiva.loaded && !al.buscaAtiva.loading){ loadAlunoBuscaAtiva(); }
+  if(al.buscaAtiva.loading){
+    return `<div class="card"><h3 style="margin-top:0;">🚌 Busca Ativa e Transporte Escolar</h3><div class="spinner"></div></div>`;
+  }
+  if(al.buscaAtiva.vinculos.length===0){
+    return `<div class="card"><h3 style="margin-top:0;">🚌 Busca Ativa e Transporte Escolar</h3><p class="muted">Você não é monitor(a) de Busca Ativa no momento. Quem é monitor acompanha a frequência, o contato dos responsáveis e registra ações pra toda a turma apadrinhada.</p></div>`;
+  }
+  return al.buscaAtiva.vinculos.map(v => {
+    const det = al.buscaAtiva.turmaDetalhe[v.turmaId];
+    if(!det || (!det.loaded && !det.loading)){ loadBuscaAtivaAlunosDaTurma(v.turmaId, 'aluno'); }
+    if(!det || det.loading){
+      return `<div class="card"><h3 style="margin-top:0;">🚌 ${esc(v.turmaName)}</h3><div class="spinner"></div></div>`;
+    }
+    const data = det.data;
+    return `
+      <div class="card">
+        <h3 style="margin-top:0;">🚌 Busca Ativa — ${esc(data.turmaName)}</h3>
+        <p class="muted">Acompanhe a frequência, o contato dos responsáveis e registre o que foi feito com cada colega da turma apadrinhada.</p>
+        ${data.alunos.map(a => renderBuscaAtivaAlunoCard(a, v.turmaId, 'aluno')).join('')}
+      </div>
+    `;
+  }).join('');
 }
 async function saveCoordPeriodos(){
   const periodos = {};
@@ -13898,6 +14263,7 @@ function renderStudentDashboard(){
 
     { action:'aluno-sub-view', sub:'duvidas', icon:'❓', label:'Mural de Dúvidas', group:'💬 Comunidade' },
     { action:'aluno-sub-view', sub:'monitoria', icon:'🧑‍🏫', label:'Monitoria de Desempenho', group:'💬 Comunidade' },
+    { action:'aluno-sub-view', sub:'buscaativa', icon:'🚌', label:'Busca Ativa e Transporte', group:'💬 Comunidade' },
     { action:'aluno-sub-view', sub:'campanha', icon:'📢', label:'Jovens Protagonistas', group:'💬 Comunidade' },
     { action:'aluno-sub-view', sub:'portfolio', icon:'🗂️', label:'Meu Portfólio', group:'💬 Comunidade' },
     { action:'aluno-sub-view', sub:'conquistas', icon:'🏅', label:'Hall de Conquistas', group:'💬 Comunidade' },
@@ -13916,6 +14282,7 @@ function renderStudentDashboard(){
   else if(al.subview==='ra') content = alunoSubviewOuVazio(renderAlunoRABlock(), 'Nenhum conteúdo de Realidade Aumentada disponível ainda.');
   else if(al.subview==='duvidas') content = renderAlunoDuvidasBlock();
   else if(al.subview==='monitoria') content = renderAlunoMonitoriaBlock();
+  else if(al.subview==='buscaativa') content = renderAlunoBuscaAtivaBlock();
   else if(al.subview==='campanha') content = renderAlunoCampanhaBlock();
   else if(al.subview==='portfolio') content = renderAlunoPortfolioBlock();
   else if(al.subview==='conquistas') content = renderAlunoConquistasBlock();
@@ -14412,6 +14779,49 @@ async function monitoriaSalvarRegistro(){
   });
   al.monitoria.registroObs = '';
   await saveMonitoria();
+  render();
+}
+
+/* -------- Busca Ativa e Transporte Escolar (lado do aluno monitor) -------- */
+async function loadAlunoBuscaAtiva(){
+  const al = state.aluno;
+  al.buscaAtiva.loading = true;
+  render();
+  try{
+    const r = await window.storage.get('busca-ativa-vinculos', true);
+    const data = JSON.parse(r.value);
+    al.buscaAtiva.vinculos = (data.vinculos || []).filter(v=>v.monitorId===al.matriculaStudentId);
+  }catch(e){
+    al.buscaAtiva.vinculos = [];
+  }
+  al.buscaAtiva.loaded = true;
+  al.buscaAtiva.loading = false;
+  render();
+}
+async function alunoBuscaAtivaEditarContato(studentId, turmaId){
+  const nomeInput = document.getElementById(`busca-contato-nome-${studentId}`);
+  const telInput = document.getElementById(`busca-contato-tel-${studentId}`);
+  const nomeResponsavel = nomeInput ? nomeInput.value.trim() : '';
+  const telefone = telInput ? telInput.value.trim() : '';
+  const novo = await buscaAtivaSalvarAlunoDoc(studentId, { nomeResponsavel, telefone, updatedAt: Date.now(), updatedBy: state.aluno.matriculaStudentId });
+  buscaAtivaAtualizarCache('aluno', turmaId, studentId, novo);
+  render();
+}
+async function alunoBuscaAtivaRegistrarAcao(studentId, turmaId){
+  const al = state.aluno;
+  const sel = document.getElementById(`busca-acao-select-${studentId}`);
+  const obsInput = document.getElementById(`busca-acao-obs-${studentId}`);
+  const acaoKey = sel ? sel.value : BUSCA_ATIVA_ACOES[0].key;
+  const observacao = obsInput ? obsInput.value.trim() : '';
+  const det = al.buscaAtiva.turmaDetalhe[turmaId];
+  const alunoAtual = det && det.data ? det.data.alunos.find(a=>a.studentId===studentId) : null;
+  const registros = [
+    { id: cryptoId(), data: new Date().toISOString().slice(0,10), acao: acaoKey, observacao, registradoPor: al.matriculaStudentId, createdAt: Date.now() },
+    ...((alunoAtual && alunoAtual.registros) || [])
+  ];
+  const novo = await buscaAtivaSalvarAlunoDoc(studentId, { registros });
+  buscaAtivaAtualizarCache('aluno', turmaId, studentId, novo);
+  if(obsInput) obsInput.value = '';
   render();
 }
 async function computeMonitoriaNotas(turmaId, studentName){
@@ -19178,6 +19588,14 @@ document.addEventListener('click', (e) => {
   else if(act==='monitoria-ver-notas'){ computeMonitoriaNotas(btn.dataset.tid, btn.dataset.name); }
   else if(act==='monitoria-indicar-alunos'){ monitoriaIndicarAlunos(); }
   else if(act==='monitoria-remover-indicado'){ monitoriaRemoverIndicado(btn.dataset.sid); }
+  else if(act==='busca-atribuir-monitor'){ atribuirMonitorBuscaAtiva(); }
+  else if(act==='busca-remover-monitor'){ removerMonitorBuscaAtiva(btn.dataset.vid); }
+  else if(act==='busca-ver-turma'){ state.coordenador.buscaAtiva.detalheTurmaId = btn.dataset.tid; render(); }
+  else if(act==='busca-fechar-turma'){ state.coordenador.buscaAtiva.detalheTurmaId = null; render(); }
+  else if(act==='busca-coord-salvar-contato'){ coordBuscaAtivaEditarContato(btn.dataset.sid, btn.dataset.tid); }
+  else if(act==='busca-coord-registrar-acao'){ coordBuscaAtivaRegistrarAcao(btn.dataset.sid, btn.dataset.tid); }
+  else if(act==='busca-aluno-salvar-contato'){ alunoBuscaAtivaEditarContato(btn.dataset.sid, btn.dataset.tid); }
+  else if(act==='busca-aluno-registrar-acao'){ alunoBuscaAtivaRegistrarAcao(btn.dataset.sid, btn.dataset.tid); }
   else if(act==='campanha-abrir-video'){ state.ui.campanhaVideoModalId = btn.dataset.youtubeId; render(); }
   else if(act==='campanha-abrir-imagem'){ state.ui.campanhaImagemModalId = btn.dataset.id; render(); }
   else if(act==='campanha-fechar-modal'){ state.ui.campanhaVideoModalId = null; state.ui.campanhaImagemModalId = null; render(); }
@@ -19207,6 +19625,7 @@ document.addEventListener('click', (e) => {
       notasCache:{}, notasLoading:false, error:'', turmasCarregadas:false,
       indicados:[]
     },
+    buscaAtiva: { loaded:false, loading:false, vinculos:[], turmaDetalhe:{} },
     campanha: {
       loaded:false, loading:false, itens:[], indicados:[],
       novoTipo:'imagem', novoTitulo:'', novoDescricao:'', novoImagemUrl:'', novoImagemPreviewUrl:'', novoImagemUploading:false, novoYoutubeUrl:'',
@@ -19361,6 +19780,8 @@ document.addEventListener('change', (e) => {
   if(el.id==='boletim-disciplina-select'){ al.boletim.detalheDisciplina = el.value; render(); return; }
   if(el.id==='boletim-unidade-select'){ al.boletim.detalheUnidade = el.value; render(); return; }
   if(el.id==='monitoria-indicar-turma-select'){ c.monitoria.indicarTurmaId = el.value; c.monitoria.indicarSelecionados = []; c.monitoria.indicarError=''; render(); return; }
+  if(el.id==='busca-atribuir-turma-select'){ c.buscaAtiva.atribuirTurmaId = el.value; c.buscaAtiva.atribuirError=''; render(); return; }
+  if(el.id==='busca-atribuir-monitor-select'){ c.buscaAtiva.atribuirMonitorId = el.value; c.buscaAtiva.atribuirError=''; render(); return; }
   if(act==='monitoria-toggle-indicar-aluno'){
     const sid = el.dataset.sid;
     if(c.monitoria.indicarSelecionados.includes(sid)) c.monitoria.indicarSelecionados = c.monitoria.indicarSelecionados.filter(x=>x!==sid);
