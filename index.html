@@ -1460,7 +1460,7 @@ let state = {
     freqConfig: { mesCalendario: new Date().toISOString().slice(0,7), horariosDraft:null, errorHorarios:'' },
     importCsv: { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false },
     temporadaForm: null, temporadaError:'',
-    monitoria: { loaded:false, loading:false, grupos:[], vinculos:[], indicados:[], indicarTurmaId:'', indicarSelecionados:[], indicarError:'', turmasCarregadas:false },
+    monitoria: { loaded:false, loading:false, grupos:[], vinculos:[], indicados:[], indicarTurmaId:'', indicarSelecionados:[], indicarBusca:'', indicarError:'', turmasCarregadas:false },
     buscaAtiva: { loaded:false, loading:false, vinculos:[], turmaDetalhe:{}, turmasCarregadas:false, atribuirTurmaId:'', atribuirMonitorId:'', atribuirMonitorBusca:'', atribuirError:'', detalheTurmaId:null },
     campanha: { loaded:false, loading:false, itens:[], indicados:[], subview:'pendentes', indicarTurmaId:'', indicarSelecionados:[], indicarError:'', turmasCarregadas:false, recusarItemId:null, recusarMotivo:'' },
     diario: { loaded:false, loading:false, itens:[], filtroTurmaId:'', turmasCarregadas:false },
@@ -1498,10 +1498,10 @@ let state = {
     boletim: { loaded:false, loading:false, erro:'', porUnidade:[], detalheDisciplina:'', detalheUnidade:'' },
     monitoria: {
       loaded:false, loading:false, grupos:[], vinculos:[], meuGrupoId:null,
-      view:'inicio', criarTurmaId:'', criarSelecionados:[], entrarGrupoId:'',
+      view:'inicio', criarTurmaId:'', criarSelecionados:[], criarAlunosBusca:'', entrarGrupoId:'',
       detalheVinculoId:null, novoVinculoMonitorandoId:null, novoVinculoHorario:'',
       editHorarioVinculoId:null, editHorarioValor:'',
-      registroStatus:'avancando', registroObs:'',
+  registroStatus:'avancando', registroObs:'',
       notasCache:{}, notasLoading:false, error:'', turmasCarregadas:false,
       indicados:[]
     },
@@ -4640,12 +4640,20 @@ function renderAlunoMonitoriaBlockGrupo(){
           <option value="">Selecione...</option>
           ${state.professor.turmas.map(t=>`<option value="${t.id}" ${t.id===mo.criarTurmaId?'selected':''}>${esc(t.name)}</option>`).join('')}
         </select>
-        ${turma ? turma.students.filter(s=>!grupo.monitorandos.some(m=>m.studentId===s.id)).map(s => `
-          <label class="row" style="align-items:center; gap:8px; font-weight:400; margin-top:8px;">
-            <input type="checkbox" data-action="monitoria-toggle-aluno" data-sid="${s.id}" ${mo.criarSelecionados.includes(s.id)?'checked':''}>
-            ${esc(s.name)}
-          </label>
-        `).join('') : ''}
+        ${turma ? `
+          <input type="text" id="monitoria-criar-alunos-busca-input" placeholder="Digite o nome do aluno para filtrar..." value="${esc(mo.criarAlunosBusca||'')}" style="margin-top:8px;">
+          ${(() => {
+            const termo = (mo.criarAlunosBusca||'').trim().toLowerCase();
+            const disponiveis = turma.students.filter(s=>!grupo.monitorandos.some(m=>m.studentId===s.id) && (!termo || s.name.toLowerCase().includes(termo)));
+            if(disponiveis.length===0) return '<p class="muted" style="margin-top:8px;">Nenhum aluno encontrado.</p>';
+            return disponiveis.map(s => `
+              <label class="row" style="align-items:center; gap:8px; font-weight:400; margin-top:8px;">
+                <input type="checkbox" data-action="monitoria-toggle-aluno" data-sid="${s.id}" ${mo.criarSelecionados.includes(s.id)?'checked':''}>
+                ${esc(s.name)}
+              </label>
+            `).join('');
+          })()}
+        ` : ''}
         ${mo.error ? `<p class="err">${esc(mo.error)}</p>` : ''}
         <div class="row" style="margin-top:14px;">
           <button class="btn btn-ghost" data-action="monitoria-voltar-painel">← Voltar</button>
@@ -11425,9 +11433,12 @@ function renderCoordMonitoria(){
           const turma = state.professor.turmas.find(t=>t.id===c.monitoria.indicarTurmaId);
           if(!turma) return '';
           const jaIndicados = new Set(c.monitoria.indicados.map(i=>i.studentId));
-          const disponiveis = turma.students.filter(s=>!jaIndicados.has(s.id));
-          if(disponiveis.length===0) return '<p class="muted" style="margin-top:8px;">Todos os alunos dessa turma já estão indicados.</p>';
-          return disponiveis.map(s => `
+          const termo = (c.monitoria.indicarBusca||'').trim().toLowerCase();
+          const buscaHtml = `<input type="text" id="monitoria-indicar-busca-input" placeholder="Digite o nome do aluno para filtrar..." value="${esc(c.monitoria.indicarBusca||'')}" style="margin-top:8px;">`;
+          const disponiveis = turma.students.filter(s=>!jaIndicados.has(s.id) && (!termo || s.name.toLowerCase().includes(termo)));
+          if(turma.students.filter(s=>!jaIndicados.has(s.id)).length===0) return '<p class="muted" style="margin-top:8px;">Todos os alunos dessa turma já estão indicados.</p>';
+          if(disponiveis.length===0) return buscaHtml + '<p class="muted" style="margin-top:8px;">Nenhum aluno encontrado.</p>';
+          return buscaHtml + disponiveis.map(s => `
             <label class="row" style="align-items:center; gap:8px; font-weight:400; margin-top:8px;">
               <input type="checkbox" data-action="monitoria-toggle-indicar-aluno" data-sid="${s.id}" ${c.monitoria.indicarSelecionados.includes(s.id)?'checked':''}>
               ${esc(s.name)}
@@ -19633,10 +19644,10 @@ document.addEventListener('click', (e) => {
     boletim: { loaded:false, loading:false, erro:'', porUnidade:[], detalheDisciplina:'', detalheUnidade:'' },
     monitoria: {
       loaded:false, loading:false, grupos:[], vinculos:[], meuGrupoId:null,
-      view:'inicio', criarTurmaId:'', criarSelecionados:[], entrarGrupoId:'',
+      view:'inicio', criarTurmaId:'', criarSelecionados:[], criarAlunosBusca:'', entrarGrupoId:'',
       detalheVinculoId:null, novoVinculoMonitorandoId:null, novoVinculoHorario:'',
       editHorarioVinculoId:null, editHorarioValor:'',
-      registroStatus:'avancando', registroObs:'',
+  registroStatus:'avancando', registroObs:'',
       notasCache:{}, notasLoading:false, error:'', turmasCarregadas:false,
       indicados:[]
     },
@@ -19785,13 +19796,27 @@ document.addEventListener('input', (e) => {
     const el2 = document.getElementById('busca-atribuir-monitor-busca-input');
     if(el2){ el2.focus(); try{ el2.setSelectionRange(selStart, selEnd); }catch(err){} }
   }
+  else if(el.id==='monitoria-criar-alunos-busca-input'){
+    al.monitoria.criarAlunosBusca = el.value;
+    const selStart = el.selectionStart, selEnd = el.selectionEnd;
+    render();
+    const el2 = document.getElementById('monitoria-criar-alunos-busca-input');
+    if(el2){ el2.focus(); try{ el2.setSelectionRange(selStart, selEnd); }catch(err){} }
+  }
+  else if(el.id==='monitoria-indicar-busca-input'){
+    state.coordenador.monitoria.indicarBusca = el.value;
+    const selStart = el.selectionStart, selEnd = el.selectionEnd;
+    render();
+    const el2 = document.getElementById('monitoria-indicar-busca-input');
+    if(el2){ el2.focus(); try{ el2.setSelectionRange(selStart, selEnd); }catch(err){} }
+  }
 });
 
 document.addEventListener('change', (e) => {
   const el = e.target;
   const act = el.dataset ? el.dataset.action : null;
   const p = state.professor, al = state.aluno, c = state.coordenador;
-  if(el.id==='monitoria-turma-select'){ al.monitoria.criarTurmaId = el.value; al.monitoria.criarSelecionados = []; al.monitoria.error=''; render(); return; }
+  if(el.id==='monitoria-turma-select'){ al.monitoria.criarTurmaId = el.value; al.monitoria.criarSelecionados = []; al.monitoria.criarAlunosBusca=''; al.monitoria.error=''; render(); return; }
   if(act==='monitoria-toggle-aluno'){
     const sid = el.dataset.sid;
     if(al.monitoria.criarSelecionados.includes(sid)) al.monitoria.criarSelecionados = al.monitoria.criarSelecionados.filter(x=>x!==sid);
@@ -19801,7 +19826,7 @@ document.addEventListener('change', (e) => {
   if(el.id==='monitoria-status-select'){ al.monitoria.registroStatus = el.value; return; }
   if(el.id==='boletim-disciplina-select'){ al.boletim.detalheDisciplina = el.value; render(); return; }
   if(el.id==='boletim-unidade-select'){ al.boletim.detalheUnidade = el.value; render(); return; }
-  if(el.id==='monitoria-indicar-turma-select'){ c.monitoria.indicarTurmaId = el.value; c.monitoria.indicarSelecionados = []; c.monitoria.indicarError=''; render(); return; }
+  if(el.id==='monitoria-indicar-turma-select'){ c.monitoria.indicarTurmaId = el.value; c.monitoria.indicarSelecionados = []; c.monitoria.indicarBusca=''; c.monitoria.indicarError=''; render(); return; }
   if(el.id==='busca-atribuir-turma-select'){ c.buscaAtiva.atribuirTurmaId = el.value; c.buscaAtiva.atribuirError=''; render(); return; }
   if(el.id==='busca-atribuir-monitor-select'){ c.buscaAtiva.atribuirMonitorId = el.value; c.buscaAtiva.atribuirError=''; render(); return; }
   if(act==='monitoria-toggle-indicar-aluno'){
