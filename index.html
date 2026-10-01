@@ -1461,7 +1461,7 @@ let state = {
     importCsv: { processando:false, erro:'', resultado:null, nomeArquivo:'', importando:false },
     temporadaForm: null, temporadaError:'',
     monitoria: { loaded:false, loading:false, grupos:[], vinculos:[], indicados:[], indicarTurmaId:'', indicarSelecionados:[], indicarError:'', turmasCarregadas:false },
-    buscaAtiva: { loaded:false, loading:false, vinculos:[], turmaDetalhe:{}, turmasCarregadas:false, atribuirTurmaId:'', atribuirMonitorId:'', atribuirError:'', detalheTurmaId:null },
+    buscaAtiva: { loaded:false, loading:false, vinculos:[], turmaDetalhe:{}, turmasCarregadas:false, atribuirTurmaId:'', atribuirMonitorId:'', atribuirMonitorBusca:'', atribuirError:'', detalheTurmaId:null },
     campanha: { loaded:false, loading:false, itens:[], indicados:[], subview:'pendentes', indicarTurmaId:'', indicarSelecionados:[], indicarError:'', turmasCarregadas:false, recusarItemId:null, recusarMotivo:'' },
     diario: { loaded:false, loading:false, itens:[], filtroTurmaId:'', turmasCarregadas:false },
     portfolio: { turmaId:'', studentId:'', turmasCarregadas:false },
@@ -10897,6 +10897,7 @@ async function atribuirMonitorBuscaAtiva(){
   });
   c.buscaAtiva.atribuirTurmaId = '';
   c.buscaAtiva.atribuirMonitorId = '';
+  c.buscaAtiva.atribuirMonitorBusca = '';
   c.buscaAtiva.atribuirError = '';
   await saveBuscaAtivaVinculos();
   render();
@@ -11522,10 +11523,24 @@ function renderCoordBuscaAtiva(){
           ${state.professor.turmas.map(t=>`<option value="${t.id}" ${t.id===c.buscaAtiva.atribuirTurmaId?'selected':''}>${esc(t.name)}</option>`).join('')}
         </select>
         <label style="margin-top:8px;">Aluno monitor</label>
-        <select id="busca-atribuir-monitor-select">
+        <input type="text" id="busca-atribuir-monitor-busca-input" placeholder="Digite o nome do aluno para filtrar..." value="${esc(c.buscaAtiva.atribuirMonitorBusca||'')}" style="margin-bottom:6px;">
+        <select id="busca-atribuir-monitor-select" size="6">
           <option value="">Selecione...</option>
-          ${state.professor.turmas.map(t => (t.students||[]).map(s=>`<option value="${s.id}" ${s.id===c.buscaAtiva.atribuirMonitorId?'selected':''}>${esc(s.name)} (${esc(t.name)})</option>`).join('')).join('')}
+          ${(() => {
+            const termo = (c.buscaAtiva.atribuirMonitorBusca||'').trim().toLowerCase();
+            const opcoes = [];
+            state.professor.turmas.forEach(t => (t.students||[]).forEach(s => {
+              if(!termo || s.name.toLowerCase().includes(termo)) opcoes.push({s, t});
+            }));
+            if(termo && opcoes.length===0) return '';
+            return opcoes.map(({s,t})=>`<option value="${s.id}" ${s.id===c.buscaAtiva.atribuirMonitorId?'selected':''}>${esc(s.name)} (${esc(t.name)})</option>`).join('');
+          })()}
         </select>
+        ${(() => {
+          const termo = (c.buscaAtiva.atribuirMonitorBusca||'').trim().toLowerCase();
+          const temResultado = state.professor.turmas.some(t => (t.students||[]).some(s=>!termo || s.name.toLowerCase().includes(termo)));
+          return (termo && !temResultado) ? '<p class="muted" style="font-size:.8rem;">Nenhum aluno encontrado com esse nome.</p>' : '';
+        })()}
         ${c.buscaAtiva.atribuirError ? `<p class="err">${esc(c.buscaAtiva.atribuirError)}</p>` : ''}
         <button class="btn btn-primary btn-sm" style="margin-top:10px;" data-action="busca-atribuir-monitor">Atribuir</button>
       </div>
@@ -19761,6 +19776,13 @@ document.addEventListener('input', (e) => {
     const selStart = el.selectionStart, selEnd = el.selectionEnd;
     render();
     const el2 = document.getElementById('biblioteca-busca-emprestimo-input');
+    if(el2){ el2.focus(); try{ el2.setSelectionRange(selStart, selEnd); }catch(err){} }
+  }
+  else if(el.id==='busca-atribuir-monitor-busca-input'){
+    state.coordenador.buscaAtiva.atribuirMonitorBusca = el.value;
+    const selStart = el.selectionStart, selEnd = el.selectionEnd;
+    render();
+    const el2 = document.getElementById('busca-atribuir-monitor-busca-input');
     if(el2){ el2.focus(); try{ el2.setSelectionRange(selStart, selEnd); }catch(err){} }
   }
 });
