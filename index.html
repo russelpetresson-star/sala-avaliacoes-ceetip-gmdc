@@ -1519,7 +1519,7 @@ let state = {
 
 
 function freshAssessment(){
-  return { instrumento:'avaliacao', unidade:'', title:'', disciplinaId:'', turmaIds:[], questions:[], startAt:'', endAt:'', resultRelease:{mode:'imediato', releaseAt:''}, securityEnabled:true, minMinutesPerQuestion:3 };
+  return { instrumento:'avaliacao', unidade:'', title:'', disciplinaId:'', turmaIds:[], questions:[], startAt:'', endAt:'', resultRelease:{mode:'imediato', releaseAt:''}, securityEnabled:true, minMinutesPerQuestion:3, exigeLiberacao:true };
 }
 function instrumentoLabel(key){ const i = INSTRUMENTOS.find(x=>x.key===key); return i ? i.label : key; }
 function assessmentTurmaIds(a){
@@ -2137,6 +2137,117 @@ function renderProfessorProfileEditor(){
   `;
 }
 
+/* ---------------- LIBERAÇÃO DA PROVA PARA OS ALUNOS PRESENTES ---------------- */
+function provaLiberacaoKey(code){ return `prova-liberacao:${code}`; }
+function provaExigeLiberacao(a){ return !!a && a.exigeLiberacao===true && assessmentTurmaIds(a).length>0; }
+async function carregarProvaLiberacao(code){
+  try{ const r = await window.storage.get(provaLiberacaoKey(code), true); const d = JSON.parse(r.value); return Array.isArray(d.liberados) ? d.liberados : []; }
+  catch(e){ return null; }
+}
+// Aluno liberado se o id bate OU o nome (mesma chave usada nas respostas) bate.
+function alunoEstaLiberado(liberados, studentId, name){
+  const slug = slugifyName(name);
+  return (liberados||[]).some(l => (studentId && l.studentId===studentId) || slugifyName(l.name)===slug);
+}
+// Libera o resultado/gabarito aos alunos a qualquer momento, mesmo que a prova tenha sido criada com "não liberar" ou com horário programado.
+async function liberarResultadoAgora(code){
+  const p = state.professor;
+  const a = p.assessments.find(x=>x.code===code);
+  if(!a) return;
+  if(!confirm(`Liberar agora o resultado e o gabarito de "${a.title}" para os alunos?`)) return;
+  const nova = {...a, resultRelease:{mode:'imediato', releaseAt:''}, updatedAt:Date.now()};
+  try{
+    await window.storage.set(`assessment:${code}`, JSON.stringify(nova), true);
+    const idx = p.assessments.findIndex(x=>x.code===code);
+    if(idx>=0) p.assessments[idx] = nova;
+    render();
+    alert('Resultado liberado! Os alunos já podem ver o gabarito.');
+  }catch(e){ alert('Não foi possível liberar o resultado. Tente de novo.'); }
+}
+async function verificarLiberacaoResultado(){
+  const al = state.aluno;
+  try{ const r = await window.storage.get(`assessment:${al.assessment.code}`, true); const fresh = JSON.parse(r.value); al.assessment = {...al.assessment, resultRelease: fresh.resultRelease}; }catch(e){}
+  if(resultReleased(al.assessment)){ al.stage='resultado'; }
+  render();
+}
+async function abrirLiberacaoProva(code){
+  const p = state.professor;
+  const a = p.assessments.find(x=>x.code===code);
+  if(!a) return;
+  p.liberacao = { code, loading:true, turmas:[], selecionados:[], mensagem:'', salvando:false };
+  render();
+  if(p.turmas.length===0){ try{ const r = await window.storage.get('turmas', true); p.turmas = JSON.parse(r.value); }catch(e){} }
+  const hoje = new Date().toISOString().slice(0,10);
+  const turmas = assessmentTurmas(a);
+  const info = await Promise.all(turmas.map(async t => {
+    let presentes = null;
+    try{ const r = await window.storage.get(`chamada:${t.id}:${hoje}`, true); presentes = (JSON.parse(r.value).presentes||[]).map(x=>x.studentId); }catch(e){}
+    return { turmaId:t.id, turmaName:t.name, students:t.students.map(s=>({id:s.id,name:s.name})), presentes };
+  }));
+  const jaLiberados = await carregarProvaLiberacao(code);
+  let selecionados;
+  if(jaLiberados){
+    selecionados = info.flatMap(t => t.students).filter(s => alunoEstaLiberado(jaLiberados, s.id, s.name)).map(s=>s.id);
+  } else {
+    selecionados = info.flatMap(t => t.presentes ? t.students.filter(s=>t.presentes.includes(s.id)).map(s=>s.id) : []);
+  }
+  if(!p.liberacao || p.liberacao.code!==code) return;
+  p.liberacao = { code, loading:false, turmas:info, selecionados, mensagem:'', salvando:false, jaSalvo: !!jaLiberados };
+  render();
+}
+function fecharLiberacaoProva(){ state.professor.liberacao = null; render(); }
+function liberacaoMarcarPresentes(){
+  const lb = state.professor.liberacao; if(!lb) return;
+  lb.selecionados = lb.turmas.flatMap(t => t.presentes ? t.students.filter(s=>t.presentes.includes(s.id)).map(s=>s.id) : []);
+  render();
+}
+function liberacaoToggleAluno(sid){
+  const lb = state.professor.liberacao; if(!lb) return;
+  lb.selecionados = lb.selecionados.includes(sid) ? lb.selecionados.filter(x=>x!==sid) : [...lb.selecionados, sid];
+}
+async function salvarProvaLiberacao(){
+  const p = state.professor, lb = p.liberacao; if(!lb || lb.salvando) return;
+  lb.salvando = true; render();
+  const liberados = lb.turmas.flatMap(t => t.students).filter(s => lb.selecionados.includes(s.id)).map(s => ({ studentId:s.id, name:s.name }));
+  try{
+    await window.storage.set(provaLiberacaoKey(lb.code), JSON.stringify({ code: lb.code, liberados, atualizadoEm: Date.now(), por: p.session.displayName }), true);
+    lb.mensagem = `Prova liberada para ${liberados.length} aluno(s).`; lb.jaSalvo = true;
+  }catch(e){ lb.mensagem = 'Não foi possível salvar a liberação. Tente de novo.'; }
+  lb.salvando = false; render();
+}
+function renderLiberacaoPanel(){
+  const lb = state.professor.liberacao;
+  if(!lb) return '';
+  const a = state.professor.assessments.find(x=>x.code===lb.code);
+  if(lb.loading) return `<div class="card"><h2>🚪 Liberar prova</h2><div class="spinner"></div></div>`;
+  return `
+    <div class="card" style="border:2px solid var(--green);">
+      <div class="row" style="align-items:center; justify-content:space-between;">
+        <h2 style="margin:0;">🚪 Liberar prova${a?': '+esc(a.title):''}</h2>
+        <button class="btn btn-ghost btn-sm" data-action="fechar-liberacao">✕ Fechar</button>
+      </div>
+      <p class="muted" style="font-size:.85rem;">Só os alunos marcados abaixo conseguem iniciar a prova. A seleção inicial vem da chamada de hoje; ajuste se necessário (por exemplo, quem chegou atrasado) e salve de novo para liberar mais alunos.</p>
+      ${lb.turmas.map(t => `
+        <h3 style="margin:14px 0 4px;">${esc(t.turmaName)}</h3>
+        ${t.presentes===null ? '<p class="muted" style="font-size:.82rem; color:var(--red);">⚠ Chamada de hoje não registrada para esta turma — marque manualmente quem está na sala.</p>' : ''}
+        ${t.students.map(s => {
+          const presente = t.presentes ? t.presentes.includes(s.id) : null;
+          return `<label class="row" style="align-items:center; gap:8px; font-weight:400; margin-top:6px;">
+            <input type="checkbox" data-action="liberacao-toggle-aluno" data-sid="${s.id}" ${lb.selecionados.includes(s.id)?'checked':''} style="width:auto;">
+            ${esc(s.name)}
+            ${presente===true ? '<span class="pill" style="font-size:.7rem;">presente na chamada</span>' : presente===false ? '<span class="muted" style="font-size:.75rem;">ausente na chamada</span>' : ''}
+          </label>`;
+        }).join('')}
+      `).join('')}
+      ${lb.mensagem ? `<p style="margin-top:10px; color:var(--green); font-weight:600;">${esc(lb.mensagem)}</p>` : ''}
+      <div class="row" style="margin-top:14px; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" data-action="liberacao-marcar-presentes">Marcar só presentes da chamada</button>
+        <button class="btn btn-primary btn-sm" data-action="salvar-liberacao" ${lb.salvando?'disabled':''}>${lb.salvando?'Salvando...':'Liberar para os selecionados'}</button>
+      </div>
+    </div>
+  `;
+}
+
 function renderProfessorList(){
   const p = state.professor;
   const myAssessments = p.assessments.filter(a => !a.professorId || a.professorId===p.session.id);
@@ -2159,6 +2270,8 @@ function renderProfessorList(){
         </div>
         <div class="row" style="flex:0 0 auto; gap:8px;">
           <span class="pill">${a.code}</span>
+          ${!resultReleased(a) ? `<button class="btn btn-primary btn-sm" data-action="liberar-resultado" data-code="${a.code}">📢 Liberar resultado</button>` : ''}
+          ${provaExigeLiberacao(a) ? `<button class="btn btn-primary btn-sm" data-action="abrir-liberacao" data-code="${a.code}">🚪 Liberar turma</button>` : ''}
           <button class="btn btn-ghost btn-sm" data-action="edit-assessment" data-code="${a.code}">Editar</button>
           <button class="btn btn-ghost btn-sm" data-action="export-pdf" data-code="${a.code}">Imprimir / PDF</button>
           ${assessmentTurmaIds(a).length>0 ? `<button class="btn btn-ghost btn-sm" data-action="print-personal-gabaritos" data-code="${a.code}">Gabaritos por aluno</button>` : ''}
@@ -2179,6 +2292,7 @@ function renderProfessorList(){
     </div>
     ${renderPeriodosCard()}
     ${renderFreqHojeCard()}
+    ${renderLiberacaoPanel()}
     <div class="card">
       <div class="row" style="align-items:center; justify-content:space-between;">
         <h2>Minhas avaliações</h2>
@@ -7252,6 +7366,11 @@ function renderNewAssessment(){
         </label>
         <p class="muted" style="font-size:.8rem;">Desmarque para exercícios de fixação, diagnósticas ou autoavaliações que o aluno pode responder tranquilamente, sem trava de tela.</p>
       ` : ''}
+      <label style="display:flex; align-items:center; gap:8px; text-transform:none; font-weight:400; margin-top:14px;">
+        <input type="checkbox" data-action="toggle-exige-liberacao" ${a.exigeLiberacao?'checked':''} style="width:auto;">
+        Só iniciar quando o professor liberar (apenas alunos presentes na sala)
+      </label>
+      <p class="muted" style="font-size:.8rem;">Antes da prova, você abre "Liberar turma" na lista de avaliações, confere a chamada de hoje e libera só quem está na sala. Funciona quando a avaliação está vinculada a uma turma.</p>
       <label>Janela de aplicação (opcional)</label>
       <div class="row">
         <div>
@@ -14445,14 +14564,14 @@ function renderEnviado(){
   const a = al.assessment;
   const rr = a.resultRelease;
   const msg = rr.mode==='nunca'
-    ? 'O professor optou por não liberar o resultado detalhado para os alunos.'
+    ? 'O resultado detalhado ainda não foi liberado pelo professor.'
     : `O resultado será liberado em ${formatDateTime(rr.releaseAt)}.`;
   return `
     <div class="card">
       <h2 class="center">Prova enviada!</h2>
       <p class="center muted">Recebemos as respostas de ${esc(al.name)}.</p>
       <p class="center" style="margin-top:10px;">${msg}</p>
-      ${rr.mode==='agendado' ? `<button class="btn btn-ghost btn-block" style="margin-top:12px;" data-action="check-release">Verificar se já foi liberado</button>` : ''}
+      ${rr.mode!=='imediato' ? `<button class="btn btn-ghost btn-block" style="margin-top:12px;" data-action="check-release">Verificar se já foi liberado</button>` : ''}
       ${backButtonHtml()}
     </div>
   `;
@@ -15579,7 +15698,8 @@ async function editAssessment(code){
     endAt: a.endAt || '',
     resultRelease: a.resultRelease ? {...a.resultRelease} : {mode:'imediato', releaseAt:''},
     securityEnabled: a.securityEnabled!==false,
-    minMinutesPerQuestion: (a.minMinutesPerQuestion!=null ? a.minMinutesPerQuestion : 3)
+    minMinutesPerQuestion: (a.minMinutesPerQuestion!=null ? a.minMinutesPerQuestion : 3),
+    exigeLiberacao: a.exigeLiberacao===true
   };
   p.editingCode = code;
   p.editingResponseCount = 0;
@@ -15626,6 +15746,7 @@ async function saveAssessment(){
     resultRelease: {...a.resultRelease},
     securityEnabled: (a.instrumento==='avaliacao' || a.instrumento==='recuperacao') ? true : (a.securityEnabled!==false),
     minMinutesPerQuestion: a.instrumento==='avaliacao' ? normalizeMinMinutes(a.minMinutesPerQuestion) : null,
+    exigeLiberacao: a.exigeLiberacao===true,
     professorId: isEditing && existingAssessment ? existingAssessment.professorId : state.professor.session.id,
     professorName: isEditing && existingAssessment ? existingAssessment.professorName : state.professor.session.displayName,
     createdAt: isEditing && existingAssessment ? existingAssessment.createdAt : Date.now(),
@@ -18660,6 +18781,17 @@ async function startExamFlow(){
     render();
     return;
   }
+  if(provaExigeLiberacao(a)){
+    let studentId = al.matriculaStudentId || null;
+    if(!studentId && al.turma){ const st = (al.turma.students||[]).find(x=>x.name===al.name); if(st) studentId = st.id; }
+    const liberados = await carregarProvaLiberacao(a.code);
+    if(!liberados || !alunoEstaLiberado(liberados, studentId, al.name)){
+      al.error = 'O professor ainda não liberou a prova para você. Aguarde a liberação e tente de novo.';
+      al.stage = al.studentLoggedIn ? 'dashboard' : al.stage;
+      render();
+      return;
+    }
+  }
   const lockKey = `attempt-lock:${a.code}:${slugifyName(al.name)}`;
   let lock = null;
   try{ const lr = await window.storage.get(lockKey, true); lock = JSON.parse(lr.value); }catch(e){}
@@ -19502,6 +19634,11 @@ document.addEventListener('click', (e) => {
   else if(act==='quick-new-assessment'){ p.subview='avaliacoes'; p.mode='new'; p.newAssessment = freshAssessment(); p.editingCode=null; p.editingResponseCount=0; p.pickerOpen=false; p.pickerSelected=[]; render(); }
   else if(act==='cancel-new'){ p.mode='list'; p.editingCode=null; p.editingResponseCount=0; render(); }
   else if(act==='edit-assessment'){ editAssessment(btn.dataset.code); }
+  else if(act==='liberar-resultado'){ liberarResultadoAgora(btn.dataset.code); }
+  else if(act==='abrir-liberacao'){ abrirLiberacaoProva(btn.dataset.code); }
+  else if(act==='fechar-liberacao'){ fecharLiberacaoProva(); }
+  else if(act==='liberacao-marcar-presentes'){ liberacaoMarcarPresentes(); }
+  else if(act==='salvar-liberacao'){ salvarProvaLiberacao(); }
   else if(act==='add-question'){ p.newAssessment.questions.push(freshQuestion(btn.dataset.qtype)); render(); }
   else if(act==='remove-question'){ p.newAssessment.questions = p.newAssessment.questions.filter(q=>q.id!==btn.dataset.qid); render(); }
   else if(act==='save-to-bank'){ const q = findQuestionRef(btn.dataset.qid); p.bank.push(JSON.parse(JSON.stringify(q))); saveBankToStorage(); alert('Questão salva no banco.'); }
@@ -19716,7 +19853,7 @@ document.addEventListener('click', (e) => {
   else if(act==='submit-answers'){ submitAnswers(); }
   else if(act==='responder-proxima'){ responderProxima(); }
   else if(act==='responder-anterior'){ responderAnterior(); }
-  else if(act==='check-release'){ if(resultReleased(al.assessment)){ al.stage='resultado'; } render(); }
+  else if(act==='check-release'){ verificarLiberacaoResultado(); }
   else if(act==='monitoria-nav-criar'){ monitoriaCriarGrupo(); }
   else if(act==='monitoria-nav-entrar'){ al.monitoria.view='entrar'; al.monitoria.error=''; render(); }
   else if(act==='monitoria-nav-voltar-inicio'){ al.monitoria.view='inicio'; al.monitoria.error=''; render(); }
@@ -19959,6 +20096,7 @@ document.addEventListener('change', (e) => {
     else al.monitoria.criarSelecionados.push(sid);
     return;
   }
+  if(act==='liberacao-toggle-aluno'){ liberacaoToggleAluno(el.dataset.sid); return; }
   if(el.id==='monitoria-status-select'){ al.monitoria.registroStatus = el.value; return; }
   if(el.id==='boletim-disciplina-select'){ al.boletim.detalheDisciplina = el.value; render(); return; }
   if(el.id==='boletim-unidade-select'){ al.boletim.detalheUnidade = el.value; render(); return; }
@@ -20022,7 +20160,8 @@ document.addEventListener('change', (e) => {
     else a.turmaIds.push(tid);
     render();
   }
-  else if(act==='set-instrumento'){ p.newAssessment.instrumento = el.value; if(el.value==='avaliacao' || el.value==='recuperacao') p.newAssessment.securityEnabled = true; render(); }
+  else if(act==='set-instrumento'){ p.newAssessment.instrumento = el.value; if(el.value==='avaliacao' || el.value==='recuperacao'){ p.newAssessment.securityEnabled = true; p.newAssessment.exigeLiberacao = true; } render(); }
+  else if(act==='toggle-exige-liberacao'){ p.newAssessment.exigeLiberacao = el.checked; }
   else if(act==='toggle-security-enabled'){ p.newAssessment.securityEnabled = el.checked; }
   else if(act==='set-unidade'){ p.newAssessment.unidade = el.value; render(); }
   else if(act==='set-disciplina'){ p.newAssessment.disciplinaId = el.value; }
