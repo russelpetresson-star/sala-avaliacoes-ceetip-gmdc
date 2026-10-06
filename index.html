@@ -8837,6 +8837,22 @@ function renderFinalGradesTable(){
       `).join('')}
     </table>
     </div>
+    ${(fg.semAluno||[]).length>0 ? `
+      <div class="card" style="border:2px solid var(--red); margin-top:16px;">
+        <h3 style="margin-top:0;">⚠ Provas feitas com nome diferente do da turma</h3>
+        <p class="muted" style="font-size:.85rem;">Estas provas não entraram nas notas porque o nome digitado pelo aluno não bate com nenhum nome da lista da turma. Escolha o aluno certo e vincule — a nota passa a contar.</p>
+        ${fg.semAluno.map((it,i) => `
+          <div class="list-item">
+            <div><strong>${esc(it.name)}</strong><br><span class="muted">${esc(it.title||it.code)} · ${it.max>0 ? (it.total/it.max*10).toFixed(1) : '—'} / 10</span></div>
+            <div class="row" style="flex:0 0 auto; gap:6px;">
+              <select id="vinc-sel-${i}" style="max-width:240px;">
+                <option value="">Escolha o aluno...</option>
+                ${(state.professor.turmas.find(t=>t.id===fg.turmaId)||{students:[]}).students.map(s => `<option value="${esc(s.name)}">${esc(s.name)}</option>`).join('')}
+              </select>
+              <button class="btn btn-primary btn-sm" data-action="vincular-resposta-aluno" data-idx="${i}">Vincular</button>
+            </div>
+          </div>`).join('')}
+      </div>` : ''}
     <h3 style="margin-top:22px;">Gráfico por aluno</h3>
     ${renderFinalGradesChart(fg)}
   `;
@@ -9537,7 +9553,7 @@ async function calcProfessorPainel(){
     responses.forEach(resp => {
       if(max>0){
         const pct = (resp.total/max)*100;
-        let turma = turmas.length===1 ? turmas[0] : turmas.find(t=>t.students.some(s=>s.name===resp.studentName));
+        let turma = turmas.length===1 ? turmas[0] : turmas.find(t=>t.students.some(s=>mesmoNomeAluno(s.name,resp.studentName)));
         if(turma){
           if(!turmaStats[turma.name]) turmaStats[turma.name] = {sum:0,count:0};
           turmaStats[turma.name].sum += pct; turmaStats[turma.name].count++;
@@ -9572,7 +9588,7 @@ async function calcProfessorPainel(){
       turmas.forEach(turma => {
         if(assessmentWindowStatus(assessmentParaTurma(a, turma.id))!=='depois') return;
         turma.students.forEach(s => {
-          const answered = responses.some(r=>r.studentName===s.name);
+          const answered = responses.some(r=>mesmoNomeAluno(r.studentName,s.name));
           if(!answered){
             const key = turma.name+'|'+s.name;
             if(!ausentesMap[key]) ausentesMap[key] = { turmaName: turma.name, studentName: s.name, count:0 };
@@ -12206,7 +12222,7 @@ async function calcExecDashboard(){
         const respTurmaIds = assessmentTurmaIds(a);
         let respTurmaId = respTurmaIds.length===1 ? respTurmaIds[0] : null;
         if(respTurmaIds.length>1){
-          const found = state.professor.turmas.find(t => respTurmaIds.includes(t.id) && t.students.some(s=>s.name===resp.studentName));
+          const found = state.professor.turmas.find(t => respTurmaIds.includes(t.id) && t.students.some(s=>mesmoNomeAluno(s.name,resp.studentName)));
           if(found) respTurmaId = found.id;
         }
         if(respTurmaId){
@@ -16332,6 +16348,9 @@ function shuffleForStudent(questions){
     return copy;
   }));
 }
+// Compara nomes ignorando maiúsculas, acentos e espaços repetidos (ex.: "ELLOAN  Paulo" = "Elloan Paulo").
+function nomeChave(n){ return String(n||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+function mesmoNomeAluno(a,b){ return nomeChave(a)===nomeChave(b); }
 function slugifyName(name){
   return (name||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'aluno';
 }
@@ -18823,6 +18842,11 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
 
   const acc = {};
   roster.forEach(name => { acc[name] = { avaliacaoScores:[], diagnosticaScores:[], exerciciosScores:[], recuperacaoScores:[], exerciciosEntregues:0 }; });
+  const rosterPorChave = {};
+  roster.forEach(n => { rosterPorChave[nomeChave(n)] = n; });
+  // nomes de alunos de QUALQUER turma: resposta cujo nome não bate com ninguém é "sem aluno" (nome digitado diferente)
+  const nomesTodasTurmas = new Set(((state.professor && state.professor.turmas)||[]).flatMap(t => (t.students||[]).map(s => nomeChave(s.name))));
+  const semAluno = [];
 
   // Busca as respostas de TODAS as avaliações (dos 4 instrumentos) em paralelo, em vez de uma
   // de cada vez — com várias avaliações lançadas numa unidade, buscar em série fica bem lento
@@ -18840,20 +18864,28 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
       const max = a.questions.reduce((s,q)=>s+q.points,0);
       let responses = [];
       try{ const r = await window.storage.get(`responses:${a.code}`, true); responses = JSON.parse(r.value); }catch(e){}
-      return { bucketKey: b.bucketKey, zeroFill: b.zeroFill, max, responses };
+      return { bucketKey: b.bucketKey, zeroFill: b.zeroFill, max, responses, code: a.code, title: a.title };
     }))
   );
-  fetchedResults.forEach(({ bucketKey, zeroFill, max, responses }) => {
+  fetchedResults.forEach(({ bucketKey, zeroFill, max, responses, code, title }) => {
     const respondedNames = new Set();
     responses.forEach(resp => {
       // Uma mesma avaliação pode estar aplicada a várias turmas ao mesmo tempo — só entram aqui
       // os alunos da turma selecionada (roster); quem respondeu mas é de outra turma fica de fora.
-      if(roster.length>0 && !roster.includes(resp.studentName)) return;
-      if(!acc[resp.studentName]) acc[resp.studentName] = { avaliacaoScores:[], diagnosticaScores:[], exerciciosScores:[], recuperacaoScores:[], exerciciosEntregues:0 };
-      respondedNames.add(resp.studentName);
+      let nome = resp.studentName;
+      if(roster.length>0 && !roster.includes(nome)){
+        const viaChave = rosterPorChave[nomeChave(nome)];
+        if(viaChave){ nome = viaChave; }
+        else {
+          if(!nomesTodasTurmas.has(nomeChave(nome))) semAluno.push({ name: resp.studentName, code, title, total: resp.total, max });
+          return;
+        }
+      }
+      if(!acc[nome]) acc[nome] = { avaliacaoScores:[], diagnosticaScores:[], exerciciosScores:[], recuperacaoScores:[], exerciciosEntregues:0 };
+      respondedNames.add(nome);
       const norm = max>0 ? resp.total/max : 0;
-      acc[resp.studentName][bucketKey].push(norm);
-      if(bucketKey==='exerciciosScores') acc[resp.studentName].exerciciosEntregues++;
+      acc[nome][bucketKey].push(norm);
+      if(bucketKey==='exerciciosScores') acc[nome].exerciciosEntregues++;
     });
     if(zeroFill){
       roster.forEach(name => {
@@ -18912,7 +18944,7 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
       autoNp1, autoDiag, autoExerc, autoAuto, autoRecuperacao };
   });
 
-  return { rows, total };
+  return { rows, total, semAluno };
 }
 
 async function calcFinalGrades(){
@@ -18937,10 +18969,33 @@ async function calcFinalGrades(){
     return disciplinaBate;
   });
   const overrides = await getNotasManuais(p.session.id, tid, unidade, disciplina.id);
-  const { rows, total } = await computeGradesForAssessments(relevant, p.pesos, t, unidade, overrides);
+  const { rows, total, semAluno } = await computeGradesForAssessments(relevant, p.pesos, t, unidade, overrides);
 
-  p.finalGrades = { turmaId: tid, unidade, disciplinaId: disciplina.id, loading:false, rows, total, editMode:false };
+  p.finalGrades = { turmaId: tid, unidade, disciplinaId: disciplina.id, loading:false, rows, total, semAluno: semAluno||[], editMode:false };
   render();
+}
+// Provas feitas com um nome diferente do da lista da turma: o professor vincula ao aluno certo.
+async function vincularRespostaAoAluno(idx){
+  const p = state.professor, fg = p.finalGrades;
+  if(!fg || !fg.semAluno || !fg.semAluno[idx]) return;
+  const item = fg.semAluno[idx];
+  const sel = document.getElementById('vinc-sel-'+idx);
+  const destino = sel ? sel.value : '';
+  if(!destino){ alert('Escolha o aluno da turma que fez essa prova.'); return; }
+  if(!confirm(`Vincular a prova de "${item.name}" ao aluno "${destino}"?`)) return;
+  let responses = [];
+  try{ const r = await window.storage.get(`responses:${item.code}`, true); responses = JSON.parse(r.value); }catch(e){ alert('Não foi possível ler as respostas dessa avaliação.'); return; }
+  if(responses.some(r => mesmoNomeAluno(r.studentName, destino))){
+    alert(`"${destino}" já tem uma prova registrada nessa avaliação. Abra "Resultados" da avaliação para decidir qual manter.`); return;
+  }
+  const alvo = responses.find(r => r.studentName===item.name);
+  if(!alvo){ alert('Resposta não encontrada (talvez já tenha sido alterada). Recalcule as notas.'); return; }
+  alvo.studentNameOriginal = alvo.studentName;
+  alvo.studentName = destino;
+  try{ await window.storage.set(`responses:${item.code}`, JSON.stringify(responses), true); }
+  catch(e){ alert('Não foi possível salvar a alteração.'); return; }
+  await calcFinalGrades();
+  alert('Prova vinculada! A nota já aparece na tabela.');
 }
 function toggleEditFinalGrades(on){
   const fg = state.professor.finalGrades;
@@ -19118,7 +19173,7 @@ async function startExamFlow(){
   try{
     const r = await window.storage.get(`responses:${a.code}`, true);
     const responses = JSON.parse(r.value);
-    existing = responses.find(resp => resp.studentName === al.name) || null;
+    existing = responses.find(resp => mesmoNomeAluno(resp.studentName, al.name)) || null;
   }catch(e){}
   if(existing){
     al.result = existing;
@@ -19356,7 +19411,7 @@ async function loadStudentDashboard(){
     return { a, responses };
   }));
   for(const { a, responses } of comResponses){
-    const mineResp = responses.find(r=>r.studentName===al.name);
+    const mineResp = responses.find(r=>mesmoNomeAluno(r.studentName, al.name));
     if(mineResp){
       realizadas.push({ assessment:a, response:mineResp });
     } else {
@@ -20103,6 +20158,7 @@ document.addEventListener('click', (e) => {
   else if(act==='toggle-ai-tipo'){ const t = btn.dataset.tipo; if(p.aiGen.tipos.includes(t)) p.aiGen.tipos = p.aiGen.tipos.filter(x=>x!==t); else p.aiGen.tipos.push(t); }
   else if(act==='toggle-ai-provas-antigas'){ p.aiGen.provasAntigas = !p.aiGen.provasAntigas; }
   else if(act==='generate-ai-questions'){ generateAiQuestions(); }
+  else if(act==='vincular-resposta-aluno'){ vincularRespostaAoAluno(parseInt(btn.dataset.idx)); }
   else if(act==='chat-bridge-abrir'){ chatBridgeAbrir(btn.dataset.kind); }
   else if(act==='chat-bridge-fechar'){ chatBridgeState().open = false; render(); }
   else if(act==='chat-bridge-copiar'){ chatBridgeCopiar(); }
