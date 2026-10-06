@@ -549,6 +549,8 @@
   .picker-item:last-child{ border-bottom:none; }
   .student-chip{ display:flex; align-items:center; justify-content:space-between; padding:7px 10px; border:1px solid var(--paper-line); border-radius:6px; margin-bottom:6px; font-size:.9rem;}
   .type-pick{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+  body.screenshot-shield #root{ visibility:hidden; }
+  body.screenshot-shield::before{ content:'📵 Captura de tela não é permitida durante a prova.'; position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; font-size:1.2rem; font-weight:700; background:#3d0f1c; color:#fff; }
   .exam-lock, .exam-lock *{ -webkit-user-select:none; -moz-user-select:none; user-select:none; }
   .exam-sticky-header{ position:sticky; top:0; background:var(--paper); z-index:5; padding-bottom:8px; margin:-26px -26px 0; padding:26px 26px 8px; border-bottom:1px solid var(--paper-line); }
   .exam-lock textarea, .exam-lock input{ user-select:text; -webkit-user-select:text; }
@@ -1517,7 +1519,7 @@ let state = {
 
 
 function freshAssessment(){
-  return { instrumento:'avaliacao', unidade:'', title:'', disciplinaId:'', turmaIds:[], questions:[], startAt:'', endAt:'', resultRelease:{mode:'imediato', releaseAt:''}, securityEnabled:true };
+  return { instrumento:'avaliacao', unidade:'', title:'', disciplinaId:'', turmaIds:[], questions:[], startAt:'', endAt:'', resultRelease:{mode:'imediato', releaseAt:''}, securityEnabled:true, minMinutesPerQuestion:3 };
 }
 function instrumentoLabel(key){ const i = INSTRUMENTOS.find(x=>x.key===key); return i ? i.label : key; }
 function assessmentTurmaIds(a){
@@ -1810,7 +1812,16 @@ function render(){
     if(wrapEl){ wrapEl.classList.remove('wide'); wrapEl.classList.remove('full'); }
     return;
   }
+  const carrosselAntigo = root.querySelector('.campanha-carousel');
   root.innerHTML = state.view==='professor' ? renderProfessor() : state.view==='coordenador' ? renderCoordenador() : state.view==='freqmonitor' ? renderFreqMonitor() : state.view==='biblioteca' ? renderBiblioteca() : renderAluno();
+  // Reaproveita o carrossel já carregado (imagens decodificadas, slide atual) quando o conteúdo
+  // não mudou, em vez de recriar tudo a cada render — evita o "pisca" do banner.
+  if(carrosselAntigo){
+    const carrosselNovo = root.querySelector('.campanha-carousel');
+    if(carrosselNovo && carrosselNovo.dataset.sig && carrosselNovo.dataset.sig===carrosselAntigo.dataset.sig){
+      carrosselNovo.replaceWith(carrosselAntigo);
+    }
+  }
   const wide = (state.view==='professor' && !!state.professor.session) || (state.view==='coordenador' && !!state.coordenador.session) || (state.view==='aluno' && state.aluno.stage==='dashboard');
   const full = state.professor.quiz.presentationMode || state.professor.roleta.presentationMode || state.professor.duelo.presentationMode || state.professor.slides.presentationMode;
   const wrapEl = document.querySelector('.wrap');
@@ -1879,9 +1890,12 @@ function campanhaCarouselGoTo(el, idx){
   slides.forEach((s,i) => s.classList.toggle('ativo', i===campanhaCarouselIdx));
 }
 function initCampanhaCarousel(){
-  if(campanhaCarouselInterval){ clearInterval(campanhaCarouselInterval); campanhaCarouselInterval = null; }
   const el = document.querySelector('.campanha-carousel');
+  // Carrossel reaproveitado entre renders (mesmo conteúdo): mantém slide atual e o timer.
+  if(el && el.dataset.ready && el.dataset.ready===el.dataset.sig && campanhaCarouselInterval) return;
+  if(campanhaCarouselInterval){ clearInterval(campanhaCarouselInterval); campanhaCarouselInterval = null; }
   if(!el) return;
+  el.dataset.ready = el.dataset.sig || '1';
   campanhaCarouselIdx = 0;
   campanhaCarouselGoTo(el, 0);
   const slides = el.querySelectorAll('.campanha-slide');
@@ -3436,11 +3450,11 @@ function renderCoordPortfolio(){
 
 /* ---------------- HALL DE CONQUISTAS POR TURMA (automático: frequência + resultado de provas) ---------------- */
 
-async function computeConquistasTurma(turmaId){
+async function computeConquistasTurma(turmaId, silent){
   const turma = state.professor.turmas.find(t=>t.id===turmaId);
   if(!turma) return { turmaId, turmaName:'', frequenciaExemplar:[], destaque:null };
   if(state.coordenador.assessments.length===0 && !state.coordenador.assessmentsLoading){ await loadCoordAssessments(); }
-  await ensureFreqStats(turma.id, turma);
+  await ensureFreqStats(turma.id, turma, false, silent);
   const freqCache = state.freqStatsCache[turma.id];
   const freq = freqCache && freqCache.stats;
   const frequenciaExemplar = (freq && turma.students.length>0) ? turma.students.filter(s => {
@@ -3561,11 +3575,17 @@ function renderAlunoConquistasBlock(){
 async function loadMuralConquistas(){
   if(state.muralConquistas.loading) return;
   state.muralConquistas.loading = true;
-  render();
+  // Sem render() aqui: o carrossel só aparece quando houver slides, e cada render() refaz a
+  // tela inteira (era isso que fazia o banner "piscar" na abertura do app). Os cálculos das
+  // turmas rodam em paralelo e em modo silencioso, com um único render() no final.
   if(state.professor.turmas.length===0){ await loadTurmas(); }
+  if(state.coordenador.assessments.length===0 && !state.coordenador.assessmentsLoading){ await loadCoordAssessments(); }
+  const turmasMural = state.professor.turmas.slice();
+  const dadosTurmas = await Promise.all(turmasMural.map(t => computeConquistasTurma(t.id, true)));
   const slides = [];
-  for(const turma of state.professor.turmas){
-    const data = await computeConquistasTurma(turma.id);
+  for(let ti=0; ti<turmasMural.length; ti++){
+    const turma = turmasMural[ti];
+    const data = dadosTurmas[ti];
     if(data.frequenciaExemplar.length>0){
       // No carrossel o espaço é mínimo (é uma legenda de slide, não uma tela cheia), então aqui
       // mostra só a contagem — a lista completa de nomes fica na tela do Hall de Conquistas.
@@ -4788,8 +4808,10 @@ function renderAlunoMonitoriaBlockGrupo(){
 // nos avisos ao vivo do aluno).
 function renderCarrosselCampanha(itensAprovados){
   if(!itensAprovados || itensAprovados.length===0) return '';
+  const sigRaw = itensAprovados.map(i => [i.tipo, i.id||'', i.youtubeId||'', i.imagemUrl||'', i.titulo||'', i.descricao||'', i.badge||''].join('~')).join('|');
+  let sigH = 5381; for(let k=0;k<sigRaw.length;k++){ sigH = ((sigH*33) ^ sigRaw.charCodeAt(k)) >>> 0; }
   return `
-    <div class="campanha-carousel">
+    <div class="campanha-carousel" data-sig="${sigH}">
       ${itensAprovados.map((item,i) => `
         <div class="campanha-slide ${i===0?'ativo':''}">
           ${item.tipo==='video'
@@ -5475,12 +5497,25 @@ async function loadQuizAtivo(){
 async function saveQuizAtivo(obj){
   await window.storage.set('quiz-ativo', obj ? JSON.stringify(obj) : JSON.stringify(null), true);
 }
+// Atualiza só o número do cronômetro na tela (sem redesenhar a página inteira a cada segundo).
+function updateLiveCountdowns(){
+  document.querySelectorAll('[data-countdown-start]').forEach(el => {
+    const start = Number(el.dataset.countdownStart), dur = Number(el.dataset.countdownDur);
+    if(!start || !dur) return;
+    const remaining = Math.max(0, dur - Math.floor((Date.now()-start)/1000));
+    if(el.textContent !== String(remaining)) el.textContent = String(remaining);
+    const urgente = remaining<=5;
+    el.classList.toggle('quiz-timer-urgente', urgente);
+    el.style.color = urgente ? 'var(--red)' : '';
+  });
+}
 async function refreshProfessorQuiz(){
   const q = state.professor.quiz;
   const prev = JSON.stringify(q.current);
   const fresh = await loadQuizAtivo();
   q.current = fresh;
   if(JSON.stringify(fresh) !== prev) render();
+  updateLiveCountdowns();
   checkQuizLeaderChange(fresh);
   if(q.presentationMode) checkQuizTick(fresh);
   await checkQuizAutoReveal(fresh);
@@ -5879,7 +5914,7 @@ function renderQuizPresentation(){
     const remaining = Math.max(0, question.durationSeconds - Math.floor((Date.now()-q.currentStartedAt)/1000));
     const urgente = remaining<=5;
     center = `
-      <p class="${urgente?'quiz-timer-urgente':''}" style="text-align:center; font-size:4.5rem; font-weight:800; margin:10px 0; ${urgente?'color:var(--red);':''}">${remaining}</p>
+      <p data-countdown-start="${q.currentStartedAt}" data-countdown-dur="${question.durationSeconds}" class="${urgente?'quiz-timer-urgente':''}" style="text-align:center; font-size:4.5rem; font-weight:800; margin:10px 0; ${urgente?'color:var(--red);':''}">${remaining}</p>
       <h1 style="text-align:center; font-size:2rem; margin-top:0;">${esc(question.text)}</h1>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:760px; margin:20px auto;">
         ${question.options.map((opt,i)=>`<div style="background:var(--board); color:#fff; padding:18px; border-radius:10px; font-size:1.3rem; text-align:center;">${String.fromCharCode(65+i)}) ${esc(opt)}</div>`).join('')}
@@ -6268,6 +6303,7 @@ async function refreshProfessorDuelo(){
   const fresh = await loadDueloAtivo();
   ds.current = fresh;
   if(JSON.stringify(fresh) !== prev) render();
+  updateLiveCountdowns();
   if(ds.presentationMode) checkDueloTick(fresh);
   await checkDueloAutoReveal(fresh);
 }
@@ -6467,7 +6503,7 @@ function renderDueloPresentation(){
     const remaining = Math.max(0, d.question.durationSeconds - Math.floor((Date.now()-d.startedAt)/1000));
     const urgente = remaining<=5;
     center = `
-      <p class="${urgente?'quiz-timer-urgente':''}" style="text-align:center; font-size:4rem; font-weight:800; margin:6px 0; ${urgente?'color:var(--red);':''}">${remaining}</p>
+      <p data-countdown-start="${d.startedAt}" data-countdown-dur="${d.question.durationSeconds}" class="${urgente?'quiz-timer-urgente':''}" style="text-align:center; font-size:4rem; font-weight:800; margin:6px 0; ${urgente?'color:var(--red);':''}">${remaining}</p>
       <h1 style="text-align:center; font-size:1.8rem;">${esc(d.question.text)}</h1>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; max-width:700px; margin:16px auto;">
         ${d.question.options.map((opt,i)=>`<div style="background:var(--board); color:#fff; padding:16px; border-radius:10px; font-size:1.2rem; text-align:center;">${String.fromCharCode(65+i)}) ${esc(opt)}</div>`).join('')}
@@ -7204,6 +7240,11 @@ function renderNewAssessment(){
       ${a.instrumento==='recuperacao' ? `
         <p class="muted" style="font-size:.85rem;">Esta avaliação substitui a Avaliação Mensal/Bimestral (NP1) na nota final apenas para os alunos que a responderem. Quem não fizer continua com o NP1 normal.</p>
       ` : ''}
+      ${a.instrumento==='avaliacao' ? `
+        <label style="margin-top:14px;">Tempo mínimo por questão (minutos)</label>
+        <input type="number" id="min-minutes-input" min="0" max="60" step="0.5" value="${esc(String(a.minMinutesPerQuestion!=null ? a.minMinutesPerQuestion : MIN_MINUTES_DEFAULT))}" style="max-width:140px;">
+        <p class="muted" style="font-size:.8rem;">Tempo que o aluno precisa permanecer em cada questão antes de poder avançar. Padrão: 3 minutos. Use 0 para não exigir tempo mínimo.</p>
+      ` : ''}
       ${(a.instrumento!=='avaliacao' && a.instrumento!=='recuperacao') ? `
         <label style="display:flex; align-items:center; gap:8px; text-transform:none; font-weight:400; margin-top:14px;">
           <input type="checkbox" data-action="toggle-security-enabled" ${a.securityEnabled?'checked':''} style="width:auto;">
@@ -7403,7 +7444,8 @@ function renderResults(){
             <td>
               ${r.tabSwitches ? `<div style="color:var(--red);">⚠ ${r.tabSwitches}x saiu da aba</div>` : ''}
               ${r.fullscreenExits ? `<div style="color:var(--red);">⚠ ${r.fullscreenExits}x saiu da tela cheia</div>` : ''}
-              ${(!r.tabSwitches && !r.fullscreenExits) ? '<span class="muted">—</span>' : ''}
+              ${r.screenshotAttempts ? `<div style="color:var(--red);">⚠ ${r.screenshotAttempts}x tentou capturar a tela</div>` : ''}
+              ${(!r.tabSwitches && !r.fullscreenExits && !r.screenshotAttempts) ? '<span class="muted">—</span>' : ''}
             </td>
             <td>
               ${r.details.some(d=>d.pending) ? `<button class="btn btn-primary btn-sm" data-action="open-correct-response" data-idx="${idx}">Corrigir</button>` : ''}
@@ -8260,12 +8302,25 @@ async function calcFrequenciaStats(turma){
   }
   const hojeRegistro = registros.find(r => r.dateStr===hojeStr);
   const faltasPorAluno = {};
-  turma.students.forEach(s => { faltasPorAluno[s.id] = { student:s, faltas:0, diasComputados:0 }; });
+  const faltasGeralPorAluno = {};
+  turma.students.forEach(s => {
+    faltasPorAluno[s.id] = { student:s, faltas:0, diasComputados:0 };
+    faltasGeralPorAluno[s.id] = { student:s, faltas:0, diasComputados:0 };
+  });
   comDataMes.forEach(r => {
     const presentesIds = new Set(r.presentes.map(x=>x.studentId));
     turma.students.forEach(s => {
       faltasPorAluno[s.id].diasComputados++;
       if(!presentesIds.has(s.id)) faltasPorAluno[s.id].faltas++;
+    });
+  });
+  // "Geral" por aluno = mesma janela dos últimos 31 dias usada no geralPct da turma (não é
+  // o ano letivo inteiro, por custo de leitura — cada dia é uma chamada separada ao storage).
+  comData.forEach(r => {
+    const presentesIds = new Set(r.presentes.map(x=>x.studentId));
+    turma.students.forEach(s => {
+      faltasGeralPorAluno[s.id].diasComputados++;
+      if(!presentesIds.has(s.id)) faltasGeralPorAluno[s.id].faltas++;
     });
   });
   const ranking = Object.values(faltasPorAluno).filter(x=>x.diasComputados>0).sort((a,b)=>b.faltas-a.faltas);
@@ -8278,17 +8333,18 @@ async function calcFrequenciaStats(turma){
     diasComputadosMes: comDataMes.length,
     diasComputadosGeral: comData.length,
     ranking,
-    faltasPorAlunoId: Object.fromEntries(Object.entries(faltasPorAluno).map(([id,v])=>[id,v]))
+    faltasPorAlunoId: Object.fromEntries(Object.entries(faltasPorAluno).map(([id,v])=>[id,v])),
+    faltasGeralPorAlunoId: Object.fromEntries(Object.entries(faltasGeralPorAluno).map(([id,v])=>[id,v]))
   };
 }
-async function ensureFreqStats(turmaId, turma, forceRefresh){
+async function ensureFreqStats(turmaId, turma, forceRefresh, silent){
   const cache = state.freqStatsCache[turmaId];
   if(cache && !forceRefresh) return;
   state.freqStatsCache[turmaId] = { loading:true, stats: cache ? cache.stats : null };
-  render();
+  if(!silent) render();
   const stats = await calcFrequenciaStats(turma);
   state.freqStatsCache[turmaId] = { loading:false, stats };
-  render();
+  if(!silent) render();
 }
 function renderFreqPainelBody(turma){
   const cache = state.freqStatsCache[turma.id];
@@ -9138,10 +9194,17 @@ async function calcProfessorPainel(){
   const turmaStats = {}, disciplinaStats = {}, conteudoStats = {}, descritorStats = {}, alunoStats = {};
   const ausentesMap = {}; // key: turmaName + '|' + studentName -> {turmaName, studentName, count}
 
-  for(const a of myAssessments){
+  // Busca as respostas de todas as avaliações em paralelo (em vez de uma a uma) — cada
+  // storage.get é uma ida e volta ao Firestore, então fazer isso em série soma a latência de
+  // todas elas; em paralelo, o tempo total é o da mais lenta, não a soma de todas.
+  const responsesPorAssessment = await Promise.all(myAssessments.map(async a => {
+    try{ const r = await window.storage.get(`responses:${a.code}`, true); return JSON.parse(r.value); }
+    catch(e){ return []; }
+  }));
+
+  myAssessments.forEach((a, idxAssessment) => {
     const max = a.questions.reduce((s,q)=>s+q.points,0);
-    let responses = [];
-    try{ const r = await window.storage.get(`responses:${a.code}`, true); responses = JSON.parse(r.value); }catch(e){}
+    const responses = responsesPorAssessment[idxAssessment];
     const turmas = assessmentTurmas(a);
 
     responses.forEach(resp => {
@@ -9191,7 +9254,7 @@ async function calcProfessorPainel(){
         });
       });
     }
-  }
+  });
 
   const toSortedArray = (obj, order) => {
     const arr = Object.keys(obj).map(name => ({ name, avg: obj[name].sum/obj[name].count, count: obj[name].count }));
@@ -10816,8 +10879,12 @@ async function loadCoordAssessments(){
   c.assessmentsLoading = true;
   try{
     const list = await window.storage.list('assessment:', true);
-    const items = [];
-    for(const k of (list.keys||[])){ try{ const r = await window.storage.get(k, true); items.push(JSON.parse(r.value)); }catch(e){} }
+    // Busca todos os documentos de avaliação em paralelo (Promise.all) em vez de um a um —
+    // um a um soma a latência de ida e volta ao banco de todas as avaliações da escola, e
+    // essa lista só cresce com o tempo.
+    const items = (await Promise.all((list.keys||[]).map(async k => {
+      try{ const r = await window.storage.get(k, true); return JSON.parse(r.value); }catch(e){ return null; }
+    }))).filter(Boolean);
     items.sort((a,b)=>b.createdAt-a.createdAt);
     c.assessments = items;
   }catch(e){ c.assessments = []; }
@@ -10955,6 +11022,7 @@ async function loadBuscaAtivaAlunosDaTurma(turmaId, role, forceRefresh){
   await ensureFreqStats(turma.id, turma, forceRefresh);
   const freqCache = state.freqStatsCache[turma.id];
   const faltasPorAlunoId = (freqCache && freqCache.stats && freqCache.stats.faltasPorAlunoId) || {};
+  const faltasGeralPorAlunoId = (freqCache && freqCache.stats && freqCache.stats.faltasGeralPorAlunoId) || {};
   const alunos = await Promise.all((turma.students||[]).map(async s => {
     let doc = { nomeResponsavel:'', telefone:'', registros:[] };
     try{
@@ -10962,7 +11030,7 @@ async function loadBuscaAtivaAlunosDaTurma(turmaId, role, forceRefresh){
       const saved = JSON.parse(r.value);
       doc = { nomeResponsavel: saved.nomeResponsavel||'', telefone: saved.telefone||'', registros: saved.registros||[] };
     }catch(e){ /* ainda sem documento salvo pra esse aluno */ }
-    return { studentId: s.id, studentName: s.name, ...doc, faltas: faltasPorAlunoId[s.id] || null };
+    return { studentId: s.id, studentName: s.name, ...doc, faltas: faltasPorAlunoId[s.id] || null, faltasGeral: faltasGeralPorAlunoId[s.id] || null };
   }));
   store.turmaDetalhe[turmaId] = { loading:false, loaded:true, data: { turmaId: turma.id, turmaName: turma.name, alunos } };
   render();
@@ -11607,16 +11675,22 @@ function renderCoordBuscaAtivaDetalheTurma(turmaId){
 // o prefixo do data-action muda conforme `role` pra chamar o handler duplicado de cada lado.
 function renderBuscaAtivaAlunoCard(a, turmaId, role){
   const freq = a.faltas;
-  const freqTxt = (freq && freq.diasComputados>0) ? `${freq.faltas} falta(s) de ${freq.diasComputados} dia(s)` : 'sem dados de frequência';
+  const freqGeral = a.faltasGeral;
+  const freqTxt = (freq && freq.diasComputados>0) ? `${freq.faltas} falta(s) de ${freq.diasComputados} dia(s) no mês` : 'sem dados de frequência no mês';
+  const freqGeralTxt = (freqGeral && freqGeral.diasComputados>0) ? `${freqGeral.faltas} falta(s) de ${freqGeral.diasComputados} dia(s) (últimos 31 dias)` : 'sem dados de frequência geral';
   const corFreq = (freq && freq.diasComputados>0 && freq.faltas===0) ? 'var(--green)' : ((freq && freq.diasComputados>0 && (freq.faltas/freq.diasComputados)>0.25) ? 'var(--red)' : 'var(--ink)');
+  const corFreqGeral = (freqGeral && freqGeral.diasComputados>0 && freqGeral.faltas===0) ? 'var(--green)' : ((freqGeral && freqGeral.diasComputados>0 && (freqGeral.faltas/freqGeral.diasComputados)>0.25) ? 'var(--red)' : 'var(--ink)');
   const ultimo = (a.registros||[])[0];
   const infoUltimo = ultimo ? buscaAtivaAcaoInfo(ultimo.acao) : null;
   const prefixo = role==='aluno' ? 'busca-aluno' : 'busca-coord';
   return `
     <div class="card" style="margin-top:10px; background:var(--surface);">
-      <div class="row" style="align-items:center; justify-content:space-between;">
+      <div class="row" style="align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px;">
         <strong>${esc(a.studentName)}</strong>
-        <span class="muted" style="font-size:.78rem; color:${corFreq};">📅 ${freqTxt}</span>
+        <span style="text-align:right;">
+          <span class="muted" style="font-size:.78rem; color:${corFreq}; display:block;">📅 ${freqTxt}</span>
+          <span class="muted" style="font-size:.74rem; color:${corFreqGeral}; display:block;">📊 Geral: ${freqGeralTxt}</span>
+        </span>
       </div>
       <div class="row" style="margin-top:8px; gap:8px; flex-wrap:wrap;">
         <input type="text" id="busca-contato-nome-${a.studentId}" placeholder="Nome do responsável" value="${esc(a.nomeResponsavel||'')}" style="flex:1 1 180px;">
@@ -11701,37 +11775,46 @@ async function saveCoordPeriodos(){
 async function downloadFullBackup(btn){
   if(btn){ btn.disabled = true; btn.textContent = 'Gerando backup...'; }
   const backup = { _meta: { exportedAt: new Date().toISOString(), version: 1 } };
+  // Todas as leituras do banco rodam em paralelo (antes eram centenas, uma atrás da outra) e o
+  // botão mostra o andamento em porcentagem.
+  let feitas = 0, total = 0;
+  let pctMax = 0;
+  const atualizarProgresso = () => { if(btn && total>0){ pctMax = Math.max(pctMax, Math.min(99, Math.round(feitas/total*100))); btn.textContent = `Gerando backup... ${pctMax}%`; } };
+  const lerJson = async (k) => {
+    try{ const r = await window.storage.get(k, true); return JSON.parse(r.value); }
+    catch(e){ return undefined; }
+    finally{ feitas++; atualizarProgresso(); }
+  };
   const simpleKeys = ['turmas','professores','pin-liberacao','unlock-requests','periodos-avaliacao','livros-didaticos'];
-  for(const k of simpleKeys){
-    try{ const r = await window.storage.get(k, true); backup[k] = JSON.parse(r.value); }catch(e){ backup[k] = null; }
-  }
-  try{ const r = await window.storage.get('coordenador-senha', true); backup['coordenador-senha'] = r.value; }catch(e){ backup['coordenador-senha'] = null; }
+  const listar = async (prefixo) => { try{ const l = await window.storage.list(prefixo, true); return l.keys||[]; }catch(e){ return []; } };
+  const [chavesAssess, chavesResp] = await Promise.all([ listar('assessment:'), listar('responses:') ]);
+  total = simpleKeys.length + 1 + chavesAssess.length + chavesResp.length;
+  atualizarProgresso();
 
+  const [simples, senha, assessList, respList] = await Promise.all([
+    Promise.all(simpleKeys.map(lerJson)),
+    (async () => { try{ const r = await window.storage.get('coordenador-senha', true); return r.value; }catch(e){ return null; } finally{ feitas++; atualizarProgresso(); } })(),
+    Promise.all(chavesAssess.map(lerJson)),
+    Promise.all(chavesResp.map(lerJson))
+  ]);
+  simpleKeys.forEach((k,i) => { backup[k] = simples[i]===undefined ? null : simples[i]; });
+  backup['coordenador-senha'] = senha;
   backup['assessments'] = {};
-  try{
-    const list = await window.storage.list('assessment:', true);
-    for(const k of (list.keys||[])){
-      try{ const r = await window.storage.get(k, true); backup['assessments'][k] = JSON.parse(r.value); }catch(e){}
-    }
-  }catch(e){}
-
+  chavesAssess.forEach((k,i) => { if(assessList[i]!==undefined) backup['assessments'][k] = assessList[i]; });
   backup['responses'] = {};
-  try{
-    const list = await window.storage.list('responses:', true);
-    for(const k of (list.keys||[])){
-      try{ const r = await window.storage.get(k, true); backup['responses'][k] = JSON.parse(r.value); }catch(e){}
-    }
-  }catch(e){}
+  chavesResp.forEach((k,i) => { if(respList[i]!==undefined) backup['responses'][k] = respList[i]; });
 
   backup['disciplinas'] = {};
   backup['questionBanks'] = {};
   backup['pesosInstrumentos'] = {};
   const professores = backup['professores'] || [];
-  for(const prof of professores){
-    try{ const r = await window.storage.get(`disciplinas:${prof.id}`, true); backup['disciplinas'][prof.id] = JSON.parse(r.value); }catch(e){}
-    try{ const r = await window.storage.get(`question-bank:${prof.id}`, true); backup['questionBanks'][prof.id] = JSON.parse(r.value); }catch(e){}
-    try{ const r = await window.storage.get(`pesos-instrumentos:${prof.id}`, true); backup['pesosInstrumentos'][prof.id] = JSON.parse(r.value); }catch(e){}
-  }
+  total += professores.length*3; atualizarProgresso();
+  await Promise.all(professores.map(async prof => {
+    const [d, qb, pi] = await Promise.all([ lerJson(`disciplinas:${prof.id}`), lerJson(`question-bank:${prof.id}`), lerJson(`pesos-instrumentos:${prof.id}`) ]);
+    if(d!==undefined) backup['disciplinas'][prof.id] = d;
+    if(qb!==undefined) backup['questionBanks'][prof.id] = qb;
+    if(pi!==undefined) backup['pesosInstrumentos'][prof.id] = pi;
+  }));
 
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type:'application/json' });
   const url = URL.createObjectURL(blob);
@@ -11752,10 +11835,9 @@ async function calcExecDashboard(){
 
   // Sempre recarrega do banco (não reaproveita o que já estava em memória), pois professores
   // podem ter excluído alunos ou avaliações em outra sessão desde a última vez que o painel
-  // foi aberto.
-  await loadCoordProfessores();
-  await loadCoordAssessments();
-  await loadTurmas();
+  // foi aberto. As três buscas são independentes entre si, então rodam em paralelo em vez de
+  // uma depois da outra — o tempo total passa a ser o da mais lenta, não a soma das três.
+  await Promise.all([ loadCoordProfessores(), loadCoordAssessments(), loadTurmas() ]);
 
   const professoresAtivos = c.professores.filter(p=>p.activatedAt).length;
   const professoresPendentes = c.professores.filter(p=>!p.activatedAt).length;
@@ -11779,10 +11861,16 @@ async function calcExecDashboard(){
   const turmaStats = {};
   const disciplinaStats = {};
   const studentStats = {};
-  for(const a of c.assessments){
+  // Busca as respostas de todas as avaliações da escola em paralelo — feito um a um, esse é
+  // o ponto mais lento do painel executivo, porque soma a ida e volta ao banco de cada
+  // avaliação já cadastrada (e só cresce com o tempo).
+  const respostasPorAssessmentExec = await Promise.all(c.assessments.map(async a => {
+    try{ const r = await window.storage.get(`responses:${a.code}`, true); return JSON.parse(r.value); }
+    catch(e){ return []; }
+  }));
+  c.assessments.forEach((a, idxAssessmentExec) => {
     const max = a.questions.reduce((s,q)=>s+q.points,0);
-    let responses = [];
-    try{ const r = await window.storage.get(`responses:${a.code}`, true); responses = JSON.parse(r.value); }catch(e){}
+    const responses = respostasPorAssessmentExec[idxAssessmentExec];
     totalRespostas += responses.length;
     responses.forEach(resp => {
       const nota10 = max>0 ? (resp.total/max)*10 : null;
@@ -11812,7 +11900,7 @@ async function calcExecDashboard(){
       tabSwitchTotal += ts; fsTotal += fs;
       if(ts>0 || fs>0) respostasComAlerta++;
     });
-  }
+  });
   const desempenhoMedio = scoreCount>0 ? scoreSum/scoreCount : null;
 
   const turmaRanking = state.professor.turmas.map(t => ({
@@ -12056,14 +12144,16 @@ async function getGeminiApiKeyOwnedBy(professorId){
 async function resolveGeminiKeyForTurma(turmaId){
   try{
     const professores = await fetchProfessoresList();
-    for(const prof of professores){
+    // Consulta todos os professores ao mesmo tempo e escolhe o primeiro (na ordem da lista)
+    // que leciona na turma e tem chave própria — mesmo resultado de antes, sem a fila de esperas.
+    const chaves = await Promise.all(professores.map(async prof => {
       let disciplinas = [];
       try{ const r = await window.storage.get(`disciplinas:${prof.id}`, true); disciplinas = JSON.parse(r.value)||[]; }catch(e){ disciplinas = []; }
-      if(disciplinas.some(d => (d.turmaIds||[]).includes(turmaId))){
-        const key = await getGeminiApiKeyOwnedBy(prof.id);
-        if(key) return key;
-      }
-    }
+      if(!disciplinas.some(d => (d.turmaIds||[]).includes(turmaId))) return '';
+      return await getGeminiApiKeyOwnedBy(prof.id);
+    }));
+    const achada = chaves.find(k => k);
+    if(achada) return achada;
   }catch(e){}
   try{ const r = await window.storage.get('gemini-api-key', true); return (r.value||'').trim(); }catch(e){ return ''; }
 }
@@ -13666,11 +13756,11 @@ async function loadCoordProfessorPesos(){
   const c = state.coordenador;
   c.professorPesosLoading = true;
   const map = {};
-  for(const pr of c.professores){
-    if(!pr.activatedAt) continue;
+  // Um professor por vez era lento (soma a espera de cada um); agora todos em paralelo.
+  await Promise.all(c.professores.filter(pr => pr.activatedAt).map(async pr => {
     try{ const r = await window.storage.get(`pesos-instrumentos:${pr.id}`, true); map[pr.id] = {...DEFAULT_PESOS, ...JSON.parse(r.value)}; }
     catch(e){ map[pr.id] = {...DEFAULT_PESOS}; }
-  }
+  }));
   c.professorPesos = map;
   c.professorPesosLoading = false;
   render();
@@ -14484,7 +14574,7 @@ function renderResponderTimed(){
   const isLast = idx >= questionsList.length-1;
   const startedAt = (al.questionTimers && al.questionTimers[q.id]) || Date.now();
   const elapsedMs = Date.now() - startedAt;
-  const remainingMs = Math.max(0, MIN_MS_PER_QUESTION_NP1 - elapsedMs);
+  const remainingMs = Math.max(0, minMsPerQuestion(a) - elapsedMs);
   const canAdvance = remainingMs<=0;
   const remainingSec = Math.ceil(remainingMs/1000);
   const mm = String(Math.floor(remainingSec/60)).padStart(2,'0');
@@ -14494,7 +14584,7 @@ function renderResponderTimed(){
       <div class="exam-sticky-header">
         <h2 style="margin-bottom:2px;">${esc(a.title)}</h2>
         <p class="muted" style="margin:0; font-size:.85rem;">${a.disciplinaName ? esc(a.disciplinaName)+' · ' : ''}código ${esc(a.code)} · Respondendo como ${esc(al.name)}</p>
-        <p class="muted" style="margin:4px 0 0; font-size:.8rem;">⏱ Questão ${idx+1} de ${questionsList.length} — leia com calma, é preciso permanecer ao menos 3 minutos em cada questão antes de avançar.</p>
+        <p class="muted" style="margin:4px 0 0; font-size:.8rem;">⏱ Questão ${idx+1} de ${questionsList.length} — ${minMsPerQuestion(a)>0 ? `leia com calma, é preciso permanecer ao menos ${fmtMinutos(a.minMinutesPerQuestion!=null?a.minMinutesPerQuestion:MIN_MINUTES_DEFAULT)} em cada questão antes de avançar.` : 'responda no seu ritmo.'}</p>
       </div>
       <div style="margin-top:14px;">
         <div class="q-card">
@@ -14560,10 +14650,11 @@ async function loadAssessmentsList(){
   p.loadingList = true; render();
   try{
     const list = await window.storage.list('assessment:', true);
-    const items = [];
-    for(const k of (list.keys||[])){
-      try{ const r = await window.storage.get(k, true); items.push(JSON.parse(r.value)); }catch(e){}
-    }
+    // Em paralelo em vez de um a um — mesma razão de loadCoordAssessments (essa tela roda a
+    // cada login/troca de aba do professor, então a soma das esperas é sentida toda vez).
+    const items = (await Promise.all((list.keys||[]).map(async k => {
+      try{ const r = await window.storage.get(k, true); return JSON.parse(r.value); }catch(e){ return null; }
+    }))).filter(Boolean);
     items.sort((a,b)=> b.createdAt - a.createdAt);
     p.assessments = items;
   }catch(e){ p.assessments = []; }
@@ -15487,7 +15578,8 @@ async function editAssessment(code){
     startAt: a.startAt || '',
     endAt: a.endAt || '',
     resultRelease: a.resultRelease ? {...a.resultRelease} : {mode:'imediato', releaseAt:''},
-    securityEnabled: a.securityEnabled!==false
+    securityEnabled: a.securityEnabled!==false,
+    minMinutesPerQuestion: (a.minMinutesPerQuestion!=null ? a.minMinutesPerQuestion : 3)
   };
   p.editingCode = code;
   p.editingResponseCount = 0;
@@ -15533,6 +15625,7 @@ async function saveAssessment(){
     endAt: a.endAt || null,
     resultRelease: {...a.resultRelease},
     securityEnabled: (a.instrumento==='avaliacao' || a.instrumento==='recuperacao') ? true : (a.securityEnabled!==false),
+    minMinutesPerQuestion: a.instrumento==='avaliacao' ? normalizeMinMinutes(a.minMinutesPerQuestion) : null,
     professorId: isEditing && existingAssessment ? existingAssessment.professorId : state.professor.session.id,
     professorName: isEditing && existingAssessment ? existingAssessment.professorName : state.professor.session.displayName,
     createdAt: isEditing && existingAssessment ? existingAssessment.createdAt : Date.now(),
@@ -15889,7 +15982,19 @@ function lockExamForSecurity(){
   registerUnlockRequest();
   startUnlockPolling();
 }
-const MIN_MS_PER_QUESTION_NP1 = 3 * 60 * 1000;
+const MIN_MINUTES_DEFAULT = 3;
+// Tempo mínimo (em minutos) que o aluno precisa ficar em cada questão antes de avançar.
+// Definido pelo professor por avaliação; 0 = sem espera. Provas antigas sem o campo usam 3.
+function fmtMinutos(m){ const n = normalizeMinMinutes(m); return (n===1 ? '1 minuto' : String(n).replace('.',',')+' minutos'); }
+function normalizeMinMinutes(v){
+  const n = parseFloat(String(v).replace(',','.'));
+  if(isNaN(n) || n<0) return MIN_MINUTES_DEFAULT;
+  return Math.min(60, Math.round(n*2)/2);
+}
+function minMsPerQuestion(a){
+  const m = (a && a.minMinutesPerQuestion!=null) ? a.minMinutesPerQuestion : MIN_MINUTES_DEFAULT;
+  return normalizeMinMinutes(m) * 60 * 1000;
+}
 let responderTickInterval = null;
 function getResponderQuestions(al){
   return (al.shuffledQuestions || (al.assessment ? al.assessment.questions : [])).filter(q=>!q.annulled);
@@ -15915,7 +16020,7 @@ function responderProxima(){
   if(!q) return;
   if(isTimedResponder(a)){
     const startedAt = al.questionTimers[q.id] || Date.now();
-    if(Date.now() - startedAt < MIN_MS_PER_QUESTION_NP1) return;
+    if(Date.now() - startedAt < minMsPerQuestion(a)) return;
   }
   if(al.responderIdx < questionsList.length-1){
     al.responderIdx++;
@@ -15945,6 +16050,35 @@ document.addEventListener('copy', e => { if(isExamActive()) e.preventDefault(); 
 document.addEventListener('cut', e => { if(isExamActive()) e.preventDefault(); });
 document.addEventListener('paste', e => { if(isExamActive()) e.preventDefault(); });
 document.addEventListener('contextmenu', e => { if(isExamActive()) e.preventDefault(); });
+// Proteção contra captura de tela durante a prova. Navegador NÃO consegue bloquear de verdade
+// o print do sistema (botões físicos do tablet, atalhos do SO), então combinamos medidas:
+// esconder a prova e limpar a área de transferência quando detectar o atalho de captura,
+// esconder a prova sempre que a janela perde o foco (ferramentas de recorte), e registrar a
+// tentativa para o professor ver no relatório.
+let screenshotShieldTimer = null;
+function screenshotShieldOn(registrar){
+  if(!isExamActive()) return;
+  document.body.classList.add('screenshot-shield');
+  try{ if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(' ').catch(()=>{}); }catch(e){}
+  if(registrar) state.aluno.screenshotAttempts = (state.aluno.screenshotAttempts||0) + 1;
+  clearTimeout(screenshotShieldTimer);
+  screenshotShieldTimer = setTimeout(screenshotShieldOff, 3000);
+}
+function screenshotShieldOff(){
+  clearTimeout(screenshotShieldTimer); screenshotShieldTimer = null;
+  document.body.classList.remove('screenshot-shield');
+}
+function isScreenshotCombo(e){
+  const k = (e.key||'').toLowerCase();
+  if(k==='printscreen' || e.code==='PrintScreen') return true;
+  if(e.metaKey && e.shiftKey && (k==='s' || k==='3' || k==='4' || k==='5' || e.code==='Digit3' || e.code==='Digit4' || e.code==='Digit5')) return true; // Win+Shift+S / Cmd+Shift+3,4,5
+  return false;
+}
+document.addEventListener('keydown', e => { if(isExamActive() && isScreenshotCombo(e)){ e.preventDefault(); screenshotShieldOn(true); } }, true);
+document.addEventListener('keyup', e => { if(isExamActive() && isScreenshotCombo(e)){ e.preventDefault(); screenshotShieldOn(false); } }, true);
+window.addEventListener('blur', () => { if(isExamActive()) document.body.classList.add('screenshot-shield'); });
+window.addEventListener('focus', () => { if(!screenshotShieldTimer) document.body.classList.remove('screenshot-shield'); });
+window.addEventListener('beforeprint', () => { if(isExamActive()) screenshotShieldOn(true); });
 document.addEventListener('visibilitychange', () => {
   if(document.hidden){
     if(isExamActive()){
@@ -18542,6 +18676,7 @@ async function startExamFlow(){
   al.tabSwitchCount = 0;
   al.examLocked = false;
   al.fullscreenExits = 0;
+  al.screenshotAttempts = 0;
   al.shuffledQuestions = shuffleForStudent(a.questions);
   al.responderIdx = 0;
   al.questionTimers = {};
@@ -18952,7 +19087,7 @@ async function submitAnswers(){
       total += score;
     }
   }
-  const result = { studentName: al.name, submittedAt: Date.now(), total, details, answers: {...al.answers}, tabSwitches: al.tabSwitchCount||0, fullscreenExits: al.fullscreenExits||0 };
+  const result = { studentName: al.name, submittedAt: Date.now(), total, details, answers: {...al.answers}, tabSwitches: al.tabSwitchCount||0, fullscreenExits: al.fullscreenExits||0, screenshotAttempts: al.screenshotAttempts||0 };
 
   // Grava a resposta de verdade antes de dizer ao aluno que terminou — se a internet cair bem
   // na hora de enviar, NÃO podemos fingir que deu certo: isso faria a prova sumir sem ficar
@@ -19693,6 +19828,7 @@ document.addEventListener('input', (e) => {
   else if(act==='avulso-import-titulo-grupo'){ p.avulso.importPlanilha.resultado.grupos[parseInt(el.dataset.gi)].tituloEdit = el.value; }
   else if(el.id==='new-student-input'){ p.newStudentName = el.value; }
   else if(act==='import-turma-roster-file'){ if(el.files[0]) importTurmaRoster(el.dataset.tid, el.files[0]); }
+  else if(el.id==='min-minutes-input'){ p.newAssessment.minMinutesPerQuestion = el.value===''? MIN_MINUTES_DEFAULT : el.value; }
   else if(el.id==='start-input'){ p.newAssessment.startAt = el.value; }
   else if(el.id==='end-input'){ p.newAssessment.endAt = el.value; }
   else if(el.id==='release-at-input'){ p.newAssessment.resultRelease.releaseAt = el.value; }
