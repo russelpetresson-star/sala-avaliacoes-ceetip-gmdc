@@ -206,6 +206,9 @@
   }
   .tab-btn.active{ background: var(--board); color: #fff; border-color: var(--board); }
 
+  @keyframes urgentePulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(200,40,40,.45); } 50%{ box-shadow:0 0 0 8px rgba(200,40,40,0); } }
+  .card-urgente{ border:3px solid var(--red, #c0392b) !important; background:rgba(200,40,40,.07); animation:urgentePulse 2s infinite; }
+  .pill-urgente{ background:var(--red, #c0392b); color:#fff; font-weight:800; letter-spacing:.06em; }
   .subnav{ display:flex; gap:8px; justify-content:center; margin-bottom:18px; flex-wrap:wrap; }
   .pill-btn{
     font-size:.85rem; font-weight:600; background:transparent; border:1px solid var(--board-light);
@@ -1976,7 +1979,7 @@ function renderProfessor(){
     { action:'sub-view', sub:'banco', icon:'📚', label:'Banco de questões', group:'📝 Avaliações' },
     { action:'sub-view', sub:'disciplinas', icon:'📖', label:'Disciplinas', group:'📝 Avaliações' },
     { action:'sub-view', sub:'pesos', icon:'⚖️', label:'Pesos das notas', group:'📝 Avaliações' },
-    { action:'sub-view', sub:'liberacoes', icon:'🔓', label:'Liberações', badge: p.unlockRequests.filter(r=>!r.released).length || 0, group:'📝 Avaliações' },
+    { action:'sub-view', sub:'liberacoes', icon:'🔓', label:'Liberações', badge: liberacoesVisiveis().filter(r=>!r.released).length || 0, group:'📝 Avaliações' },
 
     { action:'sub-view', sub:'turmas', icon:'👥', label:'Turmas', group:'👥 Turmas & Frequência' },
     { action:'sub-view', sub:'chamada', icon:'🪪', label:'Chamada', badge: (p.freqHoje && p.freqHoje.data ? p.freqHoje.data.filter(l=>l.presentesCount===0).length : 0) || 0, group:'👥 Turmas & Frequência' },
@@ -8630,7 +8633,7 @@ async function calcFrequenciaStats(turma){
   const hojeRegistro = registros.find(r => r.dateStr===hojeStr);
   const faltasPorAluno = {};
   const faltasGeralPorAluno = {};
-  turma.students.forEach(s => {
+  (turma.students||[]).forEach(s => {
     faltasPorAluno[s.id] = { student:s, faltas:0, diasComputados:0 };
     faltasGeralPorAluno[s.id] = { student:s, faltas:0, diasComputados:0 };
   });
@@ -8792,7 +8795,7 @@ function renderFinalGradesTable(){
   const editMode = !!fg.editMode;
   return `
     <div class="row" style="justify-content:space-between; align-items:center;">
-      <p class="muted" style="margin-top:10px;">NP1 é o Simulado/Avaliação (${pesos.avaliacao} pts). NP2 não é uma nota separada — é a soma de Diagnóstica (${pesos.diagnostica}) + Exercícios (${pesos.exercicios}) + Autoavaliação (${pesos.autoavaliacao}). Nota Final = NP1 + NP2. Se o aluno fizer a Recuperação Paralela, ela substitui o NP1 no cálculo. A Autoavaliação é calculada automaticamente por engajamento: 40% fichas, 30% frequência de login, 30% entrega de exercícios de fixação.</p>
+      <p class="muted" style="margin-top:10px;">NP1 é o Simulado/Avaliação (${pesos.avaliacao} pts). NP2 não é uma nota separada — é a soma de Diagnóstica (${pesos.diagnostica}) + Exercícios (${pesos.exercicios}) + Autoavaliação (${pesos.autoavaliacao}). Nota Final = NP1 + NP2. Se o aluno fizer a Recuperação Paralela, ela substitui o NP1 no cálculo. A Autoavaliação é calculada automaticamente por engajamento: 40% fichas, 30% frequência de login, 30% entrega de exercícios de fixação. Se a coordenação ativar a opção em "Avaliação Socioemocional", ela passa a vir da nota socioemocional do período (💛).</p>
       <div class="row" style="flex:0 0 auto; gap:8px;">
         ${editMode ? `
           <button class="btn btn-ghost btn-sm" data-action="cancel-edit-final-grades">Cancelar</button>
@@ -8828,7 +8831,7 @@ function renderFinalGradesTable(){
           <td>${editMode ? `<input type="number" step="0.1" id="manual-np1-${idx}" value="${r.np1.toFixed(1)}" style="width:70px;">` : `${r.np1.toFixed(1)}${r.manual.np1?' <span title="Nota ajustada manualmente">✏️</span>':''}`}</td>
           <td>${editMode ? `<input type="number" step="0.1" id="manual-diag-${idx}" value="${r.diag.toFixed(1)}" style="width:70px;">` : `${r.diag.toFixed(1)}${r.manual.diag?' ✏️':''}`}</td>
           <td>${editMode ? `<input type="number" step="0.1" id="manual-exerc-${idx}" value="${r.exerc.toFixed(1)}" style="width:70px;">` : `${r.exerc.toFixed(1)}${r.manual.exerc?' ✏️':''}`}</td>
-          <td>${editMode ? `<input type="number" step="0.1" id="manual-auto-${idx}" value="${r.auto.toFixed(1)}" style="width:70px;">` : `${r.auto.toFixed(1)} <span class="muted" style="font-size:.72rem;">(${Math.round((r.engajamento||0)*100)}%)</span>${r.manual.auto?' ✏️':''}`}</td>
+          <td>${editMode ? `<input type="number" step="0.1" id="manual-auto-${idx}" value="${r.auto.toFixed(1)}" style="width:70px;">` : `${r.auto.toFixed(1)} ${r.autoOrigem==='socio' ? `<span class="muted" style="font-size:.72rem;" title="Nota da Avaliação Socioemocional">(💛 ${fmtNota(r.socioTotal)}/10)</span>` : `<span class="muted" style="font-size:.72rem;" title="Engajamento (a Avaliação Socioemocional ainda não foi respondida)">(${Math.round((r.engajamento||0)*100)}%)</span>`}${r.manual.auto?' ✏️':''}`}</td>
           <td><strong>${r.np2.toFixed(1)}</strong></td>
           <td>${editMode ? `<input type="number" step="0.1" id="manual-rec-${idx}" value="${r.temRecuperacao ? r.recuperacao.toFixed(1) : ''}" placeholder="—" style="width:70px;">` : (r.temRecuperacao ? `${r.recuperacao.toFixed(1)}${r.manual.recuperacao?' ✏️':''}` : '<span class="muted">—</span>')}</td>
           <td><strong>${r.final.toFixed(1)} / ${fg.total}</strong></td>
@@ -10452,7 +10455,7 @@ function renderLiberacoes(){
   if(p.unlockRequestsLoading){
     return `<div class="card"><h2>Liberações</h2><div class="spinner"></div></div>`;
   }
-  const pending = p.unlockRequests.filter(r=>!r.released).sort((a,b)=>b.lockedAt-a.lockedAt);
+  const pending = liberacoesVisiveis().filter(r=>!r.released).sort((a,b)=>b.lockedAt-a.lockedAt);
   const body = pending.length===0
     ? '<div class="empty">Nenhuma prova bloqueada no momento.</div>'
     : pending.map(r => `
@@ -10461,7 +10464,12 @@ function renderLiberacoes(){
           <strong>${esc(r.studentName)}</strong><br>
           <span class="muted">${esc(r.assessmentTitle)} · bloqueado há ${minutesAgo(r.lockedAt)}${r.count>1?' · '+r.count+'x':''}</span>
         </div>
-        <button class="btn btn-primary btn-sm" data-action="release-student" data-id="${r.id}">Liberar</button>
+        ${r.finalizar
+          ? '<span class="muted" style="font-size:.82rem;">⏳ Finalizando — aguardando o aluno enviar</span>'
+          : `<div class="row" style="gap:6px; flex-wrap:wrap;">
+              <button class="btn btn-primary btn-sm" data-action="release-student" data-id="${r.id}">Liberar</button>
+              <button class="btn btn-ghost btn-sm" data-action="finalizar-prova-bloqueada" data-id="${r.id}">🏁 Finalizar prova</button>
+            </div>`}
       </div>
     `).join('');
   return `
@@ -10470,7 +10478,8 @@ function renderLiberacoes(){
         <h2>Liberações pendentes</h2>
         <button class="btn btn-ghost btn-sm" data-action="refresh-liberacoes">Atualizar</button>
       </div>
-      <p class="muted">Atualiza automaticamente a cada 5 segundos enquanto esta aba estiver aberta.</p>
+      <p class="muted">Atualiza automaticamente a cada 5 segundos enquanto esta aba estiver aberta. ${state.view==='coordenador' ? 'Você, como coordenação, vê as provas bloqueadas de todos os professores.' : 'Aqui aparecem só as provas bloqueadas das avaliações que você aplicou.'}</p>
+      <p class="muted" style="font-size:.82rem;"><strong>Liberar</strong> deixa o aluno continuar a prova. <strong>Finalizar prova</strong> encerra a prova dele agora e envia o que ele já respondeu (questões em branco valem 0).</p>
       ${body}
     </div>
   `;
@@ -10487,6 +10496,7 @@ function renderCoordenador(){
   if(!c.session) return renderCoordLogin();
   // Carrega os dados de Monitoria de Desempenho cedo (mesmo fora da tela de Monitoria)
   // só pra manter o contador de "casos novos de intervenção" no menu lateral em dia.
+  if(state.professor.unlockRequestsLoading){ loadUnlockRequests(); }
   if(!c.monitoria.loaded && !c.monitoria.loading){ loadCoordMonitoria(); }
   // Mesma lógica: carrega cedo pra manter o contador de pendentes do "Jovens Protagonistas" em dia.
   if(!c.campanha.loaded && !c.campanha.loading){ loadCampanhaCoord(); }
@@ -10520,11 +10530,13 @@ function renderCoordenador(){
     { action:'coord-sub-view', sub:'professores', icon:'🧑‍🏫', label:'Professores' },
     { action:'coord-sub-view', sub:'frequencia', icon:'📈', label:'Frequência dos Professores' },
     { action:'coord-sub-view', sub:'avaliacoes', icon:'📝', label:'Todas as avaliações' },
+    { action:'coord-sub-view', sub:'liberacoes', icon:'🔓', label:'Liberações', badge: liberacoesVisiveis().filter(r=>!r.released).length || 0 },
     { action:'coord-sub-view', sub:'turmas', icon:'👥', label:'Turmas' },
     { action:'coord-sub-view', sub:'chamada', icon:'🪪', label:'Chamada' },
     { action:'coord-sub-view', sub:'freqpainel', icon:'📊', label:'Painel de Frequência' },
     { action:'coord-sub-view', sub:'freqconfig', icon:'⏰', label:'Config. de Frequência' },
     { action:'coord-sub-view', sub:'notas', icon:'🧮', label:'Notas finais' },
+    { action:'coord-sub-view', sub:'socio', icon:'💛', label:'Avaliação Socioemocional' },
     { action:'coord-sub-view', sub:'monitoria', icon:'🧑‍🏫', label:'Monitoria de Desempenho', badge: monitoriaIntervencaoNaoVistosCount() },
     { action:'coord-sub-view', sub:'buscaativa', icon:'🚌', label:'Busca Ativa e Transporte', badge: buscaAtivaAcionamentosNaoVistosCount() },
     { action:'coord-sub-view', sub:'campanha', icon:'📢', label:'Jovens Protagonistas', badge: campanhaPendentesCount() },
@@ -10555,7 +10567,9 @@ function renderCoordenador(){
   else if(c.subview==='chamada') content = renderChamada(null, true);
   else if(c.subview==='freqpainel') content = renderFreqPainel(state.professor.freqPainel, state.professor.turmas);
   else if(c.subview==='freqconfig') content = renderCoordFreqConfig();
+  else if(c.subview==='liberacoes') content = renderLiberacoes();
   else if(c.subview==='notas') content = renderCoordNotas();
+  else if(c.subview==='socio') content = renderCoordSocio();
   else if(c.subview==='monitoria') content = renderCoordMonitoria();
   else if(c.subview==='buscaativa') content = renderCoordBuscaAtiva();
   else if(c.subview==='campanha') content = renderCoordCampanha();
@@ -11482,7 +11496,7 @@ async function loadCampanhaProfessor(){
   p.campanhaItensLoading = true;
   render();
   const todos = await fetchCampanhaItensList();
-  p.campanhaItens = todos.filter(i=>i.status==='aprovado');
+  p.campanhaItens = todos.filter(campanhaNoAr);
   p.campanhaItensLoading = false;
   render();
 }
@@ -11570,6 +11584,65 @@ async function campanhaEnviarItem(){
   }
   ca.enviando = false;
   render();
+}
+// ---- Banners criados pela coordenação (vão direto ao ar, sem aprovação) ----
+function campanhaNoAr(i){ return !!i && i.status==='aprovado' && (!i.expiraEm || Date.now() <= i.expiraEm); }
+function campBannerState(){
+  const c = state.coordenador;
+  if(!c.campanha.banner) c.campanha.banner = { titulo:'', descricao:'', tipo:'imagem', imagemUrl:'', preview:'', uploading:false, youtubeUrl:'', expira:'', erro:'', salvando:false, aberto:false };
+  return c.campanha.banner;
+}
+async function handleCoordBannerImagem(file){
+  const b = campBannerState();
+  if(!file) return;
+  if(!file.type.startsWith('image/')){ b.erro = 'Selecione um arquivo de imagem.'; render(); return; }
+  b.uploading = true; b.erro = ''; b.imagemUrl = ''; render();
+  try{
+    const img = await loadImageFile(file);
+    b.preview = resizeImageToDataUrl(img, 500, 0.6);
+    render();
+    const blob = await resizeImageToBlob(img, 1600, 0.82);
+    b.imagemUrl = await uploadImageToCloudinary(blob, 'campanha');
+  }catch(e){
+    b.preview = '';
+    b.erro = (e && e.message==='storage-indisponivel') ? 'O envio de fotos ainda não foi configurado.' : 'Não foi possível enviar essa imagem agora. Verifique a internet e tente de novo.';
+  }
+  b.uploading = false; render();
+}
+async function publicarBannerCoord(){
+  const c = state.coordenador, b = campBannerState();
+  const titulo = (b.titulo||'').trim();
+  if(!titulo){ b.erro = 'Dê um título ao banner.'; render(); return; }
+  let youtubeId = '';
+  if(b.tipo==='imagem'){
+    if(b.uploading){ b.erro = 'Espere a imagem terminar de enviar.'; render(); return; }
+    if(!b.imagemUrl){ b.erro = 'Envie uma imagem.'; render(); return; }
+  } else {
+    youtubeId = extractYoutubeId(b.youtubeUrl) || '';
+    if(!youtubeId){ b.erro = 'Cole um link válido de um vídeo do YouTube.'; render(); return; }
+  }
+  let expiraEm = null;
+  if(b.expira){
+    expiraEm = new Date(b.expira+'T23:59:59').getTime();
+    if(isNaN(expiraEm)){ b.erro = 'Data de término inválida.'; render(); return; }
+    if(expiraEm < Date.now()){ b.erro = 'A data de término já passou.'; render(); return; }
+  }
+  b.salvando = true; b.erro = ''; render();
+  const item = {
+    id: cryptoId(), tipo: b.tipo,
+    imagemUrl: b.tipo==='imagem' ? b.imagemUrl : '',
+    youtubeUrl: b.tipo==='video' ? b.youtubeUrl.trim() : '', youtubeId,
+    titulo, descricao: (b.descricao||'').trim(),
+    autorStudentId:'', autorNome:'Coordenação', turmaId:'', turmaName:'Escola', origem:'coordenacao',
+    status:'aprovado', motivoRecusa:'', criadoEm: Date.now(), revisadoEm: Date.now(), expiraEm
+  };
+  try{
+    await window.storage.set(`campanha-item:${item.id}`, JSON.stringify(item), true);
+    c.campanha.itens.unshift(item);
+    Object.assign(b, { titulo:'', descricao:'', imagemUrl:'', preview:'', youtubeUrl:'', expira:'', aberto:false });
+    c.campanha.subview = 'aprovados';
+  }catch(e){ b.erro = 'Não foi possível publicar agora. Tente de novo.'; }
+  b.salvando = false; render();
 }
 async function campanhaAprovarItem(id){
   const c = state.coordenador;
@@ -11721,7 +11794,7 @@ function renderCoordCampanha(){
       <div style="flex:1; min-width:0;">
         <strong>${item.tipo==='video'?'🎬 ':'🖼️ '}${esc(item.titulo)}</strong><br>
         ${item.descricao ? `<span class="muted" style="font-size:.82rem;">${esc(item.descricao)}</span><br>` : ''}
-        <span class="muted" style="font-size:.78rem;">Por ${esc(item.autorNome)} (${esc(item.turmaName)}) · ${new Date(item.criadoEm).toLocaleDateString('pt-BR')}</span>
+        <span class="muted" style="font-size:.78rem;">Por ${esc(item.autorNome)} (${esc(item.turmaName)}) · ${new Date(item.criadoEm).toLocaleDateString('pt-BR')}${item.expiraEm ? (Date.now()>item.expiraEm ? ' · ⏰ expirado em ' : ' · ⏰ sai do ar em ')+new Date(item.expiraEm).toLocaleDateString('pt-BR') : ''}</span>
         ${item.tipo==='video' ? `<br><a href="${esc(item.youtubeUrl)}" target="_blank" rel="noopener" style="font-size:.8rem;">Ver no YouTube ↗</a>` : ''}
         ${item.status==='recusado' && item.motivoRecusa ? `<p class="err" style="font-size:.8rem; margin:4px 0 0;">Motivo da recusa: ${esc(item.motivoRecusa)}</p>` : ''}
         ${c.campanha.recusarItemId===item.id ? `
@@ -11782,6 +11855,38 @@ function renderCoordCampanha(){
         ${c.campanha.indicarError ? `<p class="err">${esc(c.campanha.indicarError)}</p>` : ''}
         ${c.campanha.indicarTurmaId ? `<button class="btn btn-primary btn-sm" style="margin-top:10px;" data-action="campanha-indicar-alunos">Indicar selecionados</button>` : ''}
       </div>
+
+      ${(() => {
+        const b = campBannerState();
+        if(!b.aberto) return `<div style="margin-top:14px;"><button class="btn btn-primary" data-action="coord-banner-abrir">➕ Criar banner da coordenação</button><p class="muted" style="font-size:.8rem; margin:6px 0 0;">Avisos e campanhas da escola: vão direto para o carrossel de alunos e professores, sem precisar de aprovação.</p></div>`;
+        return `
+        <div class="card" style="margin-top:14px; border:2px solid var(--green);">
+          <div class="row" style="align-items:center; justify-content:space-between;"><h3 style="margin:0;">➕ Novo banner da coordenação</h3><button class="btn btn-ghost btn-sm" data-action="coord-banner-fechar">✕ Fechar</button></div>
+          <label>Título</label>
+          <input type="text" id="coord-banner-titulo" value="${esc(b.titulo)}" placeholder="Ex.: Matrículas abertas — procure a secretaria" maxlength="80">
+          <label>Descrição (opcional)</label>
+          <textarea id="coord-banner-descricao" placeholder="Uma frase curta pra legenda" maxlength="200" style="min-height:50px;">${esc(b.descricao)}</textarea>
+          <label>Tipo</label>
+          <div class="row" style="gap:8px;">
+            <button class="btn ${b.tipo==='imagem'?'btn-primary':'btn-ghost'} btn-sm" data-action="coord-banner-tipo" data-tipo="imagem">🖼️ Imagem</button>
+            <button class="btn ${b.tipo==='video'?'btn-primary':'btn-ghost'} btn-sm" data-action="coord-banner-tipo" data-tipo="video">🎬 Vídeo do YouTube</button>
+          </div>
+          ${b.tipo==='imagem' ? `
+            <label style="margin-top:10px;">Imagem</label>
+            <input type="file" id="coord-banner-imagem" accept="image/*">
+            ${b.uploading ? `<div class="row" style="align-items:center; gap:10px; margin-top:8px;">${b.preview ? `<img src="${b.preview}" alt="Prévia" style="max-width:140px; border-radius:10px;">` : ''}<span class="muted" style="font-size:.85rem;">Enviando imagem...</span></div>` : ''}
+            ${(!b.uploading && b.imagemUrl) ? `<img src="${cloudinaryThumb(b.imagemUrl, 400)}" alt="Prévia" style="max-width:100%; border-radius:10px; margin-top:8px;">` : ''}
+          ` : `
+            <label style="margin-top:10px;">Link do vídeo no YouTube</label>
+            <input type="text" id="coord-banner-youtube" value="${esc(b.youtubeUrl)}" placeholder="https://www.youtube.com/watch?v=...">
+          `}
+          <label style="margin-top:10px;">Sai do ar em (opcional)</label>
+          <input type="date" id="coord-banner-expira" value="${esc(b.expira)}" style="max-width:200px;">
+          <p class="muted" style="font-size:.8rem; margin:4px 0 0;">Em branco, o banner fica no ar até você excluí-lo.</p>
+          ${b.erro ? `<p class="err">${esc(b.erro)}</p>` : ''}
+          <button class="btn btn-primary btn-block" style="margin-top:12px;" data-action="coord-banner-publicar" ${b.salvando?'disabled':''}>${b.salvando?'Publicando...':'Publicar banner'}</button>
+        </div>`;
+      })()}
 
       <div class="row quick-actions-bar" style="gap:8px; margin-top:16px; flex-wrap:wrap;">
         <button class="btn ${c.campanha.subview!=='aprovados' && c.campanha.subview!=='recusados' ? 'btn-primary':'btn-ghost'} btn-sm" data-action="campanha-subview" data-sub="pendentes">⏳ Pendentes${pendentes.length>0?` (${pendentes.length})`:''}</button>
@@ -14599,7 +14704,7 @@ function renderAlunoBoletimScreen(){
           <div class="list-item"><span>📝 Avaliação (NP1)</span><strong>${notaDetalhe.np1.toFixed(1)} / ${(colunaDetalhe.pesos.avaliacao||0).toFixed(1)}</strong></div>
           <div class="list-item"><span>🔎 Avaliação Diagnóstica</span><strong>${notaDetalhe.diag.toFixed(1)} / ${(colunaDetalhe.pesos.diagnostica||0).toFixed(1)}</strong></div>
           <div class="list-item"><span>✏️ Exercícios de Fixação</span><strong>${notaDetalhe.exerc.toFixed(1)} / ${(colunaDetalhe.pesos.exercicios||0).toFixed(1)}</strong></div>
-          <div class="list-item"><span>🙋 Autoavaliação (engajamento)</span><strong>${notaDetalhe.auto.toFixed(1)} / ${(colunaDetalhe.pesos.autoavaliacao||0).toFixed(1)}</strong></div>
+          <div class="list-item"><span>${notaDetalhe.autoOrigem==='socio' ? '💛 Autoavaliação (Avaliação Socioemocional)' : '🙋 Autoavaliação (engajamento)'}</span><strong>${notaDetalhe.auto.toFixed(1)} / ${(colunaDetalhe.pesos.autoavaliacao||0).toFixed(1)}</strong></div>
           ${notaDetalhe.temRecuperacao ? `
             <div class="list-item"><span>♻️ Recuperação Paralela <span class="muted" style="font-size:.75rem;">(substituiu o NP1)</span></span><strong>${notaDetalhe.recuperacao.toFixed(1)} / ${(colunaDetalhe.pesos.avaliacao||0).toFixed(1)}</strong></div>
           ` : ''}
@@ -14719,8 +14824,9 @@ function renderStudentDashboard(){
       </div>
     </div>
 
+    ${renderAlunoSocioUrgente()}
     ${renderAlunoNovidadesBanner()}
-    ${renderCarrosselCampanha(muralSlidesComConquistas((al.campanha.itens||[]).filter(i=>i.status==='aprovado')))}
+    ${renderCarrosselCampanha(muralSlidesComConquistas((al.campanha.itens||[]).filter(campanhaNoAr)))}
     ${renderAlunoSlidesBlock()}
     ${renderAlunoEnqueteBlock()}
     ${renderAlunoQuizBlock()}
@@ -14732,6 +14838,7 @@ function renderStudentDashboard(){
     { action:'aluno-sub-view', sub:'inicio', icon:'🏠', label:'Início', group:'📊 Painel' },
     { action:'aluno-sub-view', sub:'provas', icon:'📝', label:'Minhas provas', group:'📊 Painel' },
     { action:'aluno-sub-view', sub:'boletim', icon:'🧮', label:'Boletim', group:'📊 Painel' },
+    { action:'aluno-sub-view', sub:'socio', icon:'💛', label:'Avaliação Socioemocional', group:'📊 Painel', badge: socioState().loaded ? socioPendentes().length : 0 },
 
     { action:'aluno-sub-view', sub:'tarefas', icon:'🗂️', label:'Tarefas', group:'📚 Estudos' },
     { action:'aluno-sub-view', sub:'mapas', icon:'🧠', label:'Mapa Mental', group:'📚 Estudos' },
@@ -14753,6 +14860,7 @@ function renderStudentDashboard(){
   let content;
   if(al.subview==='provas') content = renderAlunoProvasBlock();
   else if(al.subview==='boletim') content = renderAlunoBoletimScreen();
+  else if(al.subview==='socio') content = renderAlunoSocioBlock();
   else if(al.subview==='tarefas') content = alunoSubviewOuVazio(renderAlunoTarefasBlock(), 'Nenhuma tarefa por aqui ainda.');
   else if(al.subview==='mapas') content = alunoSubviewOuVazio(renderAlunoMapasBlock(), 'Nenhum mapa mental disponível ainda.');
   else if(al.subview==='diario') content = renderAlunoDiarioBlock();
@@ -15801,6 +15909,33 @@ async function loadUnlockRequests(){
   p.unlockRequestsLoading = false;
   if(wasLoading || JSON.stringify(p.unlockRequests) !== prev) render();
 }
+// Quem enxerga cada bloqueio: a coordenação vê todos; o professor só os das avaliações dele.
+function liberacoesVisiveis(){
+  const p = state.professor;
+  const todos = p.unlockRequests || [];
+  if(state.view==='coordenador' && state.coordenador.session) return todos;
+  const meuId = p.session && p.session.id;
+  if(!meuId) return [];
+  return todos.filter(r => {
+    if(r.professorId) return r.professorId===meuId;
+    const a = (p.assessments||[]).find(x=>x.code===r.code);   // bloqueios antigos, sem o campo
+    return !!a && a.professorId===meuId;
+  });
+}
+async function finalizarProvaBloqueada(id){
+  const p = state.professor;
+  const r = (p.unlockRequests||[]).find(x=>x.id===id);
+  if(!r) return;
+  if(!confirm(`Finalizar a prova de ${r.studentName} agora? O que ele já respondeu será enviado e as questões em branco valerão 0. Isso não pode ser desfeito.`)) return;
+  let list = [];
+  try{ const x = await window.storage.get('unlock-requests', true); list = JSON.parse(x.value); }catch(e){ list = p.unlockRequests; }
+  const e = list.find(x=>x.id===id);
+  if(!e || e.released) { await loadUnlockRequests(); return; }
+  e.finalizar = true; e.finalizarAt = Date.now();
+  await window.storage.set('unlock-requests', JSON.stringify(list), true);
+  p.unlockRequests = list;
+  render();
+}
 async function releaseStudent(id){
   const p = state.professor;
   const idx = p.unlockRequests.findIndex(r=>r.id===id);
@@ -16508,8 +16643,9 @@ async function registerUnlockRequest(){
   if(entry){
     entry.lockedAt = Date.now();
     entry.count = (entry.count||1) + 1;
+    if(!entry.professorId && a.professorId) entry.professorId = a.professorId;
   } else {
-    entry = { id: cryptoId(), code: a.code, assessmentTitle: a.title, studentName: al.name, lockedAt: Date.now(), released:false, releasedAt:null, count:1 };
+    entry = { id: cryptoId(), code: a.code, assessmentTitle: a.title, studentName: al.name, professorId: a.professorId||null, lockedAt: Date.now(), released:false, releasedAt:null, count:1 };
     list.push(entry);
   }
   al.unlockRequestId = entry.id;
@@ -16521,6 +16657,18 @@ async function checkUnlockStatus(){
   let list = [];
   try{ const r = await window.storage.get('unlock-requests', true); list = JSON.parse(r.value); }catch(e){ return; }
   const entry = list.find(x => x.id===al.unlockRequestId);
+  if(entry && entry.finalizar && !entry.released){
+    // O professor decidiu encerrar a prova deste aluno: envia o que ele já respondeu.
+    if(al.finalizandoForcado) return;
+    al.finalizandoForcado = true;
+    stopUnlockPolling();
+    al.examLocked = false;
+    await submitAnswers(true);
+    al.finalizandoForcado = false;
+    if(al.stage==='responder'){ al.examLocked = true; render(); startUnlockPolling(); }
+    else { await markRequestReleased(entry.id, true); }
+    return;
+  }
   if(entry && entry.released){
     al.examLocked = false;
     al.error = '';
@@ -16529,13 +16677,14 @@ async function checkUnlockStatus(){
     render();
   }
 }
-async function markRequestReleased(id){
+async function markRequestReleased(id, finalizada){
   let list = [];
   try{ const r = await window.storage.get('unlock-requests', true); list = JSON.parse(r.value); }catch(e){ return; }
   const entry = list.find(x => x.id===id);
   if(entry){
     entry.released = true;
     entry.releasedAt = Date.now();
+    if(finalizada) entry.finalizada = true;
     try{ await window.storage.set('unlock-requests', JSON.stringify(list), true); }catch(e){}
   }
 }
@@ -18698,6 +18847,330 @@ async function saveBankQuestion(){
   render();
 }
 
+/* ---------------- AVALIAÇÃO SOCIOEMOCIONAL ---------------- */
+// Estrutura baseada na planilha "Avaliação Socioemocional": por série, 2 situações-problema (Competência 1 e 2),
+// cada uma com 4 alternativas (A a D, de menor a maior nível), mais uma autoavaliação de 0 a 10.
+// Nota (0 a 10) = Competência 1 (até 4) + Competência 2 (até 4) + Autoavaliação (até 2). Alternativa: A=2,5 · B=5 · C=7,5 · D=10.
+const SOCIO_PONTOS = { A:2.5, B:5, C:7.5, D:10 };
+const SOCIO_NIVEIS = { A:'Em desenvolvimento', B:'Básico', C:'Consolidado', D:'Avançado' };
+const SOCIO_PESOS = { comp1:4, comp2:4, auto:2 };
+const SOCIO_AUTO_ITENS = ['Comportamento em sala','Horário de chegada','Horário de entrada em sala','Respeito à fila do almoço','Respeito aos colegas e professores','Participação nas tarefas estabelecidas','Participação nas aulas'];
+const SOCIO_SERIES = {
+  1: [
+    { id:'1-1', comp:1, tema:'Lidar com conflitos e aceitar ajuda',
+      texto:'Durante um jogo de futsal de uma determinada escola ocorreu um momento tenso, pois dois alunos começaram uma discussão que culminou em agressões físicas e verbais. O conflito foi rapidamente contido por colegas e professores e os alunos envolvidos encaminhados para a direção escolar no intuito de resolver o problema. A equipe diretiva convidou professores e um psicólogo do município para acompanhar a conversa e tentar resolver o problema da melhor forma possível. Se você fosse o aluno envolvido no conflito como agiria.',
+      opcoes:{ A:'Não reconhece que errou e acha que a ajuda dos professores e do psicólogo não é necessária.', B:'Entende a importância da ajuda de professores e psicólogo, mas não aceita que interfiram em sua vida.', C:'Reconhece que a ajuda dos professores e psicólogo é importante para não cometer erros como esse.', D:'Promete que irá melhorar e vai começar a adotar uma nova postura a partir da conversa com os professores e o psicólogo.' },
+      cresce:'Conflitos acontecem com todo mundo. O passo seguinte é transformar o reconhecimento em ação: combinar com alguém de confiança uma mudança concreta de postura e voltar a conversar sobre como está indo.',
+      parabens:'Você reconhece o erro, aceita ajuda e se compromete a mudar. Essa postura de responsabilidade é a base para conviver bem e resolver conflitos.' },
+    { id:'1-2', comp:2, tema:'Metas e persistência nos estudos',
+      texto:'Um determinado aluno do 1º ano do Ensino Médio de uma escola pública tem o sonho de fazer um curso universitário e melhorar as condições de vida de sua família. No entanto, no dia a dia escolar tem dificuldades em algumas disciplinas e encara essa situação com desleixo, ou seja, não busca melhorar seu desempenho escolar e vê seu sonho cada vez mais distante de se concretizar. Se você fosse esse aluno como agiria em tal situação.',
+      opcoes:{ A:'Tem dificuldade em aceitar que precisa se esforçar mais para conquistar seu sonho e vê seu desempenho escolar piorar a cada bimestre.', B:'Identifica quais disciplinas tem mais dificuldade e o que pode estar prejudicando, mas não se esforça para melhorar seu desempenho escolar.', C:'Identifica e estabelece prazos para alcançar um melhor desempenho escolar e vê seu sonho como possível de se concretizar.', D:'Acompanha e avalia cada meta e prazo estabelecido para melhorar seu desempenho escolar, no intuito de alcançar seu sonho.' },
+      cresce:'Identificar o que atrapalha já é um bom começo. Para avançar, transforme isso em metas pequenas, com prazos, e confira de tempos em tempos se está cumprindo. Pedir ajuda aos professores e à monitoria faz parte do caminho.',
+      parabens:'Você sabe que sonho precisa de plano: metas, prazos e acompanhamento. Continue revisando suas metas — é isso que aproxima o sonho da realidade.' },
+  ],
+  2: [
+    { id:'2-1', comp:1, tema:'Liderança e trabalho em grupo',
+      texto:'Você é líder de sua turma e se depara com o seguinte problema: os alunos foram divididos em grupos para a apresentação de um seminário, sendo que cada estudante ficou responsável por uma tarefa, envolvendo pesquisa, desenho e exposição oral. Porém, determinado grupo está apresentando dificuldades de relacionamento, e seus integrantes estão acusando uns aos outros de não executarem a sua tarefa adequadamente. Diante disso, você é criticado por alguns alunos porque não agiu antes e é pressionado para resolver a situação. O que você faria?',
+      opcoes:{ A:'Não pediria ajuda e tentaria resolver sozinho, mesmo não tendo enfrentado uma situação parecida antes.', B:'Tentaria resolver do seu jeito e não reagiria verbalmente às críticas e acusações que sofreu, para evitar confusão.', C:'Incentivaria os alunos a continuarem trabalhando juntos, mostrando que cada um, de alguma forma, se esforçou para cumprir sua tarefa.', D:'Convidaria algum estudante de outra turma que tivesse habilidade nas tarefas propostas para auxiliar os integrantes do grupo.' },
+      cresce:'Liderar também é saber pedir apoio e escutar os dois lados. Em situações assim, vale conversar com o grupo, reconhecer o esforço de cada um e, se preciso, envolver professores ou colegas que possam ajudar.',
+      parabens:'Você enxerga a liderança como articulação: buscar recursos e pessoas que ajudem o grupo a dar certo, sem deixar ninguém de fora.' },
+    { id:'2-2', comp:2, tema:'Respeito e empatia em momentos de tensão',
+      texto:'Durante uma partida de vôlei, realizada na quadra poliesportiva da escola, dois alunos do mesmo time se desentenderam por causa de um ponto perdido. Ambos se exaltaram e trocaram ofensas verbais, usando palavras como burro, imbecil, idiota, etc. Se você fizesse parte da equipe, como reagiria?',
+      opcoes:{ A:'Não se incomodaria com as palavras proferidas, pois o uso desses termos é comum no esporte.', B:'Agiria com naturalidade, já que tais conflitos fazem parte do cotidiano dos alunos.', C:'Tentaria acalmar os ânimos dos colegas, para que o desentendimento não prejudicasse o time.', D:'Chamaria a atenção dos colegas e tentaria mostrar a imaturidade do comportamento deles.' },
+      cresce:'Ofensas, mesmo no calor do jogo, machucam e não devem ser normalizadas. Você pode agir sem confronto: acalmar os colegas, lembrar que o time precisa de todos e, se for o caso, chamar o professor.',
+      parabens:'Você não normaliza a agressão verbal e age para que o grupo se respeite. Lembre de fazer isso com cuidado, buscando ajudar os colegas a refletirem e não a se sentirem humilhados.' },
+  ],
+  3: [
+    { id:'3-1', comp:1, tema:'Protagonismo e participação na comunidade',
+      texto:'A escola onde você estuda está planejando uma feira comunitária para arrecadar fundos e melhorar o ambiente escolar. Os alunos foram convidados a sugerir ideias e participar ativamente no planejamento e execução do evento. Como você se envolveria na organização da feira comunitária para ajudar a melhorar a escola e beneficiar a comunidade?',
+      opcoes:{ A:'Eu participaria, mas não vejo como isso pode realmente melhorar a escola ou a comunidade.', B:'Eu sugeriria a participação em projetos sociais, como arrecadação de alimentos ou roupas para a comunidade.', C:'Eu pensaria nas necessidades da comunidade e sugeriria projetos onde as habilidades de cada membro do grupo pudessem ser usadas de forma eficaz.', D:'Eu trabalharia em conjunto com outros alunos para planejar, implementar e avaliar um projeto que beneficie tanto a escola quanto a comunidade.' },
+      cresce:'Participar já é importante. Para ir além, procure entender o que a comunidade realmente precisa e como as habilidades de cada colega podem ser usadas — e acompanhe os resultados depois do evento.',
+      parabens:'Você pensa em todo o ciclo de um projeto — planejar, executar e avaliar — e em quem será beneficiado. Isso é protagonismo.' },
+    { id:'3-2', comp:2, tema:'Criatividade e solução de problemas',
+      texto:'Durante as aulas dos componentes de Ciências da Natureza e Matemática de uma escola em tempo integral, foi identificado um aumento exponencial do desperdício de água e de comida na escola. Os professores propuseram que os alunos desenvolvam soluções para reduzir o consumo de água e de comida, tanto na escola quanto em casa. Como você agiria para resolver o problema de desperdício de água e de comida na escola?',
+      opcoes:{ A:'Eu acho que isso não é problema meu e não faço nada para reduzir o desperdício.', B:'Eu, às vezes, coloco em prática soluções simples, como fechar a torneira enquanto escovo os dentes.', C:'Eu me abro a novas ideias e entendo que a persistência é importante para encontrar formas criativas de economizar água e comida.', D:'Eu tento criar, implementar e avaliar soluções inovadoras, como, por exemplo, a instalação de redutores de vazão d’água e comida pesada no prato dos alunos de acordo com a necessidade de cada estudante, ambas voltadas a conscientização para reduzir o desperdício de água e de comida na escola.' },
+      cresce:'Pequenas atitudes contam, e ficam ainda mais fortes quando viram hábito e ideia compartilhada. Que tal propor uma solução com os colegas e acompanhar se ela funciona?',
+      parabens:'Você cria, testa e avalia soluções para problemas reais da escola. Essa mentalidade de inovação e responsabilidade com o coletivo vale para a vida toda.' },
+  ],
+};
+function socioSerieDaTurma(nome){
+  const m = /([123])/.exec(String(nome||''));
+  return m ? parseInt(m[1],10) : null;
+}
+function socioCalc(serie, respostas, auto){
+  const qs = SOCIO_SERIES[serie] || [];
+  const pts = id => (SOCIO_PONTOS[respostas[id]] || 0);
+  const c1 = qs.filter(q=>q.comp===1).reduce((s,q)=>s+pts(q.id)*SOCIO_PESOS.comp1/10, 0);
+  const c2 = qs.filter(q=>q.comp===2).reduce((s,q)=>s+pts(q.id)*SOCIO_PESOS.comp2/10, 0);
+  const a = (Number(auto)||0) * SOCIO_PESOS.auto / 10;
+  return { comp1:c1, comp2:c2, auto:a, total:c1+c2+a };
+}
+function socioFaixa(total){
+  if(total>=8) return { label:'Muito bem desenvolvido', cor:'var(--green)' };
+  if(total>=6) return { label:'Bom caminho', cor:'var(--teal, #2a9d8f)' };
+  if(total>=4) return { label:'Em desenvolvimento', cor:'var(--coral, #e9a23b)' };
+  return { label:'Ponto de partida', cor:'var(--vinho, #8a3b57)' };
+}
+const fmtNota = n => (Math.round(n*10)/10).toFixed(1).replace('.',',');
+function socioBarra(rotulo, valor, max, cor){
+  const pct = Math.max(0, Math.min(100, Math.round(valor/max*100)));
+  return `<div style="margin:10px 0;">
+    <div class="row" style="justify-content:space-between;"><strong style="font-size:.9rem;">${rotulo}</strong><span class="muted">${fmtNota(valor)} / ${max}</span></div>
+    <div style="background:var(--paper-line); border-radius:999px; height:12px; overflow:hidden;"><div style="width:${pct}%; height:100%; background:${cor||'var(--board)'};"></div></div>
+  </div>`;
+}
+// Relatório (usado pelo aluno e pela coordenação)
+function renderSocioRelatorio(doc, paraCoord){
+  const qs = SOCIO_SERIES[doc.serie] || [];
+  const faixa = socioFaixa(doc.total);
+  return `
+    <div class="card" style="border-top:6px solid ${faixa.cor};">
+      <p class="muted" style="margin:0;">${esc(doc.unidade)} · ${doc.serie}ª série${paraCoord ? ' · '+esc(doc.studentName)+' · '+esc(doc.turmaName||'') : ''}</p>
+      <h2 style="margin:4px 0 2px;">Relatório Socioemocional</h2>
+      <div class="row" style="align-items:center; gap:16px; flex-wrap:wrap; margin-top:8px;">
+        <div style="font-size:2.6rem; font-weight:800; line-height:1;">${fmtNota(doc.total)}<span style="font-size:1.1rem; font-weight:600;" class="muted"> / 10</span></div>
+        <span class="pill" style="background:${faixa.cor}; color:#fff;">${faixa.label}</span>
+      </div>
+      ${socioBarra('Competência 1 — '+(qs.find(q=>q.comp===1)||{}).tema, doc.comp1, SOCIO_PESOS.comp1, 'var(--board)')}
+      ${socioBarra('Competência 2 — '+(qs.find(q=>q.comp===2)||{}).tema, doc.comp2, SOCIO_PESOS.comp2, 'var(--board)')}
+      ${socioBarra('Autoavaliação (nota que você se deu: '+doc.auto+')', doc.notaAuto!=null?doc.notaAuto:(doc.auto*SOCIO_PESOS.auto/10), SOCIO_PESOS.auto, 'var(--board)')}
+    </div>
+    ${qs.map(q => { const L = doc.respostas[q.id]; return `
+      <div class="card">
+        <p class="muted" style="margin:0;">Competência ${q.comp} · ${esc(q.tema)}</p>
+        <details style="margin:6px 0;"><summary style="cursor:pointer;">Ver a situação</summary><p style="margin-top:6px;">${esc(q.texto)}</p></details>
+        <p style="margin:8px 0 4px;"><strong>Sua resposta (${L}):</strong> ${esc(q.opcoes[L]||'')}</p>
+        <span class="pill">${SOCIO_NIVEIS[L]||''}</span>
+        <p style="margin:10px 0 0;">${L==='D' ? esc(q.parabens) : esc(q.cresce)}</p>
+      </div>`; }).join('')}
+    <div class="card">
+      <h3 style="margin-top:0;">Sobre este relatório</h3>
+      <p class="muted" style="margin:0;">Ele mostra como você costuma reagir a situações do dia a dia da escola, neste momento. Não é um julgamento sobre quem você é: as competências socioemocionais se desenvolvem com o tempo e com a prática. Se alguma situação aqui tocou em algo que você está vivendo, converse com a coordenação ou com um professor de confiança — a escola quer te apoiar.</p>
+    </div>`;
+}
+
+/* --- Aluno --- */
+function socioState(){
+  const al = state.aluno;
+  if(!al.socio) al.socio = { loaded:false, loading:false, docs:[], unidade:'', serie:null, respostas:{}, auto:null, saving:false, erro:'', config:{} };
+  return al.socio;
+}
+async function loadSocioAluno(){
+  const al = state.aluno, so = socioState();
+  so.loading = true; render();
+  const sid = al.matriculaStudentId;
+  try{
+    const list = await window.storage.list(`socio:${sid}:`, true);
+    const docs = await Promise.all((list.keys||[]).map(async k => { try{ const r = await window.storage.get(k, true); return JSON.parse(r.value); }catch(e){ return null; } }));
+    so.docs = docs.filter(Boolean);
+  }catch(e){ so.docs = []; }
+  so.config = await getSocioConfig();
+  so.loaded = true; so.loading = false;
+  if(!so.unidade){
+    const feitas = new Set(so.docs.map(d=>d.unidade));
+    const abertas = (so.config && so.config.abertas) || {};
+    so.unidade = UNIDADES.find(u=>abertas[u] && !feitas.has(u)) || UNIDADES.find(u=>!feitas.has(u)) || UNIDADES[UNIDADES.length-1];
+  }
+  so.serie = so.serie || socioSerieDaTurma(al.turma && al.turma.name);
+  render();
+}
+// Períodos que a coordenação abriu e que o aluno ainda não respondeu
+function socioPendentes(){
+  const so = socioState();
+  const abertas = (so.config && so.config.abertas) || {};
+  return UNIDADES.filter(u => abertas[u] && !so.docs.some(d=>d.unidade===u));
+}
+function renderAlunoSocioUrgente(){
+  const al = state.aluno;
+  if(!al.turma || !al.matriculaStudentId) return '';
+  const so = socioState();
+  if(!so.loaded){ if(!so.loading) setTimeout(loadSocioAluno, 0); return ''; }
+  const pend = socioPendentes();
+  if(!pend.length) return '';
+  return pend.map(u => `
+    <div class="card card-urgente">
+      <div class="row" style="align-items:center; gap:12px; flex-wrap:wrap; justify-content:space-between;">
+        <div style="flex:1 1 240px;">
+          <span class="pill pill-urgente">⚠ URGENTE</span>
+          <h3 style="margin:8px 0 4px;">💛 Avaliação Socioemocional — ${esc(u)}</h3>
+          <p style="margin:0;">Você ainda não respondeu. Leva poucos minutos e, assim que enviar, você já recebe o seu relatório.</p>
+        </div>
+        <button class="btn btn-primary" data-action="socio-ir" data-unidade="${esc(u)}" style="flex:0 0 auto;">Responder agora →</button>
+      </div>
+    </div>`).join('');
+}
+function renderAlunoSocioBlock(){
+  const al = state.aluno, so = socioState();
+  if(!so.loaded && !so.loading){ setTimeout(loadSocioAluno, 0); }
+  if(so.loading || !so.loaded) return `<div class="card"><h2>💛 Avaliação Socioemocional</h2><div class="spinner"></div></div>`;
+  const doc = so.docs.find(d=>d.unidade===so.unidade);
+  const unidadeSel = `
+    <label>Período</label>
+    <select data-action="socio-unidade" style="max-width:260px;">
+      ${UNIDADES.map(u => `<option value="${esc(u)}" ${u===so.unidade?'selected':''}>${esc(u)}${so.docs.some(d=>d.unidade===u)?' ✓':''}</option>`).join('')}
+    </select>`;
+  if(doc){
+    const evolucao = so.docs.length>1 ? `
+      <div class="card"><h3 style="margin-top:0;">Sua evolução</h3>
+        ${UNIDADES.filter(u=>so.docs.some(d=>d.unidade===u)).map(u => { const d = so.docs.find(x=>x.unidade===u); return socioBarra(u, d.total, 10, 'var(--board)'); }).join('')}
+      </div>` : '';
+    return `<div class="card"><h2>💛 Avaliação Socioemocional</h2>${unidadeSel}</div>${renderSocioRelatorio(doc, false)}${evolucao}`;
+  }
+  const serie = so.serie;
+  const serieSel = serie ? '' : `
+    <label>Qual é a sua série?</label>
+    <div class="row" style="gap:8px; flex:0 0 auto;">${[1,2,3].map(n => `<button class="btn btn-ghost btn-sm" data-action="socio-serie" data-serie="${n}">${n}ª série</button>`).join('')}</div>`;
+  if(!serie){
+    return `<div class="card"><h2>💛 Avaliação Socioemocional</h2>${unidadeSel}${serieSel}</div>`;
+  }
+  const qs = SOCIO_SERIES[serie];
+  return `
+    <div class="card">
+      <h2>💛 Avaliação Socioemocional</h2>
+      <p class="muted">Leia cada situação e escolha a alternativa que mais se parece com o que <strong>você realmente faria</strong>. Não há resposta "certa" para agradar: seja sincero(a), pois o relatório é para o seu autoconhecimento. Só você e a coordenação da escola veem o resultado.</p>
+      ${unidadeSel}
+    </div>
+    ${qs.map((q,i) => `
+      <div class="card">
+        <p class="muted" style="margin:0;">Situação ${i+1} de ${qs.length}</p>
+        <p style="margin:6px 0 10px;">${esc(q.texto)}</p>
+        ${['A','B','C','D'].map(L => `
+          <label style="display:flex; gap:8px; align-items:flex-start; font-weight:400; text-transform:none; margin:8px 0;">
+            <input type="radio" name="socio-${q.id}" data-action="socio-resp" data-q="${q.id}" data-letra="${L}" ${so.respostas[q.id]===L?'checked':''} style="width:auto; margin-top:4px;">
+            <span><strong>${L})</strong> ${esc(q.opcoes[L])}</span>
+          </label>`).join('')}
+      </div>`).join('')}
+    <div class="card">
+      <h3 style="margin-top:0;">Autoavaliação</h3>
+      <p>Pensando em: ${SOCIO_AUTO_ITENS.map(esc).join('; ')} — <strong>de 0 a 10, que nota você se dá?</strong></p>
+      <div class="row" style="gap:6px; flex-wrap:wrap;">
+        ${[0,1,2,3,4,5,6,7,8,9,10].map(n => `
+          <label style="display:flex; align-items:center; gap:4px; font-weight:400; text-transform:none; flex:0 0 auto;">
+            <input type="radio" name="socio-auto" data-action="socio-auto" data-nota="${n}" ${so.auto===n?'checked':''} style="width:auto;"> ${n}
+          </label>`).join('')}
+      </div>
+      ${so.erro ? `<p class="err">${esc(so.erro)}</p>` : ''}
+      <button class="btn btn-primary" data-action="socio-enviar" style="margin-top:14px;" ${so.saving?'disabled':''}>${so.saving?'Enviando...':'Enviar e ver meu relatório'}</button>
+      <p class="muted" style="font-size:.8rem;">Depois de enviar, não dá para alterar — se precisar refazer, peça à coordenação.</p>
+    </div>`;
+}
+async function enviarSocioAluno(){
+  const al = state.aluno, so = socioState();
+  const qs = SOCIO_SERIES[so.serie] || [];
+  if(qs.some(q=>!so.respostas[q.id]) || so.auto===null){ so.erro = 'Responda todas as situações e escolha sua nota de autoavaliação.'; render(); return; }
+  if(!confirm('Enviar suas respostas? Depois de enviar, não é possível alterar.')) return;
+  so.erro = ''; so.saving = true; render();
+  const calc = socioCalc(so.serie, so.respostas, so.auto);
+  const doc = { studentId: al.matriculaStudentId, studentName: al.name, turmaId: al.turma.id, turmaName: al.turma.name, serie: so.serie, unidade: so.unidade,
+    respostas: {...so.respostas}, auto: so.auto, comp1: calc.comp1, comp2: calc.comp2, notaAuto: calc.auto, total: calc.total, createdAt: Date.now() };
+  try{
+    await window.storage.set(`socio:${doc.studentId}:${slugifyName(doc.unidade)}`, JSON.stringify(doc), true);
+    so.docs = so.docs.filter(d=>d.unidade!==doc.unidade).concat(doc);
+    so.respostas = {}; so.auto = null;
+  }catch(e){ so.erro = 'Não foi possível enviar agora. Tente de novo.'; }
+  so.saving = false; render();
+}
+
+/* --- Coordenação --- */
+async function getSocioConfig(){
+  try{ const r = await window.storage.get('socio-config', true); const d = JSON.parse(r.value); return d && typeof d==='object' ? d : {}; }catch(e){ return {}; }
+}
+async function salvarSocioSubstitui(unidade, on, campo){
+  const s = socioCoordState();
+  const cfg = await getSocioConfig();
+  campo = campo || 'substituiAuto';
+  cfg[campo] = cfg[campo] || {};
+  cfg[campo][unidade] = !!on;
+  try{ await window.storage.set('socio-config', JSON.stringify(cfg), true); s.config = cfg; }
+  catch(e){ alert('Não foi possível salvar a configuração agora.'); }
+  render();
+}
+function socioCoordState(){
+  const c = state.coordenador;
+  if(!c.socio) c.socio = { loaded:false, loading:false, docs:[], unidade:UNIDADES[0], turmaId:'', verKey:'', turmasCarregadas:false, config:{} };
+  return c.socio;
+}
+async function loadSocioCoord(){
+  const s = socioCoordState();
+  s.loading = true; render();
+  try{
+    const list = await window.storage.list('socio:', true);
+    const docs = await Promise.all((list.keys||[]).map(async k => { try{ const r = await window.storage.get(k, true); const d = JSON.parse(r.value); d._key = k; return d; }catch(e){ return null; } }));
+    s.docs = docs.filter(Boolean);
+  }catch(e){ s.docs = []; }
+  s.config = await getSocioConfig();
+  s.loaded = true; s.loading = false; render();
+}
+function renderCoordSocio(){
+  const s = socioCoordState();
+  if(!s.turmasCarregadas){ s.turmasCarregadas = true; loadTurmas().then(()=>render()); }
+  if(!s.loaded && !s.loading){ loadSocioCoord(); }
+  if(s.loading || !s.loaded) return `<div class="card"><h2>💛 Avaliação Socioemocional</h2><div class="spinner"></div></div>`;
+  const turmas = state.professor.turmas;
+  const turma = turmas.find(t=>t.id===s.turmaId);
+  let corpo = '';
+  if(s.verKey){
+    const d = s.docs.find(x=>x._key===s.verKey);
+    if(d) return `<div class="card"><button class="btn btn-ghost btn-sm" data-action="socio-coord-voltar">← Voltar à turma</button></div>${renderSocioRelatorio(d, true)}`;
+  }
+  if(turma){
+    const porAluno = turma.students.map(st => ({ st, d: s.docs.find(x=>x.studentId===st.id && x.unidade===s.unidade) }));
+    const feitos = porAluno.filter(x=>x.d);
+    const media = k => feitos.length ? feitos.reduce((a,x)=>a+x.d[k],0)/feitos.length : 0;
+    corpo = `
+      <div class="row" style="gap:10px; flex-wrap:wrap; margin-top:12px;">
+        <span class="pill">Responderam: ${feitos.length} de ${turma.students.length}</span>
+        ${feitos.length ? `<span class="pill">Média da turma: ${fmtNota(media('total'))}</span><span class="pill">Comp. 1: ${fmtNota(media('comp1'))}/4</span><span class="pill">Comp. 2: ${fmtNota(media('comp2'))}/4</span><span class="pill">Auto: ${fmtNota(media('notaAuto'))}/2</span>` : ''}
+        <button class="btn btn-ghost btn-sm" data-action="socio-coord-export" style="flex:0 0 auto;">📥 Exportar Excel</button>
+      </div>
+      <div style="overflow-x:auto; margin-top:10px;"><table>
+        <tr><th>Aluno</th><th>Comp. 1</th><th>Comp. 2</th><th>Auto</th><th>Nota</th><th></th></tr>
+        ${porAluno.map(({st,d}) => d ? `
+          <tr><td>${esc(st.name)}</td><td>${fmtNota(d.comp1)}</td><td>${fmtNota(d.comp2)}</td><td>${fmtNota(d.notaAuto)}</td><td><strong>${fmtNota(d.total)}</strong></td>
+          <td><button class="btn btn-ghost btn-sm" data-action="socio-coord-ver" data-key="${esc(d._key)}">Relatório</button>
+          <button class="btn btn-ghost btn-sm" data-action="socio-coord-liberar" data-key="${esc(d._key)}" title="Apaga a resposta para o aluno refazer">Refazer</button></td></tr>
+        ` : `<tr><td>${esc(st.name)}</td><td colspan="4" class="muted">ainda não respondeu</td><td></td></tr>`).join('')}
+      </table></div>`;
+  }
+  return `
+    <div class="card">
+      <h2>💛 Avaliação Socioemocional</h2>
+      <p class="muted">Os alunos respondem na aba "Avaliação Socioemocional" do painel deles e recebem o relatório na hora. Aqui você acompanha por turma e período. Os dados são sensíveis: use apenas para acolhimento e acompanhamento pedagógico.</p>
+      <div class="card" style="background:var(--paper-soft, transparent); margin:10px 0;">
+        <label style="display:flex; align-items:flex-start; gap:8px; text-transform:none; font-weight:400; margin:0 0 12px;">
+          <input type="checkbox" data-action="socio-coord-abre" ${(s.config.abertas||{})[s.unidade]?'checked':''} style="width:auto; margin-top:4px;">
+          <span><strong>Abrir para os alunos (${esc(s.unidade)})</strong><br><span class="muted" style="font-size:.85rem;">Ligado, aparece um aviso <strong>URGENTE</strong> no Início do painel de cada aluno que ainda não respondeu, com o botão "Responder agora". O aviso some sozinho quando o aluno envia.</span></span>
+        </label>
+        <label style="display:flex; align-items:flex-start; gap:8px; text-transform:none; font-weight:400; margin:0;">
+          <input type="checkbox" data-action="socio-coord-substitui" ${(s.config.substituiAuto||{})[s.unidade]?'checked':''} style="width:auto; margin-top:4px;">
+          <span><strong>Usar a nota socioemocional no lugar da autoavaliação (${esc(s.unidade)})</strong><br><span class="muted" style="font-size:.85rem;">Desligado, a autoavaliação nas notas finais continua sendo calculada por engajamento (fichas, logins e exercícios), como sempre foi. Ligado, ela passa a vir da nota desta avaliação (nota ÷ 10 × peso da autoavaliação); alunos que ainda não responderam continuam com o engajamento. A opção vale só para o período selecionado.</span></span>
+        </label>
+      </div>
+      <div class="row" style="gap:10px; flex-wrap:wrap;">
+        <div><label>Período</label><select data-action="socio-coord-unidade">${UNIDADES.map(u=>`<option value="${esc(u)}" ${u===s.unidade?'selected':''}>${esc(u)}</option>`).join('')}</select></div>
+        <div><label>Turma</label><select data-action="socio-coord-turma"><option value="">Selecione...</option>${turmas.map(t=>`<option value="${t.id}" ${t.id===s.turmaId?'selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
+      </div>
+      ${corpo}
+    </div>`;
+}
+async function liberarSocioRefazer(key){
+  const s = socioCoordState();
+  const d = s.docs.find(x=>x._key===key); if(!d) return;
+  if(!confirm(`Apagar a resposta de ${d.studentName} (${d.unidade}) para que ele(a) possa refazer?`)) return;
+  try{ await window.storage.delete(key, true); s.docs = s.docs.filter(x=>x._key!==key); }catch(e){ alert('Não foi possível apagar agora.'); }
+  render();
+}
+function exportarSocioExcel(){
+  const s = socioCoordState();
+  const turma = state.professor.turmas.find(t=>t.id===s.turmaId); if(!turma) return;
+  const header = ['Aluno','Turma','Período','Competência 1 (máx 4)','Competência 2 (máx 4)','Autoavaliação (máx 2)','Nota (0-10)'];
+  const rows = turma.students.map(st => { const d = s.docs.find(x=>x.studentId===st.id && x.unidade===s.unidade); return d ? [st.name, turma.name, s.unidade, d.comp1, d.comp2, d.notaAuto, d.total] : [st.name, turma.name, s.unidade, '', '', '', '']; });
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Socioemocional');
+  XLSX.writeFile(wb, `socioemocional-${turma.name.replace(/[^a-z0-9]+/gi,'-')}-${s.unidade.replace(/\s+/g,'-')}.xlsx`);
+}
+
 /* ---------------- ACTIONS: TURMAS ---------------- */
 
 async function saveTurma(){
@@ -18896,6 +19369,14 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
     }
   });
 
+  // Opcional (a coordenação liga por período em "Avaliação Socioemocional"): a nota socioemocional substitui a autoavaliação por engajamento. Se o aluno ainda não respondeu, mantém o engajamento.
+  const socioPorAluno = {};
+  const socioConfig = await getSocioConfig();
+  if(turma && unidade && socioConfig.substituiAuto && socioConfig.substituiAuto[unidade]){
+    await Promise.all((turma.students||[]).map(async st => {
+      try{ const r = await window.storage.get(`socio:${st.id}:${slugifyName(unidade)}`, true); const d = JSON.parse(r.value); if(d && typeof d.total==='number') socioPorAluno[st.name] = d; }catch(e){}
+    }));
+  }
   const range = getPeriodoRange(unidade);
   const fichasPorAluno = {};
   const diasPorAluno = {};
@@ -18921,7 +19402,8 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
       dias: diasPorAluno[name]||0, diasMax,
       entregues: s.exerciciosEntregues||0, propostos: exerciciosPropostos,
     });
-    const autoAuto = engajamento * (pesos.autoavaliacao||0);
+    const socio = socioPorAluno[name] || null;
+    const autoAuto = socio ? (socio.total/10) * (pesos.autoavaliacao||0) : engajamento * (pesos.autoavaliacao||0);
     const fezRecuperacao = (s.recuperacaoScores||[]).length>0;
     const autoRecuperacao = fezRecuperacao ? avg(s.recuperacaoScores) * (pesos.avaliacao||0) : null;
 
@@ -18941,6 +19423,7 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
     const final = temRecuperacao ? (recuperacao+np2) : finalSemRecuperacao;
     const precisaRecuperacao = finalSemRecuperacao < 5;
     return { name, np1, diag, exerc, auto, np2, recuperacao, temRecuperacao, finalSemRecuperacao, precisaRecuperacao, final, engajamento, manual,
+      autoOrigem: socio ? 'socio' : 'engajamento', socioTotal: socio ? socio.total : null,
       autoNp1, autoDiag, autoExerc, autoAuto, autoRecuperacao };
   });
 
@@ -19602,14 +20085,16 @@ async function salvarRespostasComRetentativas(code, list, tentativas){
   }
   return false;
 }
-async function submitAnswers(){
+async function submitAnswers(forcado){
+  forcado = forcado===true;
   const al = state.aluno;
   const a = al.assessment;
-  if(assessmentWindowStatus(a)==='depois'){
+  if(!forcado && assessmentWindowStatus(a)==='depois'){
     al.error = 'O tempo para responder esta avaliação já encerrou. Fale com o professor.';
     render(); return;
   }
   for(const q of a.questions){
+    if(forcado) break; // prova encerrada pelo professor: vale o que o aluno já respondeu
     if(al.answers[q.id]===undefined || al.answers[q.id]===null || al.answers[q.id]===''){
       al.error = 'Responda todas as questões antes de enviar.';
       render(); return;
@@ -19621,7 +20106,10 @@ async function submitAnswers(){
   const details = []; let total = 0;
   for(const q of a.questions){
     const answer = al.answers[q.id];
-    if(q.type==='dissertativa'){
+    const emBranco = answer===undefined || answer===null || answer==='';
+    if(forcado && emBranco){
+      details.push({ questionId:q.id, score:0, feedback:'Sem resposta (prova encerrada pelo professor).' });
+    } else if(q.type==='dissertativa'){
       const res = await gradeEssay(q, answer);
       details.push({ questionId:q.id, score: res.score, feedback: res.feedback, pending: res.score===null });
       total += res.score || 0;
@@ -19631,7 +20119,7 @@ async function submitAnswers(){
       total += score;
     }
   }
-  const result = { studentName: al.name, submittedAt: Date.now(), total, details, answers: {...al.answers}, tabSwitches: al.tabSwitchCount||0, fullscreenExits: al.fullscreenExits||0, screenshotAttempts: al.screenshotAttempts||0 };
+  const result = { studentName: al.name, submittedAt: Date.now(), total, details, encerradaPeloProfessor: forcado||undefined, answers: {...al.answers}, tabSwitches: al.tabSwitchCount||0, fullscreenExits: al.fullscreenExits||0, screenshotAttempts: al.screenshotAttempts||0 };
 
   // Grava a resposta de verdade antes de dizer ao aluno que terminou — se a internet cair bem
   // na hora de enviar, NÃO podemos fingir que deu certo: isso faria a prova sumir sem ficar
@@ -19762,6 +20250,11 @@ document.addEventListener('click', (e) => {
     state.coordenador.subview = btn.dataset.sub;
     state.coordenador.mode='list';
     state.ui.sidebarSearch = '';
+    stopLiberacoesPoll();
+    if(state.coordenador.subview==='liberacoes'){
+      state.professor.unlockRequestsLoading = true; loadUnlockRequests();
+      liberacoesPollInterval = setInterval(loadUnlockRequests, 5000);
+    }
     if(state.coordenador.subview==='pesosprof'){ loadCoordProfessorPesos(); }
     if(state.coordenador.subview==='freqconfig'){ ensureTurnoHorariosLoaded().then(render); ensureDiasLetivosLoaded().then(render); }
     if(state.coordenador.subview==='importarnotas'){
@@ -20040,6 +20533,7 @@ document.addEventListener('click', (e) => {
   else if(act==='fechar-material-slides'){ fecharMaterialSlides(); }
   else if(act==='refresh-liberacoes'){ loadUnlockRequests(); }
   else if(act==='release-student'){ releaseStudent(btn.dataset.id); }
+  else if(act==='finalizar-prova-bloqueada'){ finalizarProvaBloqueada(btn.dataset.id); }
 
   // avaliações
   else if(act==='new-assessment'){ p.mode='new'; p.newAssessment = freshAssessment(); p.editingCode=null; p.editingResponseCount=0; p.pickerOpen=false; p.pickerSelected=[]; render(); }
@@ -20158,6 +20652,13 @@ document.addEventListener('click', (e) => {
   else if(act==='toggle-ai-tipo'){ const t = btn.dataset.tipo; if(p.aiGen.tipos.includes(t)) p.aiGen.tipos = p.aiGen.tipos.filter(x=>x!==t); else p.aiGen.tipos.push(t); }
   else if(act==='toggle-ai-provas-antigas'){ p.aiGen.provasAntigas = !p.aiGen.provasAntigas; }
   else if(act==='generate-ai-questions'){ generateAiQuestions(); }
+  else if(act==='socio-ir'){ const so = socioState(); so.unidade = btn.dataset.unidade; so.respostas = {}; so.auto = null; so.erro = ''; al.subview = 'socio'; state.ui.sidebarSearch = ''; render(); window.scrollTo(0,0); }
+  else if(act==='socio-enviar'){ enviarSocioAluno(); }
+  else if(act==='socio-serie'){ const so = socioState(); so.serie = parseInt(btn.dataset.serie,10); render(); }
+  else if(act==='socio-coord-ver'){ socioCoordState().verKey = btn.dataset.key; render(); }
+  else if(act==='socio-coord-voltar'){ socioCoordState().verKey = ''; render(); }
+  else if(act==='socio-coord-liberar'){ liberarSocioRefazer(btn.dataset.key); }
+  else if(act==='socio-coord-export'){ exportarSocioExcel(); }
   else if(act==='vincular-resposta-aluno'){ vincularRespostaAoAluno(parseInt(btn.dataset.idx)); }
   else if(act==='chat-bridge-abrir'){ chatBridgeAbrir(btn.dataset.kind); }
   else if(act==='chat-bridge-fechar'){ chatBridgeState().open = false; render(); }
@@ -20318,6 +20819,10 @@ document.addEventListener('click', (e) => {
     const el = btn.closest('.campanha-carousel');
     if(el) campanhaCarouselGoTo(el, campanhaCarouselIdx + parseInt(btn.dataset.dir, 10));
   }
+  else if(act==='coord-banner-abrir'){ campBannerState().aberto = true; render(); }
+  else if(act==='coord-banner-fechar'){ campBannerState().aberto = false; render(); }
+  else if(act==='coord-banner-tipo'){ const b = campBannerState(); b.tipo = btn.dataset.tipo; b.erro = ''; render(); }
+  else if(act==='coord-banner-publicar'){ publicarBannerCoord(); }
   else if(act==='campanha-set-tipo'){ al.campanha.novoTipo = btn.dataset.tipo; al.campanha.erro=''; render(); }
   else if(act==='campanha-enviar-item'){ campanhaEnviarItem(); }
   else if(act==='campanha-subview'){ state.coordenador.campanha.subview = btn.dataset.sub; render(); }
@@ -20357,6 +20862,10 @@ document.addEventListener('input', (e) => {
 
   if(el.id==='monitoria-horario-input'){ al.monitoria.novoVinculoHorario = el.value; }
   else if(el.id==='monitoria-edit-horario-input'){ al.monitoria.editHorarioValor = el.value; }
+  else if(el.id==='coord-banner-titulo'){ campBannerState().titulo = el.value; }
+  else if(el.id==='coord-banner-descricao'){ campBannerState().descricao = el.value; }
+  else if(el.id==='coord-banner-youtube'){ campBannerState().youtubeUrl = el.value; }
+  else if(el.id==='coord-banner-expira'){ campBannerState().expira = el.value; }
   else if(el.id==='campanha-titulo-input'){ al.campanha.novoTitulo = el.value; }
   else if(el.id==='campanha-descricao-input'){ al.campanha.novoDescricao = el.value; }
   else if(el.id==='campanha-youtube-input'){ al.campanha.novoYoutubeUrl = el.value; }
@@ -20542,6 +21051,7 @@ document.addEventListener('change', (e) => {
     else c.campanha.indicarSelecionados.push(sid);
     return;
   }
+  if(el.id==='coord-banner-imagem'){ if(el.files[0]) handleCoordBannerImagem(el.files[0]); return; }
   if(el.id==='campanha-imagem-input'){ if(el.files[0]) handleCampanhaImagemUpload(el.files[0]); return; }
   if(el.id==='coord-filter-professor'){ c.filterProfessorId = el.value; render(); return; }
   if(el.id==='coord-transfer-target-select'){ c.transferTargetCode = el.value; c.transferError = ''; return; }
@@ -20585,6 +21095,13 @@ document.addEventListener('change', (e) => {
   else if(act==='toggle-exige-liberacao'){ p.newAssessment.exigeLiberacao = el.checked; }
   else if(act==='toggle-security-enabled'){ p.newAssessment.securityEnabled = el.checked; }
   else if(act==='set-unidade'){ p.newAssessment.unidade = el.value; render(); }
+  else if(act==='socio-unidade'){ const so = socioState(); so.unidade = el.value; so.respostas = {}; so.auto = null; so.erro = ''; render(); }
+  else if(act==='socio-resp'){ socioState().respostas[el.dataset.q] = el.dataset.letra; }
+  else if(act==='socio-auto'){ socioState().auto = parseInt(el.dataset.nota,10); }
+  else if(act==='socio-coord-abre'){ salvarSocioSubstitui(socioCoordState().unidade, el.checked, 'abertas'); }
+  else if(act==='socio-coord-substitui'){ salvarSocioSubstitui(socioCoordState().unidade, el.checked); }
+  else if(act==='socio-coord-unidade'){ const s2 = socioCoordState(); s2.unidade = el.value; s2.verKey=''; render(); }
+  else if(act==='socio-coord-turma'){ const s2 = socioCoordState(); s2.turmaId = el.value; s2.verKey=''; render(); }
   else if(act==='banco-filtro-disciplina'){ p.bancoDisciplinaId = el.value; render(); }
   else if(act==='bank-set-disciplina'){
     const d = p.disciplinas.find(x=>x.id===el.value), q = p.newBankQuestion;
