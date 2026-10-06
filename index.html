@@ -476,10 +476,14 @@
   .ra-site-link:hover{ filter:brightness(0.95); }
 
   /* Carrossel de divulgação (Jovens Protagonistas) */
-  .campanha-carousel{ position:relative; width:100%; height:auto; aspect-ratio:3/1; min-height:140px; max-height:360px; border-radius:12px; overflow:hidden; margin-bottom:14px; background:var(--surface); }
+  .campanha-carousel{ position:relative; width:100%; height:190px; border-radius:12px; overflow:hidden; margin-bottom:14px; background:var(--surface); }
   .campanha-slide{ position:absolute; inset:0; opacity:0; transition:opacity .6s ease; pointer-events:none; }
   .campanha-slide.ativo{ opacity:1; pointer-events:auto; }
   .campanha-slide img{ width:100%; height:100%; object-fit:cover; display:block; cursor:pointer; }
+  /* Banner de imagem: mantém a altura de 190px e mostra a imagem INTEIRA (sem cortar); o espaço que sobra nas
+     laterais é preenchido com a própria imagem desfocada. */
+  .campanha-slide img.campanha-img-inteira{ position:relative; object-fit:contain; z-index:1; }
+  .campanha-slide img.campanha-img-fundo{ position:absolute; inset:-12px; width:calc(100% + 24px); height:calc(100% + 24px); object-fit:cover; filter:blur(14px) brightness(.7); cursor:default; pointer-events:none; }
   .campanha-play{ position:relative; width:100%; height:100%; cursor:pointer; }
   .campanha-play-icone{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:2.6rem; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.6); }
   /* Banner de conquista do carrossel: pensado como um "quadro" de mural — mesma linguagem
@@ -509,8 +513,8 @@
   .conquista-card{ background:var(--surface); border:1px solid var(--paper-line); border-radius:10px; padding:8px 10px; font-size:.82rem; font-weight:600; text-align:center; overflow-wrap:break-word; }
   .conquista-card.freq{ border-left:4px solid var(--green); }
   .conquista-card.destaque{ border-left:4px solid var(--yellow); }
-  .campanha-caption{ position:absolute; left:0; right:0; bottom:0; padding:10px 14px; background:linear-gradient(transparent, rgba(0,0,0,.7)); color:#fff; font-size:.85rem; pointer-events:none; }
-  .campanha-nav{ position:absolute; top:50%; transform:translateY(-50%); background:rgba(0,0,0,.4); color:#fff; border:none; width:30px; height:30px; border-radius:50%; cursor:pointer; font-size:1.1rem; display:flex; align-items:center; justify-content:center; z-index:2; line-height:1; }
+  .campanha-caption{ position:absolute; left:0; right:0; bottom:0; padding:10px 14px; background:linear-gradient(transparent, rgba(0,0,0,.7)); color:#fff; font-size:.85rem; pointer-events:none; z-index:2; }
+  .campanha-nav{ z-index:3; position:absolute; top:50%; transform:translateY(-50%); background:rgba(0,0,0,.4); color:#fff; border:none; width:30px; height:30px; border-radius:50%; cursor:pointer; font-size:1.1rem; display:flex; align-items:center; justify-content:center; z-index:2; line-height:1; }
   .campanha-nav.prev{ left:8px; }
   .campanha-nav.next{ right:8px; }
   .campanha-modal-overlay{ position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.72); display:flex; align-items:center; justify-content:center; padding:16px; }
@@ -4972,7 +4976,7 @@ function renderCarrosselCampanha(itensAprovados){
                    </div>
                  </div>
                </div>`
-            : `<img src="${cloudinaryLargura(campanhaImgSrc(item), 1600)}" alt="${esc(item.titulo)}" data-action="campanha-abrir-imagem" data-id="${esc(item.id)}">`}
+            : `<img class="campanha-img-fundo" src="${cloudinaryLargura(campanhaImgSrc(item), 400)}" alt="" aria-hidden="true"><img class="campanha-img-inteira" src="${cloudinaryLargura(campanhaImgSrc(item), 1600)}" alt="${esc(item.titulo)}" data-action="campanha-abrir-imagem" data-id="${esc(item.id)}">`}
           ${(item.tipo!=='conquista' && (item.origem!=='coordenacao' || item.mostrarLegenda)) ? `
           <div class="campanha-caption">
             <strong>${esc(item.titulo)}</strong>
@@ -19039,11 +19043,19 @@ function socioForaDoPrazo(cfg, u){
   if(j.fim && agora > j.fim) return 'O prazo para responder este período terminou em '+fmtSocioData(j.fim)+'. Se precisar, procure a coordenação.';
   return '';
 }
-// Períodos abertos (e dentro do prazo) que o aluno ainda não respondeu
+// Turmas indicadas pela coordenação para cada período. Sem lista salva = todas as turmas (comportamento antigo);
+// com lista salva = só as marcadas (lista vazia = nenhuma).
+function socioTurmaIndicada(cfg, u, turmaId){
+  const lista = ((cfg && cfg.turmas) || {})[u];
+  if(!Array.isArray(lista)) return true;
+  return lista.includes(turmaId);
+}
+// Períodos abertos (e dentro do prazo) que o aluno ainda não respondeu, e que a turma dele deve fazer
 function socioPendentes(){
   const so = socioState();
+  const turmaId = state.aluno.turma && state.aluno.turma.id;
   const abertas = (so.config && so.config.abertas) || {};
-  return UNIDADES.filter(u => abertas[u] && !socioForaDoPrazo(so.config, u) && !so.docs.some(d=>d.unidade===u));
+  return UNIDADES.filter(u => abertas[u] && socioTurmaIndicada(so.config, u, turmaId) && !socioForaDoPrazo(so.config, u) && !so.docs.some(d=>d.unidade===u));
 }
 function renderAlunoSocioUrgente(){
   const al = state.aluno;
@@ -19202,6 +19214,22 @@ async function salvarSocioPrazo(unidade, inicio, fim, abrirAgora){
   catch(e){ alert('Não foi possível salvar o prazo agora.'); }
   render();
 }
+async function salvarSocioTurmas(unidade, ids){
+  const s = socioCoordState();
+  const cfg = await getSocioConfig();
+  cfg.turmas = cfg.turmas || {};
+  if(ids===null) delete cfg.turmas[unidade]; else cfg.turmas[unidade] = ids;
+  try{ await window.storage.set('socio-config', JSON.stringify(cfg), true); s.config = cfg; if(s.turmasDraft) delete s.turmasDraft[unidade]; }
+  catch(e){ alert('Não foi possível salvar as turmas agora.'); }
+  render();
+}
+function socioTurmasSelecionadas(s){
+  const d = (s.turmasDraft||{})[s.unidade];
+  if(d===null) return null;
+  if(Array.isArray(d)) return d;
+  const l = ((s.config||{}).turmas||{})[s.unidade];
+  return Array.isArray(l) ? l : null;   // null = todas
+}
 function paraInputLocal(ts){
   if(!ts) return '';
   const d = new Date(ts), p = n => String(n).padStart(2,'0');
@@ -19263,6 +19291,31 @@ function renderCoordSocio(){
           <input type="checkbox" data-action="socio-coord-abre" ${(s.config.abertas||{})[s.unidade]?'checked':''} style="width:auto; margin-top:4px;">
           <span><strong>Abrir para os alunos (${esc(s.unidade)})</strong><br><span class="muted" style="font-size:.85rem;">Ligado, aparece um aviso <strong>URGENTE</strong> no Início do painel de cada aluno que ainda não respondeu, com o botão "Responder agora". O aviso some sozinho quando o aluno envia.</span></span>
         </label>
+        ${(() => {
+          const sel = socioTurmasSelecionadas(s);
+          const todas = sel===null;
+          const salvas = ((s.config||{}).turmas||{})[s.unidade];
+          const grupos = [...turmas].sort((a,b)=>String(a.name).localeCompare(String(b.name),'pt-BR',{numeric:true}));
+          const resumo = Array.isArray(salvas) ? (salvas.length ? salvas.length+' turma(s) indicada(s)' : 'nenhuma turma indicada') : 'todas as turmas';
+          return `<div style="border-bottom:1px dashed var(--paper-line); margin:0 0 12px; padding-bottom:12px;">
+            <strong>🏫 Quais turmas devem fazer (${esc(s.unidade)})</strong>
+            <p class="muted" style="font-size:.85rem; margin:4px 0 8px;">Hoje: <strong>${resumo}</strong>. O aviso URGENTE só aparece para os alunos das turmas indicadas. A aba "Avaliação Socioemocional" continua disponível no menu de todos.</p>
+            <label style="display:flex; align-items:center; gap:8px; text-transform:none; font-weight:400; margin:0 0 6px;">
+              <input type="radio" name="socio-turmas-modo" data-action="socio-turmas-modo" data-modo="todas" ${todas?'checked':''} style="width:auto;"> Todas as turmas
+            </label>
+            <label style="display:flex; align-items:center; gap:8px; text-transform:none; font-weight:400; margin:0 0 6px;">
+              <input type="radio" name="socio-turmas-modo" data-action="socio-turmas-modo" data-modo="algumas" ${!todas?'checked':''} style="width:auto;"> Só as turmas marcadas
+            </label>
+            ${!todas ? `
+              <div class="row" style="gap:6px 14px; flex-wrap:wrap; margin:8px 0;">
+                ${grupos.map(t => `<label style="display:flex; align-items:center; gap:6px; text-transform:none; font-weight:400; flex:0 0 auto;"><input type="checkbox" data-action="socio-turma-chk" data-id="${esc(t.id)}" ${sel.includes(t.id)?'checked':''} style="width:auto;"> ${esc(t.name)}</label>`).join('') || '<span class="muted">Nenhuma turma cadastrada.</span>'}
+              </div>
+              <div class="row" style="gap:6px; flex-wrap:wrap;">
+                <button class="btn btn-ghost btn-sm" data-action="socio-turmas-todas-marcar">Marcar todas</button>
+                <button class="btn btn-ghost btn-sm" data-action="socio-turmas-limpar">Limpar</button>
+              </div>` : ''}
+            <button class="btn btn-primary btn-sm" data-action="socio-turmas-salvar" style="margin-top:8px;">Salvar turmas</button>
+          </div>`; })()}
         ${(() => {
           const cfg = s.config||{}, j = socioJanela(cfg, s.unidade);
           const dr = (s.prazoDraft||{})[s.unidade] || {};
@@ -20964,6 +21017,9 @@ document.addEventListener('click', (e) => {
     const el = btn.closest('.campanha-carousel');
     if(el) campanhaCarouselGoTo(el, campanhaCarouselIdx + parseInt(btn.dataset.dir, 10));
   }
+  else if(act==='socio-turmas-salvar'){ const c = socioCoordState(); salvarSocioTurmas(c.unidade, socioTurmasSelecionadas(c)); }
+  else if(act==='socio-turmas-todas-marcar'){ const c = socioCoordState(); c.turmasDraft = c.turmasDraft||{}; c.turmasDraft[c.unidade] = state.professor.turmas.map(t=>t.id); render(); }
+  else if(act==='socio-turmas-limpar'){ const c = socioCoordState(); c.turmasDraft = c.turmasDraft||{}; c.turmasDraft[c.unidade] = []; render(); }
   else if(act==='socio-prazo-salvar'){ const c = socioCoordState(); const dr = (c.prazoDraft||{})[c.unidade]||{}; const j = socioJanela(c.config, c.unidade);
     const tIni = dr.inicio!==undefined ? dr.inicio : paraInputLocal(j.inicio), tFim = dr.fim!==undefined ? dr.fim : paraInputLocal(j.fim);
     salvarSocioPrazo(c.unidade, tIni ? new Date(tIni).getTime() : null, tFim ? new Date(tFim).getTime() : null, false); }
@@ -21250,6 +21306,8 @@ document.addEventListener('change', (e) => {
   else if(act==='socio-resp'){ const so = socioState(); so.respostas[el.dataset.q] = el.dataset.letra; if((so.menos||{})[el.dataset.q]===el.dataset.letra){ delete so.menos[el.dataset.q]; render(); } }
   else if(act==='socio-menos'){ const so = socioState(); if(!so.menos) so.menos = {}; so.menos[el.dataset.q] = el.dataset.letra; if(so.respostas[el.dataset.q]===el.dataset.letra){ delete so.respostas[el.dataset.q]; render(); } }
   else if(act==='socio-auto'){ const so = socioState(); if(!so.autoItens) so.autoItens = {}; so.autoItens[parseInt(el.dataset.item,10)] = parseInt(el.dataset.v,10); so.auto = socioAutoNota(so.autoItens); }
+  else if(act==='socio-turmas-modo'){ const c = socioCoordState(); c.turmasDraft = c.turmasDraft||{}; if(el.dataset.modo==='todas'){ c.turmasDraft[c.unidade] = null; } else { c.turmasDraft[c.unidade] = socioTurmasSelecionadas(c) || []; } render(); }
+  else if(act==='socio-turma-chk'){ const c = socioCoordState(); const cur = (socioTurmasSelecionadas(c)||[]).slice(); const i = cur.indexOf(el.dataset.id); if(el.checked && i<0) cur.push(el.dataset.id); if(!el.checked && i>=0) cur.splice(i,1); c.turmasDraft = c.turmasDraft||{}; c.turmasDraft[c.unidade] = cur; }
   else if(act==='coord-banner-legenda'){ campBannerState().mostrarLegenda = el.checked; }
   else if(act==='socio-coord-abre'){ salvarSocioSubstitui(socioCoordState().unidade, el.checked, 'abertas'); }
   else if(act==='socio-coord-substitui'){ salvarSocioSubstitui(socioCoordState().unidade, el.checked); }
