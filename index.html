@@ -7865,6 +7865,128 @@ function renderBanco(){
   `;
 }
 
+
+// ---- Ponte com chat de IA gratuito (ChatGPT, Gemini, Claude, Copilot...) ----
+// O app monta o pedido, o professor cola no chat que preferir e traz a resposta de volta;
+// a conversão em questões é feita aqui mesmo, sem usar a chave/limite de IA do app.
+function chatBridgeState(){ const p = state.professor; if(!p.chatBridge) p.chatBridge = { kind:'', open:false, prompt:'', resposta:'', erro:'', copiado:false }; return p.chatBridge; }
+const CHAT_BRIDGE_FORMATO = `Responda SOMENTE com um bloco de código JSON (começando com \`\`\`json e terminando com \`\`\`) contendo um array válido, sem nenhum texto fora do bloco, no formato exato abaixo (cada item segue um dos três formatos conforme o "type"):
+[
+  {"type":"mc","text":"enunciado","points":1,"options":["alternativa A","alternativa B","alternativa C","alternativa D"],"correctIndex":0},
+  {"type":"vf","text":"enunciado","points":1,"correct":true},
+  {"type":"dissertativa","text":"enunciado","points":2,"modelAnswer":"resposta modelo esperada"}
+]
+("correctIndex" é a posição da alternativa correta, começando em 0.)`;
+function buildChatBridgePromptGen(g, tema, dificuldade, qtd){
+  const base = buildAiGenPrompt(g, tema, dificuldade, qtd);
+  const semFormato = base.split('Responda SOMENTE com um array JSON')[0].trim();
+  return semFormato + '\n\n' + CHAT_BRIDGE_FORMATO;
+}
+function buildChatBridgePromptImport(texto){
+  return `Você é um assistente que organiza questões de prova a partir de um texto (de um livro didático ou lista de exercícios) para um professor brasileiro.
+Texto:
+"""${texto}"""
+
+Identifique cada questão presente no texto. Para cada uma:
+- Se tiver alternativas (múltipla escolha), extraia o enunciado, as alternativas e identifique a correta (use o gabarito se estiver no texto; se não houver, indique a alternativa mais provável).
+- Se for verdadeiro ou falso, identifique a resposta correta.
+- Se não tiver alternativas (dissertativa), escreva uma resposta modelo breve.
+
+${CHAT_BRIDGE_FORMATO}
+Se não houver nenhuma questão no texto, responda com um array vazio: []`;
+}
+function chatBridgeAbrir(kind){
+  const p = state.professor, cb = chatBridgeState();
+  cb.erro = ''; cb.copiado = false; cb.resposta = '';
+  if(kind==='gen'){
+    const g = p.aiGen;
+    const tema = (document.getElementById('ai-tema-input')||{value:g.tema}).value.trim();
+    const qtd = parseInt((document.getElementById('ai-qtd-input')||{value:g.quantidade}).value) || 5;
+    const dif = (document.getElementById('ai-dificuldade-input')||{value:g.dificuldade}).value;
+    g.tema = tema; g.quantidade = qtd; g.dificuldade = dif;
+    if(!tema){ g.error = 'Informe o tema da questão antes de usar o chat de IA.'; render(); return; }
+    if(g.tipos.length===0){ g.error = 'Marque ao menos um tipo de questão.'; render(); return; }
+    g.error = '';
+    cb.prompt = buildChatBridgePromptGen(g, tema, dif, qtd);
+  } else {
+    const g = p.pasteImport;
+    const texto = (document.getElementById('paste-text-input')||{value:g.text}).value.trim();
+    g.text = texto;
+    if(!texto){ g.error = 'Cole o texto das questões antes de usar o chat de IA.'; render(); return; }
+    g.error = '';
+    cb.prompt = buildChatBridgePromptImport(texto);
+  }
+  cb.kind = kind; cb.open = true;
+  render();
+}
+async function chatBridgeCopiar(){
+  const cb = chatBridgeState();
+  let ok = false;
+  try{ await navigator.clipboard.writeText(cb.prompt); ok = true; }catch(e){}
+  if(!ok){
+    const ta = document.getElementById('chat-bridge-prompt');
+    if(ta){ ta.focus(); ta.select(); try{ ok = document.execCommand('copy'); }catch(e){} }
+  }
+  cb.copiado = ok;
+  cb.erro = ok ? '' : 'Não consegui copiar automaticamente — selecione o texto da caixa e copie (Ctrl+C).';
+  const respEl = document.getElementById('chat-bridge-resposta'); if(respEl) cb.resposta = respEl.value;
+  render();
+}
+// Extrai as questões da resposta colada do chat (aceita bloco ```json, texto antes/depois e JSON cortado no final).
+function extrairItensDeRespostaChat(texto){
+  let t = String(texto||'').trim();
+  const cerca = /```(?:json)?\s*([\s\S]*?)```/i.exec(t);
+  if(cerca) t = cerca[1].trim();
+  const ini = t.indexOf('['), fim = t.lastIndexOf(']');
+  if(ini>=0 && fim>ini){ try{ const r = JSON.parse(t.slice(ini, fim+1)); if(Array.isArray(r)) return r; }catch(e){} }
+  const ob = t.indexOf('{'), obFim = t.lastIndexOf('}');
+  if(ob>=0 && obFim>ob){ try{ const r = JSON.parse(t.slice(ob, obFim+1)); const arr = r.questoes || r.questions; if(Array.isArray(arr)) return arr; }catch(e){} }
+  return salvarJsonParcial(t) || [];
+}
+function chatBridgeConverter(){
+  const p = state.professor, cb = chatBridgeState();
+  const el = document.getElementById('chat-bridge-resposta');
+  cb.resposta = el ? el.value : cb.resposta;
+  if(!cb.resposta.trim()){ cb.erro = 'Cole aqui a resposta que o chat de IA deu.'; render(); return; }
+  const mapped = mapearItensParaQuestoes(extrairItensDeRespostaChat(cb.resposta));
+  if(mapped.length===0){ cb.erro = 'Não encontrei questões nessa resposta. Confira se você colou a resposta inteira (o bloco que começa com [ e termina com ]). Se o chat respondeu em outro formato, peça: "responda só com o bloco JSON no formato pedido".'; render(); return; }
+  const g = cb.kind==='gen' ? p.aiGen : p.pasteImport;
+  g.results = mapped; g.selected = mapped.map((_,i)=>i); g.error = '';
+  if(cb.kind==='import') g.aviso = '';
+  cb.open = false; cb.resposta = ''; cb.erro = '';
+  render();
+}
+function renderChatBridge(kind){
+  const cb = chatBridgeState();
+  if(!(cb.open && cb.kind===kind)){
+    return `<div style="margin-top:14px; padding-top:12px; border-top:1px dashed var(--paper-line);">
+      <button class="btn btn-ghost btn-sm" data-action="chat-bridge-abrir" data-kind="${kind}">💬 Usar meu chat de IA (grátis)</button>
+      <p class="muted" style="font-size:.8rem; margin:6px 0 0;">Sem limite do app: você cola o pedido no ChatGPT, Gemini, Claude ou Copilot que já usa e traz a resposta de volta.</p>
+    </div>`;
+  }
+  return `<div class="card" style="margin-top:14px; border:2px solid var(--green);">
+    <div class="row" style="align-items:center; justify-content:space-between;">
+      <h3 style="margin:0;">💬 Usar meu chat de IA</h3>
+      <button class="btn btn-ghost btn-sm" data-action="chat-bridge-fechar">✕ Fechar</button>
+    </div>
+    <p style="margin:10px 0 4px;"><strong>1.</strong> Copie o pedido:</p>
+    <textarea id="chat-bridge-prompt" readonly style="min-height:110px; font-size:.82rem;">${esc(cb.prompt)}</textarea>
+    <button class="btn btn-primary btn-sm" data-action="chat-bridge-copiar" style="margin-top:6px;">${cb.copiado ? '✓ Copiado!' : '📋 Copiar pedido'}</button>
+    <p style="margin:12px 0 4px;"><strong>2.</strong> Abra o chat, cole o pedido e envie:</p>
+    <div class="row" style="gap:6px; flex-wrap:wrap;">
+      <a class="btn btn-ghost btn-sm" href="https://chatgpt.com" target="_blank" rel="noopener">ChatGPT</a>
+      <a class="btn btn-ghost btn-sm" href="https://gemini.google.com" target="_blank" rel="noopener">Gemini</a>
+      <a class="btn btn-ghost btn-sm" href="https://claude.ai" target="_blank" rel="noopener">Claude</a>
+      <a class="btn btn-ghost btn-sm" href="https://copilot.microsoft.com" target="_blank" rel="noopener">Copilot</a>
+    </div>
+    <p style="margin:12px 0 4px;"><strong>3.</strong> Copie a resposta do chat e cole aqui:</p>
+    <textarea id="chat-bridge-resposta" style="min-height:140px;" placeholder="Cole aqui a resposta do chat de IA...">${esc(cb.resposta)}</textarea>
+    ${cb.erro ? `<p class="err">${esc(cb.erro)}</p>` : ''}
+    <button class="btn btn-primary" data-action="chat-bridge-converter" style="margin-top:8px;">Converter em questões</button>
+    <p class="muted" style="font-size:.78rem; margin-top:8px;">Sempre confira o gabarito antes de usar. Não cole dados de alunos no chat.</p>
+  </div>`;
+}
+
 function renderAiGen(){
   const g = state.professor.aiGen;
   if(g.loading){
@@ -7937,6 +8059,7 @@ function renderAiGen(){
         <button class="btn btn-ghost" data-action="close-ai-gen">Cancelar</button>
         <button class="btn btn-primary" data-action="generate-ai-questions">Gerar</button>
       </div>
+      ${renderChatBridge('gen')}
     </div>
   `;
 }
@@ -7944,13 +8067,14 @@ function renderAiGen(){
 function renderPasteImport(){
   const g = state.professor.pasteImport;
   if(g.loading){
-    return `<div class="card"><h2>Importando...</h2><div class="spinner"></div><p class="muted center">Organizando as questões do texto colado.</p></div>`;
+    return `<div class="card"><h2>Importando...</h2><div class="spinner"></div><p class="muted center">${esc(g.progress || 'Organizando as questões do texto colado.')}</p><p class="muted center" style="font-size:.8rem;">Textos longos são lidos em partes — pode levar um minuto.</p></div>`;
   }
   if(g.results){
     return `
       <div class="card">
         <h2>Questões encontradas no texto</h2>
         <p class="muted">Revise, desmarque o que não quiser e adicione ao banco. Confira sempre o gabarito antes de usar.</p>
+        ${g.aviso ? `<p class="err">${esc(g.aviso)}</p>` : ''}
         ${g.results.map((q,idx) => `
           <div class="q-card">
             <label style="display:flex; gap:8px; align-items:flex-start; font-weight:400; text-transform:none;">
@@ -7983,6 +8107,7 @@ function renderPasteImport(){
         <button class="btn btn-ghost" data-action="close-paste-import">Cancelar</button>
         <button class="btn btn-primary" data-action="import-pasted-questions">Importar</button>
       </div>
+      ${renderChatBridge('import')}
     </div>
   `;
 }
@@ -7997,6 +8122,7 @@ function renderBookImport(){
       <div class="card">
         <h2>Questões encontradas no trecho</h2>
         <p class="muted">Revise, desmarque o que não quiser e adicione ao banco. Confira sempre o gabarito.</p>
+        ${b.extractAviso ? `<p class="err">${esc(b.extractAviso)}</p>` : ''}
         ${b.extractResults.map((q,idx) => `
           <div class="q-card">
             <label style="display:flex; gap:8px; align-items:flex-start; font-weight:400; text-transform:none;">
@@ -8052,6 +8178,9 @@ function renderBookImport(){
         <div class="row" style="margin-top:12px;">
           <button class="btn btn-ghost" data-action="close-book-import">Fechar livro</button>
           <button class="btn btn-primary" data-action="extract-book-questions" ${b.extractLoading?'disabled':''}>${b.extractLoading?'Extraindo...':'Extrair questões deste texto'}</button>
+        </div>
+        ${b.extractLoading && b.extractMsg ? `<p class="muted">${esc(b.extractMsg)}</p>` : ''}
+        <div style="display:none;">
         </div>
         <p class="muted" style="font-size:.78rem; margin-top:10px;">O livro fica carregado só nesta sessão do navegador — se recarregar a página, é preciso enviar o PDF de novo.</p>
       </div>
@@ -12355,13 +12484,28 @@ async function resolveGeminiKeyForTurma(turmaId){
   }catch(e){}
   try{ const r = await window.storage.get('gemini-api-key', true); return (r.value||'').trim(); }catch(e){ return ''; }
 }
-async function callGeminiJSONOnce(prompt, keyOverride, imagePart){
+// Recupera os objetos completos de um array JSON que foi cortado no meio (resposta longa demais).
+function salvarJsonParcial(text){
+  const start = text.indexOf('[');
+  if(start<0) return null;
+  let depth=0, inStr=false, escape=false, objStart=-1;
+  const objs=[];
+  for(let i=start+1;i<text.length;i++){
+    const c=text[i];
+    if(inStr){ if(escape) escape=false; else if(c==='\\') escape=true; else if(c==='"') inStr=false; continue; }
+    if(c==='"'){ inStr=true; continue; }
+    if(c==='{'){ if(depth===0) objStart=i; depth++; }
+    else if(c==='}'){ depth--; if(depth===0 && objStart>=0){ try{ objs.push(JSON.parse(text.slice(objStart,i+1))); }catch(e){} objStart=-1; } }
+  }
+  return objs.length ? objs : null;
+}
+async function callGeminiJSONOnce(prompt, keyOverride, imagePart, opts){
   const key = keyOverride || await getGeminiApiKey();
   if(!key) throw new Error('IA_NAO_CONFIGURADA');
   let resp, data;
   try{
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    const timeoutId = setTimeout(() => controller.abort(), (opts && opts.timeoutMs) || 45000);
     try{
       const parts = [{ text: prompt }];
       if(imagePart) parts.push({ inlineData: { mimeType: imagePart.mimeType, data: imagePart.base64 } });
@@ -12370,7 +12514,7 @@ async function callGeminiJSONOnce(prompt, keyOverride, imagePart){
         headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           contents: [{ parts }],
-          generationConfig: { responseMimeType: 'application/json', temperature: 0.7 }
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.7, maxOutputTokens: 16384 }
         }),
         signal: controller.signal
       });
@@ -12399,22 +12543,28 @@ async function callGeminiJSONOnce(prompt, keyOverride, imagePart){
     throw new Error('IA_SEM_RESPOSTA');
   }
   const cleaned = text.replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+  if(finishReason==='MAX_TOKENS'){
+    // resposta cortada: repetir o mesmo pedido daria o mesmo resultado, então avisa quem chamou (que divide o trabalho)
+    const err = new Error('IA_TRUNCADO'); err.parcial = salvarJsonParcial(cleaned); throw err;
+  }
   try{
     return JSON.parse(cleaned);
   }catch(e){
+    const parcial = salvarJsonParcial(cleaned);
+    if(parcial && opts && opts.aceitarParcial) return parcial;
     throw new Error('IA_JSON_INVALIDO');
   }
 }
 // Chamadas à IA (Gemini) falham de forma intermitente por natureza (limite de uso por minuto,
 // sobrecarga momentânea do modelo gratuito, resposta mal formatada). Em vez de mostrar erro na
 // primeira falha, tenta de novo automaticamente algumas vezes antes de desistir.
-async function callGeminiJSON(prompt, keyOverride, imagePart){
+async function callGeminiJSON(prompt, keyOverride, imagePart, opts){
   const retryDelaysMs = [1500, 3500, 6000];
   const retryableErrors = ['IA_REDE','IA_INDISPONIVEL','IA_JSON_INVALIDO','IA_SEM_RESPOSTA','IA_LIMITE_EXCEDIDO'];
   let lastErr;
   for(let attempt=0; attempt<=retryDelaysMs.length; attempt++){
     try{
-      return await callGeminiJSONOnce(prompt, keyOverride, imagePart);
+      return await callGeminiJSONOnce(prompt, keyOverride, imagePart, opts);
     }catch(e){
       lastErr = e;
       const isLast = attempt===retryDelaysMs.length;
@@ -12433,6 +12583,7 @@ function iaErrorMessage(e){
   if(m==='IA_INDISPONIVEL') return 'O serviço de IA está sobrecarregado no momento (já tentamos de novo automaticamente algumas vezes). Tente novamente em instantes.';
   if(m==='IA_BLOQUEADO') return 'A IA não conseguiu responder a esse conteúdo. Tente reformular ou usar um trecho diferente.';
   if(m==='IA_JSON_INVALIDO') return 'A IA respondeu em um formato inesperado mesmo após tentar de novo. Tente reformular o pedido.';
+  if(m==='IA_TRUNCADO') return 'O trecho enviado gerou questões demais para uma única resposta da IA. Selecione um trecho menor e tente de novo.';
   if(m==='IA_SEM_RESPOSTA') return 'A IA não retornou uma resposta, mesmo após tentar de novo. Tente novamente em instantes.';
   return 'Não foi possível usar a IA agora. Tente novamente.';
 }
@@ -18219,18 +18370,7 @@ async function openResults(code){
 
 /* ---------------- ACTIONS: BANCO ---------------- */
 
-async function generateAiQuestions(){
-  const g = state.professor.aiGen;
-  const temaInput = document.getElementById('ai-tema-input').value.trim();
-  const qtd = parseInt(document.getElementById('ai-qtd-input').value) || 5;
-  const dificuldade = document.getElementById('ai-dificuldade-input').value;
-  g.tema = temaInput; g.quantidade = qtd; g.dificuldade = dificuldade;
-  if(!temaInput){ g.error = 'Informe o tema da questão.'; render(); return; }
-  if(g.tipos.length===0){ g.error = 'Marque ao menos um tipo de questão.'; render(); return; }
-  g.error = '';
-  g.loading = true;
-  render();
-
+function buildAiGenPrompt(g, temaInput, dificuldade, qtd){
   const tipoLabels = g.tipos.map(t => t==='mc'?'múltipla escolha (4 alternativas)':t==='vf'?'verdadeiro ou falso':'dissertativa').join(', ');
   const estiloInstrucao = `As questões devem ser elaboradas em estilo ENEM: contextualizadas, apresentando um texto-base, situação-problema, gráfico, tirinha, trecho de reportagem ou caso concreto antes do enunciado da pergunta, exigindo interpretação e aplicação do conhecimento (não apenas memorização). Alinhe o nível de exigência e a forma de cobrança às avaliações externas (ENEM, SAEB, Prova Brasil), evitando questões de resposta puramente decorativa.`;
   const provasAntigasInstrucao = g.provasAntigas ? `\nAlém disso, busque se inspirar em questões de provas antigas (ENEM, SAEB, vestibulares ou avaliações externas anteriores) relacionadas ao tema, adaptando-as quando necessário — sem copiar textos protegidos por direitos autorais, apenas usando-as como referência de estilo e abordagem.` : '';
@@ -18248,6 +18388,21 @@ Responda SOMENTE com um array JSON válido, sem markdown e sem texto fora do JSO
   {"type":"vf","text":"enunciado","points":1,"correct":true},
   {"type":"dissertativa","text":"enunciado","points":2,"modelAnswer":"resposta modelo esperada"}
 ]`;
+  return prompt;
+}
+async function generateAiQuestions(){
+  const g = state.professor.aiGen;
+  const temaInput = document.getElementById('ai-tema-input').value.trim();
+  const qtd = parseInt(document.getElementById('ai-qtd-input').value) || 5;
+  const dificuldade = document.getElementById('ai-dificuldade-input').value;
+  g.tema = temaInput; g.quantidade = qtd; g.dificuldade = dificuldade;
+  if(!temaInput){ g.error = 'Informe o tema da questão.'; render(); return; }
+  if(g.tipos.length===0){ g.error = 'Marque ao menos um tipo de questão.'; render(); return; }
+  g.error = '';
+  g.loading = true;
+  render();
+
+  const prompt = buildAiGenPrompt(g, temaInput, dificuldade, qtd);
 
   try{
     const parsed = await callGeminiJSON(prompt);
@@ -18277,12 +18432,49 @@ Responda SOMENTE com um array JSON válido, sem markdown e sem texto fora do JSO
   render();
 }
 
-async function parseTextToQuestions(textInput){
-  const MAX_TEXT_CHARS = 14000;
-  const trimmedInput = textInput.length > MAX_TEXT_CHARS ? textInput.slice(0, MAX_TEXT_CHARS) + '...' : textInput;
+const sleepMs = ms => new Promise(r => setTimeout(r, ms));
+// Divide um texto longo em partes (preferindo cortar antes do início de uma questão) para a IA
+// processar uma parte por vez — evita estourar o tempo/tamanho da resposta e não perde questões.
+function dividirTextoEmPartes(text, max){
+  max = max || 6000;
+  const partes = [];
+  let rest = String(text||'').trim();
+  while(rest.length > max){
+    const janela = rest.slice(0, max);
+    let cut = -1;
+    const re = /(?:^|\s)(?:quest[ãa]o\s*\d+|\d{1,3}\s*\))/gi;
+    let m;
+    while((m = re.exec(janela))){ if(m.index > max*0.5) cut = m.index; }
+    if(cut < 0){
+      cut = Math.max(janela.lastIndexOf('\n\n'), janela.lastIndexOf('\n'), janela.lastIndexOf('. ')+1);
+      if(cut < max*0.5) cut = max;
+    }
+    partes.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if(rest) partes.push(rest);
+  return partes.filter(Boolean);
+}
+function mapearItensParaQuestoes(items){
+  return (items||[]).filter(it => it && typeof it==='object').map(item => {
+    const q = { id: cryptoId(), type: item.type, text: item.text || '', points: Number(item.points) || 1, image:null, annulled:false, descritorSaeb:'', conteudo:'' };
+    if(item.type==='mc'){
+      q.options = (item.options||[]).map(t => ({id: cryptoId(), text: t}));
+      const idx = Number(item.correctIndex);
+      q.correctOptionId = q.options[idx] ? q.options[idx].id : (q.options[0] ? q.options[0].id : null);
+    } else if(item.type==='vf'){
+      q.correctBool = !!item.correct;
+    } else {
+      q.type = 'dissertativa';
+      q.modelAnswer = item.modelAnswer || '';
+    }
+    return q;
+  }).filter(q => String(q.text).trim());
+}
+async function parseTextoUmaVez(trecho){
   const prompt = `Você é um assistente que organiza questões de prova a partir de um texto (pode ser de um livro didático ou lista de exercícios, colado por um professor brasileiro).
 Texto:
-"""${trimmedInput}"""
+"""${trecho}"""
 
 Identifique cada questão presente no texto. Para cada uma:
 - Se tiver alternativas (múltipla escolha), extraia o enunciado, as alternativas e identifique a correta (use o gabarito se estiver indicado no texto; se não houver gabarito, indique a alternativa mais provável mesmo assim).
@@ -18296,21 +18488,64 @@ Responda SOMENTE com um array JSON válido, sem markdown e sem texto fora do JSO
   {"type":"dissertativa","text":"enunciado","points":2,"modelAnswer":"resposta modelo"}
 ]
 Se não conseguir identificar nenhuma questão no texto, responda com um array vazio: []`;
-
-  const parsed = await callGeminiJSON(prompt);
-  return parsed.map(item => {
-    const q = { id: cryptoId(), type: item.type, text: item.text || '', points: Number(item.points) || 1, image:null, annulled:false, descritorSaeb:'', conteudo:'' };
-    if(item.type==='mc'){
-      q.options = (item.options||[]).map(t => ({id: cryptoId(), text: t}));
-      const idx = Number(item.correctIndex);
-      q.correctOptionId = q.options[idx] ? q.options[idx].id : (q.options[0] ? q.options[0].id : null);
-    } else if(item.type==='vf'){
-      q.correctBool = !!item.correct;
-    } else {
-      q.modelAnswer = item.modelAnswer || '';
+  const parsed = await callGeminiJSON(prompt, null, null, { timeoutMs: 90000, aceitarParcial: true });
+  if(Array.isArray(parsed)) return parsed;
+  if(parsed && Array.isArray(parsed.questoes)) return parsed.questoes;
+  if(parsed && Array.isArray(parsed.questions)) return parsed.questions;
+  throw new Error('IA_JSON_INVALIDO');
+}
+// Uma parte: se bater o limite por minuto, espera e tenta de novo; se a resposta vier cortada, divide a parte ao meio.
+async function parseParteComRetentativa(trecho, setMsg, rotulo, profundidade){
+  for(let tent=0; ; tent++){
+    try{
+      return await parseTextoUmaVez(trecho);
+    }catch(e){
+      if(e.message==='IA_LIMITE_EXCEDIDO' && tent<2){
+        for(let seg=20; seg>0; seg-=5){ setMsg(`${rotulo}: limite da IA atingido, retomando em ${seg}s…`); await sleepMs(5000); }
+        continue;
+      }
+      if(e.message==='IA_TRUNCADO'){
+        if((profundidade||0) < 2 && trecho.length > 1500){
+          let meio = trecho.lastIndexOf(' ', Math.floor(trecho.length/2)); if(meio<=0) meio = Math.floor(trecho.length/2);
+          const a = await parseParteComRetentativa(trecho.slice(0, meio), setMsg, rotulo, (profundidade||0)+1);
+          const b = await parseParteComRetentativa(trecho.slice(meio), setMsg, rotulo, (profundidade||0)+1);
+          return [...a, ...b];
+        }
+        if(e.parcial) return e.parcial;
+      }
+      throw e;
     }
-    return q;
-  }).filter(q => q.text.trim());
+  }
+}
+async function parseTextToQuestionsDetalhado(textInput, setMsg){
+  setMsg = setMsg || (()=>{});
+  const MAX_TOTAL = 60000;
+  let texto = String(textInput||'');
+  const cortado = texto.length > MAX_TOTAL;
+  if(cortado) texto = texto.slice(0, MAX_TOTAL);
+  const partes = dividirTextoEmPartes(texto, 6000);
+  const itens = [];
+  let falhas = 0, ultimoErro = null;
+  for(let i=0; i<partes.length; i++){
+    const rotulo = partes.length>1 ? `Parte ${i+1} de ${partes.length}` : 'Organizando as questões';
+    setMsg(partes.length>1 ? `Lendo a parte ${i+1} de ${partes.length}… (${itens.length} questão(ões) até agora)` : 'Organizando as questões…');
+    try{
+      itens.push(...await parseParteComRetentativa(partes[i], setMsg, rotulo, 0));
+    }catch(e){
+      if(e.message==='IA_NAO_CONFIGURADA' || e.message==='IA_CHAVE_INVALIDA') throw e;
+      falhas++; ultimoErro = e;
+    }
+    if(i < partes.length-1) await sleepMs(800);
+  }
+  const questoes = mapearItensParaQuestoes(itens);
+  if(questoes.length===0 && ultimoErro) throw ultimoErro;
+  let aviso = '';
+  if(falhas>0) aviso += `⚠ ${falhas} de ${partes.length} parte(s) do texto não puderam ser lidas pela IA — as questões dessas partes não aparecem aqui. Importe-as separadamente (selecione só esse trecho) para completar. `;
+  if(cortado) aviso += `⚠ O texto era muito grande; só os primeiros ${MAX_TOTAL.toLocaleString('pt-BR')} caracteres foram lidos. `;
+  return { questoes, partes: partes.length, falhas, aviso: aviso.trim() };
+}
+async function parseTextToQuestions(textInput){
+  return (await parseTextToQuestionsDetalhado(textInput)).questoes;
 }
 
 async function importPastedQuestions(){
@@ -18319,15 +18554,19 @@ async function importPastedQuestions(){
   g.text = textInput;
   if(!textInput){ g.error = 'Cole o texto das questões.'; render(); return; }
   g.error = '';
+  g.progress = '';
   g.loading = true;
   render();
 
   try{
-    const mapped = await parseTextToQuestions(textInput);
+    g.aviso = '';
+    const det = await parseTextToQuestionsDetalhado(textInput, m => { g.progress = m; render(); });
+    const mapped = det.questoes;
     if(mapped.length===0){
       g.error = 'Não consegui identificar nenhuma questão nesse texto. Tente colar de forma mais estruturada (enunciado, alternativas e gabarito).';
       g.results = null;
     } else {
+      g.aviso = det.aviso;
       g.results = mapped;
       g.selected = mapped.map((_,idx)=>idx);
     }
@@ -18356,6 +18595,11 @@ async function loadBookPdf(file){
     b.pages = pages;
     b.fileName = file.name;
     b.viewingText = pages[0] ? pages[0].text : '';
+    const totalChars = pages.reduce((n,pg)=>n+pg.text.length,0);
+    if(pages.length>0 && totalChars < pages.length*30){
+      b.pages = []; b.fileName = '';
+      b.error = 'Esse PDF parece ser escaneado (só imagens): não há texto para a IA ler. Use um PDF com texto selecionável, ou digite/cole o texto das questões em "Importar texto colado".';
+    }
   }catch(e){
     b.error = 'Não foi possível ler esse PDF. Verifique se o arquivo não está corrompido ou protegido.';
   }
@@ -18391,13 +18635,17 @@ async function extractBookQuestions(){
   const text = document.getElementById('book-page-text').value.trim();
   if(!text){ b.extractError = 'Não há texto para extrair.'; render(); return; }
   b.extractError = '';
+  b.extractMsg = '';
   b.extractLoading = true;
   render();
   try{
-    const mapped = await parseTextToQuestions(text);
+    b.extractAviso = '';
+    const det = await parseTextToQuestionsDetalhado(text, m => { b.extractMsg = m; render(); });
+    const mapped = det.questoes;
     if(mapped.length===0){
       b.extractError = 'Não consegui identificar nenhuma questão nesse trecho. Tente ajustar o texto selecionado.';
     } else {
+      b.extractAviso = det.aviso;
       b.extractResults = mapped;
       b.extractSelected = mapped.map((_,idx)=>idx);
     }
@@ -19855,6 +20103,10 @@ document.addEventListener('click', (e) => {
   else if(act==='toggle-ai-tipo'){ const t = btn.dataset.tipo; if(p.aiGen.tipos.includes(t)) p.aiGen.tipos = p.aiGen.tipos.filter(x=>x!==t); else p.aiGen.tipos.push(t); }
   else if(act==='toggle-ai-provas-antigas'){ p.aiGen.provasAntigas = !p.aiGen.provasAntigas; }
   else if(act==='generate-ai-questions'){ generateAiQuestions(); }
+  else if(act==='chat-bridge-abrir'){ chatBridgeAbrir(btn.dataset.kind); }
+  else if(act==='chat-bridge-fechar'){ chatBridgeState().open = false; render(); }
+  else if(act==='chat-bridge-copiar'){ chatBridgeCopiar(); }
+  else if(act==='chat-bridge-converter'){ chatBridgeConverter(); }
   else if(act==='toggle-ai-result'){ const idx = Number(btn.dataset.idx); if(p.aiGen.selected.includes(idx)) p.aiGen.selected = p.aiGen.selected.filter(x=>x!==idx); else p.aiGen.selected.push(idx); }
   else if(act==='add-ai-selected'){
     p.aiGen.selected.forEach(idx => { const q = p.aiGen.results[idx]; if(q){ stampBankDisciplina(q, (p.bancoDisciplinaId && p.bancoDisciplinaId!=='__sem' ? p.bancoDisciplinaId : '')); p.bank.push(q); } });
