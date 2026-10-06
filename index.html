@@ -1519,7 +1519,7 @@ let state = {
 
 
 function freshAssessment(){
-  return { instrumento:'avaliacao', unidade:'', title:'', disciplinaId:'', turmaIds:[], questions:[], startAt:'', endAt:'', resultRelease:{mode:'imediato', releaseAt:''}, securityEnabled:true, minMinutesPerQuestion:3, exigeLiberacao:true };
+  return { instrumento:'avaliacao', unidade:'', title:'', disciplinaId:'', turmaIds:[], questions:[], startAt:'', endAt:'', agendaTurmas:{}, resultRelease:{mode:'imediato', releaseAt:''}, securityEnabled:true, minMinutesPerQuestion:3, exigeLiberacao:true };
 }
 function instrumentoLabel(key){ const i = INSTRUMENTOS.find(x=>x.key===key); return i ? i.label : key; }
 function assessmentTurmaIds(a){
@@ -1704,6 +1704,25 @@ function formatDateTime(iso){
   const d = new Date(iso);
   if(isNaN(d.getTime())) return '';
   return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+}
+// Agenda por turma: a mesma prova pode abrir/encerrar em horários diferentes para cada turma.
+// a.agendaTurmas = { [turmaId]: {startAt, endAt} }. Campo em branco usa o horário geral da prova.
+function assessmentTemAgendaTurmas(a){ return !!a && !!a.agendaTurmas && Object.keys(a.agendaTurmas).length>0; }
+function assessmentAgendaFor(a, turmaId){
+  const ag = (a.agendaTurmas||{})[turmaId] || {};
+  return { startAt: ag.startAt || a.startAt || '', endAt: ag.endAt || a.endAt || '' };
+}
+function assessmentParaTurma(a, turmaId){
+  if(!assessmentTemAgendaTurmas(a) || !turmaId) return a;
+  const w = assessmentAgendaFor(a, turmaId);
+  return {...a, startAt: w.startAt || null, endAt: w.endAt || null};
+}
+// Descobre a turma real do aluno (quando a prova tem várias turmas, al.turma é uma turma "multi").
+function alunoTurmaIdReal(al){
+  if(al.turma && al.turma.id && al.turma.id!=='multi') return al.turma.id;
+  const lista = al.assessmentTurmas || [];
+  const t = lista.find(t => (al.matriculaStudentId && (t.students||[]).some(s=>s.id===al.matriculaStudentId)) || (t.students||[]).some(s=>s.name===al.name));
+  return t ? t.id : null;
 }
 function assessmentWindowStatus(a){
   const now = Date.now();
@@ -2265,7 +2284,8 @@ function renderProfessorList(){
         <div>
           <strong>${esc(a.title)}</strong><br>
           <span class="muted">${a.instrumento?instrumentoLabel(a.instrumento)+' · ':''}${disciplina?esc(disciplina.name)+' · ':''}${a.questions.length} questão(ões) · criada em ${new Date(a.createdAt).toLocaleDateString('pt-BR')}${turmaNames?' · turma(s) '+esc(turmaNames):''}</span>
-          ${(a.startAt||a.endAt) ? `<br><span class="muted">${a.startAt?'abre '+formatDateTime(a.startAt):''}${a.startAt&&a.endAt?' · ':''}${a.endAt?'encerra '+formatDateTime(a.endAt):''}</span>` : ''}
+          ${assessmentTemAgendaTurmas(a) ? Object.keys(a.agendaTurmas).map(tid => { const t=p.turmas.find(x=>x.id===tid); const w=assessmentAgendaFor(a,tid); return `<br><span class="muted">🗓 ${esc(t?t.name:tid)}: ${w.startAt?'abre '+formatDateTime(w.startAt):'sem início'}${w.endAt?' · encerra '+formatDateTime(w.endAt):''}</span>`; }).join('') : ''}
+          ${(a.startAt||a.endAt) ? `<br><span class="muted">${assessmentTemAgendaTurmas(a)?'Demais turmas: ':''}${a.startAt?'abre '+formatDateTime(a.startAt):''}${a.startAt&&a.endAt?' · ':''}${a.endAt?'encerra '+formatDateTime(a.endAt):''}</span>` : ''}
           <br><span class="muted">Gabarito: ${!a.resultRelease||a.resultRelease.mode==='imediato'?'liberado na hora':a.resultRelease.mode==='nunca'?'não liberado ao aluno':'liberado em '+formatDateTime(a.resultRelease.releaseAt)}</span>
         </div>
         <div class="row" style="flex:0 0 auto; gap:8px;">
@@ -7317,11 +7337,13 @@ function renderNewAssessment(){
   const disciplinaOptions = p.disciplinas.map(d => `<option value="${d.id}" ${a.disciplinaId===d.id?'selected':''}>${esc(d.name)}</option>`).join('');
   const picker = p.pickerOpen ? `
     <div class="picker">
-      ${p.bank.length===0 ? '<p class="muted" style="margin:0;">Seu banco de questões está vazio ainda.</p>' : p.bank.map(q => `
+      ${p.bank.length===0 ? '<p class="muted" style="margin:0;">Seu banco de questões está vazio ainda.</p>' : bankAgruparPorDisciplina(p.bank, a.disciplinaId).map(g => `
+        <p style="margin:10px 0 2px; font-weight:700;">📚 ${esc(g.nome)}</p>
+        ${g.questoes.map(q => `
         <label class="picker-item">
           <input type="checkbox" data-action="toggle-picker" data-qid="${q.id}" ${p.pickerSelected.includes(q.id)?'checked':''}>
           <span><strong>${questionTagLabel(q.type)}</strong> · ${esc(q.text).slice(0,70)}${q.text.length>70?'…':''}</span>
-        </label>
+        </label>`).join('')}
       `).join('')}
       <div class="row" style="margin-top:10px;">
         <button class="btn btn-ghost btn-sm" data-action="close-picker">Cancelar</button>
@@ -7383,6 +7405,18 @@ function renderNewAssessment(){
         </div>
       </div>
       <p class="muted" style="font-size:.82rem;">Deixe em branco para permitir respostas a qualquer momento. Se preenchido, o aluno só consegue responder dentro desse horário — ideal para aplicar em tablet ou celular com prazo controlado.</p>
+      ${(a.turmaIds||[]).length>0 ? `
+        <label style="margin-top:10px;">Horário por turma (opcional)</label>
+        <p class="muted" style="font-size:.82rem; margin-top:0;">Use a mesma prova em momentos diferentes. Campo em branco usa o horário geral acima.</p>
+        ${a.turmaIds.map(tid => { const t = p.turmas.find(x=>x.id===tid); const ag = (a.agendaTurmas||{})[tid]||{}; return `
+          <div class="card" style="padding:10px 12px; margin:6px 0;">
+            <strong>${esc(t?t.name:tid)}</strong>
+            <div class="row" style="margin-top:6px;">
+              <div><input type="datetime-local" class="agenda-turma-input" data-tid="${tid}" data-campo="startAt" value="${esc(ag.startAt||'')}"><p class="muted" style="font-size:.78rem; margin-top:4px;">Início</p></div>
+              <div><input type="datetime-local" class="agenda-turma-input" data-tid="${tid}" data-campo="endAt" value="${esc(ag.endAt||'')}"><p class="muted" style="font-size:.78rem; margin-top:4px;">Término</p></div>
+            </div>
+          </div>`; }).join('')}
+      ` : ''}
       <label>Liberação do resultado corrigido para o aluno</label>
       <div>
         <label style="display:flex;align-items:center;gap:6px;font-weight:400;text-transform:none;margin:6px 0;">
@@ -7706,6 +7740,41 @@ function renderDistributionChart(responses, max){
 
 /* ---------------- BANCO DE QUESTÕES ---------------- */
 
+// ---- Banco de questões organizado por disciplina ----
+function bankDisciplinaKey(q){ return q.disciplinaId || (q.disciplinaName ? 'n:'+q.disciplinaName : ''); }
+function bankDisciplinaNome(q){
+  if(q.disciplinaId){ const d = state.professor.disciplinas.find(x=>x.id===q.disciplinaId); if(d) return d.name; }
+  return q.disciplinaName || 'Sem disciplina';
+}
+// Marca a questão com a disciplina (sem sobrescrever uma já definida).
+function stampBankDisciplina(q, disciplinaId){
+  if(!q || q.disciplinaId || !disciplinaId) return q;
+  const d = state.professor.disciplinas.find(x=>x.id===disciplinaId);
+  if(d){ q.disciplinaId = d.id; q.disciplinaName = d.name; }
+  return q;
+}
+function bankAgruparPorDisciplina(lista, primeiraId){
+  const grupos = {};
+  lista.forEach(q => { const k = bankDisciplinaKey(q); (grupos[k] = grupos[k] || {key:k, nome:bankDisciplinaNome(q), questoes:[]}).questoes.push(q); });
+  return Object.values(grupos).sort((x,y) => {
+    if(primeiraId){ if(x.key===primeiraId) return -1; if(y.key===primeiraId) return 1; }
+    if(!x.key) return 1; if(!y.key) return -1;
+    return x.nome.localeCompare(y.nome,'pt-BR');
+  });
+}
+function renderBancoQuestaoItem(q){
+  return `
+      <div class="list-item">
+        <div>
+          <span class="q-tag">${questionTagLabel(q.type)} · ${q.points} pt(s)${q.descritorSaeb?' · '+esc(q.descritorSaeb):''}${q.conteudo?' · '+esc(q.conteudo):''}</span><br>
+          ${esc(q.text).slice(0,90)}${q.text.length>90?'…':''}
+        </div>
+        <div class="row" style="flex:0 0 auto; gap:6px;">
+          <button class="btn btn-ghost btn-sm" data-action="edit-bank-question" data-qid="${q.id}">Editar</button>
+          <button class="btn btn-danger btn-sm" data-action="delete-bank-question" data-qid="${q.id}">Excluir</button>
+        </div>
+      </div>`;
+}
 function renderBanco(){
   const p = state.professor;
   if(p.aiGen.open){
@@ -7724,6 +7793,11 @@ function renderBanco(){
     return `
       <div class="card">
         <h2>${p.editingBankId ? 'Editar questão' : 'Nova questão do banco'}</h2>
+        <label>Disciplina desta questão</label>
+        <select data-action="bank-set-disciplina">
+          <option value="">Sem disciplina</option>
+          ${p.disciplinas.map(d => `<option value="${d.id}" ${p.newBankQuestion.disciplinaId===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}
+        </select>
         ${renderQuestionEditor(p.newBankQuestion, 0, false)}
         <div id="bank-err"></div>
         <div class="row" style="margin-top:14px;">
@@ -7749,18 +7823,23 @@ function renderBanco(){
   } else if(p.bank.length===0){
     body = `<div class="empty">Nenhuma questão salva ainda.<br>Crie questões aqui para reutilizar em várias provas.</div>`;
   } else {
-    body = p.bank.map(q => `
-      <div class="list-item">
-        <div>
-          <span class="q-tag">${questionTagLabel(q.type)} · ${q.points} pt(s)${q.descritorSaeb?' · '+esc(q.descritorSaeb):''}${q.conteudo?' · '+esc(q.conteudo):''}</span><br>
-          ${esc(q.text).slice(0,90)}${q.text.length>90?'…':''}
-        </div>
-        <div class="row" style="flex:0 0 auto; gap:6px;">
-          <button class="btn btn-ghost btn-sm" data-action="edit-bank-question" data-qid="${q.id}">Editar</button>
-          <button class="btn btn-danger btn-sm" data-action="delete-bank-question" data-qid="${q.id}">Excluir</button>
-        </div>
-      </div>
-    `).join('');
+    const filtro = p.bancoDisciplinaId || '';
+    const visiveis = filtro==='__sem' ? p.bank.filter(q=>!bankDisciplinaKey(q)) : filtro ? p.bank.filter(q=>bankDisciplinaKey(q)===filtro) : p.bank;
+    const grupos = bankAgruparPorDisciplina(visiveis);
+    const chavesBanco = bankAgruparPorDisciplina(p.bank);
+    body = `
+      <label>Disciplina</label>
+      <select data-action="banco-filtro-disciplina" style="max-width:340px;">
+        <option value="">Todas as disciplinas (${p.bank.length})</option>
+        ${chavesBanco.map(g => `<option value="${g.key||'__sem'}" ${filtro===(g.key||'__sem')?'selected':''}>${esc(g.nome)} (${g.questoes.length})</option>`).join('')}
+      </select>
+      <p class="muted" style="font-size:.8rem;">Questões novas criadas ou importadas aqui entram na disciplina selecionada. Questões sem disciplina podem ser classificadas em "Editar".</p>
+      ${grupos.length===0 ? '<div class="empty">Nenhuma questão nesta disciplina.</div>' : grupos.map(g => `
+        <details open style="margin-top:12px;">
+          <summary style="cursor:pointer; font-weight:700;">📚 ${esc(g.nome)} <span class="muted" style="font-weight:400;">(${g.questoes.length})</span></summary>
+          ${g.questoes.map(renderBancoQuestaoItem).join('')}
+        </details>`).join('')}
+    `;
   }
   return `
     <div class="card">
@@ -9360,9 +9439,9 @@ async function calcProfessorPainel(){
       });
     });
 
-    const status = assessmentWindowStatus(a);
-    if(status==='depois'){
+    {
       turmas.forEach(turma => {
+        if(assessmentWindowStatus(assessmentParaTurma(a, turma.id))!=='depois') return;
         turma.students.forEach(s => {
           const answered = responses.some(r=>r.studentName===s.name);
           if(!answered){
@@ -15696,6 +15775,7 @@ async function editAssessment(code){
     questions: JSON.parse(JSON.stringify(a.questions)),
     startAt: a.startAt || '',
     endAt: a.endAt || '',
+    agendaTurmas: a.agendaTurmas ? JSON.parse(JSON.stringify(a.agendaTurmas)) : {},
     resultRelease: a.resultRelease ? {...a.resultRelease} : {mode:'imediato', releaseAt:''},
     securityEnabled: a.securityEnabled!==false,
     minMinutesPerQuestion: (a.minMinutesPerQuestion!=null ? a.minMinutesPerQuestion : 3),
@@ -15727,6 +15807,19 @@ async function saveAssessment(){
   if(a.resultRelease.mode==='agendado' && !a.resultRelease.releaseAt){
     errEl.innerHTML = '<p class="err">Defina o horário em que o resultado deve ser liberado.</p>'; return;
   }
+  // agenda por turma: só mantém turmas ainda selecionadas e com algum horário preenchido
+  const agendaLimpa = {};
+  Object.keys(a.agendaTurmas||{}).forEach(tid => {
+    const ag = a.agendaTurmas[tid]||{};
+    if(!(a.turmaIds||[]).includes(tid) || (!ag.startAt && !ag.endAt)) return;
+    const ini = ag.startAt || a.startAt, fim = ag.endAt || a.endAt;
+    if(ini && fim && new Date(fim).getTime() <= new Date(ini).getTime()){
+      const t = state.professor.turmas.find(x=>x.id===tid);
+      errEl.innerHTML = `<p class="err">Turma ${esc(t?t.name:tid)}: o término deve ser depois do início.</p>`; agendaLimpa.__erro = true; return;
+    }
+    agendaLimpa[tid] = { startAt: ag.startAt||'', endAt: ag.endAt||'' };
+  });
+  if(agendaLimpa.__erro) return;
   const p = state.professor;
   const disciplinaObj = state.professor.disciplinas.find(d=>d.id===a.disciplinaId);
   const isEditing = !!p.editingCode;
@@ -15743,6 +15836,7 @@ async function saveAssessment(){
     questions: a.questions,
     startAt: a.startAt || null,
     endAt: a.endAt || null,
+    agendaTurmas: agendaLimpa,
     resultRelease: {...a.resultRelease},
     securityEnabled: (a.instrumento==='avaliacao' || a.instrumento==='recuperacao') ? true : (a.securityEnabled!==false),
     minMinutesPerQuestion: a.instrumento==='avaliacao' ? normalizeMinMinutes(a.minMinutesPerQuestion) : null,
@@ -18328,6 +18422,7 @@ async function saveBankQuestion(){
     const idx = p.bank.findIndex(x=>x.id===p.editingBankId);
     if(idx>=0) p.bank[idx] = q;
   } else {
+    stampBankDisciplina(q, p.bancoDisciplinaId && p.bancoDisciplinaId!=='__sem' ? p.bancoDisciplinaId : '');
     p.bank.push(q);
   }
   await saveBankToStorage();
@@ -18736,7 +18831,7 @@ async function findAssessment(){
   try{
     const r = await window.storage.get(`assessment:${codeInput}`, true);
     al.assessment = JSON.parse(r.value);
-    const status = assessmentWindowStatus(al.assessment);
+    const status = assessmentTemAgendaTurmas(al.assessment) ? 'aberta' : assessmentWindowStatus(al.assessment);
     if(status!=='aberta'){
       al.windowStatus = status;
       al.stage = 'fechada';
@@ -18744,12 +18839,14 @@ async function findAssessment(){
       return;
     }
     al.turma = null;
+    al.assessmentTurmas = [];
     const turmaIds = assessmentTurmaIds(al.assessment);
     if(turmaIds.length>0){
       try{
         const tr = await window.storage.get('turmas', true);
         const allTurmas = JSON.parse(tr.value);
         const matched = allTurmas.filter(t => turmaIds.includes(t.id));
+        al.assessmentTurmas = matched;
         if(matched.length===1){
           al.turma = matched[0];
         } else if(matched.length>1){
@@ -18781,7 +18878,19 @@ async function startExamFlow(){
     render();
     return;
   }
-  if(provaExigeLiberacao(a)){
+  if(assessmentTemAgendaTurmas(a)){
+    const tid = alunoTurmaIdReal(al);
+    const ar = assessmentParaTurma(a, tid);
+    al.assessment = ar;
+    const st = assessmentWindowStatus(ar);
+    if(st!=='aberta'){
+      al.windowStatus = st;
+      al.stage = 'fechada';
+      render();
+      return;
+    }
+  }
+  if(provaExigeLiberacao(al.assessment)){
     let studentId = al.matriculaStudentId || null;
     if(!studentId && al.turma){ const st = (al.turma.students||[]).find(x=>x.name===al.name); if(st) studentId = st.id; }
     const liberados = await carregarProvaLiberacao(a.code);
@@ -18990,7 +19099,7 @@ async function loadStudentDashboard(){
     }));
     allAssessments = fetched.filter(Boolean);
   }catch(e){}
-  const mine = allAssessments.filter(a => assessmentTurmaIds(a).includes(al.turma.id));
+  const mine = allAssessments.filter(a => assessmentTurmaIds(a).includes(al.turma.id)).map(a => assessmentParaTurma(a, al.turma.id));
   const realizadas = [];
   const pendentes = [];
   const comResponses = await Promise.all(mine.map(async a => {
@@ -19641,7 +19750,7 @@ document.addEventListener('click', (e) => {
   else if(act==='salvar-liberacao'){ salvarProvaLiberacao(); }
   else if(act==='add-question'){ p.newAssessment.questions.push(freshQuestion(btn.dataset.qtype)); render(); }
   else if(act==='remove-question'){ p.newAssessment.questions = p.newAssessment.questions.filter(q=>q.id!==btn.dataset.qid); render(); }
-  else if(act==='save-to-bank'){ const q = findQuestionRef(btn.dataset.qid); p.bank.push(JSON.parse(JSON.stringify(q))); saveBankToStorage(); alert('Questão salva no banco.'); }
+  else if(act==='save-to-bank'){ const q = findQuestionRef(btn.dataset.qid); const cp = JSON.parse(JSON.stringify(q)); stampBankDisciplina(cp, p.newAssessment.disciplinaId); p.bank.push(cp); saveBankToStorage(); alert('Questão salva no banco.'); }
   else if(act==='open-picker'){ p.pickerOpen = true; p.pickerSelected=[]; render(); }
   else if(act==='close-picker'){ p.pickerOpen = false; render(); }
   else if(act==='toggle-picker'){ const id = btn.dataset.qid; if(p.pickerSelected.includes(id)) p.pickerSelected = p.pickerSelected.filter(x=>x!==id); else p.pickerSelected.push(id); }
@@ -19748,7 +19857,7 @@ document.addEventListener('click', (e) => {
   else if(act==='generate-ai-questions'){ generateAiQuestions(); }
   else if(act==='toggle-ai-result'){ const idx = Number(btn.dataset.idx); if(p.aiGen.selected.includes(idx)) p.aiGen.selected = p.aiGen.selected.filter(x=>x!==idx); else p.aiGen.selected.push(idx); }
   else if(act==='add-ai-selected'){
-    p.aiGen.selected.forEach(idx => { const q = p.aiGen.results[idx]; if(q) p.bank.push(q); });
+    p.aiGen.selected.forEach(idx => { const q = p.aiGen.results[idx]; if(q){ stampBankDisciplina(q, (p.bancoDisciplinaId && p.bancoDisciplinaId!=='__sem' ? p.bancoDisciplinaId : '')); p.bank.push(q); } });
     saveBankToStorage();
     p.aiGen.open = false; p.aiGen.results = null;
     render();
@@ -19759,7 +19868,7 @@ document.addEventListener('click', (e) => {
   else if(act==='import-pasted-questions'){ importPastedQuestions(); }
   else if(act==='toggle-paste-result'){ const idx = Number(btn.dataset.idx); if(p.pasteImport.selected.includes(idx)) p.pasteImport.selected = p.pasteImport.selected.filter(x=>x!==idx); else p.pasteImport.selected.push(idx); }
   else if(act==='add-paste-selected'){
-    p.pasteImport.selected.forEach(idx => { const q = p.pasteImport.results[idx]; if(q) p.bank.push(q); });
+    p.pasteImport.selected.forEach(idx => { const q = p.pasteImport.results[idx]; if(q){ stampBankDisciplina(q, (p.bancoDisciplinaId && p.bancoDisciplinaId!=='__sem' ? p.bancoDisciplinaId : '')); p.bank.push(q); } });
     saveBankToStorage();
     p.pasteImport.open = false; p.pasteImport.results = null;
     render();
@@ -19774,7 +19883,7 @@ document.addEventListener('click', (e) => {
   else if(act==='book-back-to-viewer'){ p.book.extractResults = null; render(); }
   else if(act==='toggle-book-result'){ const idx = Number(btn.dataset.idx); if(p.book.extractSelected.includes(idx)) p.book.extractSelected = p.book.extractSelected.filter(x=>x!==idx); else p.book.extractSelected.push(idx); }
   else if(act==='add-book-selected'){
-    p.book.extractSelected.forEach(idx => { const q = p.book.extractResults[idx]; if(q) p.bank.push(q); });
+    p.book.extractSelected.forEach(idx => { const q = p.book.extractResults[idx]; if(q){ stampBankDisciplina(q, (p.bancoDisciplinaId && p.bancoDisciplinaId!=='__sem' ? p.bancoDisciplinaId : '')); p.bank.push(q); } });
     saveBankToStorage();
     p.book.extractResults = null;
     render();
@@ -19968,6 +20077,10 @@ document.addEventListener('input', (e) => {
   else if(el.id==='min-minutes-input'){ p.newAssessment.minMinutesPerQuestion = el.value===''? MIN_MINUTES_DEFAULT : el.value; }
   else if(el.id==='start-input'){ p.newAssessment.startAt = el.value; }
   else if(el.id==='end-input'){ p.newAssessment.endAt = el.value; }
+  else if(el.classList && el.classList.contains('agenda-turma-input')){
+    const na = p.newAssessment; na.agendaTurmas = na.agendaTurmas || {};
+    na.agendaTurmas[el.dataset.tid] = {...(na.agendaTurmas[el.dataset.tid]||{}), [el.dataset.campo]: el.value};
+  }
   else if(el.id==='release-at-input'){ p.newAssessment.resultRelease.releaseAt = el.value; }
   else if(el.id==='ai-tema-input'){ p.aiGen.tema = el.value; }
   else if(el.id==='ai-qtd-input'){ p.aiGen.quantidade = parseInt(el.value)||5; }
@@ -20164,6 +20277,11 @@ document.addEventListener('change', (e) => {
   else if(act==='toggle-exige-liberacao'){ p.newAssessment.exigeLiberacao = el.checked; }
   else if(act==='toggle-security-enabled'){ p.newAssessment.securityEnabled = el.checked; }
   else if(act==='set-unidade'){ p.newAssessment.unidade = el.value; render(); }
+  else if(act==='banco-filtro-disciplina'){ p.bancoDisciplinaId = el.value; render(); }
+  else if(act==='bank-set-disciplina'){
+    const d = p.disciplinas.find(x=>x.id===el.value), q = p.newBankQuestion;
+    if(q){ q.disciplinaId = d ? d.id : ''; q.disciplinaName = d ? d.name : ''; }
+  }
   else if(act==='set-disciplina'){ p.newAssessment.disciplinaId = el.value; }
   else if(el.id==='tarefa-instrumento-input'){ p.newTarefaInstrumento = el.value; p.tarefaError=''; render(); }
   else if(el.id==='tarefa-disciplina-input'){ p.newTarefaDisciplinaId = el.value; }
