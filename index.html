@@ -476,7 +476,7 @@
   .ra-site-link:hover{ filter:brightness(0.95); }
 
   /* Carrossel de divulgação (Jovens Protagonistas) */
-  .campanha-carousel{ position:relative; width:100%; height:190px; border-radius:12px; overflow:hidden; margin-bottom:14px; background:var(--surface); }
+  .campanha-carousel{ position:relative; width:100%; height:auto; aspect-ratio:3/1; min-height:140px; max-height:360px; border-radius:12px; overflow:hidden; margin-bottom:14px; background:var(--surface); }
   .campanha-slide{ position:absolute; inset:0; opacity:0; transition:opacity .6s ease; pointer-events:none; }
   .campanha-slide.ativo{ opacity:1; pointer-events:auto; }
   .campanha-slide img{ width:100%; height:100%; object-fit:cover; display:block; cursor:pointer; }
@@ -788,6 +788,11 @@ function uploadImageToCloudinary(file, folder, onProgress){
    em que alguém pede ela pela primeira vez. Em listas/carrossel usamos a miniatura (carrega
    rápido, pesa pouco); ao abrir a foto ampliada usamos a URL original. Se não for uma URL do
    Cloudinary (ex.: foto antiga salva em base64, de antes dessa mudança), devolve como está. */
+// Reduz só a largura, mantendo a proporção original (sem recortar em quadrado como o cloudinaryThumb).
+function cloudinaryLargura(url, w){
+  if(!url || !/res\.cloudinary\.com/.test(url)) return url;
+  return url.replace('/upload/', `/upload/c_limit,w_${w},q_auto,f_auto/`);
+}
 function cloudinaryThumb(url, size){
   if(!url || !/res\.cloudinary\.com/.test(url)) return url;
   return url.replace('/upload/', `/upload/c_fill,g_auto,w_${size},h_${size},q_auto,f_auto/`);
@@ -4967,8 +4972,8 @@ function renderCarrosselCampanha(itensAprovados){
                    </div>
                  </div>
                </div>`
-            : `<img src="${campanhaImgSrc(item, 600)}" alt="${esc(item.titulo)}" data-action="campanha-abrir-imagem" data-id="${esc(item.id)}">`}
-          ${item.tipo!=='conquista' ? `
+            : `<img src="${cloudinaryLargura(campanhaImgSrc(item), 1600)}" alt="${esc(item.titulo)}" data-action="campanha-abrir-imagem" data-id="${esc(item.id)}">`}
+          ${(item.tipo!=='conquista' && (item.origem!=='coordenacao' || item.mostrarLegenda)) ? `
           <div class="campanha-caption">
             <strong>${esc(item.titulo)}</strong>
             ${item.descricao ? `<br><span>${esc(item.descricao)}</span>` : ''}
@@ -11589,7 +11594,7 @@ async function campanhaEnviarItem(){
 function campanhaNoAr(i){ return !!i && i.status==='aprovado' && (!i.expiraEm || Date.now() <= i.expiraEm); }
 function campBannerState(){
   const c = state.coordenador;
-  if(!c.campanha.banner) c.campanha.banner = { titulo:'', descricao:'', tipo:'imagem', imagemUrl:'', preview:'', uploading:false, youtubeUrl:'', expira:'', erro:'', salvando:false, aberto:false };
+  if(!c.campanha.banner) c.campanha.banner = { titulo:'', descricao:'', tipo:'imagem', imagemUrl:'', preview:'', uploading:false, youtubeUrl:'', expira:'', erro:'', salvando:false, aberto:false, mostrarLegenda:false };
   return c.campanha.banner;
 }
 async function handleCoordBannerImagem(file){
@@ -11634,7 +11639,7 @@ async function publicarBannerCoord(){
     youtubeUrl: b.tipo==='video' ? b.youtubeUrl.trim() : '', youtubeId,
     titulo, descricao: (b.descricao||'').trim(),
     autorStudentId:'', autorNome:'Coordenação', turmaId:'', turmaName:'Escola', origem:'coordenacao',
-    status:'aprovado', motivoRecusa:'', criadoEm: Date.now(), revisadoEm: Date.now(), expiraEm
+    status:'aprovado', motivoRecusa:'', criadoEm: Date.now(), revisadoEm: Date.now(), expiraEm, mostrarLegenda: !!b.mostrarLegenda
   };
   try{
     await window.storage.set(`campanha-item:${item.id}`, JSON.stringify(item), true);
@@ -11866,6 +11871,9 @@ function renderCoordCampanha(){
           <input type="text" id="coord-banner-titulo" value="${esc(b.titulo)}" placeholder="Ex.: Matrículas abertas — procure a secretaria" maxlength="80">
           <label>Descrição (opcional)</label>
           <textarea id="coord-banner-descricao" placeholder="Uma frase curta pra legenda" maxlength="200" style="min-height:50px;">${esc(b.descricao)}</textarea>
+          <label style="display:flex; align-items:center; gap:8px; text-transform:none; font-weight:400; margin-top:8px;">
+            <input type="checkbox" data-action="coord-banner-legenda" ${b.mostrarLegenda?'checked':''} style="width:auto;"> Mostrar título e descrição por cima da imagem <span class="muted" style="font-size:.8rem;">(deixe desligado se o texto já está dentro da imagem)</span>
+          </label>
           <label>Tipo</label>
           <div class="row" style="gap:8px;">
             <button class="btn ${b.tipo==='imagem'?'btn-primary':'btn-ghost'} btn-sm" data-action="coord-banner-tipo" data-tipo="imagem">🖼️ Imagem</button>
@@ -11874,6 +11882,7 @@ function renderCoordCampanha(){
           ${b.tipo==='imagem' ? `
             <label style="margin-top:10px;">Imagem</label>
             <input type="file" id="coord-banner-imagem" accept="image/*">
+            <p class="muted" style="font-size:.8rem; margin:4px 0 0;">Tamanho ideal: <strong>2000 × 667 px (proporção 3:1)</strong>. O carrossel mostra a imagem inteira nessa proporção; em telas muito estreitas, um pouco das laterais pode ser cortado.</p>
             ${b.uploading ? `<div class="row" style="align-items:center; gap:10px; margin-top:8px;">${b.preview ? `<img src="${b.preview}" alt="Prévia" style="max-width:140px; border-radius:10px;">` : ''}<span class="muted" style="font-size:.85rem;">Enviando imagem...</span></div>` : ''}
             ${(!b.uploading && b.imagemUrl) ? `<img src="${cloudinaryThumb(b.imagemUrl, 400)}" alt="Prévia" style="max-width:100%; border-radius:10px; margin-top:8px;">` : ''}
           ` : `
@@ -21241,6 +21250,7 @@ document.addEventListener('change', (e) => {
   else if(act==='socio-resp'){ const so = socioState(); so.respostas[el.dataset.q] = el.dataset.letra; if((so.menos||{})[el.dataset.q]===el.dataset.letra){ delete so.menos[el.dataset.q]; render(); } }
   else if(act==='socio-menos'){ const so = socioState(); if(!so.menos) so.menos = {}; so.menos[el.dataset.q] = el.dataset.letra; if(so.respostas[el.dataset.q]===el.dataset.letra){ delete so.respostas[el.dataset.q]; render(); } }
   else if(act==='socio-auto'){ const so = socioState(); if(!so.autoItens) so.autoItens = {}; so.autoItens[parseInt(el.dataset.item,10)] = parseInt(el.dataset.v,10); so.auto = socioAutoNota(so.autoItens); }
+  else if(act==='coord-banner-legenda'){ campBannerState().mostrarLegenda = el.checked; }
   else if(act==='socio-coord-abre'){ salvarSocioSubstitui(socioCoordState().unidade, el.checked, 'abertas'); }
   else if(act==='socio-coord-substitui'){ salvarSocioSubstitui(socioCoordState().unidade, el.checked); }
   else if(act==='socio-coord-unidade'){ const s2 = socioCoordState(); s2.unidade = el.value; s2.verKey=''; render(); }
