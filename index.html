@@ -499,6 +499,13 @@
   .conquista-medal{ flex:0 0 auto; width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center; border:2px dashed rgba(255,255,255,.75); background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.28), rgba(255,255,255,0) 65%); box-shadow:0 3px 10px rgba(0,0,0,.3), inset 0 0 0 1px rgba(255,255,255,.12); }
   .conquista-medal-glyph{ font-size:1.4rem; font-weight:700; color:#fff; font-family:'Source Sans 3', sans-serif; text-shadow:0 1px 3px rgba(0,0,0,.35); }
   .conquista-slide-text{ min-width:0; }
+  .conquista-resumo{ position:relative; z-index:1; height:100%; box-sizing:border-box; padding:10px 46px; display:flex; flex-direction:column; gap:7px; }
+  .conquista-resumo-topo{ display:flex; align-items:center; gap:12px; flex:0 0 auto; }
+  .conquista-resumo .conquista-medal{ width:38px; height:38px; }
+  .conquista-resumo .conquista-medal-glyph{ font-size:1.1rem; }
+  .conquista-chips{ flex:1 1 auto; min-height:0; overflow:hidden; display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:4px 6px; align-content:start; }
+  .conquista-chip{ background:rgba(0,0,0,.28); color:#fff; font-size:.72rem; line-height:1.25; padding:3px 8px; border-radius:999px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .conquista-chip b{ color:#ffe9a8; margin-right:2px; }
   .conquista-slide-titulo{ display:block; font-family:'Caveat', cursive; font-weight:700; font-size:1.5rem; line-height:1.1; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .conquista-slide-turma{ display:block; font-family:'Source Sans 3', sans-serif; font-size:.74rem; font-weight:600; color:rgba(255,255,255,.82); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .conquista-slide-desc{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; margin-top:5px; font-family:'Source Sans 3', sans-serif; font-size:.78rem; color:rgba(255,255,255,.92); }
@@ -825,7 +832,9 @@ window.storage = {
            .where(firebase.firestore.FieldPath.documentId(), '<', prefix + '\uf8ff');
     }
     const snap = await q.get();
-    return { keys: snap.docs.map(d=>d.id), prefix, shared: !!shared };
+    const values = {};
+    snap.docs.forEach(d => { try{ const dd = d.data(); if(dd && dd.value!==undefined) values[d.id] = dd.value; }catch(e){} });
+    return { keys: snap.docs.map(d=>d.id), values, prefix, shared: !!shared };
   }
 };
 
@@ -1910,8 +1919,9 @@ function renderFotoLightbox(){
     </div>
   `;
 }
-// Faz o carrossel avançar sozinho a cada 5s mexendo direto nas classes dos slides —
+// Faz o carrossel avançar sozinho a cada 10s mexendo direto nas classes dos slides —
 // de propósito NÃO chama render() aqui (ver comentário em renderCarrosselCampanha).
+const CAMPANHA_SEGUNDOS_POR_BANNER = 10;   // tempo de cada banner no carrossel
 let campanhaCarouselInterval = null;
 let campanhaCarouselIdx = 0;
 function campanhaCarouselGoTo(el, idx){
@@ -1931,7 +1941,7 @@ function initCampanhaCarousel(){
   campanhaCarouselGoTo(el, 0);
   const slides = el.querySelectorAll('.campanha-slide');
   if(slides.length>1){
-    campanhaCarouselInterval = setInterval(() => { campanhaCarouselGoTo(el, campanhaCarouselIdx+1); }, 5000);
+    campanhaCarouselInterval = setInterval(() => { campanhaCarouselGoTo(el, campanhaCarouselIdx+1); }, CAMPANHA_SEGUNDOS_POR_BANNER*1000);
   }
 }
 
@@ -1971,7 +1981,7 @@ function renderProfessor(){
       ${!(p.subview==='avaliacoes' && p.mode==='new') ? '<button class="btn btn-primary btn-sm" data-action="quick-new-assessment" style="flex:0 0 auto;">+ Nova avaliação</button>' : ''}
       ${p.subview!=='avulso' ? '<button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="avulso" style="flex:0 0 auto;">🗒️ Gabarito Avulso</button>' : ''}
     </div>
-    ${renderCarrosselCampanha(muralSlidesComConquistas(p.campanhaItens||[]))}
+    ${renderCarrosselCampanha(muralSlidesComConquistas(p.campanhaItens||[], !p.campanhaItensLoading))}
     ${(p.session.coordNote && !p.session.coordNoteDismissed) ? `
     <div style="background:var(--accent-yellow-bg,#fdf3e8); border:1px solid var(--yellow-dark); border-radius:8px; padding:12px 14px; margin-bottom:14px;">
       <strong style="font-size:.85rem;">📋 Recado da coordenação</strong>
@@ -3728,40 +3738,48 @@ async function loadMuralConquistas(){
   if(state.coordenador.assessments.length===0 && !state.coordenador.assessmentsLoading){ await loadCoordAssessments(); }
   const turmasMural = state.professor.turmas.slice();
   const dadosTurmas = await Promise.all(turmasMural.map(t => computeConquistasTurma(t.id, true)));
-  const slides = [];
+  // Um único banner de Frequência Exemplar e um único de Destaque Acadêmico, com todas as turmas.
+  const ordem = (a,b) => String(a.nome).localeCompare(String(b.nome),'pt-BR',{numeric:true});
+  const freq = [], dest = [];
   for(let ti=0; ti<turmasMural.length; ti++){
-    const turma = turmasMural[ti];
-    const data = dadosTurmas[ti];
-    if(data.frequenciaExemplar.length>0){
-      // No carrossel o espaço é mínimo (é uma legenda de slide, não uma tela cheia), então aqui
-      // mostra só a contagem — a lista completa de nomes fica na tela do Hall de Conquistas.
-      const n = data.frequenciaExemplar.length;
-      slides.push({
-        tipo:'conquista', badge:'frequencia',
-        titulo:`🎯 Frequência Exemplar — ${turma.name}`,
-        descricao: `${n} aluno${n>1?'s':''} com frequência perfeita este mês`
-      });
-    }
-    if(data.destaque){
-      slides.push({
-        tipo:'conquista', badge:'destaque',
-        titulo:`🏆 Destaque Acadêmico — ${turma.name}`,
-        descricao: `${data.destaque.students.map(s=>s.name).join(', ')} · média ${data.destaque.media.toFixed(1)} na ${data.destaque.unidade}`
-      });
-    }
+    const turma = turmasMural[ti], data = dadosTurmas[ti];
+    if(data.frequenciaExemplar.length>0) freq.push({ nome: turma.name, n: data.frequenciaExemplar.length });
+    if(data.destaque) dest.push({ nome: turma.name, alunos: data.destaque.students.map(s=>s.name), media: data.destaque.media, unidade: data.destaque.unidade });
+  }
+  freq.sort(ordem); dest.sort(ordem);
+  const slides = [];
+  if(freq.length){
+    const total = freq.reduce((a,x)=>a+x.n,0);
+    slides.push({ tipo:'conquista', badge:'frequencia', titulo:'🎯 Frequência Exemplar do mês',
+      descricao: `${total} aluno${total>1?'s':''} com frequência perfeita este mês`, turmas: freq });
+  }
+  if(dest.length){
+    slides.push({ tipo:'conquista', badge:'destaque', titulo:'🏆 Destaque Acadêmico',
+      descricao: 'Maior média de cada turma', turmas: dest });
   }
   state.muralConquistas.slides = slides;
   state.muralConquistas.loaded = true;
   state.muralConquistas.loading = false;
+  try{ localStorage.setItem('mural-conquistas-v2', JSON.stringify({ ts:Date.now(), slides })); }catch(e){}
   render();
 }
 // Junta as publicações aprovadas do Jovens Protagonistas com as conquistas automáticas de
 // turma (frequência exemplar, destaque acadêmico) num só mural — dispara o cálculo das
 // conquistas na primeira vez que o carrossel é mostrado nessa sessão e vai completando o
 // mural sozinho conforme o cálculo termina (sem travar a primeira pintura da tela).
-function muralSlidesComConquistas(itensAprovados){
-  if(!state.muralConquistas.loaded && !state.muralConquistas.loading){ loadMuralConquistas(); }
-  return [...(itensAprovados||[]), ...state.muralConquistas.slides];
+function muralSlidesComConquistas(itensAprovados, podeCarregar){
+  const m = state.muralConquistas;
+  if(!m.hidratado){
+    m.hidratado = true;
+    try{ const c = JSON.parse(localStorage.getItem('mural-conquistas-v2')||'null'); if(c && Array.isArray(c.slides) && !m.slides.length) m.slides = c.slides; }catch(e){}
+  }
+  // O cálculo das conquistas é pesado: só começa depois que os banners publicados já foram carregados,
+  // para não competir com eles e atrasar a exibição.
+  if(podeCarregar!==false && !m.loaded && !m.loading && !m.agendado){
+    m.agendado = true;
+    setTimeout(() => { m.agendado = false; loadMuralConquistas(); }, 800);
+  }
+  return [...(itensAprovados||[]), ...m.slides];
 }
 
 /* ---------------- MAPA MENTAL (modelo do professor, aluno completa) ---------------- */
@@ -4954,7 +4972,7 @@ function renderAlunoMonitoriaBlockGrupo(){
 // nos avisos ao vivo do aluno).
 function renderCarrosselCampanha(itensAprovados){
   if(!itensAprovados || itensAprovados.length===0) return '';
-  const sigRaw = itensAprovados.map(i => [i.tipo, i.id||'', i.youtubeId||'', i.imagemUrl||'', i.titulo||'', i.descricao||'', i.badge||''].join('~')).join('|');
+  const sigRaw = itensAprovados.map(i => [i.tipo, i.id||'', i.youtubeId||'', i.imagemUrl||'', i.titulo||'', i.descricao||'', i.badge||'', i.turmas ? JSON.stringify(i.turmas) : '', i.mostrarLegenda?'1':''].join('~')).join('|');
   let sigH = 5381; for(let k=0;k<sigRaw.length;k++){ sigH = ((sigH*33) ^ sigRaw.charCodeAt(k)) >>> 0; }
   return `
     <div class="campanha-carousel" data-sig="${sigH}">
@@ -4966,7 +4984,22 @@ function renderCarrosselCampanha(itensAprovados){
                  <span class="campanha-play-icone">▶</span>
                </div>`
             : item.tipo==='conquista'
-            ? `<div class="campanha-slide-conquista ${item.badge==='destaque'?'destaque':'frequencia'}">
+            ? (item.turmas ? `<div class="campanha-slide-conquista ${item.badge==='destaque'?'destaque':'frequencia'}">
+                 <div class="conquista-resumo">
+                   <div class="conquista-resumo-topo">
+                     <div class="conquista-medal"><span class="conquista-medal-glyph">${item.badge==='destaque'?'★':'✓'}</span></div>
+                     <div class="conquista-slide-text">
+                       <strong class="conquista-slide-titulo">${esc(item.titulo.replace(/^\S+\s+/, ''))}</strong>
+                       <span class="conquista-slide-turma">${esc(item.descricao||'')}</span>
+                     </div>
+                   </div>
+                   <div class="conquista-chips">
+                     ${item.turmas.map(t => item.badge==='destaque'
+                       ? `<span class="conquista-chip" title="${esc(t.alunos.join(', '))} · média ${t.media.toFixed(1)}"><b>${esc(t.nome)}</b> ${esc(t.alunos[0])}${t.alunos.length>1?' +'+(t.alunos.length-1):''} · ${t.media.toFixed(1).replace('.',',')}</span>`
+                       : `<span class="conquista-chip"><b>${esc(t.nome)}</b> ${t.n} aluno${t.n>1?'s':''}</span>`).join('')}
+                   </div>
+                 </div>
+               </div>` : `<div class="campanha-slide-conquista ${item.badge==='destaque'?'destaque':'frequencia'}">
                  <div class="conquista-slide-content">
                    <div class="conquista-medal"><span class="conquista-medal-glyph">${item.badge==='destaque'?'★':'✓'}</span></div>
                    <div class="conquista-slide-text">
@@ -4975,7 +5008,7 @@ function renderCarrosselCampanha(itensAprovados){
                      ${item.descricao ? `<span class="conquista-slide-desc">${esc(item.descricao)}</span>` : ''}
                    </div>
                  </div>
-               </div>`
+               </div>`)
             : `<img class="campanha-img-fundo" src="${cloudinaryLargura(campanhaImgSrc(item), 400)}" alt="" aria-hidden="true"><img class="campanha-img-inteira" src="${cloudinaryLargura(campanhaImgSrc(item), 1600)}" alt="${esc(item.titulo)}" data-action="campanha-abrir-imagem" data-id="${esc(item.id)}">`}
           ${(item.tipo!=='conquista' && (item.origem!=='coordenacao' || item.mostrarLegenda)) ? `
           <div class="campanha-caption">
@@ -8840,7 +8873,7 @@ function renderFinalGradesTable(){
           <td>${editMode ? `<input type="number" step="0.1" id="manual-np1-${idx}" value="${r.np1.toFixed(1)}" style="width:70px;">` : `${r.np1.toFixed(1)}${r.manual.np1?' <span title="Nota ajustada manualmente">✏️</span>':''}`}</td>
           <td>${editMode ? `<input type="number" step="0.1" id="manual-diag-${idx}" value="${r.diag.toFixed(1)}" style="width:70px;">` : `${r.diag.toFixed(1)}${r.manual.diag?' ✏️':''}`}</td>
           <td>${editMode ? `<input type="number" step="0.1" id="manual-exerc-${idx}" value="${r.exerc.toFixed(1)}" style="width:70px;">` : `${r.exerc.toFixed(1)}${r.manual.exerc?' ✏️':''}`}</td>
-          <td>${editMode ? `<input type="number" step="0.1" id="manual-auto-${idx}" value="${r.auto.toFixed(1)}" style="width:70px;">` : `${r.auto.toFixed(1)} ${r.autoOrigem==='socio' ? `<span class="muted" style="font-size:.72rem;" title="Nota da Avaliação Socioemocional">(💛 ${fmtNota(r.socioTotal)}/10)</span>` : `<span class="muted" style="font-size:.72rem;" title="Engajamento (a Avaliação Socioemocional ainda não foi respondida)">(${Math.round((r.engajamento||0)*100)}%)</span>`}${r.manual.auto?' ✏️':''}`}</td>
+          <td>${editMode ? `<input type="number" step="0.1" id="manual-auto-${idx}" value="${r.auto.toFixed(1)}" style="width:70px;">` : `${r.auto.toFixed(1)} ${r.autoOrigem==='socio' ? `<span class="muted" style="font-size:.72rem;" title="Nota da Avaliação Socioemocional">(💛 ${fmtNota(r.socioTotal)}/10)</span>` : r.autoOrigem==='socio-pendente' ? `<span class="muted" style="font-size:.72rem; color:#b3402f;" title="A Avaliação Socioemocional substitui a autoavaliação e este aluno ainda não respondeu: nota zerada até responder">(💛 não respondeu)</span>` : `<span class="muted" style="font-size:.72rem;" title="Engajamento (a Avaliação Socioemocional ainda não foi respondida)">(${Math.round((r.engajamento||0)*100)}%)</span>`}${r.manual.auto?' ✏️':''}`}</td>
           <td><strong>${r.np2.toFixed(1)}</strong></td>
           <td>${editMode ? `<input type="number" step="0.1" id="manual-rec-${idx}" value="${r.temRecuperacao ? r.recuperacao.toFixed(1) : ''}" placeholder="—" style="width:70px;">` : (r.temRecuperacao ? `${r.recuperacao.toFixed(1)}${r.manual.recuperacao?' ✏️':''}` : '<span class="muted">—</span>')}</td>
           <td><strong>${r.final.toFixed(1)} / ${fg.total}</strong></td>
@@ -11463,8 +11496,12 @@ async function monitoriaRemoverIndicado(studentId){
 async function fetchCampanhaItensList(){
   try{
     const list = await window.storage.list('campanha-item:', true);
+    const vals = list.values || {};
     const itens = await Promise.all((list.keys||[]).map(async k => {
-      try{ const r = await window.storage.get(k, true); return JSON.parse(r.value); }catch(e){ return null; }
+      try{
+        if(vals[k]!==undefined) return JSON.parse(vals[k]);
+        const r = await window.storage.get(k, true); return JSON.parse(r.value);
+      }catch(e){ return null; }
     }));
     return itens.filter(Boolean).sort((a,b)=>(b.criadoEm||0)-(a.criadoEm||0));
   }catch(e){ return []; }
@@ -11480,12 +11517,23 @@ function alunoSouJovemProtagonista(){
   const al = state.aluno;
   return (al.campanha.indicados||[]).some(i=>i.studentId===al.matriculaStudentId);
 }
+const CAMPANHA_CACHE_KEY = 'campanha-cache-v1';
+function campanhaCacheLer(){
+  try{ const c = JSON.parse(localStorage.getItem(CAMPANHA_CACHE_KEY)||'null'); return (c && Array.isArray(c.itens)) ? c.itens.filter(campanhaNoAr) : null; }catch(e){ return null; }
+}
+function campanhaCacheGravar(itens){
+  try{ localStorage.setItem(CAMPANHA_CACHE_KEY, JSON.stringify({ ts:Date.now(), itens:(itens||[]).filter(i=>i.status==='aprovado' && !i.imagemDataUrl) })); }catch(e){}
+}
 async function loadCampanhaAluno(){
   const al = state.aluno;
   al.campanha.loading = true;
+  const cache = campanhaCacheLer();
+  if(cache && cache.length){ al.campanha.itens = cache; al.campanha.loaded = true; }   // mostra já os banners da última visita
   render();
-  al.campanha.indicados = await loadJovensProtagonistasIndicados();
-  al.campanha.itens = await fetchCampanhaItensList();
+  const [indicados, itens] = await Promise.all([loadJovensProtagonistasIndicados(), fetchCampanhaItensList()]);
+  al.campanha.indicados = indicados;
+  al.campanha.itens = itens;
+  campanhaCacheGravar(itens);
   al.campanha.loaded = true;
   al.campanha.loading = false;
   render();
@@ -11503,9 +11551,12 @@ async function loadCampanhaCoord(){
 async function loadCampanhaProfessor(){
   const p = state.professor;
   p.campanhaItensLoading = true;
+  const cache = campanhaCacheLer();
+  if(cache && cache.length){ p.campanhaItens = cache; }
   render();
   const todos = await fetchCampanhaItensList();
   p.campanhaItens = todos.filter(campanhaNoAr);
+  campanhaCacheGravar(todos);
   p.campanhaItensLoading = false;
   render();
 }
@@ -14717,7 +14768,7 @@ function renderAlunoBoletimScreen(){
           <div class="list-item"><span>📝 Avaliação (NP1)</span><strong>${notaDetalhe.np1.toFixed(1)} / ${(colunaDetalhe.pesos.avaliacao||0).toFixed(1)}</strong></div>
           <div class="list-item"><span>🔎 Avaliação Diagnóstica</span><strong>${notaDetalhe.diag.toFixed(1)} / ${(colunaDetalhe.pesos.diagnostica||0).toFixed(1)}</strong></div>
           <div class="list-item"><span>✏️ Exercícios de Fixação</span><strong>${notaDetalhe.exerc.toFixed(1)} / ${(colunaDetalhe.pesos.exercicios||0).toFixed(1)}</strong></div>
-          <div class="list-item"><span>${notaDetalhe.autoOrigem==='socio' ? '💛 Autoavaliação (Avaliação Socioemocional)' : '🙋 Autoavaliação (engajamento)'}</span><strong>${notaDetalhe.auto.toFixed(1)} / ${(colunaDetalhe.pesos.autoavaliacao||0).toFixed(1)}</strong></div>
+          <div class="list-item"><span>${notaDetalhe.autoOrigem==='socio' ? '💛 Autoavaliação (Avaliação Socioemocional)' : notaDetalhe.autoOrigem==='socio-pendente' ? '💛 Autoavaliação (Avaliação Socioemocional — ainda não respondida, vale 0)' : '🙋 Autoavaliação (engajamento)'}</span><strong>${notaDetalhe.auto.toFixed(1)} / ${(colunaDetalhe.pesos.autoavaliacao||0).toFixed(1)}</strong></div>
           ${notaDetalhe.temRecuperacao ? `
             <div class="list-item"><span>♻️ Recuperação Paralela <span class="muted" style="font-size:.75rem;">(substituiu o NP1)</span></span><strong>${notaDetalhe.recuperacao.toFixed(1)} / ${(colunaDetalhe.pesos.avaliacao||0).toFixed(1)}</strong></div>
           ` : ''}
@@ -14839,7 +14890,7 @@ function renderStudentDashboard(){
 
     ${renderAlunoSocioUrgente()}
     ${renderAlunoNovidadesBanner()}
-    ${renderCarrosselCampanha(muralSlidesComConquistas((al.campanha.itens||[]).filter(campanhaNoAr)))}
+    ${renderCarrosselCampanha(muralSlidesComConquistas((al.campanha.itens||[]).filter(campanhaNoAr), al.campanha.loaded && !al.campanha.loading))}
     ${renderAlunoSlidesBlock()}
     ${renderAlunoEnqueteBlock()}
     ${renderAlunoQuizBlock()}
@@ -19342,7 +19393,7 @@ function renderCoordSocio(){
           </div>`; })()}
         <label style="display:flex; align-items:flex-start; gap:8px; text-transform:none; font-weight:400; margin:0;">
           <input type="checkbox" data-action="socio-coord-substitui" ${(s.config.substituiAuto||{})[s.unidade]?'checked':''} style="width:auto; margin-top:4px;">
-          <span><strong>Usar a nota socioemocional no lugar da autoavaliação (${esc(s.unidade)})</strong><br><span class="muted" style="font-size:.85rem;">Desligado, a autoavaliação nas notas finais continua sendo calculada por engajamento (fichas, logins e exercícios), como sempre foi. Ligado, ela passa a vir da nota desta avaliação (nota ÷ 10 × peso da autoavaliação); alunos que ainda não responderam continuam com o engajamento. A opção vale só para o período selecionado.</span></span>
+          <span><strong>Usar a nota socioemocional no lugar da autoavaliação (${esc(s.unidade)})</strong><br><span class="muted" style="font-size:.85rem;">Desligado, a autoavaliação nas notas finais continua sendo calculada por engajamento (fichas, logins e exercícios), como sempre foi. Ligado, ela passa a vir da nota desta avaliação (nota ÷ 10 × peso da autoavaliação), e <strong>quem ainda não respondeu fica com a autoavaliação zerada</strong> até responder (a nota é recalculada assim que ele enviar). Antes de ligar, confira o prazo e se todas as turmas já tiveram tempo de responder. A opção vale só para o período selecionado.</span></span>
         </label>
       </div>
       <div class="row" style="gap:10px; flex-wrap:wrap;">
@@ -19568,10 +19619,11 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
     }
   });
 
-  // Opcional (a coordenação liga por período em "Avaliação Socioemocional"): a nota socioemocional substitui a autoavaliação por engajamento. Se o aluno ainda não respondeu, mantém o engajamento.
+  // Opcional (a coordenação liga por período em "Avaliação Socioemocional"): a nota socioemocional substitui a autoavaliação por engajamento. Com a substituição ligada, quem ainda não respondeu fica com a autoavaliação ZERADA (até responder).
   const socioPorAluno = {};
   const socioConfig = await getSocioConfig();
-  if(turma && unidade && socioConfig.substituiAuto && socioConfig.substituiAuto[unidade]){
+  const socioSubstitui = !!(turma && unidade && socioConfig.substituiAuto && socioConfig.substituiAuto[unidade]);
+  if(socioSubstitui){
     await Promise.all((turma.students||[]).map(async st => {
       try{ const r = await window.storage.get(`socio:${st.id}:${slugifyName(unidade)}`, true); const d = JSON.parse(r.value); if(d && typeof d.total==='number') socioPorAluno[st.name] = d; }catch(e){}
     }));
@@ -19602,7 +19654,7 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
       entregues: s.exerciciosEntregues||0, propostos: exerciciosPropostos,
     });
     const socio = socioPorAluno[name] || null;
-    const autoAuto = socio ? (socio.total/10) * (pesos.autoavaliacao||0) : engajamento * (pesos.autoavaliacao||0);
+    const autoAuto = socio ? (socio.total/10) * (pesos.autoavaliacao||0) : (socioSubstitui ? 0 : engajamento * (pesos.autoavaliacao||0));
     const fezRecuperacao = (s.recuperacaoScores||[]).length>0;
     const autoRecuperacao = fezRecuperacao ? avg(s.recuperacaoScores) * (pesos.avaliacao||0) : null;
 
@@ -19622,7 +19674,7 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
     const final = temRecuperacao ? (recuperacao+np2) : finalSemRecuperacao;
     const precisaRecuperacao = finalSemRecuperacao < 5;
     return { name, np1, diag, exerc, auto, np2, recuperacao, temRecuperacao, finalSemRecuperacao, precisaRecuperacao, final, engajamento, manual,
-      autoOrigem: socio ? 'socio' : 'engajamento', socioTotal: socio ? socio.total : null,
+      autoOrigem: socio ? 'socio' : (socioSubstitui ? 'socio-pendente' : 'engajamento'), socioTotal: socio ? socio.total : null,
       autoNp1, autoDiag, autoExerc, autoAuto, autoRecuperacao };
   });
 
@@ -20066,6 +20118,7 @@ async function loadStudentDashboard(){
   al.dashboardLoading = true;
   al.stage = 'dashboard';
   render();
+  if(!al.campanha.loaded && !al.campanha.loading) loadCampanhaAluno();   // banners publicados: começa já, sem esperar o resto do painel
   if(state.professor.avisosLoading) loadAvisos();
   if(state.professor.materiaisLoading) loadMateriais();
   if(state.professor.cronogramaLoading) loadCronograma();
