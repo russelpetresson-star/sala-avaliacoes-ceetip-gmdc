@@ -10500,7 +10500,16 @@ function renderLiberacoes(){
   const pending = liberacoesVisiveis().filter(r=>!r.released).sort((a,b)=>b.lockedAt-a.lockedAt);
   const body = pending.length===0
     ? '<div class="empty">Nenhuma prova bloqueada no momento.</div>'
-    : pending.map(r => `
+    : pending.map(r => r.tipo==='trava' ? `
+      <div class="list-item" style="border-left:4px solid #d9951f;">
+        <div>
+          <strong>🔒 ${esc(r.studentName)}</strong> <span class="pill" style="background:#d9951f; color:#fff;">outro aparelho</span><br>
+          <span class="muted">${esc(r.assessmentTitle)} · tentou entrar há ${minutesAgo(r.lockedAt)}${r.count>1?' · '+r.count+'x':''}</span><br>
+          <span class="muted" style="font-size:.82rem;">Prova aberta em: <strong>${esc(r.deviceAtual||'?')}</strong> · Tentativa em: <strong>${esc(r.deviceNovo||'?')}</strong></span>
+        </div>
+        <button class="btn btn-primary btn-sm" data-action="destravar-aluno" data-id="${r.id}">🔓 Destravar</button>
+      </div>
+    ` : `
       <div class="list-item">
         <div>
           <strong>${esc(r.studentName)}</strong><br>
@@ -16000,6 +16009,21 @@ async function finalizarProvaBloqueada(id){
   p.unlockRequests = list;
   render();
 }
+// Libera a "vaga" da prova que estava presa a outro aparelho: o aluno consegue iniciar de novo.
+async function destravarAluno(id){
+  const p = state.professor;
+  const r = (p.unlockRequests||[]).find(x=>x.id===id);
+  if(!r) return;
+  if(!confirm(`Destravar a prova de ${r.studentName}? O aparelho que está com a prova aberta perde a vaga e o aluno poderá iniciar de novo no aparelho que ele estiver usando agora.`)) return;
+  try{ if(r.lockKey) await window.storage.delete(r.lockKey, true); }catch(e){}
+  let list = [];
+  try{ const x = await window.storage.get('unlock-requests', true); list = JSON.parse(x.value); }catch(e){ list = p.unlockRequests; }
+  const e = list.find(x=>x.id===id);
+  if(e){ e.released = true; e.releasedAt = Date.now(); e.destravada = true; }
+  await window.storage.set('unlock-requests', JSON.stringify(list), true);
+  p.unlockRequests = list;
+  render();
+}
 async function releaseStudent(id){
   const p = state.professor;
   const idx = p.unlockRequests.findIndex(r=>r.id===id);
@@ -16531,6 +16555,19 @@ function logoutProfessor(){
 
 const MY_SESSION_ID = cryptoId();
 const LOCK_TTL_MS = 90 * 60 * 1000; // 90 minutos
+// Identifica o APARELHO (não só a aba): fica guardado no navegador, então atualizar a página ou reabrir a
+// prova no mesmo celular continua sendo "o mesmo aparelho" e não trava o próprio aluno.
+const MY_DEVICE_ID = (() => {
+  try{ let d = localStorage.getItem('sala-device-id'); if(!d){ d = cryptoId(); localStorage.setItem('sala-device-id', d); } return d; }
+  catch(e){ return MY_SESSION_ID; }
+})();
+// Rótulo legível do aparelho (ex.: "Android · Chrome"), só para o professor saber qual é qual.
+function deviceLabel(){
+  const ua = navigator.userAgent || '';
+  const so = /Android/i.test(ua) ? 'Android' : /iPhone|iPad|iPod/i.test(ua) ? 'iPhone/iPad' : /Windows/i.test(ua) ? 'Windows' : /Mac OS X|Macintosh/i.test(ua) ? 'Mac' : /CrOS/i.test(ua) ? 'Chromebook' : /Linux/i.test(ua) ? 'Linux' : 'Aparelho';
+  const nav = /Edg\//i.test(ua) ? 'Edge' : /OPR\/|Opera/i.test(ua) ? 'Opera' : /SamsungBrowser/i.test(ua) ? 'Samsung Internet' : /Firefox|FxiOS/i.test(ua) ? 'Firefox' : /Chrome|CriOS/i.test(ua) ? 'Chrome' : /Safari/i.test(ua) ? 'Safari' : 'navegador';
+  return so+' · '+nav;
+}
 
 function shuffleArray(arr){
   const a = [...arr];
@@ -16703,7 +16740,7 @@ async function registerUnlockRequest(){
   if(!a) return;
   let list = [];
   try{ const r = await window.storage.get('unlock-requests', true); list = JSON.parse(r.value); }catch(e){}
-  let entry = list.find(x => x.code===a.code && x.studentName===al.name && !x.released);
+  let entry = list.find(x => x.code===a.code && x.studentName===al.name && !x.released && x.tipo!=='trava');
   if(entry){
     entry.lockedAt = Date.now();
     entry.count = (entry.count||1) + 1;
@@ -19900,6 +19937,18 @@ async function findAssessment(){
   render();
 }
 
+// Avisa o professor (aba Liberações) e a coordenação que alguém tentou abrir a prova em outro aparelho.
+async function registrarTentativaOutroAparelho(a, al, lockKey, lock){
+  try{
+    let list = [];
+    try{ const r = await window.storage.get('unlock-requests', true); list = JSON.parse(r.value); }catch(e){}
+    let e = list.find(x => x.tipo==='trava' && x.code===a.code && x.studentName===al.name && !x.released);
+    if(e){ e.lockedAt = Date.now(); e.count = (e.count||1)+1; e.deviceNovo = deviceLabel(); }
+    else list.push({ id: cryptoId(), tipo:'trava', code:a.code, assessmentTitle:a.title, studentName:al.name, professorId:a.professorId||null,
+      lockKey, lockedAt: Date.now(), released:false, releasedAt:null, count:1, deviceNovo: deviceLabel(), deviceAtual: lock.device||'outro aparelho' });
+    await window.storage.set('unlock-requests', JSON.stringify(list), true);
+  }catch(err){}
+}
 async function startExamFlow(){
   const al = state.aluno;
   const a = al.assessment;
@@ -19942,13 +19991,15 @@ async function startExamFlow(){
   let lock = null;
   try{ const lr = await window.storage.get(lockKey, true); lock = JSON.parse(lr.value); }catch(e){}
   const now = Date.now();
-  if(lock && lock.sessionId!==MY_SESSION_ID && (now - lock.startedAt) < LOCK_TTL_MS){
-    al.error = 'Esta avaliação já está sendo respondida em outro dispositivo ou aba com este nome. Se isso for um engano, avise o professor.';
+  const lockEhMeu = lock && (lock.deviceId ? lock.deviceId===MY_DEVICE_ID : lock.sessionId===MY_SESSION_ID);
+  if(lock && !lockEhMeu && (now - lock.startedAt) < LOCK_TTL_MS){
+    await registrarTentativaOutroAparelho(a, al, lockKey, lock);
+    al.error = 'Esta avaliação já está aberta em outro aparelho com este nome. O professor foi avisado. Se foi você mesmo (por exemplo, trocou de celular), peça para ele destravar e toque em iniciar de novo.';
     al.stage = al.studentLoggedIn ? 'dashboard' : al.stage;
     render();
     return;
   }
-  await window.storage.set(lockKey, JSON.stringify({startedAt: now, sessionId: MY_SESSION_ID}), true);
+  await window.storage.set(lockKey, JSON.stringify({startedAt: lockEhMeu && lock.startedAt ? lock.startedAt : now, sessionId: MY_SESSION_ID, deviceId: MY_DEVICE_ID, device: deviceLabel()}), true);
   al.lockKey = lockKey;
   al.answers = {};
   al.tabSwitchCount = 0;
@@ -20785,6 +20836,7 @@ document.addEventListener('click', (e) => {
   else if(act==='fechar-material-slides'){ fecharMaterialSlides(); }
   else if(act==='refresh-liberacoes'){ loadUnlockRequests(); }
   else if(act==='release-student'){ releaseStudent(btn.dataset.id); }
+  else if(act==='destravar-aluno'){ destravarAluno(btn.dataset.id); }
   else if(act==='finalizar-prova-bloqueada'){ finalizarProvaBloqueada(btn.dataset.id); }
 
   // avaliações
