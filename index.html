@@ -671,7 +671,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-07-1230</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-07-1330</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -10592,7 +10592,7 @@ function renderCoordenador(){
     { action:'coord-sub-view', sub:'dashboard', icon:'🏠', label:'Painel', group:'📊 Painel' },
     { action:'coord-sub-view', sub:'avaliacoes', icon:'📝', label:'Todas as avaliações', group:'📝 Avaliações & Notas' },
     { action:'coord-sub-view', sub:'liberacoes', icon:'🔓', label:'Liberações', badge: liberacoesVisiveis().filter(r=>!r.released).length || 0, group:'📝 Avaliações & Notas' },
-    { action:'coord-sub-view', sub:'notas', icon:'🧮', label:'Notas finais', group:'📝 Avaliações & Notas' },
+    { action:'coord-sub-view', sub:'notas', icon:'🧮', label:'Notas finais e risco', group:'📝 Avaliações & Notas' },
     { action:'coord-sub-view', sub:'importarnotas', icon:'📥', label:'Importar Notas (CSV)', group:'📝 Avaliações & Notas' },
     { action:'coord-sub-view', sub:'periodos', icon:'📅', label:'Períodos', group:'📝 Avaliações & Notas' },
     { action:'coord-sub-view', sub:'turmas', icon:'👥', label:'Turmas', group:'👥 Turmas & Frequência' },
@@ -11115,14 +11115,339 @@ function renderCoordPesosProf(){
   `;
 }
 
+/* ================= RELATÓRIO DE RISCO DE REPROVAÇÃO (Notas finais da coordenação) =================
+   Regras institucionais:
+   - Média mínima 5,0.
+   - Áreas do conhecimento: aprovação pela MÉDIA ARITMÉTICA das disciplinas da área (>= 5,0 aprova a área).
+       Linguagens = Língua Portuguesa, Inglês, Arte, Educação Física · Natureza = Física, Química, Biologia
+       Humanas = Sociologia, História, Geografia, Filosofia · Matemática = Matemática
+   - Demais disciplinas (técnicas, etc.) são avaliadas sozinhas: precisa de >= 5,0 em cada uma.
+   - Componentes em reprovação (áreas + disciplinas individuais abaixo de 5,0):
+       0 = Fora de risco · 1–2 = Risco baixo · 3–4 = Risco médio · 5 ou mais = Risco alto
+   - Notas arredondadas para 1 casa decimal antes de comparar (o que aparece na tela é o que vale).
+   - Média global abaixo de 3,0 = sinal de provável evasão (regra institucional).                                 */
+const AREAS_CONHEC = [
+  { id:'ling', nome:'Linguagens', curto:'Linguagens', discs:['lingua portuguesa','portugues','lingua inglesa','ingles','arte','artes','educacao fisica'] },
+  { id:'nat',  nome:'Ciências da Natureza', curto:'Natureza', discs:['fisica','quimica','biologia'] },
+  { id:'hum',  nome:'Ciências Humanas', curto:'Humanas', discs:['sociologia','historia','geografia','filosofia'] },
+  { id:'mat',  nome:'Matemática', curto:'Matemática', discs:['matematica'] },
+];
+const RISCO_INFO = {
+  alto:     { label:'Risco alto',    cor:'#b3261e', ordem:0 },
+  medio:    { label:'Risco médio',   cor:'#e07b24', ordem:1 },
+  baixo:    { label:'Risco baixo',   cor:'#b8901a', ordem:2 },
+  fora:     { label:'Fora de risco', cor:'#2e7d32', ordem:3 },
+  semnotas: { label:'Sem notas',     cor:'#888',    ordem:4 },
+};
+const EVASAO_LIMITE = 3.0, META_REPROVACAO_PCT = 5;
+const r1 = v => Math.round(v*10)/10;
+const fmt1 = v => (v==null || isNaN(v)) ? '—' : r1(v).toFixed(1).replace('.',',');
+function normDisc(n){
+  return String(n||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase()
+    .replace(/[^a-z0-9 ]+/g,' ').replace(/\s+/g,' ').trim()
+    .replace(/ (i|ii|iii|iv|v|\d+)( ano| serie)?$/,'').trim();
+}
+function areaPadraoDaDisciplina(nome){ const n = normDisc(nome); const a = AREAS_CONHEC.find(x => x.discs.includes(n)); return a ? a.id : 'ind'; }
+function areaDaDisciplina(nome, mapa){ return (mapa||{})[normDisc(nome)] || areaPadraoDaDisciplina(nome); }
+function nomeArea(id){ const a = AREAS_CONHEC.find(x=>x.id===id); return a ? a.nome : 'Disciplina individual (técnica/outras)'; }
+function classificarRisco(n){ return n===0 ? 'fora' : n<=2 ? 'baixo' : n<=4 ? 'medio' : 'alto'; }
+function riscoPill(r){ const i = RISCO_INFO[r]; return `<span class="pill" style="background:${i.cor}; color:#fff; white-space:nowrap;">${i.label}</span>`; }
+function notaCel(v){ return v==null ? '<span class="muted">—</span>' : (v<5 ? `<strong style="color:#b3261e;">${fmt1(v)}</strong>` : fmt1(v)); }
+
+// Junta as notas de várias unidades (cada item de "blocos" = colunas de uma unidade) numa nota 0–10 por disciplina.
+// Mesma disciplina com mais de um professor na unidade = média; "acumulado do ano" = média das unidades com nota.
+function notasDoAluno(nome, blocos){
+  const porDisc = {};
+  blocos.forEach(colunas => {
+    const daUnidade = {};
+    (colunas||[]).forEach(col => {
+      const g = col.grades[nome];
+      if(g===undefined || g.final==null || isNaN(g.final)) return;
+      const v = col.total ? g.final / col.total * 10 : g.final;
+      (daUnidade[col.disciplinaName] = daUnidade[col.disciplinaName] || []).push(v);
+    });
+    Object.entries(daUnidade).forEach(([d, vs]) => (porDisc[d] = porDisc[d] || []).push(vs.reduce((a,b)=>a+b,0)/vs.length));
+  });
+  const out = {};
+  Object.entries(porDisc).forEach(([d, vs]) => { out[d] = r1(vs.reduce((a,b)=>a+b,0)/vs.length); });
+  return out;
+}
+function analisarAluno(st, turma, notas, mapa){
+  const areas = {}; AREAS_CONHEC.forEach(a => { areas[a.id] = { media:null, discs:[] }; });
+  const individuais = [];
+  Object.entries(notas).forEach(([d, v]) => {
+    const a = areaDaDisciplina(d, mapa);
+    if(a==='ind') individuais.push({ nome:d, nota:v }); else areas[a].discs.push({ nome:d, nota:v });
+  });
+  AREAS_CONHEC.forEach(a => { const ds = areas[a.id].discs; if(ds.length) areas[a.id].media = r1(ds.reduce((s,x)=>s+x.nota,0)/ds.length); });
+  individuais.sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+  const reprov = [];
+  AREAS_CONHEC.forEach(a => { const m = areas[a.id].media; if(m!=null && m<5) reprov.push({ tipo:'area', id:a.id, nome:a.nome, media:m, discs:areas[a.id].discs }); });
+  individuais.forEach(x => { if(x.nota<5) reprov.push({ tipo:'disc', nome:x.nome, media:x.nota }); });
+  const vals = Object.values(notas);
+  const mediaGlobal = vals.length ? r1(vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+  return { nome: st.name, matricula: st.matricula||'', turmaId: turma.id, turmaNome: turma.name, areas, individuais, reprov,
+    total: reprov.length, risco: vals.length ? classificarRisco(reprov.length) : 'semnotas', mediaGlobal, nDisc: vals.length,
+    evasao: mediaGlobal!=null && mediaGlobal < EVASAO_LIMITE };
+}
+function ordenarPorRisco(a, b){
+  return RISCO_INFO[a.risco].ordem - RISCO_INFO[b.risco].ordem || b.total - a.total || (a.mediaGlobal??99) - (b.mediaGlobal??99) || a.nome.localeCompare(b.nome,'pt-BR');
+}
+async function getAreasMapa(){ try{ const r = await window.storage.get('areas-disciplinas', true); const d = JSON.parse(r.value); return d && typeof d==='object' ? d : {}; }catch(e){ return {}; } }
+function riscoState(){
+  const c = state.coordenador;
+  if(!c.risco) c.risco = { linhas:[], disciplinas:[], filtro:'emrisco', busca:'', turmaFiltro:'', visao:'risco', mapa:{}, editarAreas:false, calculado:false, rotulo:'', progresso:'' };
+  return c.risco;
+}
+// Recalcula a análise (sem buscar notas de novo) — usado também quando a coordenação muda a área de uma disciplina.
+function reanalisarRisco(){
+  const R = riscoState();
+  R.linhas = (R.base||[]).map(b => analisarAluno(b.st, b.turma, b.notas, R.mapa)).sort(ordenarPorRisco);
+  const ds = new Set(); (R.base||[]).forEach(b => Object.keys(b.notas).forEach(d => ds.add(d)));
+  R.disciplinas = [...ds].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+}
+async function calcularRiscoEscolar(turmas, unidade){
+  const c = state.coordenador, R = riscoState();
+  R.mapa = await getAreasMapa();
+  const unidades = unidade==='__ano' ? UNIDADES : [unidade];
+  const base = [];
+  for(let i=0;i<turmas.length;i++){
+    const t = turmas[i];
+    R.progresso = turmas.length>1 ? `Calculando ${t.name} (${i+1} de ${turmas.length})…` : '';
+    if(turmas.length>1) render();
+    const blocos = await Promise.all(unidades.map(u => calcColunasParaUnidade(t.id, u, t)));
+    if(turmas.length===1 && unidade!=='__ano'){ c.notasColunas = blocos[0]; }
+    (t.students||[]).forEach(st => base.push({ st, turma:t, notas: notasDoAluno(st.name, blocos) }));
+  }
+  R.base = base; R.progresso = ''; R.calculado = true;
+  R.rotulo = (turmas.length>1 ? 'Todas as turmas' : turmas[0].name) + ' · ' + (unidade==='__ano' ? 'Acumulado do ano' : unidade);
+  reanalisarRisco();
+}
+function riscoLinhasFiltradas(){
+  const R = riscoState();
+  const q = normDisc(R.busca);
+  return R.linhas.filter(l => {
+    if(R.turmaFiltro && l.turmaId!==R.turmaFiltro) return false;
+    if(q && !normDisc(l.nome).includes(q)) return false;
+    if(R.filtro==='todos') return true;
+    if(R.filtro==='emrisco') return l.risco==='alto' || l.risco==='medio' || l.risco==='baixo';
+    if(R.filtro==='evasao') return l.evasao;
+    return l.risco===R.filtro;
+  });
+}
+function riscoContagem(linhas){
+  const n = { alto:0, medio:0, baixo:0, fora:0, semnotas:0 }; linhas.forEach(l => n[l.risco]++); return n;
+}
+function textoApoio(l){
+  return l.reprov.map(r => r.tipo==='area'
+    ? `<strong>${esc(r.nome)}</strong> (média ${fmt1(r.media)}: ${r.discs.map(d => `${esc(d.nome)} ${notaCel(d.nota)}`).join(', ')})`
+    : `<strong>${esc(r.nome)}</strong> ${notaCel(r.media)}`).join(' · ');
+}
+function renderRiscoRelatorio(){
+  const c = state.coordenador, R = riscoState();
+  if(!R.calculado) return '';
+  const multi = new Set(R.linhas.map(l=>l.turmaId)).size > 1;
+  const linhas = riscoLinhasFiltradas();
+  const todos = R.turmaFiltro ? R.linhas.filter(l=>l.turmaId===R.turmaFiltro) : R.linhas;
+  const n = riscoContagem(todos);
+  const comNotas = todos.length - n.semnotas;
+  const pct = v => comNotas ? Math.round(v/comNotas*100) : 0;
+  const nEvasao = todos.filter(l=>l.evasao).length;
+  const card = (f, titulo, valor, cor, sub) => `
+    <button class="card" data-action="risco-filtro" data-f="${f}" style="flex:1 1 130px; margin:0; padding:12px; text-align:left; cursor:pointer; border:2px solid ${R.filtro===f?cor:'transparent'};">
+      <div style="font-size:1.6rem; font-weight:800; color:${cor}; line-height:1;">${valor}</div>
+      <div style="font-size:.85rem; font-weight:600; margin-top:4px;">${titulo}</div>
+      ${sub ? `<div class="muted" style="font-size:.75rem;">${sub}</div>` : ''}
+    </button>`;
+  // Resumo por turma (só quando há várias): meta de até 5% de reprovação por turma.
+  const porTurma = multi && !R.turmaFiltro ? (() => {
+    const grupos = {};
+    R.linhas.forEach(l => { (grupos[l.turmaId] = grupos[l.turmaId] || { nome:l.turmaNome, ls:[] }).ls.push(l); });
+    const rows = Object.entries(grupos).map(([id, g]) => {
+      const k = riscoContagem(g.ls), cn = g.ls.length - k.semnotas, em = k.alto + k.medio + k.baixo, p = cn ? em/cn*100 : 0;
+      return { id, nome:g.nome, total:g.ls.length, cn, em, k, p };
+    }).sort((a,b)=>b.p-a.p);
+    return `
+      <h3 style="margin-top:18px;">Resumo por turma</h3>
+      <p class="muted" style="font-size:.82rem;">Meta institucional: até ${META_REPROVACAO_PCT}% de alunos com reprovação por turma. Toque no nome da turma para ver só ela.</p>
+      <div class="table-scroll"><table>
+        <tr><th>Turma</th><th>Alunos com notas</th><th>Em risco</th><th>Alto</th><th>Médio</th><th>Baixo</th><th>Meta ≤ ${META_REPROVACAO_PCT}%</th></tr>
+        ${rows.map(r => `<tr>
+          <td><a href="#" data-action="risco-turma" data-id="${r.id}">${esc(r.nome)}</a></td><td>${r.cn}</td>
+          <td><strong>${r.em}</strong> (${Math.round(r.p)}%)</td><td>${r.k.alto}</td><td>${r.k.medio}</td><td>${r.k.baixo}</td>
+          <td>${r.cn ? (r.p<=META_REPROVACAO_PCT ? '✅ dentro' : '❌ acima') : '—'}</td></tr>`).join('')}
+      </table></div>`;
+  })() : '';
+
+  // ---- Parte A ----
+  const parteA = `
+    <h3 style="margin-top:22px;">Parte A — Visão geral e análise de risco</h3>
+    <div class="row" style="gap:8px; flex-wrap:wrap; align-items:flex-end;">
+      <div style="flex:1 1 220px;"><label>Buscar aluno</label><input id="risco-busca" placeholder="Digite parte do nome" value="${esc(R.busca)}" autocomplete="off"></div>
+      ${multi ? `<div style="flex:0 1 220px;"><label>Turma</label><select data-action="risco-turma-select">
+        <option value="">Todas</option>${[...new Map(R.linhas.map(l=>[l.turmaId,l.turmaNome])).entries()].sort((a,b)=>a[1].localeCompare(b[1],'pt-BR')).map(([id,nm]) => `<option value="${id}" ${R.turmaFiltro===id?'selected':''}>${esc(nm)}</option>`).join('')}
+      </select></div>` : ''}
+      <div class="row" style="gap:4px; flex-wrap:wrap; flex:0 0 auto;">
+        ${[['emrisco','Em risco'],['alto','Alto'],['medio','Médio'],['baixo','Baixo'],['fora','Fora de risco'],['evasao','Provável evasão'],['todos','Todos']].map(([f,t]) => `<button class="btn ${R.filtro===f?'btn-primary':'btn-ghost'} btn-sm" data-action="risco-filtro" data-f="${f}">${t}</button>`).join('')}
+      </div>
+    </div>
+    <p class="muted" style="font-size:.82rem; margin:8px 0;">Mostrando ${linhas.length} de ${todos.length} alunos. Notas abaixo de 5,0 em vermelho. Ordem: maior risco primeiro.</p>
+    <div class="table-scroll"><table data-risco-tabela="1">
+      <tr><th>Aluno</th>${multi?'<th>Turma</th>':''}${AREAS_CONHEC.map(a=>`<th>${a.curto}</th>`).join('')}<th>Disciplinas individuais abaixo de 5,0</th><th>Média global</th><th>Componentes em reprovação</th><th>Classificação</th></tr>
+      ${linhas.length ? linhas.map(l => `<tr>
+        <td>${esc(l.nome)}${l.evasao?' <span title="Média global abaixo de 3,0: provável evasão">⚠️</span>':''}</td>${multi?`<td>${esc(l.turmaNome)}</td>`:''}
+        ${AREAS_CONHEC.map(a => `<td>${notaCel(l.areas[a.id].media)}</td>`).join('')}
+        <td style="font-size:.85rem;">${l.individuais.filter(x=>x.nota<5).map(x => `${esc(x.nome)} ${notaCel(x.nota)}`).join('<br>') || (l.individuais.length ? '<span class="muted">nenhuma</span>' : '<span class="muted">—</span>')}</td>
+        <td>${notaCel(l.mediaGlobal)}</td><td style="text-align:center;"><strong>${l.risco==='semnotas'?'—':l.total}</strong></td><td>${riscoPill(l.risco)}</td>
+      </tr>`).join('') : `<tr><td colspan="${8+(multi?1:0)}"><div class="empty">Nenhum aluno neste filtro.</div></td></tr>`}
+    </table></div>`;
+
+  // ---- Parte B ----
+  const ranq = todos.filter(l=>l.mediaGlobal!=null).sort((a,b)=>b.mediaGlobal-a.mediaGlobal || a.nome.localeCompare(b.nome,'pt-BR'));
+  let topo = ranq.slice(0,5);
+  if(ranq.length>5){ const corte = ranq[4].mediaGlobal; topo = ranq.filter((l,i)=>i<5 || l.mediaGlobal===corte); }   // empates no 5º lugar entram
+  const medalha = i => ['🥇','🥈','🥉'][i] || `${i+1}º`;
+  const parteB = `
+    <h3 style="margin-top:22px;">Parte B — Ranking de desempenho global (melhores médias)</h3>
+    <div class="table-scroll"><table>
+      <tr><th>Posição</th><th>Aluno</th>${multi?'<th>Turma</th>':''}<th>Média global</th><th>Situação</th></tr>
+      ${topo.map((l,i) => `<tr><td>${medalha(ranq.findIndex(x=>x.mediaGlobal===l.mediaGlobal))}</td><td>${esc(l.nome)}</td>${multi?`<td>${esc(l.turmaNome)}</td>`:''}<td><strong>${fmt1(l.mediaGlobal)}</strong></td><td>${riscoPill(l.risco)}</td></tr>`).join('') || '<tr><td colspan="5"><div class="empty">Sem notas.</div></td></tr>'}
+    </table></div>`;
+
+  // ---- Parte C ----
+  const piores = ranq.slice().reverse().filter(l => l.total>0 || l.mediaGlobal<6).slice(0,5);   // as piores médias, mas só de quem precisa de apoio
+  const prioridade = [...new Set([...todos.filter(l=>l.risco==='alto'||l.risco==='medio'||l.evasao), ...piores])].sort(ordenarPorRisco);
+  const parteC = `
+    <h3 style="margin-top:22px;">Parte C — Plano de Busca Ativa e Apoio Pedagógico</h3>
+    <p class="muted" style="font-size:.82rem;">Alunos em risco alto e médio, com provável evasão (média global abaixo de 3,0) e as piores médias globais (até 5, entre quem tem reprovação ou média abaixo de 6,0). A ordem é de prioridade de intervenção.</p>
+    ${prioridade.length ? `<div class="table-scroll"><table>
+      <tr><th>#</th><th>Aluno</th>${multi?'<th>Turma</th>':''}<th>Média global</th><th>Reprovações</th><th>Classificação</th><th>Onde precisa de apoio</th><th>Ação sugerida</th></tr>
+      ${prioridade.map((l,i) => `<tr>
+        <td>${i+1}</td><td>${esc(l.nome)}${l.evasao?'<br><span class="pill" style="background:#5b1a2c; color:#fff; font-size:.7rem;">⚠️ provável evasão</span>':''}</td>${multi?`<td>${esc(l.turmaNome)}</td>`:''}
+        <td>${notaCel(l.mediaGlobal)}</td><td style="text-align:center;">${l.total}</td><td>${riscoPill(l.risco)}</td>
+        <td style="font-size:.85rem;">${textoApoio(l) || '<span class="muted">nenhum componente abaixo de 5,0</span>'}</td>
+        <td style="font-size:.82rem;">${l.evasao ? 'Busca ativa imediata: contato com a família e verificação de frequência.' : l.risco==='alto' ? 'Reunião com a família e plano individual de recuperação nos componentes listados.' : l.risco==='medio' ? 'Recuperação paralela e monitoria nos componentes listados; acompanhar a cada quinzena.' : 'Acompanhar de perto: está entre as menores médias.'}</td>
+      </tr>`).join('')}
+    </table></div>` : '<div class="empty">Nenhum aluno precisa de intervenção urgente. 🎉</div>'}`;
+
+  // ---- Parte D ----
+  const blocoArea = a => {
+    const ls = todos.filter(l => l.areas[a.id].media!=null && l.areas[a.id].media<5).sort((x,y)=>x.areas[a.id].media-y.areas[a.id].media);
+    const discsArea = [...new Set(todos.flatMap(l => l.areas[a.id].discs.map(d=>d.nome)))].sort((x,y)=>x.localeCompare(y,'pt-BR'));
+    return `<h4 style="margin:16px 0 6px;">${a.nome} <span class="muted" style="font-weight:400;">· ${ls.length} aluno(s) abaixo de 5,0</span></h4>
+      ${ls.length ? `<div class="table-scroll"><table>
+        <tr><th>Aluno</th>${multi?'<th>Turma</th>':''}${discsArea.map(d=>`<th>${esc(d)}</th>`).join('')}<th>Média da área</th></tr>
+        ${ls.map(l => `<tr><td>${esc(l.nome)}</td>${multi?`<td>${esc(l.turmaNome)}</td>`:''}${discsArea.map(d => { const x = l.areas[a.id].discs.find(y=>y.nome===d); return `<td>${x?notaCel(x.nota):'<span class="muted">—</span>'}</td>`; }).join('')}<td><strong>${notaCel(l.areas[a.id].media)}</strong></td></tr>`).join('')}
+      </table></div>` : '<p class="muted" style="font-size:.85rem;">Nenhum aluno abaixo de 5,0 nesta área.</p>'}`;
+  };
+  const tecnicas = [...new Set(todos.flatMap(l => l.individuais.map(x=>x.nome)))].sort((x,y)=>x.localeCompare(y,'pt-BR'));
+  const blocoTec = tecnicas.map(d => {
+    const ls = todos.map(l => ({ l, x: l.individuais.find(y=>y.nome===d) })).filter(o => o.x && o.x.nota<5).sort((p,q)=>p.x.nota-q.x.nota);
+    return ls.length ? `<tr><td><strong>${esc(d)}</strong></td><td>${ls.length}</td><td style="font-size:.85rem;">${ls.map(o => `${esc(o.l.nome)}${multi?' ('+esc(o.l.turmaNome)+')':''} ${notaCel(o.x.nota)}`).join(' · ')}</td></tr>` : '';
+  }).join('');
+  const parteD = `
+    <h3 style="margin-top:22px;">Parte D — Risco de reprovação por área do conhecimento e disciplina</h3>
+    ${AREAS_CONHEC.map(blocoArea).join('')}
+    <h4 style="margin:16px 0 6px;">Disciplinas individuais (técnicas e outras)</h4>
+    ${blocoTec ? `<div class="table-scroll"><table><tr><th>Disciplina</th><th>Alunos abaixo de 5,0</th><th>Alunos e notas</th></tr>${blocoTec}</table></div>` : '<p class="muted" style="font-size:.85rem;">Nenhum aluno abaixo de 5,0 nas disciplinas individuais.</p>'}`;
+
+  // ---- Classificação das disciplinas (editável) ----
+  const classif = `
+    <details style="margin-top:22px;" ${R.editarAreas?'open':''}>
+      <summary style="cursor:pointer; font-weight:600;">⚙️ Como cada disciplina foi classificada (${R.disciplinas.length})</summary>
+      <p class="muted" style="font-size:.82rem;">O app reconhece as disciplinas da base comum pelo nome. Se alguma estiver no lugar errado (por exemplo, "Português e Literatura" contando como disciplina individual), corrija aqui. A mudança vale para todos os relatórios.</p>
+      <div class="table-scroll"><table>
+        <tr><th>Disciplina</th><th>Classificação</th></tr>
+        ${R.disciplinas.map(d => { const atual = areaDaDisciplina(d, R.mapa); return `<tr><td>${esc(d)}</td><td>
+          <select data-action="risco-area" data-disc="${esc(d)}" style="max-width:300px;">
+            ${[...AREAS_CONHEC.map(a=>[a.id,a.nome]), ['ind','Disciplina individual (técnica/outras)']].map(([id,nm]) => `<option value="${id}" ${atual===id?'selected':''}>${nm}</option>`).join('')}
+          </select></td></tr>`; }).join('')}
+      </table></div>
+    </details>`;
+
+  return `
+    <div data-risco-relatorio="1">
+      <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:6px;">
+        <p style="margin:0;"><strong>Relatório de Risco de Reprovação</strong> · <span class="muted">${esc(R.rotulo)}${R.turmaFiltro?' · '+esc((todos[0]||{}).turmaNome||''):''}</span></p>
+        <div class="row" style="gap:6px; flex:0 0 auto;">
+          <button class="btn btn-ghost btn-sm" data-action="risco-exportar">Exportar .xlsx</button>
+          <button class="btn btn-ghost btn-sm" data-action="risco-imprimir">🖨️ Imprimir relatório</button>
+        </div>
+      </div>
+      <div class="row" style="gap:8px; flex-wrap:wrap; margin-top:10px;">
+        ${card('alto','Risco alto', n.alto, RISCO_INFO.alto.cor, `${pct(n.alto)}% · 5 ou mais componentes`)}
+        ${card('medio','Risco médio', n.medio, RISCO_INFO.medio.cor, `${pct(n.medio)}% · 3 a 4 componentes`)}
+        ${card('baixo','Risco baixo', n.baixo, RISCO_INFO.baixo.cor, `${pct(n.baixo)}% · 1 a 2 componentes`)}
+        ${card('fora','Fora de risco', n.fora, RISCO_INFO.fora.cor, `${pct(n.fora)}%`)}
+        ${card('evasao','Provável evasão', nEvasao, '#5b1a2c', 'média global abaixo de 3,0')}
+      </div>
+      ${n.semnotas ? `<p class="muted" style="font-size:.82rem; margin-top:8px;">${n.semnotas} aluno(s) ainda sem nenhuma nota lançada neste período (não entram na contagem).</p>` : ''}
+      ${porTurma}${parteA}${parteB}${parteC}${parteD}${classif}
+      <p class="muted" style="font-size:.78rem; margin-top:18px;">Como é calculado: cada nota é convertida para 0–10 e arredondada a 1 casa. A média da área é a média aritmética das disciplinas da área que têm nota. Áreas e disciplinas individuais abaixo de 5,0 contam como componentes em reprovação: 1–2 = risco baixo, 3–4 = médio, 5 ou mais = alto. A média global é a média de todas as disciplinas com nota.${R.rotulo.includes('Acumulado') ? ' No acumulado do ano, a nota de cada disciplina é a média das unidades que já têm nota.' : ''}</p>
+    </div>`;
+}
+async function salvarAreaDisciplina(disc, area){
+  const R = riscoState();
+  const mapa = await getAreasMapa();
+  const k = normDisc(disc);
+  if(area===areaPadraoDaDisciplina(disc)) delete mapa[k]; else mapa[k] = area;
+  try{ await window.storage.set('areas-disciplinas', JSON.stringify(mapa), true); }catch(e){ alert('Não foi possível salvar agora.'); return; }
+  R.mapa = mapa; R.editarAreas = true;
+  reanalisarRisco(); render();
+}
+function exportarRiscoXlsx(){
+  const R = riscoState();
+  if(!R.calculado){ alert('Calcule antes de exportar.'); return; }
+  const multi = new Set(R.linhas.map(l=>l.turmaId)).size > 1;
+  const ls = R.turmaFiltro ? R.linhas.filter(l=>l.turmaId===R.turmaFiltro) : R.linhas;
+  const num = v => v==null ? '' : r1(v);
+  const A = [['Aluno', ...(multi?['Turma']:[]), ...AREAS_CONHEC.map(a=>a.nome), 'Disciplinas individuais abaixo de 5,0', 'Média global', 'Componentes em reprovação', 'Classificação', 'Provável evasão']];
+  ls.forEach(l => A.push([l.nome, ...(multi?[l.turmaNome]:[]), ...AREAS_CONHEC.map(a=>num(l.areas[a.id].media)), l.individuais.filter(x=>x.nota<5).map(x=>`${x.nome} (${fmt1(x.nota)})`).join('; '), num(l.mediaGlobal), l.risco==='semnotas'?'':l.total, RISCO_INFO[l.risco].label, l.evasao?'Sim':'']));
+  const B = [['Posição','Aluno', ...(multi?['Turma']:[]), 'Média global']];
+  ls.filter(l=>l.mediaGlobal!=null).sort((a,b)=>b.mediaGlobal-a.mediaGlobal).forEach((l,i) => B.push([i+1, l.nome, ...(multi?[l.turmaNome]:[]), num(l.mediaGlobal)]));
+  const C = [['Aluno', ...(multi?['Turma']:[]), 'Média global', 'Reprovações', 'Classificação', 'Provável evasão', 'Onde precisa de apoio']];
+  ls.filter(l=>l.risco==='alto'||l.risco==='medio'||l.evasao).sort(ordenarPorRisco).forEach(l => C.push([l.nome, ...(multi?[l.turmaNome]:[]), num(l.mediaGlobal), l.total, RISCO_INFO[l.risco].label, l.evasao?'Sim':'',
+    l.reprov.map(r => r.tipo==='area' ? `${r.nome} (média ${fmt1(r.media)}: ${r.discs.map(d=>d.nome+' '+fmt1(d.nota)).join(', ')})` : `${r.nome} ${fmt1(r.media)}`).join('; ')]));
+  const D = [['Área / disciplina', 'Tipo', 'Aluno', ...(multi?['Turma']:[]), 'Média', 'Notas das disciplinas da área']];
+  AREAS_CONHEC.forEach(a => ls.filter(l=>l.areas[a.id].media!=null && l.areas[a.id].media<5).forEach(l => D.push([a.nome, 'Área', l.nome, ...(multi?[l.turmaNome]:[]), num(l.areas[a.id].media), l.areas[a.id].discs.map(d=>d.nome+' '+fmt1(d.nota)).join('; ')])));
+  ls.forEach(l => l.individuais.filter(x=>x.nota<5).forEach(x => D.push([x.nome, 'Disciplina individual', l.nome, ...(multi?[l.turmaNome]:[]), num(x.nota), ''])));
+  const wb = XLSX.utils.book_new();
+  [['A - Visão geral',A],['B - Ranking',B],['C - Busca ativa',C],['D - Por área e disciplina',D]].forEach(([nm,aoa]) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), nm));
+  XLSX.writeFile(wb, `relatorio-risco-${R.rotulo.replace(/[^a-z0-9]+/gi,'-').toLowerCase()}.xlsx`);
+}
+function imprimirRisco(){
+  const R = riscoState();
+  if(!R.calculado){ alert('Calcule antes de imprimir.'); return; }
+  const filtroAntes = R.filtro, buscaAntes = R.busca;
+  R.filtro = 'todos'; R.busca = '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = renderRiscoRelatorio();
+  R.filtro = filtroAntes; R.busca = buscaAntes;
+  tmp.querySelectorAll('button.card').forEach(b => { const d = document.createElement('div'); d.innerHTML = b.innerHTML; d.style.cssText = b.style.cssText; d.style.border = '1px solid #ccc'; b.replaceWith(d); });
+  tmp.querySelectorAll('button, details, input, select, label').forEach(el => el.remove());
+  tmp.querySelectorAll('.row').forEach(el => { if(!el.textContent.trim()) el.remove(); });
+  tmp.querySelectorAll('table').forEach(t => t.classList.add('pv-sign-table'));
+  printPages(`<div class="pv-page">${buildPrintHeader({ title:'Relatório de Risco de Reprovação', subtitle: R.rotulo })}${tmp.innerHTML}</div>`);
+}
+
 function renderCoordNotas(){
   const c = state.coordenador;
   const turmaOptions = state.professor.turmas.map(t => `<option value="${t.id}" ${c.notasTurmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('');
   let resultBlock = '';
+  const R = riscoState();
+  const temTabela = c.notasColunas.length>0;
+  const abas = (R.calculado && temTabela) ? `
+      <div class="row" style="gap:6px; margin-bottom:12px; flex-wrap:wrap;">
+        <button class="btn ${R.visao!=='notas'?'btn-primary':'btn-ghost'} btn-sm" data-action="risco-visao" data-v="risco">⚠️ Relatório de risco</button>
+        <button class="btn ${R.visao==='notas'?'btn-primary':'btn-ghost'} btn-sm" data-action="risco-visao" data-v="notas">🧮 Notas por disciplina</button>
+      </div>` : '';
   if(c.notasLoading){
-    resultBlock = '<div class="spinner"></div>';
-  } else if(c.notasColunas.length>0){
-    resultBlock = `
+    resultBlock = `<div class="spinner"></div>${R.progresso ? `<p class="muted center">${esc(R.progresso)}</p>` : ''}`;
+  } else if(R.calculado && (R.visao!=='notas' || !temTabela)){
+    resultBlock = abas + (R.linhas.length ? renderRiscoRelatorio() : '<div class="empty">Nenhum aluno encontrado.</div>');
+  } else if(temTabela){
+    resultBlock = abas;
+    resultBlock += `
       <div class="row" style="justify-content:flex-end; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
         <button class="btn btn-ghost btn-sm" data-action="export-coord-notas-xlsx">Exportar .xlsx</button>
         <button class="btn btn-ghost btn-sm" data-action="imprimir-notas-finais" data-modo="matricula">🖨️ Imprimir (matrícula e notas)</button>
@@ -11158,13 +11483,14 @@ function renderCoordNotas(){
   }
   return `
     <div class="card">
-      <h2>Notas finais por turma</h2>
-      <p class="muted">Reúne, lado a lado, a nota final (NP1+NP2) de cada disciplina que tenha avaliações nessa turma/unidade — cada uma calculada com os pesos configurados pelo respectivo professor.</p>
+      <h2>Notas finais e risco de reprovação</h2>
+      <p class="muted">Escolha uma turma (ou a escola inteira) e o período. O app mostra quem está em risco de reprovação por área do conhecimento e por disciplina, o ranking das melhores médias e o plano de busca ativa. Na aba "Notas por disciplina" fica a tabela de notas finais (NP1+NP2) com os boletins.</p>
       <div class="row" style="align-items:flex-end;">
         <div>
           <label>Turma</label>
           <select id="coord-notas-turma-select">
             <option value="">Selecione...</option>
+            <option value="__todas" ${c.notasTurmaId==='__todas'?'selected':''}>Todas as turmas (escola inteira)</option>
             ${turmaOptions}
           </select>
         </div>
@@ -11172,6 +11498,7 @@ function renderCoordNotas(){
           <label>Unidade</label>
           <select id="coord-notas-unidade-select">
             ${UNIDADES.map(u => `<option value="${esc(u)}" ${c.notasUnidade===u?'selected':''}>${esc(u)}</option>`).join('')}
+            <option value="__ano" ${c.notasUnidade==='__ano'?'selected':''}>Acumulado do ano (média das unidades)</option>
           </select>
         </div>
         <button class="btn btn-primary" data-action="coord-calc-notas" style="flex:0 0 auto;">Calcular</button>
@@ -14541,19 +14868,21 @@ async function calcCoordNotas(){
   const unidade = document.getElementById('coord-notas-unidade-select').value;
   c.notasTurmaId = turmaId;
   c.notasUnidade = unidade;
+  const R = riscoState();
+  R.calculado = false; R.turmaFiltro = ''; R.busca = '';
   if(!turmaId){ c.notasColunas=[]; c.notasRows=[]; render(); return; }
   c.notasLoading = true;
+  c.notasColunas = []; c.notasRows = [];
   render();
-
-  const turma = state.professor.turmas.find(t=>t.id===turmaId);
-  const roster = turma ? turma.students.map(s=>s.name) : [];
-  const rosterMatriculas = {};
-  if(turma) turma.students.forEach(s => { rosterMatriculas[s.name] = s.matricula||''; });
-
-  const colunas = await calcColunasParaUnidade(turmaId, unidade, turma);
-
-  c.notasColunas = colunas;
-  c.notasRows = roster.map(name => ({ name, matricula: rosterMatriculas[name]||'' }));
+  try{
+    if(!c.assessments.length) await loadCoordAssessments();
+    const turmas = turmaId==='__todas' ? state.professor.turmas.slice() : [state.professor.turmas.find(t=>t.id===turmaId)].filter(Boolean);
+    await calcularRiscoEscolar(turmas, unidade);   // em turma única + unidade, também preenche c.notasColunas
+    if(turmaId!=='__todas' && unidade!=='__ano' && turmas[0]){
+      const turma = turmas[0];
+      c.notasRows = turma.students.map(s => ({ name: s.name, matricula: s.matricula||'' }));
+    }
+  }catch(e){ alert('Não foi possível calcular agora. Verifique a internet e tente de novo.'); }
   c.notasLoading = false;
   render();
 }
@@ -20990,6 +21319,11 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-open-results'){ openCoordResults(btn.dataset.code); }
   else if(act==='coord-back-to-list'){ state.coordenador.mode='list'; state.coordenador.transferRespIdx=null; state.coordenador.transferError=''; render(); }
   else if(act==='coord-calc-notas'){ calcCoordNotas(); }
+  else if(act==='risco-filtro'){ riscoState().filtro = btn.dataset.f; render(); }
+  else if(act==='risco-turma'){ riscoState().turmaFiltro = btn.dataset.id; render(); }
+  else if(act==='risco-visao'){ riscoState().visao = btn.dataset.v; render(); }
+  else if(act==='risco-exportar'){ exportarRiscoXlsx(); }
+  else if(act==='risco-imprimir'){ imprimirRisco(); }
   else if(act==='coord-send-note'){ sendCoordNote(btn.dataset.id); }
   else if(act==='coord-clear-note'){ clearCoordNote(btn.dataset.id); }
   else if(act==='sub-view'){
@@ -21621,6 +21955,13 @@ document.addEventListener('input', (e) => {
   else if(el.id==='bloco-lancar-aluno-select'){ p.bloco.lancarStudentId = el.value; }
   else if(el.id==='bloco-lancar-sequencia-input'){ p.bloco.lancarSequencia = el.value; }
   else if(el.id==='bloco-scan-file-input'){ if(el.files[0]) iniciarLeituraBloco(el.files[0]); }
+  else if(el.id==='risco-busca'){
+    riscoState().busca = el.value;
+    const selStart = el.selectionStart, selEnd = el.selectionEnd;
+    render();
+    const el2 = document.getElementById('risco-busca');
+    if(el2){ el2.focus(); try{ el2.setSelectionRange(selStart, selEnd); }catch(err){} }
+  }
   else if(el.id==='sidebar-search-input'){
     state.ui.sidebarSearch = el.value;
     const selStart = el.selectionStart, selEnd = el.selectionEnd;
@@ -21671,6 +22012,8 @@ document.addEventListener('change', (e) => {
   const el = e.target;
   const act = el.dataset ? el.dataset.action : null;
   const p = state.professor, al = state.aluno, c = state.coordenador;
+  if(act==='risco-area'){ salvarAreaDisciplina(el.dataset.disc, el.value); return; }
+  if(act==='risco-turma-select'){ riscoState().turmaFiltro = el.value; render(); return; }
   if(act==='sessao-cfg'){ salvarSessaoCampo(el.dataset.campo, el.value); return; }
   if(act==='rede-toggle'){ const on = el.checked; salvarRedeEscola(cfg => { cfg.ativo = on; }); return; }
   if(el.id==='monitoria-turma-select'){ al.monitoria.criarTurmaId = el.value; al.monitoria.criarSelecionados = []; al.monitoria.criarAlunosBusca=''; al.monitoria.error=''; render(); return; }
