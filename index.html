@@ -671,7 +671,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-09-28-1240</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-07-1230</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -1094,6 +1094,7 @@ const TOUR_STEPS = {
     { icon:'🖨️', title:'Bloco de Provas e Gabarito Avulso', text:'Imprima provas em papel com cartão-resposta com QR code, ou monte um "Gabarito Avulso" para provas integradas com várias disciplinas no mesmo cartão.' },
     { icon:'🔍', title:'Leitura de Gabaritos', text:'Depois de aplicar a prova em papel, fotografe o cartão-resposta preenchido pelo celular — o sistema lê e lança a nota automaticamente.' },
     { icon:'📣', title:'Atividades ao vivo', text:'Enquete Relâmpago, Quiz por Equipes, Roleta de Sorteio e Apresentação de Slides deixam a aula mais interativa — os alunos participam pelo próprio tablet.' },
+    { icon:'🗂️', title:'Menu organizado por assunto', text:'O menu lateral está dividido em grupos: Avaliações & Notas, Turmas & Frequência, Professores, Acompanhamento do Aluno, Protagonismo, Comunicação, Provas em Papel, Recursos de Aula e Configurações (no fim). Também dá para digitar na busca do menu.' },
     { icon:'⭐', title:'Atalhos favoritos', text:'Passe o mouse sobre um item do menu lateral e clique na estrelinha para fixá-lo no topo — assim as áreas que você mais usa ficam sempre à mão.' },
     { icon:'🗑️', title:'Lixeira', text:'Excluiu algo por engano? Turmas, disciplinas, questões do banco e notas ficam guardadas na Lixeira por 30 dias e podem ser restauradas a qualquer momento.' },
     { icon:'👤', title:'Meu perfil', text:'A qualquer momento, clique em "Meu perfil" no topo da tela para trocar sua foto ou escolher um avatar. Pronto — bom trabalho!' },
@@ -1834,6 +1835,7 @@ function renderPrivacyNotice(){
 }
 
 function render(){
+  setTimeout(atualizarTelaAcesa, 0);
   tabsEl.innerHTML = '';
   const tourEl = document.getElementById('tour-overlay-root');
   if(tourEl) tourEl.innerHTML = renderTourOverlay();
@@ -1973,10 +1975,17 @@ function renderProfessor(){
       <div class="row" style="flex:0 0 auto; gap:6px;">
         ${renderThemeToggleBtn()}
         <button class="btn btn-ghost btn-sm" data-action="start-tour" data-role="professor">🧭 Tour</button>
-        <button class="btn btn-ghost btn-sm" data-action="open-professor-profile">👤 Meu perfil</button>
-        <button class="btn btn-ghost btn-sm" data-action="prof-logout">Sair</button>
+        ${p.session.viaCoord ? '' : '<button class="btn btn-ghost btn-sm" data-action="open-professor-profile">👤 Meu perfil</button>'}
+        ${p.session.viaCoord
+          ? '<button class="btn btn-primary btn-sm" data-action="coord-voltar-coordenacao">↩ Voltar à coordenação</button>'
+          : '<button class="btn btn-ghost btn-sm" data-action="prof-logout">Sair</button>'}
       </div>
     </div>
+    ${p.session.viaCoord ? `
+    <div data-via-coord="1" style="background:#5b1a2c; color:#fff; border-radius:8px; padding:10px 14px; margin-bottom:12px; display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
+      <span>👁 <strong>Modo coordenação:</strong> você está no painel de <strong>${esc(p.session.displayName)}</strong>. O que fizer aqui fica gravado como se fosse do professor.</span>
+      <button class="btn btn-ghost btn-sm" data-action="coord-voltar-coordenacao" style="background:#fff;">↩ Voltar à coordenação</button>
+    </div>` : ''}
     <div class="row quick-actions-bar" style="gap:8px; flex-wrap:wrap; margin-bottom:14px;">
       ${!(p.subview==='avaliacoes' && p.mode==='new') ? '<button class="btn btn-primary btn-sm" data-action="quick-new-assessment" style="flex:0 0 auto;">+ Nova avaliação</button>' : ''}
       ${p.subview!=='avulso' ? '<button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="avulso" style="flex:0 0 auto;">🗒️ Gabarito Avulso</button>' : ''}
@@ -7641,6 +7650,7 @@ function renderResults(){
             <td>${new Date(r.submittedAt).toLocaleString('pt-BR')}</td>
             <td>
               ${r.tabSwitches ? `<div style="color:var(--red);">⚠ ${r.tabSwitches}x saiu da aba</div>` : ''}
+              ${r.saidasToleradas ? `<div class="muted" style="font-size:.82rem;">↩ ${r.saidasToleradas}x saiu e voltou dentro da tolerância</div>` : ''}
               ${r.fullscreenExits ? `<div style="color:var(--red);">⚠ ${r.fullscreenExits}x saiu da tela cheia</div>` : ''}
               ${r.screenshotAttempts ? `<div style="color:var(--red);">⚠ ${r.screenshotAttempts}x tentou capturar a tela</div>` : ''}
               ${(!r.tabSwitches && !r.fullscreenExits && !r.screenshotAttempts) ? '<span class="muted">—</span>' : ''}
@@ -10505,14 +10515,14 @@ function renderLiberacoes(){
         <div>
           <strong>🔒 ${esc(r.studentName)}</strong> <span class="pill" style="background:#d9951f; color:#fff;">outro aparelho</span><br>
           <span class="muted">${esc(r.assessmentTitle)} · tentou entrar há ${minutesAgo(r.lockedAt)}${r.count>1?' · '+r.count+'x':''}</span><br>
-          <span class="muted" style="font-size:.82rem;">Prova aberta em: <strong>${esc(r.deviceAtual||'?')}</strong> · Tentativa em: <strong>${esc(r.deviceNovo||'?')}</strong></span>
+          <span class="muted" style="font-size:.82rem;">Prova aberta em: <strong>${esc(r.deviceAtual||'?')}</strong>${redeSelo(r.ipAtual, r.ipAtualChecado)} · Tentativa em: <strong>${esc(r.deviceNovo||'?')}</strong>${redeSelo(r.ipNovo, r.ipNovoChecado)}</span>
         </div>
         <button class="btn btn-primary btn-sm" data-action="destravar-aluno" data-id="${r.id}">🔓 Destravar</button>
       </div>
     ` : `
       <div class="list-item">
         <div>
-          <strong>${esc(r.studentName)}</strong><br>
+          <strong>${esc(r.studentName)}</strong>${redeSelo(r.ip, r.ipChecado)}<br>
           <span class="muted">${esc(r.assessmentTitle)} · bloqueado há ${minutesAgo(r.lockedAt)}${r.count>1?' · '+r.count+'x':''}</span>
         </div>
         ${r.finalizar
@@ -10533,6 +10543,7 @@ function renderLiberacoes(){
       <p class="muted" style="font-size:.82rem;"><strong>Liberar</strong> deixa o aluno continuar a prova. <strong>Finalizar prova</strong> encerra a prova dele agora e envia o que ele já respondeu (questões em branco valem 0).</p>
       ${body}
     </div>
+    ${state.view==='coordenador' ? renderRedeEscolaConfig() : ''}
   `;
 }
 function minutesAgo(ts){
@@ -10576,39 +10587,41 @@ function renderCoordenador(){
       </div>
     </div>
   `;
+  // Menu da coordenação organizado em grupos (mesmo recurso do menu do professor).
   const sidebarItems = [
-    { action:'coord-sub-view', sub:'dashboard', icon:'🏠', label:'Painel' },
-    { action:'coord-sub-view', sub:'professores', icon:'🧑‍🏫', label:'Professores' },
-    { action:'coord-sub-view', sub:'frequencia', icon:'📈', label:'Frequência dos Professores' },
-    { action:'coord-sub-view', sub:'avaliacoes', icon:'📝', label:'Todas as avaliações' },
-    { action:'coord-sub-view', sub:'liberacoes', icon:'🔓', label:'Liberações', badge: liberacoesVisiveis().filter(r=>!r.released).length || 0 },
-    { action:'coord-sub-view', sub:'turmas', icon:'👥', label:'Turmas' },
-    { action:'coord-sub-view', sub:'chamada', icon:'🪪', label:'Chamada' },
-    { action:'coord-sub-view', sub:'freqpainel', icon:'📊', label:'Painel de Frequência' },
-    { action:'coord-sub-view', sub:'freqconfig', icon:'⏰', label:'Config. de Frequência' },
-    { action:'coord-sub-view', sub:'notas', icon:'🧮', label:'Notas finais' },
-    { action:'coord-sub-view', sub:'socio', icon:'💛', label:'Avaliação Socioemocional' },
-    { action:'coord-sub-view', sub:'monitoria', icon:'🧑‍🏫', label:'Monitoria de Desempenho', badge: monitoriaIntervencaoNaoVistosCount() },
-    { action:'coord-sub-view', sub:'buscaativa', icon:'🚌', label:'Busca Ativa e Transporte', badge: buscaAtivaAcionamentosNaoVistosCount() },
-    { action:'coord-sub-view', sub:'campanha', icon:'📢', label:'Jovens Protagonistas', badge: campanhaPendentesCount() },
-    { action:'coord-sub-view', sub:'diario', icon:'📷', label:'Diário de Bordo' },
-    { action:'coord-sub-view', sub:'portfolio', icon:'🗂️', label:'Portfólio do Aluno' },
-    { action:'coord-sub-view', sub:'conquistas', icon:'🏅', label:'Hall de Conquistas' },
-    { action:'coord-sub-view', sub:'importarnotas', icon:'📥', label:'Importar Notas (CSV)' },
-    { action:'coord-sub-view', sub:'pesosprof', icon:'⚖️', label:'Pesos dos professores' },
-    { action:'coord-sub-view', sub:'periodos', icon:'📅', label:'Períodos' },
-    { action:'coord-sub-view', sub:'bloco', icon:'🖨️', label:'Bloco de Provas' },
-    { action:'coord-sub-view', sub:'avulso', icon:'🗒️', label:'Gabarito Avulso' },
-    { action:'coord-sub-view', sub:'livros', icon:'📘', label:'Livros Didáticos' },
-    { action:'coord-sub-view', sub:'mural', icon:'📌', label:'Mural de Avisos' },
-    { action:'coord-sub-view', sub:'enquete', icon:'📣', label:'Enquete Relâmpago' },
-    { action:'coord-sub-view', sub:'quiz', icon:'🎮', label:'Quiz por Equipes' },
-    { action:'coord-sub-view', sub:'roleta', icon:'🎡', label:'Roleta de Sorteio' },
-    { action:'coord-sub-view', sub:'duelo', icon:'⚔️', label:'Modo Duelo' },
-    { action:'coord-sub-view', sub:'slides', icon:'🖥️', label:'Apresentação de Slides' },
-    { action:'coord-sub-view', sub:'lixeira', icon:'🗑️', label:'Lixeira' },
-    { action:'coord-sub-view', sub:'ia', icon:'🤖', label:'Configurações de IA' },
-    { action:'coord-sub-view', sub:'temporada', icon:'🏆', label:'Temporada de Desafios' },
+    { action:'coord-sub-view', sub:'dashboard', icon:'🏠', label:'Painel', group:'📊 Painel' },
+    { action:'coord-sub-view', sub:'avaliacoes', icon:'📝', label:'Todas as avaliações', group:'📝 Avaliações & Notas' },
+    { action:'coord-sub-view', sub:'liberacoes', icon:'🔓', label:'Liberações', badge: liberacoesVisiveis().filter(r=>!r.released).length || 0, group:'📝 Avaliações & Notas' },
+    { action:'coord-sub-view', sub:'notas', icon:'🧮', label:'Notas finais', group:'📝 Avaliações & Notas' },
+    { action:'coord-sub-view', sub:'importarnotas', icon:'📥', label:'Importar Notas (CSV)', group:'📝 Avaliações & Notas' },
+    { action:'coord-sub-view', sub:'periodos', icon:'📅', label:'Períodos', group:'📝 Avaliações & Notas' },
+    { action:'coord-sub-view', sub:'turmas', icon:'👥', label:'Turmas', group:'👥 Turmas & Frequência' },
+    { action:'coord-sub-view', sub:'chamada', icon:'🪪', label:'Chamada', group:'👥 Turmas & Frequência' },
+    { action:'coord-sub-view', sub:'freqpainel', icon:'📊', label:'Painel de Frequência', group:'👥 Turmas & Frequência' },
+    { action:'coord-sub-view', sub:'professores', icon:'🧑‍🏫', label:'Professores', group:'🧑‍🏫 Professores' },
+    { action:'coord-sub-view', sub:'frequencia', icon:'📈', label:'Frequência dos Professores', group:'🧑‍🏫 Professores' },
+    { action:'coord-sub-view', sub:'pesosprof', icon:'⚖️', label:'Pesos dos professores', group:'🧑‍🏫 Professores' },
+    { action:'coord-sub-view', sub:'monitoria', icon:'🎯', label:'Monitoria de Desempenho', badge: monitoriaIntervencaoNaoVistosCount(), group:'💛 Acompanhamento do Aluno' },
+    { action:'coord-sub-view', sub:'buscaativa', icon:'🚌', label:'Busca Ativa e Transporte', badge: buscaAtivaAcionamentosNaoVistosCount(), group:'💛 Acompanhamento do Aluno' },
+    { action:'coord-sub-view', sub:'socio', icon:'💛', label:'Avaliação Socioemocional', group:'💛 Acompanhamento do Aluno' },
+    { action:'coord-sub-view', sub:'portfolio', icon:'🗂️', label:'Portfólio do Aluno', group:'💛 Acompanhamento do Aluno' },
+    { action:'coord-sub-view', sub:'campanha', icon:'📢', label:'Jovens Protagonistas', badge: campanhaPendentesCount(), group:'🏅 Protagonismo' },
+    { action:'coord-sub-view', sub:'conquistas', icon:'🏅', label:'Hall de Conquistas', group:'🏅 Protagonismo' },
+    { action:'coord-sub-view', sub:'temporada', icon:'🏆', label:'Temporada de Desafios', group:'🏅 Protagonismo' },
+    { action:'coord-sub-view', sub:'mural', icon:'📌', label:'Mural de Avisos', group:'📢 Comunicação' },
+    { action:'coord-sub-view', sub:'diario', icon:'📷', label:'Diário de Bordo', group:'📢 Comunicação' },
+    { action:'coord-sub-view', sub:'enquete', icon:'📣', label:'Enquete Relâmpago', group:'📢 Comunicação' },
+    { action:'coord-sub-view', sub:'bloco', icon:'🖨️', label:'Bloco de Provas', group:'🖨️ Provas em Papel' },
+    { action:'coord-sub-view', sub:'avulso', icon:'🗒️', label:'Gabarito Avulso', group:'🖨️ Provas em Papel' },
+    { action:'coord-sub-view', sub:'livros', icon:'📘', label:'Livros Didáticos', group:'🎮 Recursos de Aula' },
+    { action:'coord-sub-view', sub:'quiz', icon:'🎮', label:'Quiz por Equipes', group:'🎮 Recursos de Aula' },
+    { action:'coord-sub-view', sub:'roleta', icon:'🎡', label:'Roleta de Sorteio', group:'🎮 Recursos de Aula' },
+    { action:'coord-sub-view', sub:'duelo', icon:'⚔️', label:'Modo Duelo', group:'🎮 Recursos de Aula' },
+    { action:'coord-sub-view', sub:'slides', icon:'🖥️', label:'Apresentação de Slides', group:'🎮 Recursos de Aula' },
+    { action:'coord-sub-view', sub:'sessao', icon:'🔐', label:'Sessão e prova', group:'⚙️ Configurações' },
+    { action:'coord-sub-view', sub:'freqconfig', icon:'⏰', label:'Config. de Frequência', group:'⚙️ Configurações' },
+    { action:'coord-sub-view', sub:'ia', icon:'🤖', label:'Configurações de IA', group:'⚙️ Configurações' },
+    { action:'coord-sub-view', sub:'lixeira', icon:'🗑️', label:'Lixeira', group:'⚙️ Configurações' },
   ];
   let content;
   if(c.subview==='dashboard') content = renderCoordDashboard();
@@ -10619,6 +10632,7 @@ function renderCoordenador(){
   else if(c.subview==='freqpainel') content = renderFreqPainel(state.professor.freqPainel, state.professor.turmas);
   else if(c.subview==='freqconfig') content = renderCoordFreqConfig();
   else if(c.subview==='liberacoes') content = renderLiberacoes();
+  else if(c.subview==='sessao') content = renderCoordSessao();
   else if(c.subview==='notas') content = renderCoordNotas();
   else if(c.subview==='socio') content = renderCoordSocio();
   else if(c.subview==='monitoria') content = renderCoordMonitoria();
@@ -10646,6 +10660,35 @@ function renderCoordenador(){
   return `<div class="app-topbar">${topBar}</div><div class="app-shell">${renderSidebar(sidebarItems, c.subview, 'coordenador')}<div class="app-main">${content}</div></div>`;
 }
 
+function renderCoordSessao(){
+  const cfg = SESSAO_CFG;
+  const opcMin = [[20,'20 minutos'],[30,'30 minutos'],[60,'1 hora'],[120,'2 horas'],[240,'4 horas'],[480,'8 horas'],[720,'12 horas'],[1440,'24 horas']];
+  const opcTol = [[0,'Nenhuma — bloqueia na hora (como era antes)'],[10,'10 segundos'],[15,'15 segundos'],[30,'30 segundos'],[60,'1 minuto']];
+  const sel = (id, opcoes, atual) => `<select id="${id}" data-action="sessao-cfg" data-campo="${id.replace('sessao-','')}" style="max-width:340px;">${opcoes.map(([v,t]) => `<option value="${v}" ${Number(atual)===v?'selected':''}>${t}</option>`).join('')}</select>`;
+  return `
+    <div class="card" data-sessao-config="1">
+      <h2>🔐 Sessão e prova</h2>
+      <h3 style="margin-top:14px;">Manter conectado</h3>
+      <p class="muted">Se o aluno ou o professor sair do aplicativo (trocar de app, fechar o navegador, o celular recarregar a página), ele volta já conectado enquanto não passar este tempo <strong>sem usar</strong> o app. Ao tocar em "Sair", a sessão acaba na hora.</p>
+      <label>Professores</label>
+      ${sel('sessao-profMin', opcMin, cfg.profMin)}
+      <p class="muted" style="font-size:.82rem;">Também é o tempo de inatividade para o professor ser desconectado com o app aberto. Em computadores compartilhados, prefira um tempo curto.</p>
+      <label>Alunos</label>
+      ${sel('sessao-alunoMin', opcMin, cfg.alunoMin)}
+      <h3 style="margin-top:22px;">Tolerância durante a prova</h3>
+      <p class="muted">Durante a prova o app pede ao celular para <strong>não apagar a tela</strong>. Se mesmo assim a tela apagar ou o aluno sair da prova por um instante (uma notificação, por exemplo) e voltar dentro deste tempo, a prova <strong>não é bloqueada</strong>: ele só toca em "Voltar para a prova". Cada saída fica registrada para o professor. Depois de ${MAX_SAIDAS_TOLERADAS} saídas, ou se demorar mais que a tolerância para voltar, a prova é bloqueada como antes.</p>
+      <label>Tolerância</label>
+      ${sel('sessao-toleranciaSeg', opcTol, cfg.toleranciaSeg)}
+      <p class="muted" style="font-size:.82rem; margin-top:12px;">As mudanças valem a partir da próxima vez que cada pessoa abrir o app ou iniciar uma prova.</p>
+    </div>`;
+}
+async function salvarSessaoCampo(campo, valor){
+  const cfg = { ...(await carregarSessaoConfig()) };
+  cfg[campo] = Number(valor);
+  try{ await window.storage.set('sessao-config', JSON.stringify(cfg), true); SESSAO_CFG = { ...SESSAO_PADRAO, ...cfg }; }
+  catch(e){ alert('Não foi possível salvar agora. Tente de novo.'); }
+  render();
+}
 function renderCoordLogin(){
   const c = state.coordenador;
   return `
@@ -10922,7 +10965,8 @@ function renderCoordProfessores(){
             <strong>${pr.displayName ? esc(pr.displayName) : esc(pr.email)}</strong><br>
             <span class="muted">${esc(pr.email)}${pr.disciplina?' · '+esc(pr.disciplina):''} · ${pr.activatedAt ? 'ativo' : 'pendente (aguardando primeiro acesso)'}${pr.coordNote?' · ⚠ recado pendente':''}</span>
           </div>
-          <div class="row" style="flex:0 0 auto; gap:6px;">
+          <div class="row" style="flex:0 0 auto; gap:6px; flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" data-action="coord-entrar-painel-prof" data-id="${pr.id}" title="Abre o painel deste professor, como se fosse ele, sem precisar da senha">👁 Entrar no painel</button>
             <button class="btn btn-ghost btn-sm" data-action="${editandoDisciplinas?'coord-fechar-disciplinas-prof':'coord-abrir-disciplinas-prof'}" data-id="${pr.id}">${editandoDisciplinas?'Fechar':'📚 Disciplinas'}</button>
             ${pr.passwordHash ? `<button class="btn btn-ghost btn-sm" data-action="coord-reset-professor-password" data-id="${pr.id}">Redefinir senha</button>` : ''}
             <button class="btn btn-danger btn-sm" data-action="coord-remove-professor" data-id="${pr.id}">Remover</button>
@@ -10936,6 +10980,7 @@ function renderCoordProfessores(){
     <div class="card">
       <h2>Professores cadastrados</h2>
       <p class="muted">Cadastre aqui o e-mail de cada professor. Na primeira vez que ele entrar com esse e-mail, escolhe o nome e cria a própria senha.</p>
+      <p class="muted" style="font-size:.85rem;"><strong>👁 Entrar no painel</strong> abre o painel do professor exatamente como ele vê, sem pedir a senha dele. Tudo o que você fizer lá fica gravado como se fosse do professor. Essa entrada não conta na Frequência dos Professores.</p>
       <label>E-mail do professor</label>
       <input type="text" id="new-prof-email-input" placeholder="professor@exemplo.com">
       <label>Disciplina (opcional)</label>
@@ -14972,6 +15017,14 @@ function renderExamLocked(){
 }
 
 function renderExamReentry(){
+  const al = state.aluno;
+  if(al.reentradaTolerada) return `
+    <div class="card" data-reentrada-tolerada="1">
+      <h2 class="center">📱 Você saiu da prova</h2>
+      <p class="center">Tudo bem: você voltou a tempo e suas respostas estão guardadas. Toque no botão abaixo para voltar à tela cheia e continuar de onde parou.</p>
+      <p class="center muted" style="font-size:.85rem;">A saída fica registrada para o professor. Se sair muitas vezes ou demorar para voltar, a prova é bloqueada.</p>
+      <button class="btn btn-primary btn-block" style="margin-top:14px;" data-action="reentrar-prova-fullscreen">⛶ Voltar para a prova</button>
+    </div>`;
   return `
     <div class="card">
       <h2 class="center">✅ Prova liberada!</h2>
@@ -15977,10 +16030,12 @@ async function loadUnlockRequests(){
   const p = state.professor;
   const wasLoading = p.unlockRequestsLoading;
   const prev = JSON.stringify(p.unlockRequests);
+  const prevRede = JSON.stringify(REDE_CFG_CACHE);
   try{ const r = await window.storage.get('unlock-requests', true); p.unlockRequests = JSON.parse(r.value); }
   catch(e){ p.unlockRequests = []; }
+  await getRedeEscolaConfig();
   p.unlockRequestsLoading = false;
-  if(wasLoading || JSON.stringify(p.unlockRequests) !== prev) render();
+  if(wasLoading || JSON.stringify(p.unlockRequests) !== prev || JSON.stringify(REDE_CFG_CACHE) !== prevRede) render();
 }
 // Quem enxerga cada bloqueio: a coordenação vê todos; o professor só os das avaliações dele.
 function liberacoesVisiveis(){
@@ -16300,7 +16355,110 @@ function loginLockMessage(minutos){
 }
 
 /* -------- Logout automático por inatividade (professor/coordenador) -------- */
-const IDLE_LOGOUT_MS = 20 * 60 * 1000; // 20 minutos sem interação
+// ---- Manter conectado + tolerância da prova (configurado pela coordenação em "Sessão e prova") ----
+// O app guarda no aparelho quem estava logado. Se o navegador fechar ou recarregar a página (o celular
+// faz isso ao trocar de aplicativo), a pessoa volta logada enquanto não passar o tempo definido sem uso.
+const SESSAO_PADRAO = { profMin: 60, alunoMin: 240, toleranciaSeg: 15 };
+let SESSAO_CFG = { ...SESSAO_PADRAO };
+async function carregarSessaoConfig(){
+  try{ const r = await window.storage.get('sessao-config', true); const d = JSON.parse(r.value); if(d && typeof d==='object') SESSAO_CFG = { ...SESSAO_PADRAO, ...d }; }catch(e){}
+  return SESSAO_CFG;
+}
+function sessaoLimiteMs(role){ return (role==='aluno' ? SESSAO_CFG.alunoMin : SESSAO_CFG.profMin) * 60 * 1000; }
+function lerSessaoSalva(){ try{ const d = JSON.parse(localStorage.getItem('sala-sessao')||'null'); return d && d.role ? d : null; }catch(e){ return null; } }
+function salvarSessaoLocal(dados){ try{ localStorage.setItem('sala-sessao', JSON.stringify({ ...dados, lastActive: Date.now() })); }catch(e){} }
+function limparSessaoLocal(role){ try{ if(role){ const s = lerSessaoSalva(); if(s && s.role!==role) return; } localStorage.removeItem('sala-sessao'); }catch(e){} }
+function tocarSessaoLocal(){
+  const s = lerSessaoSalva(); if(!s) return;
+  const ativo = (s.role==='professor' && state.view==='professor' && state.professor.session && !state.professor.session.viaCoord)
+             || (s.role==='aluno' && state.view==='aluno' && state.aluno.studentLoggedIn);
+  if(ativo){ s.lastActive = Date.now(); try{ localStorage.setItem('sala-sessao', JSON.stringify(s)); }catch(e){} }
+}
+function sessaoExpirada(s){ return !s || (Date.now() - (s.lastActive||0)) > sessaoLimiteMs(s.role); }
+// Ao abrir o app: se havia alguém logado neste aparelho e o tempo não passou, entra de novo sozinho.
+async function restaurarSessao(){
+  const s = lerSessaoSalva();
+  if(!s || state.view!=='landing' || window.pendingGradeDeepLink) return;
+  await carregarSessaoConfig();
+  if(sessaoExpirada(s)){ limparSessaoLocal(); return; }
+  try{
+    if(s.role==='professor'){
+      const rec = (await fetchProfessoresList()).find(x => x.id===s.id);
+      if(!rec || !rec.passwordHash){ limparSessaoLocal(); return; }
+      const p = state.professor;
+      p.session = { id: rec.id, email: rec.email, displayName: rec.displayName, disciplina: rec.disciplina, coordNote: rec.coordNote||null, coordNoteDismissed:false, avatarEmoji: rec.avatarEmoji||null, avatarColor: rec.avatarColor||null, photoUrl: rec.photoUrl||null };
+      state.view = 'professor';
+      salvarSessaoLocal({ role:'professor', id: rec.id });
+      render(); resetIdleLogoutTimer();
+      registerProfessorLogin(rec.id);
+      handlePostLoginRedirect();
+    } else if(s.role==='aluno'){
+      if(state.professor.turmasLoading || !(state.professor.turmas||[]).length) await loadTurmas();
+      const t = (state.professor.turmas||[]).find(x => x.id===s.turmaId);
+      const st = t && (t.students||[]).find(x => x.id===s.id);
+      if(!st || !st.passwordHash || !st.avatarEmoji){ limparSessaoLocal(); return; }
+      if(state.view!=='landing') return;   // a pessoa já começou a fazer outra coisa
+      const al = state.aluno;
+      al.matriculaTurmaId = t.id; al.matriculaStudentId = st.id; al.matriculaName = st.name;
+      al.turma = t; al.name = st.name; al.studentLoggedIn = true;
+      state.view = 'aluno';
+      salvarSessaoLocal({ role:'aluno', id: st.id, turmaId: t.id });
+      await loadStudentDashboard();
+    }
+  }catch(e){}
+}
+// Ao voltar para o app sem recarregar (a aba ficou parada em segundo plano): se o tempo passou, sai.
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){ tocarSessaoLocal(); return; }
+  const s = lerSessaoSalva();
+  if(!s || !sessaoExpirada(s)) return;
+  if(s.role==='professor' && state.view==='professor' && state.professor.session && !state.professor.session.viaCoord){
+    logoutProfessor(); alert('Sua sessão foi encerrada porque o aplicativo ficou muito tempo sem uso.');
+  } else if(s.role==='aluno' && state.aluno.studentLoggedIn && state.aluno.stage!=='responder'){
+    sairAluno(); alert('Sua sessão foi encerrada porque o aplicativo ficou muito tempo sem uso.');
+  }
+});
+function idleLogoutMs(){
+  if(state.view==='professor' && state.professor.session && !state.professor.session.viaCoord) return sessaoLimiteMs('professor');
+  return IDLE_LOGOUT_MS;
+}
+function sairAluno(){
+  const al = state.aluno;
+  limparSessaoLocal('aluno');
+  exitFullscreenSafe();
+  stopAlunoEnquetePoll();
+  al.turma=null;
+  al.name='';
+  al.studentLoggedIn=false;
+  al.loginTurmaId='';
+  al.matriculaStage='input';
+  al.matriculaTurmaId=null;
+  al.matriculaStudentId=null;
+  al.matriculaName='';
+  al.enqueteAtiva=null;
+  al.slidesAtivo=null;
+  al.slidesCurrentImg=null;
+  al.materiaisSlides=[];
+  al.materialDeck=null;
+  al.isNewStudentSetup=false;
+  al.tarefasTurma=[];
+  al.tarefaEntregasProprias={};
+  al.enviandoTarefaId=null;
+  al.tarefaSubmitFile=null;
+  al.tarefaSubmitFileName='';
+  al.tarefaSubmitLink='';
+  al.tarefaSubmitComentario='';
+  al.tarefaSubmitError='';
+  al.duvidaFormOpen=false;
+  al.newDuvidaTexto='';
+  al.duvidaError='';
+  al.novidades=null;
+  al.bibliotecaEmprestimos=[];
+  al.stage='entrada';
+  state.view='landing';
+  render();
+}
+const IDLE_LOGOUT_MS = 20 * 60 * 1000; // 20 minutos sem interação (coordenação)
 const IDLE_WARN_BEFORE_MS = 60 * 1000; // avisa 1 minuto antes de encerrar
 let idleLogoutTimer = null;
 let idleWarnTimer = null;
@@ -16331,7 +16489,9 @@ function showIdleWarning(){
 function performIdleLogout(){
   hideIdleWarning();
   if(state.view==='professor' && state.professor.session){
+    const viaCoord = !!state.professor.session.viaCoord;
     logoutProfessor();
+    if(viaCoord){ state.coordenador.session = false; state.coordenador.error = ''; render(); }   // encerra também a sessão da coordenação
     alert('Sua sessão foi encerrada automaticamente por inatividade (proteção do sistema em computadores/tablets compartilhados).');
   } else if(state.view==='coordenador' && state.coordenador.session){
     state.coordenador.session = false;
@@ -16351,13 +16511,15 @@ function resetIdleLogoutTimer(){
     return;
   }
   hideIdleWarning();
-  idleWarnTimer = setTimeout(showIdleWarning, Math.max(0, IDLE_LOGOUT_MS - IDLE_WARN_BEFORE_MS));
-  idleLogoutTimer = setTimeout(performIdleLogout, IDLE_LOGOUT_MS);
+  const limite = idleLogoutMs();
+  idleWarnTimer = setTimeout(showIdleWarning, Math.max(0, limite - IDLE_WARN_BEFORE_MS));
+  idleLogoutTimer = setTimeout(performIdleLogout, limite);
 }
 function markUserActivity(){
   const now = Date.now();
   if(now - lastIdleReset < 5000) return; // evita reagendar o timer a cada evento
   lastIdleReset = now;
+  tocarSessaoLocal();
   resetIdleLogoutTimer();
 }
 ['click','keydown','touchstart'].forEach(evt => {
@@ -16482,6 +16644,7 @@ async function submitLoginPassword(){
   p.session = { id: rec.id, email: rec.email, displayName: rec.displayName, disciplina: rec.disciplina, coordNote: rec.coordNote||null, coordNoteDismissed:false, avatarEmoji: rec.avatarEmoji||null, avatarColor: rec.avatarColor||null, photoUrl: rec.photoUrl||null };
   p.loginError = '';
   render();
+  salvarSessaoLocal({ role:'professor', id: rec.id });
   resetIdleLogoutTimer();
   registerProfessorLogin(rec.id);
   handlePostLoginRedirect();
@@ -16509,13 +16672,45 @@ async function submitLoginSetup(){
   p.loginError = '';
   p.setupName = ''; p.setupPassword = ''; p.setupPassword2 = '';
   render();
+  salvarSessaoLocal({ role:'professor', id: rec.id });
   resetIdleLogoutTimer();
   registerProfessorLogin(rec.id);
   handlePostLoginRedirect();
   startTour('professor');
 }
+// A coordenação entra no painel de um professor sem a senha dele. Não registra acesso do professor
+// (para não distorcer a Frequência dos Professores) e não permite mexer no perfil pessoal dele.
+async function coordEntrarPainelProfessor(id){
+  const c = state.coordenador;
+  if(!c.session) return;
+  const list = await fetchProfessoresList();
+  const rec = list.find(x => x.id===id);
+  if(!rec){ alert('Professor não encontrado. Atualize a página e tente de novo.'); return; }
+  const nome = rec.displayName || rec.email;
+  if(!confirm(`Entrar no painel de ${nome}?\n\nVocê verá tudo como o professor vê, e o que fizer lá fica gravado como se fosse dele. Para sair, use "Voltar à coordenação".`)) return;
+  logoutProfessor();   // limpa dados de outro professor que estejam na memória
+  const p = state.professor;
+  p.session = { id: rec.id, email: rec.email, displayName: nome, disciplina: rec.disciplina, coordNote: rec.coordNote||null, coordNoteDismissed:false,
+    avatarEmoji: rec.avatarEmoji||null, avatarColor: rec.avatarColor||null, photoUrl: rec.photoUrl||null, viaCoord: true };
+  p.subview = 'inicio';
+  state.view = 'professor';
+  window.scrollTo(0,0);
+  render();
+  resetIdleLogoutTimer();
+  handlePostLoginRedirect();
+}
+function coordVoltarCoordenacao(){
+  logoutProfessor();
+  if(state.coordenador.session){
+    state.view = 'coordenador';
+    state.coordenador.subview = 'professores';
+  }
+  window.scrollTo(0,0);
+  render();
+}
 function logoutProfessor(){
   const p = state.professor;
+  if(p.session && !p.session.viaCoord) limparSessaoLocal('professor');
   p.session = null;
   p.loginStage = 'email';
   p.loginEmail = '';
@@ -16567,6 +16762,78 @@ function deviceLabel(){
   const so = /Android/i.test(ua) ? 'Android' : /iPhone|iPad|iPod/i.test(ua) ? 'iPhone/iPad' : /Windows/i.test(ua) ? 'Windows' : /Mac OS X|Macintosh/i.test(ua) ? 'Mac' : /CrOS/i.test(ua) ? 'Chromebook' : /Linux/i.test(ua) ? 'Linux' : 'Aparelho';
   const nav = /Edg\//i.test(ua) ? 'Edge' : /OPR\/|Opera/i.test(ua) ? 'Opera' : /SamsungBrowser/i.test(ua) ? 'Samsung Internet' : /Firefox|FxiOS/i.test(ua) ? 'Firefox' : /Chrome|CriOS/i.test(ua) ? 'Chrome' : /Safari/i.test(ua) ? 'Safari' : 'navegador';
   return so+' · '+nav;
+}
+
+// ---- Aviso "fora da rede da escola" (opcional, DESLIGADO por padrão) ----
+// Só informa o professor/coordenação; nunca bloqueia a prova. Usa o IP público da internet do aparelho
+// (o mesmo para todos que estão no Wi-Fi da escola). Não usa GPS nem localização do aluno.
+let REDE_CFG_CACHE = null, REDE_CFG_AT = 0, MEU_IP = null, MEU_IP_AT = 0;
+async function getRedeEscolaConfig(force){
+  if(!force && REDE_CFG_CACHE && Date.now()-REDE_CFG_AT < 30000) return REDE_CFG_CACHE;
+  try{ const r = await window.storage.get('rede-escola', true); const d = JSON.parse(r.value); REDE_CFG_CACHE = (d && typeof d==='object') ? d : {}; }
+  catch(e){ REDE_CFG_CACHE = REDE_CFG_CACHE || {}; }
+  REDE_CFG_AT = Date.now();
+  return REDE_CFG_CACHE;
+}
+async function descobrirMeuIP(){
+  if(MEU_IP && Date.now()-MEU_IP_AT < 5*60000) return MEU_IP;
+  try{
+    const ctrl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+    const t = ctrl ? setTimeout(()=>ctrl.abort(), 4000) : null;
+    const r = await fetch('https://api.ipify.org?format=json', { cache:'no-store', signal: ctrl ? ctrl.signal : undefined });
+    if(t) clearTimeout(t);
+    const j = await r.json();
+    if(j && j.ip){ MEU_IP = String(j.ip).trim(); MEU_IP_AT = Date.now(); }
+  }catch(e){}
+  return MEU_IP;
+}
+// Devolve {ip, checado} — só consulta o IP se a coordenação ligou o aviso.
+async function redeInfoSeAtiva(){
+  const cfg = await getRedeEscolaConfig();
+  if(!cfg.ativo) return { ip:null, checado:false };
+  return { ip: await descobrirMeuIP(), checado:true };
+}
+function redeSelo(ip, checado){
+  const cfg = REDE_CFG_CACHE || {};
+  if(!cfg.ativo || !checado) return '';
+  if(!ip) return ' <span class="pill" style="background:#777; color:#fff;" title="Não foi possível verificar a rede deste aparelho.">? rede não verificada</span>';
+  if((cfg.ips||[]).includes(ip)) return ' <span class="pill" style="background:#2e7d32; color:#fff;">✓ rede da escola</span>';
+  return ` <span class="pill" style="background:#b3261e; color:#fff;" data-fora-rede="1" title="IP ${esc(ip)}: não é um IP cadastrado da escola. Pode ser internet móvel (dados do celular) ou outra rede. É só um aviso.">⚠ fora da rede da escola</span>`;
+}
+async function salvarRedeEscola(mudar){
+  const cfg = Object.assign({}, await getRedeEscolaConfig(true));
+  cfg.ips = Array.isArray(cfg.ips) ? [...cfg.ips] : [];
+  mudar(cfg);
+  cfg.ips = [...new Set(cfg.ips.map(x=>String(x).trim()).filter(Boolean))];
+  try{ await window.storage.set('rede-escola', JSON.stringify(cfg), true); REDE_CFG_CACHE = cfg; REDE_CFG_AT = Date.now(); }
+  catch(e){ alert('Não foi possível salvar agora. Tente de novo.'); }
+  render();
+}
+async function redeUsarIpDestaRede(){
+  MEU_IP = null;
+  const ip = await descobrirMeuIP();
+  if(!ip){ alert('Não consegui descobrir o IP desta rede agora. Confira a internet e tente de novo, ou digite o IP manualmente.'); return; }
+  if(!confirm(`O IP público desta rede é ${ip}.\n\nVocê está conectado ao Wi-Fi da escola agora? Só confirme se sim.`)) return;
+  await salvarRedeEscola(cfg => { cfg.ips.push(ip); });
+}
+function renderRedeEscolaConfig(){
+  const cfg = REDE_CFG_CACHE || {};
+  const ips = cfg.ips || [];
+  return `
+    <div class="card" data-rede-config="1">
+      <h3 style="margin-top:0;">📶 Aviso de rede da escola <span class="muted" style="font-size:.8rem; font-weight:400;">(opcional)</span></h3>
+      <label style="display:flex; gap:8px; align-items:center; font-weight:400; text-transform:none;">
+        <input type="checkbox" data-action="rede-toggle" ${cfg.ativo?'checked':''} style="width:auto;"> Mostrar aqui se o aparelho do aluno está fora da rede (Wi-Fi) da escola
+      </label>
+      <p class="muted" style="font-size:.82rem;">É só um aviso para o professor: <strong>nunca bloqueia a prova</strong> e não usa GPS. O app compara o endereço de internet (IP) do aparelho com os IPs da escola cadastrados abaixo. Aluno usando os dados móveis do celular dentro da escola também aparece como "fora da rede", e o IP da escola pode mudar de vez em quando — se começar a aparecer "fora" para todos, cadastre o IP de novo.</p>
+      <p style="margin:8px 0 4px;"><strong>IPs da escola:</strong> ${ips.length ? ips.map(ip => `<span class="pill" style="margin:2px;">${esc(ip)} <a href="#" data-action="rede-remover-ip" data-ip="${esc(ip)}" title="Remover" style="text-decoration:none;">✕</a></span>`).join(' ') : '<span class="muted">nenhum cadastrado</span>'}</p>
+      <div class="row" style="gap:6px; flex-wrap:wrap; align-items:center;">
+        <button class="btn btn-ghost btn-sm" data-action="rede-usar-ip">📍 Usar o IP desta rede (estou no Wi-Fi da escola)</button>
+        <input id="rede-ip-input" placeholder="ou digite um IP" style="max-width:180px;">
+        <button class="btn btn-ghost btn-sm" data-action="rede-add-ip">Adicionar</button>
+      </div>
+      ${cfg.ativo && !ips.length ? '<p class="err" style="margin-top:8px;">O aviso está ligado, mas nenhum IP da escola foi cadastrado: todos aparecerão como "fora da rede".</p>' : ''}
+    </div>`;
 }
 
 function shuffleArray(arr){
@@ -16704,14 +16971,62 @@ document.addEventListener('visibilitychange', () => {
   if(document.hidden){
     if(isExamActive()){
       state.aluno.tabSwitchCount = (state.aluno.tabSwitchCount||0) + 1;
-      armAwayTimer();
+      if(toleranciaProvaMs()>0) registrarSaidaProva(); else armAwayTimer();
     }
   } else {
     disarmAwayTimer();
+    registrarVoltaProva();
+    manterTelaAcesa();
   }
 });
-window.addEventListener('blur', () => { if(isExamActive()) armAwayTimer(); });
-window.addEventListener('focus', () => { disarmAwayTimer(); });
+window.addEventListener('blur', () => { if(isExamActive()){ if(toleranciaProvaMs()>0) registrarSaidaProva(); else armAwayTimer(); } });
+window.addEventListener('focus', () => { disarmAwayTimer(); registrarVoltaProva(); });
+
+// ---- Tela acesa e tolerância durante a prova ----
+// 1) Pede ao celular para não apagar a tela enquanto a prova está aberta (Wake Lock; funciona no
+//    Chrome/Android e no iPhone com iOS 16.4+; em aparelhos sem suporte, simplesmente não faz nada).
+// 2) Se o aluno sair da prova (tela apagou, notificação, trocou de app) e VOLTAR dentro da tolerância
+//    definida pela coordenação, a prova não é bloqueada: ele só toca em "Voltar para a prova".
+//    A saída fica registrada para o professor. Passou do tempo, ou saiu vezes demais = bloqueio, como antes.
+const MAX_SAIDAS_TOLERADAS = 5;
+let telaAcesaLock = null, saidaProvaEm = null, saidaProvaTimer = null;
+async function manterTelaAcesa(){
+  try{
+    if(!isExamActive() || telaAcesaLock || document.hidden || !navigator.wakeLock) return;
+    telaAcesaLock = await navigator.wakeLock.request('screen');
+    telaAcesaLock.addEventListener('release', () => { telaAcesaLock = null; });
+  }catch(e){ telaAcesaLock = null; }
+}
+function liberarTelaAcesa(){ try{ if(telaAcesaLock){ telaAcesaLock.release(); telaAcesaLock = null; } }catch(e){} }
+function atualizarTelaAcesa(){ if(isExamActive()) manterTelaAcesa(); else liberarTelaAcesa(); }
+function toleranciaProvaMs(){ return Math.max(0, Number(SESSAO_CFG.toleranciaSeg)||0) * 1000; }
+function telaCheiaDisponivel(){ return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled); }
+function provaForaDeVista(){ return document.hidden || !document.hasFocus() || (telaCheiaDisponivel() && !isFullscreenActive()); }
+function registrarSaidaProva(){
+  const al = state.aluno;
+  if(!isExamActive() || al.examLocked) return;
+  if((al.saidasToleradas||0) >= MAX_SAIDAS_TOLERADAS){ lockExamForSecurity(); return; }
+  if(saidaProvaEm) return;
+  saidaProvaEm = Date.now();
+  clearTimeout(saidaProvaTimer);
+  saidaProvaTimer = setTimeout(() => {
+    saidaProvaTimer = null;
+    if(saidaProvaEm && isExamActive() && !state.aluno.examLocked && provaForaDeVista()){ saidaProvaEm = null; lockExamForSecurity(); }
+  }, toleranciaProvaMs());
+}
+function registrarVoltaProva(){
+  const al = state.aluno;
+  if(!saidaProvaEm) return;
+  if(document.hidden || !document.hasFocus()) return;   // ainda não voltou de verdade
+  const fora = Date.now() - saidaProvaEm;
+  saidaProvaEm = null;
+  clearTimeout(saidaProvaTimer); saidaProvaTimer = null;
+  if(!isExamActive() || al.examLocked) return;
+  if(fora > toleranciaProvaMs()){ lockExamForSecurity(); return; }
+  al.saidasToleradas = (al.saidasToleradas||0) + 1;
+  if(telaCheiaDisponivel() && !isFullscreenActive() && al.assessment && al.assessment.securityEnabled!==false){ al.pendingFullscreenReentry = true; al.reentradaTolerada = true; }
+  render();
+}
 function requestFullscreenSafe(){
   const el = document.documentElement;
   if(el.requestFullscreen){ el.requestFullscreen().catch(()=>{}); }
@@ -16749,6 +17064,7 @@ async function registerUnlockRequest(){
     entry = { id: cryptoId(), code: a.code, assessmentTitle: a.title, studentName: al.name, professorId: a.professorId||null, lockedAt: Date.now(), released:false, releasedAt:null, count:1 };
     list.push(entry);
   }
+  if(al.meuIpChecado){ entry.ip = al.meuIp||null; entry.ipChecado = true; }
   al.unlockRequestId = entry.id;
   try{ await window.storage.set('unlock-requests', JSON.stringify(list), true); }catch(e){}
 }
@@ -16790,11 +17106,13 @@ async function markRequestReleased(id, finalizada){
   }
 }
 document.addEventListener('fullscreenchange', () => {
-  if(!isFullscreenActive() && isExamActive()){ lockExamForSecurity(); }
+  if(!isFullscreenActive() && isExamActive() && !state.aluno.pendingFullscreenReentry){ if(toleranciaProvaMs()>0) registrarSaidaProva(); else lockExamForSecurity(); }
+  else if(isFullscreenActive()) registrarVoltaProva();
   onFullscreenChangeForSlides();
 });
 document.addEventListener('webkitfullscreenchange', () => {
-  if(!isFullscreenActive() && isExamActive()){ lockExamForSecurity(); }
+  if(!isFullscreenActive() && isExamActive() && !state.aluno.pendingFullscreenReentry){ if(toleranciaProvaMs()>0) registrarSaidaProva(); else lockExamForSecurity(); }
+  else if(isFullscreenActive()) registrarVoltaProva();
   onFullscreenChangeForSlides();
 });
 function onFullscreenChangeForSlides(){
@@ -19199,6 +19517,9 @@ function renderAlunoSocioBlock(){
   if(foraPrazo){
     return `<div class="card"><h2>💛 Avaliação Socioemocional</h2>${unidadeSel}<p style="margin-top:12px;">⏰ ${esc(foraPrazo)}</p></div>`;
   }
+  if(!socioTurmaIndicada(so.config, so.unidade, al.turma && al.turma.id)){
+    return `<div class="card"><h2>💛 Avaliação Socioemocional</h2>${unidadeSel}<p style="margin-top:12px;" data-socio-nao-indicada="1">📌 Neste período, a sua turma não foi indicada pela coordenação para responder a Avaliação Socioemocional. Você não precisa fazer nada. Se achar que é um engano, procure a coordenação.</p></div>`;
+  }
   const serie = so.serie;
   const serieSel = serie ? '' : `
     <label>Qual é a sua série?</label>
@@ -19263,6 +19584,7 @@ async function enviarSocioAluno(){
   const qs = SOCIO_SERIES[so.serie] || [];
   const foraPrazo = socioForaDoPrazo(so.config, so.unidade);
   if(foraPrazo){ so.erro = foraPrazo; render(); return; }
+  if(!socioTurmaIndicada(so.config, so.unidade, al.turma && al.turma.id)){ so.erro = 'A sua turma não foi indicada para responder neste período.'; render(); return; }
   if(qs.some(q=>!so.respostas[q.id] || !(so.menos||{})[q.id]) || so.auto===null){ so.erro = 'Responda todas as situações (a atitude que mais e a que menos se parece com você) e todas as frases da autoavaliação.'; render(); return; }
   if(!confirm('Enviar suas respostas? Depois de enviar, não é possível alterar.')) return;
   so.erro = ''; so.saving = true; render();
@@ -19943,14 +20265,16 @@ async function registrarTentativaOutroAparelho(a, al, lockKey, lock){
     let list = [];
     try{ const r = await window.storage.get('unlock-requests', true); list = JSON.parse(r.value); }catch(e){}
     let e = list.find(x => x.tipo==='trava' && x.code===a.code && x.studentName===al.name && !x.released);
-    if(e){ e.lockedAt = Date.now(); e.count = (e.count||1)+1; e.deviceNovo = deviceLabel(); }
-    else list.push({ id: cryptoId(), tipo:'trava', code:a.code, assessmentTitle:a.title, studentName:al.name, professorId:a.professorId||null,
-      lockKey, lockedAt: Date.now(), released:false, releasedAt:null, count:1, deviceNovo: deviceLabel(), deviceAtual: lock.device||'outro aparelho' });
+    const redeNovo = { ipNovo: al.meuIp||null, ipNovoChecado: !!al.meuIpChecado, ipAtual: lock.ip||null, ipAtualChecado: !!lock.ipChecado };
+    if(e){ e.lockedAt = Date.now(); e.count = (e.count||1)+1; e.deviceNovo = deviceLabel(); Object.assign(e, redeNovo); }
+    else list.push(Object.assign({ id: cryptoId(), tipo:'trava', code:a.code, assessmentTitle:a.title, studentName:al.name, professorId:a.professorId||null,
+      lockKey, lockedAt: Date.now(), released:false, releasedAt:null, count:1, deviceNovo: deviceLabel(), deviceAtual: lock.device||'outro aparelho' }, redeNovo));
     await window.storage.set('unlock-requests', JSON.stringify(list), true);
   }catch(err){}
 }
 async function startExamFlow(){
   const al = state.aluno;
+  await carregarSessaoConfig();   // tolerância da prova atualizada
   const a = al.assessment;
   let existing = null;
   try{
@@ -19988,6 +20312,8 @@ async function startExamFlow(){
     }
   }
   const lockKey = `attempt-lock:${a.code}:${slugifyName(al.name)}`;
+  const rede = await redeInfoSeAtiva();   // só consulta o IP se a coordenação ligou o aviso de rede
+  al.meuIp = rede.ip; al.meuIpChecado = rede.checado;
   let lock = null;
   try{ const lr = await window.storage.get(lockKey, true); lock = JSON.parse(lr.value); }catch(e){}
   const now = Date.now();
@@ -19999,10 +20325,11 @@ async function startExamFlow(){
     render();
     return;
   }
-  await window.storage.set(lockKey, JSON.stringify({startedAt: lockEhMeu && lock.startedAt ? lock.startedAt : now, sessionId: MY_SESSION_ID, deviceId: MY_DEVICE_ID, device: deviceLabel()}), true);
+  await window.storage.set(lockKey, JSON.stringify({startedAt: lockEhMeu && lock.startedAt ? lock.startedAt : now, sessionId: MY_SESSION_ID, deviceId: MY_DEVICE_ID, device: deviceLabel(), ip: al.meuIp||null, ipChecado: !!al.meuIpChecado}), true);
   al.lockKey = lockKey;
   al.answers = {};
   al.tabSwitchCount = 0;
+  al.saidasToleradas = 0; al.reentradaTolerada = false; saidaProvaEm = null;
   al.examLocked = false;
   al.fullscreenExits = 0;
   al.screenshotAttempts = 0;
@@ -20115,6 +20442,7 @@ async function matriculaPasswordSubmit(){
   al.turma = t;
   al.name = s.name;
   al.studentLoggedIn = true;
+  salvarSessaoLocal({ role:'aluno', id: s.id, turmaId: t.id });
   await loadStudentDashboard();
 }
 async function matriculaAvatarSubmit(){
@@ -20130,6 +20458,7 @@ async function matriculaAvatarSubmit(){
   al.turma = t;
   al.name = s.name;
   al.studentLoggedIn = true;
+  salvarSessaoLocal({ role:'aluno', id: s.id, turmaId: t.id });
   const wasNewSetup = al.isNewStudentSetup;
   al.isNewStudentSetup = false;
   await loadStudentDashboard();
@@ -20422,7 +20751,7 @@ async function submitAnswers(forcado){
       total += score;
     }
   }
-  const result = { studentName: al.name, submittedAt: Date.now(), total, details, encerradaPeloProfessor: forcado||undefined, answers: {...al.answers}, tabSwitches: al.tabSwitchCount||0, fullscreenExits: al.fullscreenExits||0, screenshotAttempts: al.screenshotAttempts||0 };
+  const result = { studentName: al.name, submittedAt: Date.now(), total, details, encerradaPeloProfessor: forcado||undefined, answers: {...al.answers}, tabSwitches: al.tabSwitchCount||0, fullscreenExits: al.fullscreenExits||0, screenshotAttempts: al.screenshotAttempts||0, saidasToleradas: al.saidasToleradas||0 };
 
   // Grava a resposta de verdade antes de dizer ao aluno que terminou — se a internet cair bem
   // na hora de enviar, NÃO podemos fingir que deu certo: isso faria a prova sumir sem ficar
@@ -20502,10 +20831,12 @@ document.addEventListener('click', (e) => {
   else if(act==='prof-login-password-submit'){ submitLoginPassword(); }
   else if(act==='prof-login-setup-submit'){ submitLoginSetup(); }
   else if(act==='prof-login-back-to-email'){ const p=state.professor; p.loginStage='email'; p.loginError=''; p.setupName=''; p.setupPassword=''; p.setupPassword2=''; render(); }
-  else if(act==='prof-logout'){ logoutProfessor(); }
+  else if(act==='prof-logout'){ if(state.professor.session && state.professor.session.viaCoord) coordVoltarCoordenacao(); else logoutProfessor(); }
+  else if(act==='coord-entrar-painel-prof'){ coordEntrarPainelProfessor(btn.dataset.id); }
+  else if(act==='coord-voltar-coordenacao'){ coordVoltarCoordenacao(); }
   else if(act==='dismiss-coord-note'){ state.professor.session.coordNoteDismissed = true; render(); }
   else if(act==='dismiss-diario-hoje'){ dismissDiarioHoje(); }
-  else if(act==='open-professor-profile'){ p.avatarDraft = null; p.profileEditorOpen = true; render(); loadMyIaKey(); }
+  else if(act==='open-professor-profile'){ if(p.session && p.session.viaCoord){ alert('No modo coordenação não é possível abrir o perfil pessoal do professor (nome, foto, senha e chave de IA).'); return; } p.avatarDraft = null; p.profileEditorOpen = true; render(); loadMyIaKey(); }
   else if(act==='save-my-ia-key'){ saveMyIaKey(); }
   else if(act==='remove-my-ia-key'){ removeMyIaKey(); }
   else if(act==='close-professor-profile'){ p.profileEditorOpen = false; p.avatarDraft = null; render(); }
@@ -20554,6 +20885,7 @@ document.addEventListener('click', (e) => {
     state.coordenador.mode='list';
     state.ui.sidebarSearch = '';
     stopLiberacoesPoll();
+    if(state.coordenador.subview==='sessao'){ carregarSessaoConfig().then(render); }
     if(state.coordenador.subview==='liberacoes'){
       state.professor.unlockRequestsLoading = true; loadUnlockRequests();
       liberacoesPollInterval = setInterval(loadUnlockRequests, 5000);
@@ -20837,6 +21169,13 @@ document.addEventListener('click', (e) => {
   else if(act==='refresh-liberacoes'){ loadUnlockRequests(); }
   else if(act==='release-student'){ releaseStudent(btn.dataset.id); }
   else if(act==='destravar-aluno'){ destravarAluno(btn.dataset.id); }
+  else if(act==='rede-usar-ip'){ redeUsarIpDestaRede(); }
+  else if(act==='rede-add-ip'){
+    const inp = document.getElementById('rede-ip-input'); const v = inp ? inp.value.trim() : '';
+    if(!/^[0-9a-fA-F:.]{3,45}$/.test(v)){ alert('Digite um IP válido (ex.: 177.10.20.30).'); }
+    else salvarRedeEscola(cfg => { cfg.ips.push(v); });
+  }
+  else if(act==='rede-remover-ip'){ e.preventDefault(); const ip = btn.dataset.ip; if(confirm('Remover o IP '+ip+' da lista da escola?')) salvarRedeEscola(cfg => { cfg.ips = cfg.ips.filter(x=>x!==ip); }); }
   else if(act==='finalizar-prova-bloqueada'){ finalizarProvaBloqueada(btn.dataset.id); }
 
   // avaliações
@@ -21042,7 +21381,7 @@ document.addEventListener('click', (e) => {
   else if(act==='save-pesos'){ savePesos(); }
   else if(act==='save-pin'){ savePin(); }
   else if(act==='unlock-exam'){ unlockExam(); }
-  else if(act==='reentrar-prova-fullscreen'){ al.pendingFullscreenReentry = false; requestFullscreenSafe(); render(); if(isTimedResponder(al.assessment)) startResponderTick(); }
+  else if(act==='reentrar-prova-fullscreen'){ al.pendingFullscreenReentry = false; al.reentradaTolerada = false; manterTelaAcesa(); requestFullscreenSafe(); render(); if(isTimedResponder(al.assessment)) startResponderTick(); }
 
   // aluno
   // aluno
@@ -21064,7 +21403,7 @@ document.addEventListener('click', (e) => {
   }
   else if(act==='goto-code-entry'){ al.stage='code'; al.error=''; render(); }
   else if(act==='back-to-entrada'){ al.stage='entrada'; al.error=''; al.matriculaStage='input'; render(); }
-  else if(act==='student-logout'){ exitFullscreenSafe(); stopAlunoEnquetePoll(); al.turma=null; al.name=''; al.studentLoggedIn=false; al.loginTurmaId=''; al.matriculaStage='input'; al.matriculaTurmaId=null; al.matriculaStudentId=null; al.matriculaName=''; al.enqueteAtiva=null; al.slidesAtivo=null; al.slidesCurrentImg=null; al.materiaisSlides=[]; al.materialDeck=null; al.isNewStudentSetup=false; al.tarefasTurma=[]; al.tarefaEntregasProprias={}; al.enviandoTarefaId=null; al.tarefaSubmitFile=null; al.tarefaSubmitFileName=''; al.tarefaSubmitLink=''; al.tarefaSubmitComentario=''; al.tarefaSubmitError=''; al.duvidaFormOpen=false; al.newDuvidaTexto=''; al.duvidaError=''; al.novidades=null; al.bibliotecaEmprestimos=[]; al.stage='entrada'; state.view='landing'; render(); }
+  else if(act==='student-logout'){ sairAluno(); }
   else if(act==='goto-aluno-livros'){ stopAlunoEnquetePoll(); al.stage='aluno-livros'; if(state.professor.livrosLoading){ loadLivros(); } render(); }
   else if(act==='back-to-student-dashboard'){ loadStudentDashboard(); }
   else if(act==='dashboard-start-exam'){ stopAlunoEnquetePoll(); dashboardStartExam(btn.dataset.code); }
@@ -21145,7 +21484,7 @@ document.addEventListener('click', (e) => {
   else if(act==='campanha-excluir-item'){ campanhaExcluirItem(btn.dataset.id); }
   else if(act==='campanha-indicar-alunos'){ campanhaIndicarAlunos(); }
   else if(act==='campanha-remover-indicado'){ campanhaRemoverIndicado(btn.dataset.sid); }
-  else if(act==='reset-aluno'){ exitFullscreenSafe(); stopUnlockPolling(); disarmAwayTimer(); stopAlunoEnquetePoll(); state.aluno = { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, dueloAtivo:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false, tarefasTurma:[], tarefaEntregasProprias:{}, enviandoTarefaId:null, tarefaSubmitFile:null, tarefaSubmitFileName:'', tarefaSubmitFotos:[], tarefaSubmitLink:'', tarefaSubmitComentario:'', tarefaSubmitError:'', tarefaSubmitUploading:false, duvidaFormOpen:false, newDuvidaTexto:'', duvidaError:'', novidades:null, duvidaIaLoadingId:null, duvidaIaErro:'', revisao: { loaded:false, loading:false, pendentes:[], recebidas:[] }, revisaoDrafts:{}, mapasTurma:[], mapaEntregasProprias:{}, mapaRascunho:null, mapaError:'', mapaSalvando:false,
+  else if(act==='reset-aluno'){ if(state.aluno.studentLoggedIn) limparSessaoLocal('aluno'); exitFullscreenSafe(); stopUnlockPolling(); disarmAwayTimer(); stopAlunoEnquetePoll(); state.aluno = { stage:'entrada', code:'', assessment:null, turma:null, name:'', manualName:false, answers:{}, result:null, error:'', windowStatus:null, shuffledQuestions:null, tabSwitchCount:0, lockKey:null, examLocked:false, fullscreenExits:0, unlockRequestId:null, loginTurmaId:'', studentLoggedIn:false, dashboardLoading:false, dashboardPendentes:[], dashboardRealizadas:[], matriculaStage:'input', matriculaName:'', matriculaTurmaId:null, matriculaStudentId:null, enqueteAtiva:null, pendingAvatarEmoji:null, pendingAvatarColor:null, quizAtivo:null, roletaAtiva:null, dueloAtivo:null, slidesAtivo:null, slidesCurrentImg:null, materiaisSlides:[], materialDeck:null, isNewStudentSetup:false, responderIdx:0, questionTimers:{}, pendingFullscreenReentry:false, tarefasTurma:[], tarefaEntregasProprias:{}, enviandoTarefaId:null, tarefaSubmitFile:null, tarefaSubmitFileName:'', tarefaSubmitFotos:[], tarefaSubmitLink:'', tarefaSubmitComentario:'', tarefaSubmitError:'', tarefaSubmitUploading:false, duvidaFormOpen:false, newDuvidaTexto:'', duvidaError:'', novidades:null, duvidaIaLoadingId:null, duvidaIaErro:'', revisao: { loaded:false, loading:false, pendentes:[], recebidas:[] }, revisaoDrafts:{}, mapasTurma:[], mapaEntregasProprias:{}, mapaRascunho:null, mapaError:'', mapaSalvando:false,
     subview:'inicio',
     boletim: { loaded:false, loading:false, erro:'', porUnidade:[], detalheDisciplina:'', detalheUnidade:'' },
     monitoria: {
@@ -21332,6 +21671,8 @@ document.addEventListener('change', (e) => {
   const el = e.target;
   const act = el.dataset ? el.dataset.action : null;
   const p = state.professor, al = state.aluno, c = state.coordenador;
+  if(act==='sessao-cfg'){ salvarSessaoCampo(el.dataset.campo, el.value); return; }
+  if(act==='rede-toggle'){ const on = el.checked; salvarRedeEscola(cfg => { cfg.ativo = on; }); return; }
   if(el.id==='monitoria-turma-select'){ al.monitoria.criarTurmaId = el.value; al.monitoria.criarSelecionados = []; al.monitoria.criarAlunosBusca=''; al.monitoria.error=''; render(); return; }
   if(act==='monitoria-toggle-aluno'){
     const sid = el.dataset.sid;
@@ -21501,6 +21842,8 @@ document.addEventListener('keydown', (e) => {
 })();
 
 render();
+carregarSessaoConfig();
+restaurarSessao();
 </script>
 </body>
 </html>
