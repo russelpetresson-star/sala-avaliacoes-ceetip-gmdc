@@ -19059,6 +19059,7 @@ function socioPendentes(){
 }
 function renderAlunoSocioUrgente(){
   const al = state.aluno;
+  if(al.subview==='socio') return '';   // já está na tela da avaliação
   if(!al.turma || !al.matriculaStudentId) return '';
   const so = socioState();
   if(!so.loaded){ if(!so.loading) setTimeout(loadSocioAluno, 0); return ''; }
