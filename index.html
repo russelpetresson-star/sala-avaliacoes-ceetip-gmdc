@@ -671,7 +671,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-07-1330</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-08-1615</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -970,7 +970,7 @@ const INSTRUMENTOS = [
   {key:'diagnostica', label:'Avaliação Diagnóstica', baseTitle:'Avaliação Diagnóstica'},
   {key:'exercicios', label:'Exercícios de Fixação', baseTitle:'Exercícios de Fixação'},
   {key:'autoavaliacao', label:'Autoavaliação', baseTitle:'Autoavaliação'},
-  {key:'recuperacao', label:'Recuperação Paralela (substitui o Simulado/NP1)', baseTitle:'Recuperação Paralela'},
+  {key:'recuperacao', label:'Recuperação Paralela (vale a maior: ela ou o Simulado/NP1)', baseTitle:'Recuperação Paralela'},
 ];
 const DEFAULT_PESOS = { avaliacao:5, diagnostica:2, exercicios:2, autoavaliacao:1 };
 const TAREFA_MAX_FOTOS = 6;
@@ -1090,7 +1090,7 @@ const TOUR_STEPS = {
     { icon:'👥', title:'Turmas e Disciplinas', text:'Antes de criar avaliações, cadastre suas turmas (com a lista de alunos) e as disciplinas que você leciona, no menu lateral.' },
     { icon:'📝', title:'Avaliações', text:'Crie provas com questões de múltipla escolha, verdadeiro/falso ou dissertativas. Compartilhe o código com a turma e receba as respostas já corrigidas.' },
     { icon:'🤖', title:'Criar questões com IA', text:'No Banco de Questões, use a IA para gerar questões por tema, importar de um PDF (livro ou lista de exercícios) ou de um texto colado. Revise sempre o gabarito antes de usar. Precisa estar configurada pela coordenação (é gratuita).' },
-    { icon:'🧮', title:'Nota final e Recuperação Paralela', text:'Em cada turma, calcule a Nota Final do bimestre (NP1 + NP2). Alunos abaixo de 5 aparecem destacados como "Recuperação Paralela". Crie uma avaliação do tipo "Recuperação Paralela" para que a nota dela substitua o NP1 de quem a responder. Se alguma nota estiver errada, use "✏️ Editar notas manualmente" para corrigir qualquer instrumento na hora.' },
+    { icon:'🧮', title:'Nota final e Recuperação Paralela', text:'Em cada turma, calcule a Nota Final do bimestre (NP1 + NP2). Alunos abaixo de 5 aparecem destacados como "Recuperação Paralela". Crie uma avaliação do tipo "Recuperação Paralela" : para quem a responder, vale a maior nota entre a recuperação e o NP1. Se alguma nota estiver errada, use "✏️ Editar notas manualmente" para corrigir qualquer instrumento na hora.' },
     { icon:'🖨️', title:'Bloco de Provas e Gabarito Avulso', text:'Imprima provas em papel com cartão-resposta com QR code, ou monte um "Gabarito Avulso" para provas integradas com várias disciplinas no mesmo cartão.' },
     { icon:'🔍', title:'Leitura de Gabaritos', text:'Depois de aplicar a prova em papel, fotografe o cartão-resposta preenchido pelo celular — o sistema lê e lança a nota automaticamente.' },
     { icon:'📣', title:'Atividades ao vivo', text:'Enquete Relâmpago, Quiz por Equipes, Roleta de Sorteio e Apresentação de Slides deixam a aula mais interativa — os alunos participam pelo próprio tablet.' },
@@ -8847,7 +8847,7 @@ function renderFinalGradesTable(){
   const editMode = !!fg.editMode;
   return `
     <div class="row" style="justify-content:space-between; align-items:center;">
-      <p class="muted" style="margin-top:10px;">NP1 é o Simulado/Avaliação (${pesos.avaliacao} pts). NP2 não é uma nota separada — é a soma de Diagnóstica (${pesos.diagnostica}) + Exercícios (${pesos.exercicios}) + Autoavaliação (${pesos.autoavaliacao}). Nota Final = NP1 + NP2. Se o aluno fizer a Recuperação Paralela, ela substitui o NP1 no cálculo. A Autoavaliação é calculada automaticamente por engajamento: 40% fichas, 30% frequência de login, 30% entrega de exercícios de fixação. Se a coordenação ativar a opção em "Avaliação Socioemocional", ela passa a vir da nota socioemocional do período (💛).</p>
+      <p class="muted" style="margin-top:10px;">NP1 é o Simulado/Avaliação (${pesos.avaliacao} pts). NP2 não é uma nota separada — é a soma de Diagnóstica (${pesos.diagnostica}) + Exercícios (${pesos.exercicios}) + Autoavaliação (${pesos.autoavaliacao}). Nota Final = NP1 + NP2. Se o aluno fizer a Recuperação Paralela, vale a maior nota entre a recuperação e a NP1 (a recuperação nunca diminui a nota). A Autoavaliação é calculada automaticamente por engajamento: 40% fichas, 30% frequência de login, 30% entrega de exercícios de fixação. Se a coordenação ativar a opção em "Avaliação Socioemocional", ela passa a vir da nota socioemocional do período (💛).</p>
       <div class="row" style="flex:0 0 auto; gap:8px;">
         ${editMode ? `
           <button class="btn btn-ghost btn-sm" data-action="cancel-edit-final-grades">Cancelar</button>
@@ -8885,9 +8885,9 @@ function renderFinalGradesTable(){
           <td>${editMode ? `<input type="number" step="0.1" id="manual-exerc-${idx}" value="${r.exerc.toFixed(1)}" style="width:70px;">` : `${r.exerc.toFixed(1)}${r.manual.exerc?' ✏️':''}`}</td>
           <td>${editMode ? `<input type="number" step="0.1" id="manual-auto-${idx}" value="${r.auto.toFixed(1)}" style="width:70px;">` : `${r.auto.toFixed(1)} ${r.autoOrigem==='socio' ? `<span class="muted" style="font-size:.72rem;" title="Nota da Avaliação Socioemocional">(💛 ${fmtNota(r.socioTotal)}/10)</span>` : r.autoOrigem==='socio-pendente' ? `<span class="muted" style="font-size:.72rem; color:#b3402f;" title="A Avaliação Socioemocional substitui a autoavaliação e este aluno ainda não respondeu: nota zerada até responder">(💛 não respondeu)</span>` : `<span class="muted" style="font-size:.72rem;" title="Engajamento (a Avaliação Socioemocional ainda não foi respondida)">(${Math.round((r.engajamento||0)*100)}%)</span>`}${r.manual.auto?' ✏️':''}`}</td>
           <td><strong>${r.np2.toFixed(1)}</strong></td>
-          <td>${editMode ? `<input type="number" step="0.1" id="manual-rec-${idx}" value="${r.temRecuperacao ? r.recuperacao.toFixed(1) : ''}" placeholder="—" style="width:70px;">` : (r.temRecuperacao ? `${r.recuperacao.toFixed(1)}${r.manual.recuperacao?' ✏️':''}` : '<span class="muted">—</span>')}</td>
+          <td>${editMode ? `<input type="number" step="0.1" id="manual-rec-${idx}" value="${r.temRecuperacao ? r.recuperacao.toFixed(1) : ''}" placeholder="—" style="width:70px;">` : (r.temRecuperacao ? `${r.recuperacao.toFixed(1)}${r.manual.recuperacao?' ✏️':''}${r.recuperacaoValeu===false?'<br><span class="muted" style="font-size:.72rem;" title="A recuperação ficou menor ou igual à NP1, então vale a NP1">menor que a NP1 — vale a NP1</span>':''}` : '<span class="muted">—</span>')}</td>
           <td><strong>${r.final.toFixed(1)} / ${fg.total}</strong></td>
-          <td>${r.precisaRecuperacao ? (r.temRecuperacao ? '<span class="pill" style="background:var(--green); color:#fff;">✅ Recuperado</span>' : '<span class="pill" style="background:var(--red); color:#fff;">🔺 Recup. paralela</span>') : ''}</td>
+          <td>${r.precisaRecuperacao ? (r.temRecuperacao ? (r.final>=5 ? '<span class="pill" style="background:var(--green); color:#fff;">✅ Recuperado</span>' : '<span class="pill" style="background:#e07b24; color:#fff;">♻️ Fez recup. — ainda abaixo de 5</span>') : '<span class="pill" style="background:var(--red); color:#fff;">🔺 Recup. paralela</span>') : ''}</td>
         </tr>
       `).join('')}
     </table>
@@ -11466,7 +11466,7 @@ function renderCoordNotas(){
             ${c.notasColunas.map(col => {
               const g = col.grades[r.name];
               if(g===undefined) return '<td><span class="muted">—</span></td>';
-              const badge = g.precisaRecuperacao ? (g.temRecuperacao ? ' <span class="pill" style="background:var(--green); color:#fff; font-size:.62rem;" title="Fez recuperação paralela">✅</span>' : ' <span class="pill" style="background:var(--red); color:#fff; font-size:.62rem;" title="Abaixo de 5 — recuperação paralela">🔺</span>') : '';
+              const badge = g.precisaRecuperacao ? (g.temRecuperacao ? ((col.total ? g.final/col.total*10 : g.final)>=5 ? ' <span class="pill" style="background:var(--green); color:#fff; font-size:.62rem;" title="Fez a recuperação paralela e ficou com 5 ou mais">✅</span>' : ' <span class="pill" style="background:#e07b24; color:#fff; font-size:.62rem;" title="Fez a recuperação paralela, mas continua abaixo de 5">♻️</span>') : ' <span class="pill" style="background:var(--red); color:#fff; font-size:.62rem;" title="Abaixo de 5 — recuperação paralela">🔺</span>') : '';
               return `<td><strong>${g.final.toFixed(1)}</strong>${badge}</td>`;
             }).join('')}
             <td style="white-space:nowrap;">
@@ -14802,7 +14802,7 @@ async function calcColunasParaUnidade(turmaId, unidade, turma){
       final: r.final, precisaRecuperacao: r.precisaRecuperacao, temRecuperacao: r.temRecuperacao,
       // detalhamento por instrumento, usado no boletim do aluno ("ver detalhamento da nota")
       np1: r.np1, diag: r.diag, exerc: r.exerc, auto: r.auto, recuperacao: r.recuperacao,
-      np2: r.np2, finalSemRecuperacao: r.finalSemRecuperacao,
+      np2: r.np2, finalSemRecuperacao: r.finalSemRecuperacao, recuperacaoValeu: r.recuperacaoValeu,
     }; });
     return { disciplinaName: g.disciplinaName, professorName: g.professorName, total, pesos, grades };
   }));
@@ -15153,7 +15153,7 @@ function renderAlunoBoletimScreen(){
           <div class="list-item"><span>✏️ Exercícios de Fixação</span><strong>${notaDetalhe.exerc.toFixed(1)} / ${(colunaDetalhe.pesos.exercicios||0).toFixed(1)}</strong></div>
           <div class="list-item"><span>${notaDetalhe.autoOrigem==='socio' ? '💛 Autoavaliação (Avaliação Socioemocional)' : notaDetalhe.autoOrigem==='socio-pendente' ? '💛 Autoavaliação (Avaliação Socioemocional — ainda não respondida, vale 0)' : '🙋 Autoavaliação (engajamento)'}</span><strong>${notaDetalhe.auto.toFixed(1)} / ${(colunaDetalhe.pesos.autoavaliacao||0).toFixed(1)}</strong></div>
           ${notaDetalhe.temRecuperacao ? `
-            <div class="list-item"><span>♻️ Recuperação Paralela <span class="muted" style="font-size:.75rem;">(substituiu o NP1)</span></span><strong>${notaDetalhe.recuperacao.toFixed(1)} / ${(colunaDetalhe.pesos.avaliacao||0).toFixed(1)}</strong></div>
+            <div class="list-item"><span>♻️ Recuperação Paralela <span class="muted" style="font-size:.75rem;">${notaDetalhe.recuperacaoValeu===false ? '(menor que a NP1 — vale a NP1)' : '(substituiu a NP1)'}</span></span><strong>${notaDetalhe.recuperacao.toFixed(1)} / ${(colunaDetalhe.pesos.avaliacao||0).toFixed(1)}</strong></div>
           ` : ''}
           <div class="list-item" style="border-top:2px solid var(--paper-line); margin-top:6px; padding-top:10px;">
             <span><strong>Nota final na unidade</strong></span>
@@ -20359,9 +20359,11 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
     const temRecuperacao = fezRecuperacao || manual.recuperacao;
     const np2 = diag+exerc+auto;
     const finalSemRecuperacao = np1+np2;
-    const final = temRecuperacao ? (recuperacao+np2) : finalSemRecuperacao;
+    // Recuperação Paralela: vale a MAIOR nota entre a recuperação e a NP1 (a recuperação nunca baixa a nota do aluno).
+    const recuperacaoValeu = temRecuperacao && recuperacao > np1;
+    const final = recuperacaoValeu ? (recuperacao+np2) : finalSemRecuperacao;
     const precisaRecuperacao = finalSemRecuperacao < 5;
-    return { name, np1, diag, exerc, auto, np2, recuperacao, temRecuperacao, finalSemRecuperacao, precisaRecuperacao, final, engajamento, manual,
+    return { name, np1, diag, exerc, auto, np2, recuperacao, temRecuperacao, recuperacaoValeu, finalSemRecuperacao, precisaRecuperacao, final, engajamento, manual,
       autoOrigem: socio ? 'socio' : (socioSubstitui ? 'socio-pendente' : 'engajamento'), socioTotal: socio ? socio.total : null,
       autoNp1, autoDiag, autoExerc, autoAuto, autoRecuperacao };
   });
@@ -20461,7 +20463,7 @@ function exportFinalGradesXlsx(tid){
   const fg = p.finalGrades;
   if(!t || !fg || fg.rows.length===0){ alert('Calcule as notas finais dessa turma antes de exportar.'); return; }
   const header = ['Aluno','NP1 (Simulado)','Diagnóstica','Exercícios','Autoavaliação','NP2','Recuperação','Nota Final', `de ${fg.total}`,'Situação'];
-  const rows = fg.rows.map(r => [r.name, r.np1, r.diag, r.exerc, r.auto, r.np2, r.temRecuperacao ? r.recuperacao : '', r.final, '', r.precisaRecuperacao ? (r.temRecuperacao ? 'Recuperado' : 'Recuperação paralela') : '']);
+  const rows = fg.rows.map(r => [r.name, r.np1, r.diag, r.exerc, r.auto, r.np2, r.temRecuperacao ? r.recuperacao : '', r.final, '', r.precisaRecuperacao ? (r.temRecuperacao ? (r.final>=5 ? 'Recuperado' : 'Fez recuperação, ainda abaixo de 5') : 'Recuperação paralela') : '']);
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Notas Finais');
