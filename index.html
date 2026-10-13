@@ -671,7 +671,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-08-1615</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-09-1600</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -2245,6 +2245,18 @@ async function abrirLiberacaoProva(code){
   p.liberacao = { code, loading:false, turmas:info, selecionados, mensagem:'', salvando:false, jaSalvo: !!jaLiberados };
   render();
 }
+// Tira a exigência de liberação de uma avaliação já criada: todos os alunos da turma passam a poder responder.
+async function dispensarLiberacaoProva(code){
+  const p = state.professor;
+  const a = p.assessments.find(x=>x.code===code);
+  if(!a) return;
+  if(!confirm(`Abrir "${a.title}" para todos os alunos da turma, sem precisar liberar um por um?`)) return;
+  a.exigeLiberacao = false; a.updatedAt = Date.now();
+  try{ await window.storage.set(`assessment:${code}`, JSON.stringify(a), true); }
+  catch(e){ a.exigeLiberacao = true; alert('Não foi possível salvar agora. Tente de novo.'); }
+  if(p.liberacao && p.liberacao.code===code) p.liberacao = null;
+  render();
+}
 function fecharLiberacaoProva(){ state.professor.liberacao = null; render(); }
 function liberacaoMarcarPresentes(){
   const lb = state.professor.liberacao; if(!lb) return;
@@ -2291,6 +2303,7 @@ function renderLiberacaoPanel(){
       `).join('')}
       ${lb.mensagem ? `<p style="margin-top:10px; color:var(--green); font-weight:600;">${esc(lb.mensagem)}</p>` : ''}
       <div class="row" style="margin-top:14px; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" data-action="liberacao-marcar-todos">✅ Marcar todos</button>
         <button class="btn btn-ghost btn-sm" data-action="liberacao-marcar-presentes">Marcar só presentes da chamada</button>
         <button class="btn btn-primary btn-sm" data-action="salvar-liberacao" ${lb.salvando?'disabled':''}>${lb.salvando?'Salvando...':'Liberar para os selecionados'}</button>
       </div>
@@ -2318,6 +2331,7 @@ function renderProfessorList(){
           ${assessmentTemAgendaTurmas(a) ? Object.keys(a.agendaTurmas).map(tid => { const t=p.turmas.find(x=>x.id===tid); const w=assessmentAgendaFor(a,tid); return `<br><span class="muted">🗓 ${esc(t?t.name:tid)}: ${w.startAt?'abre '+formatDateTime(w.startAt):'sem início'}${w.endAt?' · encerra '+formatDateTime(w.endAt):''}</span>`; }).join('') : ''}
           ${(a.startAt||a.endAt) ? `<br><span class="muted">${assessmentTemAgendaTurmas(a)?'Demais turmas: ':''}${a.startAt?'abre '+formatDateTime(a.startAt):''}${a.startAt&&a.endAt?' · ':''}${a.endAt?'encerra '+formatDateTime(a.endAt):''}</span>` : ''}
           <br><span class="muted">Gabarito: ${!a.resultRelease||a.resultRelease.mode==='imediato'?'liberado na hora':a.resultRelease.mode==='nunca'?'não liberado ao aluno':'liberado em '+formatDateTime(a.resultRelease.releaseAt)}</span>
+          ${provaExigeLiberacao(a) ? `<br><span style="font-size:.82rem; color:#b3261e;">🔒 Os alunos só conseguem responder depois que você tocar em "🚪 Liberar turma".</span> <a href="#" data-action="dispensar-liberacao" data-code="${a.code}" style="font-size:.82rem;">Não precisa liberar — abrir para todos</a>` : ''}
         </div>
         <div class="row" style="flex:0 0 auto; gap:8px;">
           <span class="pill">${a.code}</span>
@@ -7446,6 +7460,7 @@ function renderNewAssessment(){
         <input type="checkbox" data-action="toggle-exige-liberacao" ${a.exigeLiberacao?'checked':''} style="width:auto;">
         Só iniciar quando o professor liberar (apenas alunos presentes na sala)
       </label>
+      ${a.exigeLiberacao ? '<p style="font-size:.82rem; margin:4px 0 0; color:#b3261e;">⚠ Com esta opção marcada, <strong>nenhum aluno consegue responder</strong> até você abrir "🚪 Liberar turma" na lista de avaliações e liberar os alunos.</p>' : ''}
       <p class="muted" style="font-size:.8rem;">Antes da prova, você abre "Liberar turma" na lista de avaliações, confere a chamada de hoje e libera só quem está na sala. Funciona quando a avaliação está vinculada a uma turma.</p>
       <label>Janela de aplicação (opcional)</label>
       <div class="row">
@@ -15185,6 +15200,8 @@ function renderAlunoProvasBlock(){
             <div>
               <strong>${esc(a.title)}</strong><br>
               <span class="muted">${a.disciplinaName?esc(a.disciplinaName)+' · ':''}${aberta ? 'disponível agora' + (a.endAt?' · encerra em '+formatDateTime(a.endAt):'') : 'abre em '+formatDateTime(a.startAt)}</span>
+              ${aberta && p.aguardandoLiberacao ? '<br><span style="font-size:.82rem; color:#b3261e;">🔒 Aguardando o professor liberar para você. Quando ele liberar, toque em Responder.</span>' : ''}
+              ${al.error && al.code===a.code ? `<br><span class="err" style="font-size:.82rem;">${esc(al.error)}</span>` : ''}
             </div>
             ${aberta ? `<button class="btn btn-primary btn-sm" data-action="dashboard-start-exam" data-code="${a.code}">Responder</button>` : '<span class="muted">Aguardando</span>'}
           </div>
@@ -20865,6 +20882,11 @@ async function loadStudentDashboard(){
       if(status!=='depois'){ pendentes.push({ assessment:a, status }); }
     }
   }
+  // Provas que só abrem depois que o professor liberar: avisa o aluno em vez de deixar ele tentar sem saber.
+  await Promise.all(pendentes.filter(pd => provaExigeLiberacao(pd.assessment)).map(async pd => {
+    const liberados = await carregarProvaLiberacao(pd.assessment.code);
+    pd.aguardandoLiberacao = !liberados || !alunoEstaLiberado(liberados, al.matriculaStudentId, al.name);
+  }));
   realizadas.sort((x,y) => y.response.submittedAt - x.response.submittedAt);
   pendentes.sort((x,y) => (x.assessment.startAt?new Date(x.assessment.startAt).getTime():0) - (y.assessment.startAt?new Date(y.assessment.startAt).getTime():0));
   al.dashboardRealizadas = realizadas;
@@ -20990,6 +21012,9 @@ async function dashboardStartExam(code){
     return;
   }
   await startExamFlow();
+  // Não conseguiu abrir (ex.: o professor ainda não liberou): leva o aluno para "Minhas provas", onde o aviso aparece.
+  // Antes, quem tocava em "Fazer agora" no Início não via mensagem nenhuma.
+  if(al.stage==='dashboard' && al.error){ exitFullscreenSafe(); al.subview = 'provas'; render(); }
 }
 
 async function dashboardViewResult(code){
@@ -21521,6 +21546,8 @@ document.addEventListener('click', (e) => {
   else if(act==='edit-assessment'){ editAssessment(btn.dataset.code); }
   else if(act==='liberar-resultado'){ liberarResultadoAgora(btn.dataset.code); }
   else if(act==='abrir-liberacao'){ abrirLiberacaoProva(btn.dataset.code); }
+  else if(act==='dispensar-liberacao'){ dispensarLiberacaoProva(btn.dataset.code); }
+  else if(act==='liberacao-marcar-todos'){ const lb = p.liberacao; if(lb){ lb.selecionados = lb.turmas.flatMap(t => t.students.map(s=>s.id)); render(); } }
   else if(act==='fechar-liberacao'){ fecharLiberacaoProva(); }
   else if(act==='liberacao-marcar-presentes'){ liberacaoMarcarPresentes(); }
   else if(act==='salvar-liberacao'){ salvarProvaLiberacao(); }
@@ -22090,8 +22117,8 @@ document.addEventListener('change', (e) => {
     else a.turmaIds.push(tid);
     render();
   }
-  else if(act==='set-instrumento'){ p.newAssessment.instrumento = el.value; if(el.value==='avaliacao' || el.value==='recuperacao'){ p.newAssessment.securityEnabled = true; p.newAssessment.exigeLiberacao = true; } render(); }
-  else if(act==='toggle-exige-liberacao'){ p.newAssessment.exigeLiberacao = el.checked; }
+  else if(act==='set-instrumento'){ p.newAssessment.instrumento = el.value; if(el.value==='avaliacao' || el.value==='recuperacao'){ p.newAssessment.securityEnabled = true; p.newAssessment.exigeLiberacao = true; } else if(!p.editingCode){ p.newAssessment.exigeLiberacao = false; } render(); }
+  else if(act==='toggle-exige-liberacao'){ p.newAssessment.exigeLiberacao = el.checked; render(); }
   else if(act==='toggle-security-enabled'){ p.newAssessment.securityEnabled = el.checked; }
   else if(act==='set-unidade'){ p.newAssessment.unidade = el.value; render(); }
   else if(act==='socio-unidade'){ const so = socioState(); so.unidade = el.value; so.respostas = {}; so.menos = {}; so.autoItens = {}; so.auto = null; so.erro = ''; render(); }
