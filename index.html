@@ -671,7 +671,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-09-1600</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-14-1300</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -14019,7 +14019,10 @@ function renderBiblioteca(){
 function renderBibliotecaCatalogo(){
   const b = state.biblioteca;
   const busca = (b.buscaLivro||'').trim().toLowerCase();
-  const livros = b.livros.filter(l => !busca || l.titulo.toLowerCase().includes(busca) || (l.autor||'').toLowerCase().includes(busca)).sort((x,y)=>x.titulo.localeCompare(y.titulo,'pt-BR'));
+  const semCapa = b.livros.filter(l => !l.capaUrl).length, semIsbn = b.livros.filter(l => !l.isbn).length, semCat = b.livros.filter(l => !l.categoria).length;
+  const livros = b.livros.filter(l => !busca || l.titulo.toLowerCase().includes(busca) || (l.autor||'').toLowerCase().includes(busca))
+    .filter(l => b.filtroPendencia==='capa' ? !l.capaUrl : b.filtroPendencia==='isbn' ? !l.isbn : b.filtroPendencia==='categoria' ? !l.categoria : true)
+    .sort((x,y)=>x.titulo.localeCompare(y.titulo,'pt-BR'));
   return `
     <div class="card">
       <div class="row" style="justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -14030,6 +14033,12 @@ function renderBibliotecaCatalogo(){
         </div>
       </div>
       <input type="text" id="biblioteca-busca-livro-input" placeholder="Buscar por título ou autor..." value="${esc(b.buscaLivro||'')}" style="margin-top:10px;">
+      ${(semCapa||semIsbn||semCat) ? `<div class="row" style="gap:6px; margin-top:8px; flex-wrap:wrap; align-items:center;">
+        <span class="muted" style="font-size:.82rem;">Para completar depois:</span>
+        ${semCapa ? `<button class="btn ${b.filtroPendencia==='capa'?'btn-primary':'btn-ghost'} btn-sm" data-action="biblio-filtro-pendencia" data-f="capa">📷 Sem capa (${semCapa})</button>` : ''}
+        ${semIsbn ? `<button class="btn ${b.filtroPendencia==='isbn'?'btn-primary':'btn-ghost'} btn-sm" data-action="biblio-filtro-pendencia" data-f="isbn">🔢 Sem ISBN (${semIsbn})</button>` : ''}
+        ${semCat ? `<button class="btn ${b.filtroPendencia==='categoria'?'btn-primary':'btn-ghost'} btn-sm" data-action="biblio-filtro-pendencia" data-f="categoria">🏷️ Sem categoria (${semCat})</button>` : ''}
+      </div>` : ''}
     </div>
 
     ${b.formLivro ? renderBibliotecaFormLivro() : ''}
@@ -14038,14 +14047,15 @@ function renderBibliotecaCatalogo(){
       ${livros.length===0 ? `<p class="muted center">Nenhum livro cadastrado${busca?' com essa busca':''}.</p>` : `
         <div class="table-scroll">
         <table class="pv-sign-table">
-          <thead><tr><th>Título</th><th>Autor</th><th>Categoria</th><th style="text-align:center;">Exemplares</th><th style="text-align:center;">Disponíveis</th><th></th></tr></thead>
+          <thead><tr><th style="width:52px;">Capa</th><th>Título</th><th>Autor</th><th>Categoria</th><th style="text-align:center;">Exemplares</th><th style="text-align:center;">Disponíveis</th><th></th></tr></thead>
           <tbody>
             ${livros.map(l => {
               const disp = bibliotecaExemplaresDisponiveis(l, b.emprestimos);
               const filaCount = (b.reservas||[]).filter(r=>r.livroId===l.id && r.status==='ativa').length;
               return `
               <tr>
-                <td><strong>${esc(l.titulo)}</strong>${l.isbn?`<br><span class="muted" style="font-size:.75rem;">ISBN ${esc(l.isbn)}</span>`:''}${filaCount>0?`<br><span class="pill" style="font-size:.7rem; padding:1px 8px;">⏳ ${filaCount} na fila</span>`:''}</td>
+                <td>${l.capaUrl ? `<img src="${cloudinaryLargura(l.capaUrl, 100)}" alt="" loading="lazy" style="width:44px; height:64px; object-fit:cover; border-radius:3px; display:block;">` : `<button class="btn btn-ghost btn-sm" data-action="biblioteca-livro-form-abrir" data-id="${l.id}" title="Adicionar a foto da capa" style="width:44px; height:64px; padding:0; font-size:1.1rem;">📷</button>`}</td>
+                <td><strong>${esc(l.titulo)}</strong>${l.isbn?`<br><span class="muted" style="font-size:.75rem;">ISBN ${esc(l.isbn)}</span>`:`<br><a href="#" data-action="biblioteca-livro-form-abrir" data-id="${l.id}" data-foco="isbn" style="font-size:.75rem;">+ adicionar ISBN</a>`}${filaCount>0?`<br><span class="pill" style="font-size:.7rem; padding:1px 8px;">⏳ ${filaCount} na fila</span>`:''}</td>
                 <td>${esc(l.autor||'-')}</td>
                 <td>${esc(l.categoria||'-')}</td>
                 <td style="text-align:center;">${l.exemplares}</td>
@@ -14064,118 +14074,454 @@ function renderBibliotecaCatalogo(){
   `;
 }
 
+/* ================= CATALOGAÇÃO DE LIVROS: capa obrigatória, recorte automático, categorias guiadas =================
+   - A foto da capa é obrigatória em livro novo. O app acha sozinho os 4 cantos do livro na foto e "endireita" a imagem
+     (correção de perspectiva), deixando só a capa, sem fundo. Quem cataloga pode arrastar os cantos para ajustar.
+   - A capa recortada sobe para o Cloudinary (pasta biblioteca-capas); no catálogo fica só o link (capaUrl).
+   - Categoria em lista suspensa. Para quem não sabe escolher: sugestão da IA (lendo a capa), palpite pelo título
+     e um "assistente" com perguntas simples.
+   - ISBN opcional: pode ser lido pelo código de barras da contracapa e adicionado/corrigido depois.               */
+const BIBLIO_CATEGORIAS = [
+  'Literatura brasileira', 'Literatura estrangeira', 'Literatura infantojuvenil', 'Poesia', 'Teatro', 'Quadrinhos e mangás', 'Biografias e memórias',
+  'Didático — Linguagens', 'Didático — Matemática', 'Didático — Ciências da Natureza', 'Didático — Ciências Humanas',
+  'Técnico — Eletromecânica', 'Técnico — Petróleo e Gás', 'Técnico — Segurança do Trabalho', 'Técnico — outras áreas',
+  'ENEM e vestibular', 'Dicionários e obras de referência', 'Divulgação científica e conhecimentos gerais',
+  'Autoajuda e desenvolvimento pessoal', 'Religião e espiritualidade', 'Outros',
+];
+function biblioCategoriasDisponiveis(){
+  const usadas = (state.biblioteca.livros||[]).map(l => (l.categoria||'').trim()).filter(Boolean);
+  const extras = [...new Set(usadas)].filter(c => !BIBLIO_CATEGORIAS.includes(c)).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  return { padrao: BIBLIO_CATEGORIAS, extras };
+}
+// Palpite simples pelo título (sem IA). Só sugere — quem cataloga confirma.
+const BIBLIO_PALAVRAS = [
+  [/\b(nr[\s-]?\d+|seguran[cç]a do trabalho|epi\b|ergonomia|higiene (ocupacional|e seguran)|primeiros socorros|preven[cç][aã]o de (acidentes|inc[eê]ndio)|cipa)\b/i, 'Técnico — Segurança do Trabalho'],
+  [/\b(petr[oó]leo|g[aá]s natural|perfura[cç][aã]o|refino|offshore|reservat[oó]rio|upstream)\b/i, 'Técnico — Petróleo e Gás'],
+  [/\b(eletr[oô]nica|eletrot[eé]cnica|eletricidade|instala[cç][oõ]es el[eé]tricas|m[aá]quinas el[eé]tricas|motores?|mec[aâ]nica|automa[cç][aã]o|clp|soldagem|hidr[aá]ulica|pneum[aá]tica|manuten[cç][aã]o industrial|usinagem|desenho t[eé]cnico|eletromec)/i, 'Técnico — Eletromecânica'],
+  [/\b(dicion[aá]rio|minidicion[aá]rio|atlas|enciclop[eé]dia|gram[aá]tica de refer)/i, 'Dicionários e obras de referência'],
+  [/\b(enem|vestibular|simulados?)\b/i, 'ENEM e vestibular'],
+  [/\b(matem[aá]tica|[aá]lgebra|geometria|c[aá]lculo|trigonometria|estat[ií]stica)\b/i, 'Didático — Matemática'],
+  [/\b(f[ií]sica|qu[ií]mica|biologia|ci[eê]ncias da natureza)\b/i, 'Didático — Ciências da Natureza'],
+  [/\b(hist[oó]ria (geral|do brasil)|geografia|sociologia|filosofia|ci[eê]ncias humanas)\b/i, 'Didático — Ciências Humanas'],
+  [/\b(portugu[eê]s|l[ií]ngua portuguesa|gram[aá]tica|reda[cç][aã]o|ingl[eê]s|english|espanhol|arte|educa[cç][aã]o f[ií]sica|linguagens)\b/i, 'Didático — Linguagens'],
+  [/\b(poemas?|poesias?|sonetos?|versos)\b/i, 'Poesia'],
+  [/\b(mang[aá]|hq|quadrinhos|graphic novel|turma da m[oô]nica)\b/i, 'Quadrinhos e mangás'],
+  [/\b(biografia|mem[oó]rias|autobiografia|di[aá]rio de)\b/i, 'Biografias e memórias'],
+  [/\b(b[ií]blia|evangelho|ora[cç][oõ]es|espiritualidade)\b/i, 'Religião e espiritualidade'],
+];
+function biblioSugerirPorTitulo(titulo){
+  const t = String(titulo||'');
+  const hit = BIBLIO_PALAVRAS.find(([re]) => re.test(t));
+  return hit ? hit[1] : '';
+}
+// Assistente de categoria: perguntas simples, uma por vez.
+const BIBLIO_ASSISTENTE = {
+  inicio: { p:'O livro é usado nas aulas (livro didático, apostila, livro do curso técnico)?', op:[['Sim','aula'],['Não','tipo']] },
+  aula:   { p:'De qual área?', op:[['Português, Inglês, Arte ou Ed. Física','=Didático — Linguagens'],['Matemática','=Didático — Matemática'],['Física, Química ou Biologia','=Didático — Ciências da Natureza'],['História, Geografia, Sociologia ou Filosofia','=Didático — Ciências Humanas'],['Curso técnico','tecnico'],['Preparação para ENEM/vestibular','=ENEM e vestibular']] },
+  tecnico:{ p:'De qual curso técnico?', op:[['Eletromecânica','=Técnico — Eletromecânica'],['Petróleo e Gás','=Técnico — Petróleo e Gás'],['Segurança do Trabalho','=Técnico — Segurança do Trabalho'],['Outro','=Técnico — outras áreas']] },
+  tipo:   { p:'O que tem dentro do livro?', op:[['Uma história inventada (romance, conto, aventura)','historia'],['Poemas','=Poesia'],['Uma peça de teatro','=Teatro'],['Quadrinhos ou mangá','=Quadrinhos e mangás'],['A vida de uma pessoa real','=Biografias e memórias'],['Dicionário, atlas ou enciclopédia','=Dicionários e obras de referência'],['Explica um assunto (ciência, saúde, história, dinheiro…)','=Divulgação científica e conhecimentos gerais'],['Dicas para a vida, motivação','=Autoajuda e desenvolvimento pessoal'],['Religião','=Religião e espiritualidade'],['Não sei','=Outros']] },
+  historia:{ p:'É um livro para crianças ou adolescentes (letras grandes, ilustrações, linguagem simples)?', op:[['Sim','=Literatura infantojuvenil'],['Não','autor']] },
+  autor:  { p:'O autor é brasileiro?', op:[['Sim','=Literatura brasileira'],['Não','=Literatura estrangeira'],['Não sei','=Literatura brasileira']] },
+};
+
+/* ---------- imagem: carregar, achar os cantos, endireitar ---------- */
+function biblioCarregarImagem(src){
+  return new Promise((resolve, reject) => { const im = new Image(); im.onload = () => resolve(im); im.onerror = () => reject(new Error('leitura-arquivo')); im.src = src; });
+}
+function biblioLerArquivo(file){
+  return new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject(new Error('leitura-arquivo')); r.readAsDataURL(file); });
+}
+// Reduz a foto para no máximo `max` px no lado maior (fotos de celular têm 4000 px — pesadas para processar).
+function biblioCanvasReduzido(img, max){
+  const k = Math.min(1, max / Math.max(img.naturalWidth||img.width, img.naturalHeight||img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round((img.naturalWidth||img.width)*k)); c.height = Math.max(1, Math.round((img.naturalHeight||img.height)*k));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+// Acha os 4 cantos do livro: estima a cor do fundo pelas bordas da foto, separa o que é "livro",
+// pega a maior mancha e usa os pontos extremos dela como cantos. Se não der, devolve a foto inteira.
+function biblioDetectarCantos(canvas){
+  const W0 = canvas.width, H0 = canvas.height;
+  const k = Math.min(1, 220 / Math.max(W0, H0));
+  const w = Math.max(8, Math.round(W0*k)), h = Math.max(8, Math.round(H0*k));
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const ctx = c.getContext('2d'); ctx.drawImage(canvas, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const inteira = [{x:0,y:0},{x:W0,y:0},{x:W0,y:H0},{x:0,y:H0}];
+  const borda = Math.max(2, Math.round(Math.min(w,h)*0.04));
+  const amostras = [];
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    if(x<borda || y<borda || x>=w-borda || y>=h-borda){ const i=(y*w+x)*4; amostras.push([d[i],d[i+1],d[i+2]]); }
+  }
+  const med = [0,1,2].map(ch => { const v = amostras.map(a=>a[ch]).sort((a,b)=>a-b); return v[Math.floor(v.length/2)]; });
+  const dist = (i) => Math.hypot(d[i]-med[0], d[i+1]-med[1], d[i+2]-med[2]);
+  const distBorda = amostras.map(a => Math.hypot(a[0]-med[0], a[1]-med[1], a[2]-med[2])).sort((a,b)=>a-b);
+  const limiar = Math.max(38, distBorda[Math.floor(distBorda.length*0.9)] * 1.6);
+  const mask = new Uint8Array(w*h);
+  for(let p=0;p<w*h;p++) mask[p] = dist(p*4) > limiar ? 1 : 0;
+  // maior mancha (vizinhança de 4)
+  const rot = new Int32Array(w*h); let melhor = 0, melhorTam = 0, atual = 0;
+  const pilha = [];
+  for(let p=0;p<w*h;p++){
+    if(!mask[p] || rot[p]) continue;
+    atual++; let tam = 0; pilha.push(p); rot[p] = atual;
+    while(pilha.length){
+      const q = pilha.pop(); tam++;
+      const x = q % w, y = (q / w) | 0;
+      const viz = [x>0?q-1:-1, x<w-1?q+1:-1, y>0?q-w:-1, y<h-1?q+w:-1];
+      for(const v of viz){ if(v>=0 && mask[v] && !rot[v]){ rot[v] = atual; pilha.push(v); } }
+    }
+    if(tam > melhorTam){ melhorTam = tam; melhor = atual; }
+  }
+  if(melhorTam < w*h*0.12) return inteira;          // nada que pareça um livro: usa a foto inteira
+  let tl=null, tr=null, br=null, bl=null;
+  for(let p=0;p<w*h;p++){
+    if(rot[p]!==melhor) continue;
+    const x = p % w, y = (p / w) | 0;
+    if(!tl || x+y < tl.x+tl.y) tl = {x,y};
+    if(!br || x+y > br.x+br.y) br = {x,y};
+    if(!tr || x-y > tr.x-tr.y) tr = {x,y};
+    if(!bl || x-y < bl.x-bl.y) bl = {x,y};
+  }
+  const s = 1/k;
+  const cantos = [tl,tr,br,bl].map(pt => ({ x: Math.min(W0, Math.max(0, (pt.x+0.5)*s)), y: Math.min(H0, Math.max(0, (pt.y+0.5)*s)) }));
+  return biblioAreaQuad(cantos) > W0*H0*0.12 ? cantos : inteira;
+}
+function biblioAreaQuad(q){ let a = 0; for(let i=0;i<4;i++){ const p=q[i], n=q[(i+1)%4]; a += p.x*n.y - n.x*p.y; } return Math.abs(a)/2; }
+// Homografia: leva o retângulo de saída (0..W, 0..H) para o quadrilátero da foto.
+function biblioHomografia(W, H, q){
+  const src = [[0,0],[W,0],[W,H],[0,H]], dst = q.map(p=>[p.x,p.y]);
+  const A = [], b = [];
+  for(let i=0;i<4;i++){
+    const [x,y] = src[i], [u,v] = dst[i];
+    A.push([x,y,1,0,0,0,-u*x,-u*y]); b.push(u);
+    A.push([0,0,0,x,y,1,-v*x,-v*y]); b.push(v);
+  }
+  for(let c=0;c<8;c++){                                   // eliminação de Gauss
+    let piv = c; for(let r=c+1;r<8;r++) if(Math.abs(A[r][c])>Math.abs(A[piv][c])) piv = r;
+    [A[c],A[piv]] = [A[piv],A[c]]; [b[c],b[piv]] = [b[piv],b[c]];
+    for(let r=0;r<8;r++){ if(r===c) continue; const f = A[r][c]/A[c][c]; for(let k=c;k<8;k++) A[r][k] -= f*A[c][k]; b[r] -= f*b[c]; }
+  }
+  return b.map((v,i)=>v/A[i][i]);
+}
+// Recorta e endireita a capa a partir dos 4 cantos. Devolve um canvas só com a capa.
+function biblioEndireitar(fonte, q, alturaMax){
+  const L = (a,b) => Math.hypot(a.x-b.x, a.y-b.y);
+  let W = (L(q[0],q[1]) + L(q[3],q[2]))/2, H = (L(q[0],q[3]) + L(q[1],q[2]))/2;
+  const esc = Math.min(1, (alturaMax||900)/H);
+  W = Math.max(20, Math.round(W*esc)); H = Math.max(20, Math.round(H*esc));
+  const h = biblioHomografia(W, H, q);
+  const sw = fonte.width, sh = fonte.height;
+  const sd = fonte.getContext('2d').getImageData(0, 0, sw, sh).data;
+  const out = document.createElement('canvas'); out.width = W; out.height = H;
+  const octx = out.getContext('2d'); const od = octx.createImageData(W, H);
+  for(let y=0;y<H;y++){
+    for(let x=0;x<W;x++){
+      const den = h[6]*x + h[7]*y + 1;
+      let u = (h[0]*x + h[1]*y + h[2]) / den, v = (h[3]*x + h[4]*y + h[5]) / den;
+      u = Math.min(sw-1.001, Math.max(0, u)); v = Math.min(sh-1.001, Math.max(0, v));
+      const x0 = u|0, y0 = v|0, fx = u-x0, fy = v-y0;
+      const i00 = (y0*sw+x0)*4, i10 = i00+4, i01 = i00+sw*4, i11 = i01+4, o = (y*W+x)*4;
+      for(let ch=0;ch<3;ch++){
+        od.data[o+ch] = (sd[i00+ch]*(1-fx) + sd[i10+ch]*fx)*(1-fy) + (sd[i01+ch]*(1-fx) + sd[i11+ch]*fx)*fy;
+      }
+      od.data[o+3] = 255;
+    }
+  }
+  octx.putImageData(od, 0, 0);
+  return out;
+}
+function biblioCanvasParaBlob(cv){ return new Promise(res => cv.toBlob(b => res(b), 'image/jpeg', 0.86)); }
+
+/* ---------- fluxo da capa ---------- */
+async function biblioCapaSelecionada(file){
+  const b = state.biblioteca, f = b.formLivro;
+  if(!file || !f) return;
+  if(!file.type.startsWith('image/')){ b.livroIaError = 'Selecione uma foto da capa.'; render(); return; }
+  b.livroError = ''; b.livroIaError = '';
+  b.capaProcessando = true; render();
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  try{
+    const dataUrl = await biblioLerArquivo(file);
+    const img = await biblioCarregarImagem(dataUrl);
+    const fonte = biblioCanvasReduzido(img, 1800);
+    const cantos = biblioDetectarCantos(fonte);
+    b.capaEditor = { fonte, src: fonte.toDataURL('image/jpeg', 0.9), w: fonte.width, h: fonte.height, cantos, tocado:false };
+    b.capaProcessando = false;
+    await biblioAplicarCorte();
+    biblioLerCapaComIA(dataUrl);   // em paralelo: título, autor, categoria e (se der) cantos mais precisos
+  }catch(e){
+    b.capaProcessando = false;
+    b.livroIaError = 'Não foi possível abrir essa foto. Tente tirar outra.';
+    render();
+  }
+}
+async function biblioAplicarCorte(){
+  const b = state.biblioteca, ed = b.capaEditor, f = b.formLivro;
+  if(!ed || !f) return;
+  const cv = biblioEndireitar(ed.fonte, ed.cantos, 900);
+  f.capaBlob = await biblioCanvasParaBlob(cv);
+  f.capaPreview = cv.toDataURL('image/jpeg', 0.86);
+  render();
+}
+function renderBiblioCapaEditor(){
+  const b = state.biblioteca, ed = b.capaEditor;
+  if(!ed || !b.capaAjustando) return '';
+  const r = Math.max(ed.w, ed.h) * 0.03;
+  const pts = ed.cantos.map(p => `${p.x},${p.y}`).join(' ');
+  return `
+    <div data-capa-editor="1" style="margin-top:10px;">
+      <p class="muted" style="font-size:.82rem; margin:0 0 6px;">Arraste as 4 bolinhas até os cantos do livro. A capa é endireitada sozinha.</p>
+      <div style="position:relative; max-width:420px; touch-action:none; user-select:none;">
+        <img src="${ed.src}" style="display:block; width:100%; border-radius:6px;" alt="Foto original da capa" draggable="false">
+        <svg id="capa-editor-svg" viewBox="0 0 ${ed.w} ${ed.h}" preserveAspectRatio="none" style="position:absolute; inset:0; width:100%; height:100%;">
+          <polygon id="capa-editor-poly" points="${pts}" fill="rgba(91,26,44,.18)" stroke="#f5c542" stroke-width="${r/3}"/>
+          ${ed.cantos.map((p,i) => `<circle data-capa-handle="${i}" cx="${p.x}" cy="${p.y}" r="${r}" fill="#f5c542" stroke="#5b1a2c" stroke-width="${r/4}" style="cursor:grab;"/>`).join('')}
+        </svg>
+      </div>
+      <div class="row" style="gap:6px; margin-top:8px; flex-wrap:wrap;">
+        <button class="btn btn-primary btn-sm" data-action="biblio-capa-pronto">✓ Pronto</button>
+        <button class="btn btn-ghost btn-sm" data-action="biblio-capa-redetectar">↺ Achar os cantos de novo</button>
+        <button class="btn btn-ghost btn-sm" data-action="biblio-capa-inteira">Usar a foto inteira</button>
+      </div>
+    </div>`;
+}
+// Arrastar os cantos (mouse ou dedo). Atualiza só o desenho enquanto arrasta; recorta ao soltar.
+let biblioArraste = null;
+document.addEventListener('pointerdown', e => {
+  const hnd = e.target.closest && e.target.closest('[data-capa-handle]');
+  if(!hnd) return;
+  e.preventDefault();
+  biblioArraste = { i: Number(hnd.dataset.capaHandle) };
+  try{ hnd.setPointerCapture(e.pointerId); }catch(err){}
+});
+document.addEventListener('pointermove', e => {
+  if(!biblioArraste) return;
+  const ed = state.biblioteca.capaEditor, svg = document.getElementById('capa-editor-svg');
+  if(!ed || !svg) return;
+  const rc = svg.getBoundingClientRect();
+  const x = Math.min(ed.w, Math.max(0, (e.clientX-rc.left)/rc.width*ed.w));
+  const y = Math.min(ed.h, Math.max(0, (e.clientY-rc.top)/rc.height*ed.h));
+  ed.cantos[biblioArraste.i] = { x, y }; ed.tocado = true;
+  const c = svg.querySelector(`[data-capa-handle="${biblioArraste.i}"]`); if(c){ c.setAttribute('cx', x); c.setAttribute('cy', y); }
+  const poly = document.getElementById('capa-editor-poly'); if(poly) poly.setAttribute('points', ed.cantos.map(p=>`${p.x},${p.y}`).join(' '));
+});
+document.addEventListener('pointerup', () => { if(biblioArraste){ biblioArraste = null; biblioAplicarCorte(); } });
+
+/* ---------- IA: lê a capa, sugere categoria da lista e os cantos ---------- */
+async function biblioLerCapaComIA(dataUrl){
+  const b = state.biblioteca, f = b.formLivro;
+  const m = /^data:([^;]+);base64,(.*)$/.exec(dataUrl || '');
+  if(!m || !f) return;
+  b.livroIaLoading = true; render();
+  const prompt = `Você está vendo a foto da capa de um livro de uma biblioteca escolar. Responda em JSON com exatamente estas chaves:
+{"titulo": string, "autor": string, "isbn": string, "categoria": string, "motivoCategoria": string, "cantos": [[x,y],[x,y],[x,y],[x,y]]}
+Regras:
+- "titulo": título principal do livro. "autor": nome(s) do(s) autor(es), separados por vírgula; "" se não estiver visível.
+- "isbn": só se estiver visível na foto (números e hífens); senão "".
+- "categoria": escolha UMA destas, escrita exatamente igual: ${BIBLIO_CATEGORIAS.join(' | ')}. Use o título, o autor, a editora e as imagens da capa. Se não der para saber, use "Outros".
+- "motivoCategoria": uma frase curta e simples explicando a escolha (ex.: "Romance de Machado de Assis, autor brasileiro").
+- "cantos": os 4 cantos da CAPA do livro na foto, na ordem superior-esquerdo, superior-direito, inferior-direito, inferior-esquerdo, em coordenadas de 0 a 1000 relativas à largura (x) e à altura (y) da imagem. Use [] se a capa não estiver toda visível.
+Não invente informação que não esteja visível ou claramente indicada.`;
+  try{
+    const dados = await callGeminiJSON(prompt, null, { mimeType: m[1], base64: m[2] });
+    const fa = state.biblioteca.formLivro;
+    if(!fa || fa!==f){ b.livroIaLoading = false; return; }
+    if(dados.titulo && !fa.tituloTocado) fa.titulo = dados.titulo;
+    if(dados.autor && !fa.autorTocado) fa.autor = dados.autor;
+    if(dados.isbn && !fa.isbn) fa.isbn = String(dados.isbn).replace(/[^0-9Xx-]/g,'');
+    if(dados.categoria && BIBLIO_CATEGORIAS.includes(dados.categoria)){
+      b.sugestaoCategoria = { categoria: dados.categoria, motivo: String(dados.motivoCategoria||''), fonte:'ia' };
+      if(!fa.categoria) fa.categoria = dados.categoria;
+    }
+    const ed = b.capaEditor;
+    if(ed && !ed.tocado && Array.isArray(dados.cantos) && dados.cantos.length===4 && dados.cantos.every(p => Array.isArray(p) && p.length===2 && p.every(n => typeof n==='number' && n>=0 && n<=1000))){
+      const q = dados.cantos.map(([x,y]) => ({ x: x/1000*ed.w, y: y/1000*ed.h }));
+      if(biblioAreaQuad(q) > ed.w*ed.h*0.12){ ed.cantos = q; await biblioAplicarCorte(); }
+    }
+  }catch(e){
+    b.livroIaError = (e && e.message==='IA_NAO_CONFIGURADA') ? '' : 'A IA não conseguiu ler a capa agora. Preencha os dados à mão — a capa já foi recortada.';
+  }
+  b.livroIaLoading = false;
+  render();
+}
+
+/* ---------- ISBN ---------- */
+function biblioNormalizarIsbn(s){ return String(s||'').replace(/[^0-9Xx]/g,'').toUpperCase(); }
+function biblioIsbnValido(s){
+  const n = biblioNormalizarIsbn(s);
+  if(n.length===13 && /^\d{13}$/.test(n)){ let t=0; for(let i=0;i<12;i++) t += (+n[i])*(i%2?3:1); return (10 - t%10)%10 === +n[12]; }
+  if(n.length===10 && /^\d{9}[\dX]$/.test(n)){ let t=0; for(let i=0;i<10;i++) t += (n[i]==='X'?10:+n[i])*(10-i); return t%11===0; }
+  return false;
+}
+async function biblioLerCodigoBarras(file){
+  const b = state.biblioteca, f = b.formLivro;
+  if(!file || !f) return;
+  b.isbnMsg = 'Lendo o código de barras…'; render();
+  try{
+    if(!('BarcodeDetector' in window)) throw new Error('sem-suporte');
+    const img = await biblioCarregarImagem(await biblioLerArquivo(file));
+    const det = new window.BarcodeDetector({ formats: ['ean_13'] });
+    const cods = await det.detect(biblioCanvasReduzido(img, 1600));
+    const isbn = (cods.map(c => biblioNormalizarIsbn(c.rawValue)).find(v => /^97[89]\d{10}$/.test(v)) || '');
+    if(!isbn) throw new Error('nao-achou');
+    f.isbn = isbn; b.isbnMsg = '✓ ISBN lido: ' + isbn;
+  }catch(e){
+    b.isbnMsg = e.message==='sem-suporte' ? 'Este navegador não lê código de barras. Digite os números que ficam embaixo das barras (começam com 978 ou 979).'
+      : 'Não achei o código de barras nessa foto. Tente de novo, bem de perto e com luz, ou digite os números.';
+  }
+  render();
+}
+
+/* ---------- formulário ---------- */
 function renderBibliotecaFormLivro(){
   const b = state.biblioteca;
   const f = b.formLivro;
+  const { padrao, extras } = biblioCategoriasDisponiveis();
+  const outra = f.categoria && !padrao.includes(f.categoria) && !extras.includes(f.categoria);
+  const sug = b.sugestaoCategoria;
+  const palpite = !sug ? biblioSugerirPorTitulo(f.titulo) : '';
+  const temCapa = !!(f.capaPreview || f.capaUrl);
+  const isbnRuim = f.isbn && !biblioIsbnValido(f.isbn);
+  const assist = b.assistenteCategoria;
+  const passo = assist ? BIBLIO_ASSISTENTE[assist] : null;
   return `
-    <div class="card">
+    <div class="card" data-form-livro="1">
       <h3 style="margin-top:0;">${f.id?'Editar livro':'Novo livro'}</h3>
-      <div style="border:1px dashed var(--paper-line); border-radius:10px; padding:10px 12px; margin-bottom:12px;">
-        <label style="margin-top:0;">🤖 Preencher com foto da capa</label>
-        <p class="muted" style="font-size:.8rem; margin:0 0 8px;">Tire uma foto (ou envie uma imagem) da capa do livro — a IA lê o título, autor, categoria e ISBN pra você conferir antes de salvar.</p>
-        <input type="file" id="biblioteca-capa-input" accept="image/*" capture="environment" ${b.livroIaLoading?'disabled':''}>
-        ${b.livroIaLoading ? `<p class="muted" style="font-size:.82rem; margin-top:6px;"><span class="spinner" style="width:14px; height:14px; display:inline-block; vertical-align:middle; margin-right:6px;"></span>Lendo a capa...</p>` : ''}
-        ${b.livroIaError ? `<p class="err" style="font-size:.82rem;">${esc(b.livroIaError)}</p>` : ''}
+
+      <label style="margin-top:0;">1. Foto da capa ${f.id ? '' : '<span style="color:#b3261e;">(obrigatória)</span>'}</label>
+      <div class="row" style="gap:12px; align-items:flex-start; flex-wrap:wrap;">
+        <div style="width:120px; flex:0 0 120px; aspect-ratio:2/3; border:2px dashed var(--paper-line); border-radius:8px; display:flex; align-items:center; justify-content:center; overflow:hidden; background:var(--surface);">
+          ${temCapa ? `<img src="${f.capaPreview || cloudinaryLargura(f.capaUrl, 240)}" style="width:100%; height:100%; object-fit:contain;" alt="Capa" data-capa-preview="1">` : '<span class="muted" style="font-size:2rem;">📕</span>'}
+        </div>
+        <div style="flex:1 1 220px;">
+          <p class="muted" style="font-size:.82rem; margin:0 0 8px;">Tire a foto com o livro em cima de uma mesa de cor lisa e diferente da capa. O app recorta e endireita sozinho, deixando só a capa.${b.livroIaLoading ? '' : ' Se a IA estiver configurada, ela também lê o título, o autor e sugere a categoria.'}</p>
+          <label class="btn btn-primary btn-sm" style="display:inline-block; margin:0; cursor:pointer; text-transform:none;">📷 ${temCapa ? 'Tirar outra foto' : 'Tirar foto da capa'}
+            <input type="file" id="biblioteca-capa-input" accept="image/*" capture="environment" style="display:none;" ${b.capaProcessando?'disabled':''}>
+          </label>
+          ${b.capaEditor ? `<button class="btn btn-ghost btn-sm" data-action="biblio-capa-ajustar" style="margin-left:6px;">✂️ Ajustar recorte</button>` : ''}
+          ${b.capaProcessando ? '<p class="muted" style="font-size:.82rem; margin-top:6px;">Recortando a capa…</p>' : ''}
+          ${b.livroIaLoading ? '<p class="muted" style="font-size:.82rem; margin-top:6px;">🤖 Lendo os dados da capa…</p>' : ''}
+          ${b.livroIaError ? `<p class="err" style="font-size:.82rem;">${esc(b.livroIaError)}</p>` : ''}
+        </div>
       </div>
-      <label>Título</label>
+      ${renderBiblioCapaEditor()}
+
+      <label>2. Título</label>
       <input type="text" id="biblioteca-livro-titulo-input" value="${esc(f.titulo||'')}">
       <label>Autor</label>
       <input type="text" id="biblioteca-livro-autor-input" value="${esc(f.autor||'')}">
-      <label>Categoria <span class="muted" style="text-transform:none; font-weight:400;">(opcional)</span></label>
-      <input type="text" id="biblioteca-livro-categoria-input" value="${esc(f.categoria||'')}" placeholder="Ex.: Literatura, Técnico, Didático...">
-      <label>ISBN <span class="muted" style="text-transform:none; font-weight:400;">(opcional)</span></label>
-      <input type="text" id="biblioteca-livro-isbn-input" value="${esc(f.isbn||'')}">
-      <label>Quantidade de exemplares</label>
+
+      <label>3. Categoria</label>
+      <select id="biblioteca-livro-categoria-select" data-action="biblio-categoria">
+        <option value="">Escolha…</option>
+        ${padrao.map(c => `<option value="${esc(c)}" ${f.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}
+        ${extras.length ? `<optgroup label="Já usadas neste catálogo">${extras.map(c => `<option value="${esc(c)}" ${f.categoria===c?'selected':''}>${esc(c)}</option>`).join('')}</optgroup>` : ''}
+        <option value="__outra" ${outra||f.categoriaOutra?'selected':''}>➕ Outra categoria…</option>
+      </select>
+      ${(outra || f.categoriaOutra) ? `<input type="text" id="biblioteca-livro-categoria-input" value="${esc(outra ? f.categoria : (f.categoriaNova||''))}" placeholder="Digite a nova categoria" style="margin-top:6px;">` : ''}
+      ${sug && sug.categoria!==f.categoria ? `<p style="font-size:.85rem; margin:6px 0 0;">🤖 Sugestão da IA: <strong>${esc(sug.categoria)}</strong>${sug.motivo?` <span class="muted">— ${esc(sug.motivo)}</span>`:''} <button class="btn btn-ghost btn-sm" data-action="biblio-usar-sugestao" data-cat="${esc(sug.categoria)}">Usar</button></p>` : ''}
+      ${sug && sug.categoria===f.categoria ? `<p class="muted" style="font-size:.82rem; margin:6px 0 0;">🤖 Categoria sugerida pela IA${sug.motivo?': '+esc(sug.motivo):''}. Confira se faz sentido.</p>` : ''}
+      ${palpite && palpite!==f.categoria ? `<p style="font-size:.85rem; margin:6px 0 0;">💡 Pelo título, parece ser <strong>${esc(palpite)}</strong>. <button class="btn btn-ghost btn-sm" data-action="biblio-usar-sugestao" data-cat="${esc(palpite)}">Usar</button></p>` : ''}
+      ${!assist ? `<button class="btn btn-ghost btn-sm" data-action="biblio-assistente" data-passo="inicio" style="margin-top:6px;">🤔 Não sei a categoria — me ajude</button>` : `
+        <div style="border:1px solid var(--paper-line); border-radius:8px; padding:10px 12px; margin-top:8px; background:var(--surface);" data-assistente="1">
+          <p style="margin:0 0 8px;"><strong>${esc(passo.p)}</strong></p>
+          <div class="row" style="gap:6px; flex-wrap:wrap;">
+            ${passo.op.map(([t, alvo]) => `<button class="btn btn-ghost btn-sm" data-action="biblio-assistente" data-passo="${esc(alvo)}">${esc(t)}</button>`).join('')}
+          </div>
+          <button class="btn btn-ghost btn-sm" data-action="biblio-assistente" data-passo="" style="margin-top:6px; font-size:.78rem;">Fechar</button>
+        </div>`}
+
+      <label>4. ISBN <span class="muted" style="text-transform:none; font-weight:400;">(opcional — pode adicionar depois)</span></label>
+      <input type="text" id="biblioteca-livro-isbn-input" value="${esc(f.isbn||'')}" placeholder="Ex.: 978-85-359-0277-8" inputmode="numeric">
+      <p class="muted" style="font-size:.78rem; margin:4px 0 0;">Fica na contracapa, embaixo do código de barras (começa com 978 ou 979).</p>
+      ${'BarcodeDetector' in window ? `<label class="btn btn-ghost btn-sm" style="display:inline-block; margin-top:6px; cursor:pointer; text-transform:none;">📷 Ler o código de barras da contracapa
+        <input type="file" id="biblioteca-isbn-foto-input" accept="image/*" capture="environment" style="display:none;"></label>` : ''}
+      ${b.isbnMsg ? `<p style="font-size:.82rem; margin:4px 0 0;">${esc(b.isbnMsg)}</p>` : ''}
+      ${isbnRuim ? '<p style="font-size:.82rem; margin:4px 0 0; color:#b3261e;">⚠ Esse ISBN parece ter algum número errado. Confira (dá para salvar assim mesmo e corrigir depois).</p>' : ''}
+
+      <label>5. Quantidade de exemplares</label>
       <input type="number" min="1" step="1" id="biblioteca-livro-exemplares-input" value="${f.exemplares||1}">
-      ${state.biblioteca.livroError ? `<p class="err">${esc(state.biblioteca.livroError)}</p>` : ''}
+      ${b.livroError ? `<p class="err">${esc(b.livroError)}</p>` : ''}
+      ${b.capaEnviando ? '<p class="muted">Enviando a capa…</p>' : ''}
       <div class="row" style="margin-top:10px;">
         <button class="btn btn-ghost" data-action="biblioteca-livro-form-cancelar">Cancelar</button>
-        <button class="btn btn-primary" data-action="biblioteca-livro-salvar">Salvar</button>
+        <button class="btn btn-primary" data-action="biblioteca-livro-salvar" ${b.capaEnviando||b.capaProcessando?'disabled':''}>Salvar</button>
       </div>
     </div>
   `;
 }
-// Lê uma foto/imagem da capa do livro e pede pra IA (mesma infraestrutura de IA já usada
-// pelo resto do app — chave configurada pela coordenação em "Configurações de IA") extrair
-// título, autor, categoria e ISBN. Preenche o formulário pro coordenador só conferir e salvar
-// — nunca salva direto, porque a leitura pode errar (letra pequena, reflexo na capa etc.).
-async function bibliotecaPreencherComIAFoto(file){
-  const b = state.biblioteca;
-  if(!file) return;
-  if(!file.type.startsWith('image/')){ b.livroIaError = 'Selecione uma foto ou imagem da capa.'; render(); return; }
-  if(!b.formLivro) return;
-  b.livroIaLoading = true;
-  b.livroIaError = '';
-  render();
-  // Dá ao navegador a chance de pintar o spinner antes da leitura do arquivo + chamada à IA
-  // (mesmo motivo do ajuste feito no Boletim do aluno).
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-  try{
-    const dataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => reject(new Error('leitura-arquivo'));
-      reader.readAsDataURL(file);
-    });
-    const m = /^data:([^;]+);base64,(.*)$/.exec(dataUrl || '');
-    if(!m) throw new Error('leitura-arquivo');
-    const prompt = `Você está vendo a foto da capa de um livro. Identifique os dados abaixo, o melhor que conseguir a partir do que está escrito e visível na capa. Responda em JSON com exatamente estas chaves: {"titulo": string, "autor": string, "categoria": string, "isbn": string}. Regras: "titulo" é o título principal do livro (sem subtítulo, a menos que faça parte do nome). "autor" é o(s) nome(s) do(s) autor(es), separados por vírgula se houver mais de um; use "" se não estiver visível. "categoria" é um gênero/área curto (ex.: Literatura, Técnico, Didático, Infantil, História) com base no que a capa sugere; use "" se não for possível saber. "isbn" é o código ISBN (só números e hífens) se estiver visível na capa; a maioria das capas de frente não mostra ISBN (ele costuma estar na contracapa) — nesse caso use "". Não invente informação que não esteja de fato visível ou claramente indicada na imagem.`;
-    const dados = await callGeminiJSON(prompt, null, { mimeType: m[1], base64: m[2] });
-    const f = b.formLivro;
-    if(!f){ b.livroIaLoading = false; render(); return; }
-    if(dados.titulo) f.titulo = dados.titulo;
-    if(dados.autor) f.autor = dados.autor;
-    if(dados.categoria) f.categoria = dados.categoria;
-    if(dados.isbn) f.isbn = dados.isbn;
-    b.livroIaLoading = false;
-    render();
-  }catch(e){
-    b.livroIaLoading = false;
-    b.livroIaError = e && e.message==='leitura-arquivo' ? 'Não foi possível ler essa imagem. Tente outra foto.' : iaErrorMessage(e);
-    render();
-  }
+// Guarda o que a pessoa digita (para não perder ao redesenhar a tela quando a IA termina de ler).
+function biblioGuardarCampos(){
+  const f = state.biblioteca.formLivro; if(!f) return;
+  const v = id => { const el = document.getElementById(id); return el ? el.value : null; };
+  const t = v('biblioteca-livro-titulo-input'); if(t!==null) f.titulo = t;
+  const a = v('biblioteca-livro-autor-input'); if(a!==null) f.autor = a;
+  const i = v('biblioteca-livro-isbn-input'); if(i!==null) f.isbn = i;
+  const n = v('biblioteca-livro-exemplares-input'); if(n!==null) f.exemplares = n;
+  const c = v('biblioteca-livro-categoria-input'); if(c!==null){ f.categoriaNova = c; if(f.categoriaOutra || !BIBLIO_CATEGORIAS.includes(f.categoria)) f.categoria = c; }
 }
-
-function bibliotecaAbrirFormLivro(id){
+function bibliotecaAbrirFormLivro(id, foco){
   const b = state.biblioteca;
   if(id){
     const l = b.livros.find(x=>x.id===id);
     if(!l) return;
-    b.formLivro = { id:l.id, titulo:l.titulo, autor:l.autor, categoria:l.categoria, isbn:l.isbn, exemplares:l.exemplares };
+    b.formLivro = { id:l.id, titulo:l.titulo, autor:l.autor, categoria:l.categoria||'', isbn:l.isbn||'', exemplares:l.exemplares, capaUrl:l.capaUrl||'' };
   } else {
-    b.formLivro = { id:null, titulo:'', autor:'', categoria:'', isbn:'', exemplares:1 };
+    b.formLivro = { id:null, titulo:'', autor:'', categoria:'', isbn:'', exemplares:1, capaUrl:'' };
   }
-  b.livroError = '';
-  b.livroIaError = '';
-  b.livroIaLoading = false;
+  b.livroError = ''; b.livroIaError = ''; b.livroIaLoading = false; b.isbnMsg = '';
+  b.capaEditor = null; b.capaAjustando = false; b.capaProcessando = false; b.capaEnviando = false;
+  b.sugestaoCategoria = null; b.assistenteCategoria = '';
   render();
+  setTimeout(() => {
+    const card = document.querySelector('[data-form-livro]'); if(card) card.scrollIntoView({ behavior:'smooth', block:'start' });
+    if(foco==='isbn'){ const el = document.getElementById('biblioteca-livro-isbn-input'); if(el) el.focus(); }
+  }, 50);
 }
 function bibliotecaCancelarFormLivro(){
-  state.biblioteca.formLivro = null;
-  state.biblioteca.livroError = '';
+  const b = state.biblioteca;
+  b.formLivro = null; b.livroError = ''; b.capaEditor = null; b.capaAjustando = false;
   render();
 }
 async function bibliotecaSalvarLivro(){
   const b = state.biblioteca;
   const f = b.formLivro;
-  const titulo = document.getElementById('biblioteca-livro-titulo-input').value.trim();
-  const autor = document.getElementById('biblioteca-livro-autor-input').value.trim();
-  const categoria = document.getElementById('biblioteca-livro-categoria-input').value.trim();
-  const isbn = document.getElementById('biblioteca-livro-isbn-input').value.trim();
-  const exemplares = parseInt(document.getElementById('biblioteca-livro-exemplares-input').value) || 0;
+  biblioGuardarCampos();
+  const titulo = (f.titulo||'').trim();
+  const autor = (f.autor||'').trim();
+  const categoria = (f.categoria||'').trim();
+  const isbn = (f.isbn||'').trim();
+  const exemplares = parseInt(f.exemplares) || 0;
+  if(!f.id && !f.capaBlob){ b.livroError = 'Tire a foto da capa do livro antes de salvar.'; render(); return; }
   if(!titulo){ b.livroError = 'Informe o título do livro.'; render(); return; }
+  if(!categoria){ b.livroError = 'Escolha a categoria. Se não souber, toque em "🤔 Não sei a categoria — me ajude".'; render(); return; }
   if(exemplares < 1){ b.livroError = 'Informe pelo menos 1 exemplar.'; render(); return; }
+  let capaUrl = f.capaUrl || '';
+  if(f.capaBlob){
+    b.capaEnviando = true; b.livroError = ''; render();
+    try{
+      const arq = new File([f.capaBlob], 'capa.jpg', { type:'image/jpeg' });
+      capaUrl = await uploadImageToCloudinary(arq, 'biblioteca-capas');
+    }catch(e){
+      b.capaEnviando = false;
+      b.livroError = 'Não foi possível enviar a foto da capa (verifique a internet) e tente salvar de novo.';
+      render(); return;
+    }
+    b.capaEnviando = false;
+  }
   if(f.id){
     const l = b.livros.find(x=>x.id===f.id);
-    Object.assign(l, { titulo, autor, categoria, isbn, exemplares });
+    Object.assign(l, { titulo, autor, categoria, isbn, exemplares, capaUrl: capaUrl || l.capaUrl || '' });
   } else {
-    b.livros.push({ id: cryptoId(), titulo, autor, categoria, isbn, exemplares, createdAt: Date.now() });
+    b.livros.push({ id: cryptoId(), titulo, autor, categoria, isbn, exemplares, capaUrl, createdAt: Date.now() });
   }
   await saveBibliotecaLivros();
-  b.formLivro = null;
-  b.livroError = '';
+  b.formLivro = null; b.livroError = ''; b.capaEditor = null; b.capaAjustando = false;
   render();
 }
+
 async function bibliotecaExcluirLivro(id){
   const b = state.biblioteca;
   const ativos = b.emprestimos.filter(e => e.livroId===id && !e.dataDevolucao);
@@ -21211,7 +21557,20 @@ document.addEventListener('click', (e) => {
   else if(act==='biblioteca-login-submit'){ submitBibliotecaLogin(); }
   else if(act==='biblioteca-logout'){ state.biblioteca.session=false; state.biblioteca.error=''; state.biblioteca.senhaInput=''; state.view='landing'; render(); resetIdleLogoutTimer(); }
   else if(act==='biblioteca-subview'){ state.biblioteca.subview = btn.dataset.sub; render(); }
-  else if(act==='biblioteca-livro-form-abrir'){ bibliotecaAbrirFormLivro(btn.dataset.id||null); }
+  else if(act==='biblioteca-livro-form-abrir'){ bibliotecaAbrirFormLivro(btn.dataset.id||null, btn.dataset.foco||''); }
+  else if(act==='biblio-capa-ajustar'){ biblioGuardarCampos(); state.biblioteca.capaAjustando = true; render(); }
+  else if(act==='biblio-capa-pronto'){ state.biblioteca.capaAjustando = false; render(); }
+  else if(act==='biblio-capa-redetectar'){ const ed = state.biblioteca.capaEditor; if(ed){ ed.cantos = biblioDetectarCantos(ed.fonte); ed.tocado = true; biblioAplicarCorte(); } }
+  else if(act==='biblio-capa-inteira'){ const ed = state.biblioteca.capaEditor; if(ed){ ed.cantos = [{x:0,y:0},{x:ed.w,y:0},{x:ed.w,y:ed.h},{x:0,y:ed.h}]; ed.tocado = true; biblioAplicarCorte(); } }
+  else if(act==='biblio-usar-sugestao'){ const f = state.biblioteca.formLivro; if(f){ biblioGuardarCampos(); f.categoria = btn.dataset.cat; f.categoriaOutra = false; render(); } }
+  else if(act==='biblio-assistente'){
+    const b = state.biblioteca, passo = btn.dataset.passo || '';
+    biblioGuardarCampos();
+    if(passo.startsWith('=')){ if(b.formLivro){ b.formLivro.categoria = passo.slice(1); b.formLivro.categoriaOutra = false; } b.assistenteCategoria = ''; }
+    else b.assistenteCategoria = passo;
+    render();
+  }
+  else if(act==='biblio-filtro-pendencia'){ const b = state.biblioteca; b.filtroPendencia = b.filtroPendencia===btn.dataset.f ? '' : btn.dataset.f; render(); }
   else if(act==='biblioteca-livro-form-cancelar'){ bibliotecaCancelarFormLivro(); }
   else if(act==='biblioteca-livro-salvar'){ bibliotecaSalvarLivro(); }
   else if(act==='biblioteca-livro-excluir'){ bibliotecaExcluirLivro(btn.dataset.id); }
@@ -22000,6 +22359,10 @@ document.addEventListener('input', (e) => {
   }
   else if(el.id==='biblioteca-emp-data-input'){ state.biblioteca.formEmprestimo.dataEmprestimo = el.value; }
   else if(el.id==='biblioteca-emp-prazo-input'){ state.biblioteca.formEmprestimo.dataPrevista = el.value; }
+  else if(el.id==='biblioteca-livro-titulo-input' || el.id==='biblioteca-livro-autor-input' || el.id==='biblioteca-livro-isbn-input' || el.id==='biblioteca-livro-exemplares-input' || el.id==='biblioteca-livro-categoria-input'){
+    const f = state.biblioteca.formLivro;
+    if(f){ if(el.id.includes('titulo')) f.tituloTocado = true; if(el.id.includes('autor')) f.autorTocado = true; biblioGuardarCampos(); }
+  }
   else if(el.id==='biblioteca-busca-livro-input'){
     state.biblioteca.buscaLivro = el.value;
     const selStart = el.selectionStart, selEnd = el.selectionEnd;
@@ -22041,6 +22404,7 @@ document.addEventListener('change', (e) => {
   const el = e.target;
   const act = el.dataset ? el.dataset.action : null;
   const p = state.professor, al = state.aluno, c = state.coordenador;
+  if(act==='biblio-categoria'){ const f = state.biblioteca.formLivro; if(f){ biblioGuardarCampos(); if(el.value==='__outra'){ f.categoriaOutra = true; f.categoria = f.categoriaNova||''; } else { f.categoriaOutra = false; f.categoria = el.value; } render(); } return; }
   if(act==='risco-area'){ salvarAreaDisciplina(el.dataset.disc, el.value); return; }
   if(act==='risco-turma-select'){ riscoState().turmaFiltro = el.value; render(); return; }
   if(act==='sessao-cfg'){ salvarSessaoCampo(el.dataset.campo, el.value); return; }
@@ -22178,7 +22542,8 @@ document.addEventListener('change', (e) => {
   else if(el.id==='freq-painel-turma-select'){ const fp = state.view==='freqmonitor' ? state.freqMonitor.painel : state.professor.freqPainel; fp.turmaId = el.value; render(); }
   else if(el.id==='chamada-data-input'){ const {ch}=getChamadaCtx(); ch.data = el.value; ch.presentes = []; ch.mensagem=''; if(ch.turmaId) loadChamada(); else render(); }
   else if(el.id==='avulso-scan-file-input'){ if(el.files[0]) iniciarLeituraAvulso(el.files[0]); }
-  else if(el.id==='biblioteca-capa-input'){ if(el.files[0]) bibliotecaPreencherComIAFoto(el.files[0]); }
+  else if(el.id==='biblioteca-capa-input'){ biblioGuardarCampos(); if(el.files[0]) biblioCapaSelecionada(el.files[0]); el.value=''; }
+  else if(el.id==='biblioteca-isbn-foto-input'){ biblioGuardarCampos(); if(el.files[0]) biblioLerCodigoBarras(el.files[0]); el.value=''; }
   else if(el.id==='avulso-import-planilha-file'){ if(el.files[0]) processarArquivoRespostasAvulso(el.files[0]); }
   else if(el.id==='avulso-scan-turma-select'){ p.avulso.scanTurmaId = el.value; render(); }
   else if(el.id==='professor-photo-input'){ if(el.files[0]) handleProfessorPhotoUpload(el.files[0]); }
