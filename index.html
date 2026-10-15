@@ -177,6 +177,8 @@
     box-shadow: 0 2px 6px rgba(92,26,43,0.18);
   }
   .school-logo-sm{ width:34px; height:34px; object-fit:contain; display:block; }
+  body.apoio-fonte #root{ font-size:1.2rem; }
+  body.apoio-fonte .q-card p, body.apoio-fonte .q-card label, body.apoio-fonte .q-card textarea, body.apoio-fonte [data-revisao-q]{ font-size:1.25rem !important; line-height:1.5; }
   .school-name-sm{
     font-family:'Source Sans 3', sans-serif;
     font-size:.68rem;
@@ -671,7 +673,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-15-1600</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-15-1800</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -1120,7 +1122,7 @@ const CAMPOS_DO_SERVIDOR = ['fichas', 'fichasHistorico', 'contadores', 'temporad
 const SEG_EMAIL_COORD = 'coordenacao@sala-ceetip.app';
 // Chaves que só a equipe pode gravar (alunos, monitores e biblioteca continuam gravando o resto)
 const SEG_SO_EQUIPE_PREFIXOS = ['assessment', 'pesos-instrumentos', 'notas-manuais', 'bloco-lancamentos', 'disciplinas', 'question-bank',
-  'plano-livro', 'plano-livro-img', 'plano-livro-prog', 'plano-livro-slides', 'plano-livro-videos', 'plano-config', 'plano-visto',
+  'plano-livro', 'plano-livro-parte', 'plano-livro-img', 'plano-livro-prog', 'plano-livro-slides', 'plano-livro-videos', 'plano-config', 'plano-visto',
   'plano-termometro', 'slide-img', 'gemini-api-key-professor', 'avulso-respostas', 'aula-viva', 'seg-teste'];
 const SEG_SO_EQUIPE_CHAVES = ['professores', 'coordenador-senha', 'coordenador-senha-salt', 'pin-liberacao', 'periodos-avaliacao', 'socio-config',
   'sessao-config', 'gabaritos-avulsos', 'gemini-api-key', 'temporada-atual', 'slides-decks', 'avisos', 'cronograma', 'dias-letivos',
@@ -2253,7 +2255,7 @@ function alunoTurmaIdReal(al){
 function assessmentWindowStatus(a){
   const now = Date.now();
   if(a.startAt && now < new Date(a.startAt).getTime()) return 'antes';
-  if(a.endAt && now > new Date(a.endAt).getTime()) return 'depois';
+  if(a.endAt && now > (apoioFimEstendido(a) || new Date(a.endAt).getTime())) return 'depois';
   return 'aberta';
 }
 function resultReleased(a){
@@ -2340,6 +2342,7 @@ function renderPrivacyNotice(){
 
 function render(){
   setTimeout(atualizarTelaAcesa, 0);
+  try{ document.body.classList.toggle('apoio-fonte', state.view==='aluno' && !!alunoApoio().fonteGrande); }catch(e){}
   tabsEl.innerHTML = '';
   const tourEl = document.getElementById('tour-overlay-root');
   if(tourEl) tourEl.innerHTML = renderTourOverlay();
@@ -9466,9 +9469,11 @@ function renderTurmaDetail(t){
             <button class="btn btn-ghost btn-sm" data-action="award-ficha-manual" data-tid="${t.id}" data-sid="${s.id}" title="Dar 1 ficha por participação">+🎫</button>
             <button class="btn btn-ghost btn-sm" data-action="set-student-matricula" data-tid="${t.id}" data-sid="${s.id}">${s.matricula?'Editar matrícula':'Definir matrícula'}</button>
             ${s.passwordHash ? `<button class="btn btn-ghost btn-sm" data-action="reset-student-password" data-tid="${t.id}" data-sid="${s.id}">Redefinir senha</button>` : ''}
+            <button class="btn btn-ghost btn-sm" data-action="apoio-abrir" data-sid="${s.id}" title="Apoio: leitura em voz alta, letra maior, tempo extra, versão de apoio">♿${apoioResumo(s) ? ' ' + apoioResumo(s) : ''}</button>
             <button class="btn btn-danger btn-sm" data-action="remove-student" data-tid="${t.id}" data-sid="${s.id}">✕</button>
           </div>
         </div>
+        ${state.professor.apoioAberto===s.id ? apoioPainelHtml(t, s) : ''}
       `; }).join('')}
       ${t.students.length>0 ? `
         <h3 style="margin-top:22px;">🏆 Ranking de Fichas</h3>
@@ -13342,7 +13347,7 @@ async function saveCoordPeriodos(){
 // ---------------- BACKUP: exportar e restaurar tudo ----------------
 // Formato 2: { _meta, docs: { chave: valorTexto } } — cópia fiel do banco (cada documento como está).
 // "Essencial" deixa de fora só o que é pesado e se refaz sozinho (imagens dos slides, planos importados) ou é passageiro (aula ao vivo).
-const BACKUP_FORA_ESSENCIAL = ['slide-img:', 'plano-livro-img:', 'plano-livro:', 'turmas-antigo-backup',
+const BACKUP_FORA_ESSENCIAL = ['slide-img:', 'plano-livro-img:', 'plano-livro:', 'plano-livro-parte:', 'turmas-antigo-backup',
   'aula-viva', 'quiz-resp:', 'slides-eng:', 'enquete-ativa:', 'quiz-ativo:', 'roleta-ativa:', 'duelo-ativo:', 'slides-sessao-ativa:'];
 function backupState(){ const c = state.coordenador; if(!c.backup) c.backup = { ultimo:null, carregado:false, restaurar:null, msg:'', erro:'', progresso:null }; return c.backup; }
 async function backupCarregarUltimo(){
@@ -16331,6 +16336,7 @@ function renderAlunoMuralAvisosBlock(){
 // Aba "Início": visão geral — recomendações, temporada/gamificação, ranking, trilha e avisos.
 function renderAlunoInicioBlock(){
   const blocos = [
+    renderAlunoRevisaoBlock(),
     renderAlunoPrazoBlock(),
     renderAlunoRecomendacoesBlock(),
     renderAlunoTemporadaBlock(),
@@ -16590,7 +16596,7 @@ function renderResponder(){
   const questionsList = getResponderQuestions(al);
   const qs = questionsList.map((q, idx) => `
       <div class="q-card">
-        <div class="q-head"><span class="q-tag">Questão ${idx+1} · ${q.points} pt(s)</span></div>
+        <div class="q-head"><span class="q-tag">Questão ${idx+1} · ${q.points} pt(s)</span>${q.mapaCaderno ? '' : ouvirBotao(q.id)}</div>
         <p style="margin-top:0; white-space:pre-line;">${qTextoBaseHtml(q)}</p>
         ${q.image ? `<div class="img-preview"><img src="${q.image}" alt="Imagem da questão"></div>` : ''}
         ${q.comando ? `<p style="margin:8px 0 0; font-weight:600;">${esc(q.comando)}</p>` : ''}
@@ -16633,7 +16639,7 @@ function renderResponderTimed(){
       </div>
       <div style="margin-top:14px;">
         <div class="q-card">
-          <div class="q-head"><span class="q-tag">Questão ${idx+1} · ${q.points} pt(s)</span></div>
+          <div class="q-head"><span class="q-tag">Questão ${idx+1} · ${q.points} pt(s)</span>${q.mapaCaderno ? '' : ouvirBotao(q.id)}</div>
           <p style="margin-top:0; white-space:pre-line;">${qTextoBaseHtml(q)}</p>
           ${q.image ? `<div class="img-preview"><img src="${q.image}" alt="Imagem da questão"></div>` : ''}
           ${q.comando ? `<p style="margin:8px 0 0; font-weight:600;">${esc(q.comando)}</p>` : ''}
@@ -21441,7 +21447,7 @@ function planoTurmasVisiveis(){
 async function planoObter(planoId){
   const s = planoState();
   if(!planoId) return null;
-  if(!s.planos[planoId]) s.planos[planoId] = await planoLerJson(`plano-livro:${planoId}`, null);
+  if(!s.planos[planoId]) s.planos[planoId] = await planoLerDoc(planoId);
   if(!s.slides[planoId]) s.slides[planoId] = await planoLerJson(`plano-livro-slides:${planoId}`, {});
   await planoCarregarExtras(planoId);
   return s.planos[planoId];
@@ -21472,7 +21478,7 @@ async function importarPlanoLivro(file){
   const index = await planoLerJson('plano-livro-index', []);
   for(const pl of planos){
     if(!pl.id || !Array.isArray(pl.aulas)) continue;
-    await window.storage.set(`plano-livro:${pl.id}`, JSON.stringify(pl), true);
+    await planoSalvarDoc(pl);
     s.planos[pl.id] = pl;
     const resumo = { id:pl.id, titulo:pl.titulo||pl.id, disciplina:pl.disciplina||'', serie:pl.serie||'', versao:pl.versao||'', descricao:pl.descricao||'', totalAulas:pl.aulas.length, comExercicios: pl.aulas.filter(a=>a.exercicio).length, importadoEm: Date.now() };
     const i = index.findIndex(x=>x.id===pl.id);
@@ -21499,7 +21505,7 @@ async function excluirPlanoLivro(planoId){
   const s = planoState();
   s.index = (await planoLerJson('plano-livro-index', [])).filter(x=>x.id!==planoId);
   await window.storage.set('plano-livro-index', JSON.stringify(s.index), true);
-  try{ await window.storage.delete(`plano-livro:${planoId}`, true); }catch(e){}
+  await planoApagarDoc(planoId);
   const tp = await planoLerJson('plano-livro-turmas', {});
   Object.keys(tp).forEach(t => { if(tp[t]===planoId) delete tp[t]; });
   await window.storage.set('plano-livro-turmas', JSON.stringify(tp), true);
@@ -21597,15 +21603,36 @@ async function aplicarExercicioPlano(turmaId, n){
     professorName: sess ? sess.displayName : 'Coordenação',
     createdAt: Date.now(), updatedAt: null,
   };
+  // Níveis: versão de apoio (3 alternativas) para os alunos escolhidos e desafio extra para quem fizer 80%+
+  const apoioIds = planoApoioSel(turmaId).filter(id => ((turma && turma.students)||[]).some(st => st.id===id));
+  const extras = [];
+  if(apoioIds.length){
+    const nomesApoio = ((turma && turma.students)||[]).filter(st => apoioIds.includes(st.id)).map(st => st.name);
+    assessment.excetoAlunos = apoioIds.slice(); assessment.excetoAlunosNomes = nomesApoio;
+    const codeA = genCode();
+    extras.push({ tipo:'apoio', a: Object.assign({}, assessment, { code: codeA, title: assessment.title + ' (versão de apoio)', questions: planoQuestoesApoio(assessment.questions),
+      excetoAlunos: undefined, excetoAlunosNomes: undefined, somenteAlunos: apoioIds.slice(), somenteAlunosNomes: nomesApoio, origemPlano: Object.assign({}, assessment.origemPlano, { apoio: true }) }) });
+  }
+  if(aula.exercicio.desafio){
+    const q = aula.exercicio.desafio; const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
+    const qd = { id: cryptoId(), type:'mc', text: q.texto, points: 10, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo:'Desafio', options, correctOptionId: options[q.correta].id, explicacao: q.explicacao||'' };
+    if(q.comando) qd.comando = q.comando;
+    const codeD = genCode();
+    assessment.desafioCode = codeD;
+    extras.push({ tipo:'desafio', a: Object.assign({}, assessment, { code: codeD, title: `⭐ Desafio extra — Aula ${n}`, questions: [qd], valeNota: false, endAt: null, desafioCode: undefined,
+      excetoAlunos: undefined, excetoAlunosNomes: undefined, origemPlano: Object.assign({}, assessment.origemPlano, { desafio: true }) }) });
+  }
   await window.storage.set(`assessment:${code}`, JSON.stringify(assessment), true);
   (state.professor.assessments = state.professor.assessments||[]).unshift(assessment);
+  for(const x of extras){ const limpo = JSON.parse(JSON.stringify(x.a)); await window.storage.set(`assessment:${limpo.code}`, JSON.stringify(limpo), true); state.professor.assessments.unshift(limpo); }
   if(state.coordenador && Array.isArray(state.coordenador.assessments)) state.coordenador.assessments.unshift(assessment);
   const fresh = await planoLerJson(`plano-livro-prog:${turmaId}`, prog);
   fresh.dadas = fresh.dadas || {}; fresh.exercicios = fresh.exercicios || {};
   fresh.exercicios[n] = code;
+  extras.forEach(x => { if(x.tipo==='apoio') fresh.apoio = Object.assign({}, fresh.apoio||{}, { [n]: { code: x.a.code, alunos: x.a.somenteAlunos } }); if(x.tipo==='desafio') fresh.desafios = Object.assign({}, fresh.desafios||{}, { [n]: x.a.code }); });
   s.prog[turmaId] = fresh; s.painel = null;
   await planoSalvarProg(turmaId);
-  s.msg = `✅ Exercício da aula ${n} aplicado à turma ${turma?turma.name:''} — código ${code}. ${valeNota ? 'Vale nota (entra em Exercícios de fixação da ' + unidade + ').' : 'Não vale nota (só para treino).'} ${assessment.endAt ? 'Prazo: até ' + planoDataCurta(assessment.endAt) + ', 23h59.' : 'Sem prazo.'} Os alunos já veem em “Provas”.`;
+  s.msg = `✅ Exercício da aula ${n} aplicado à turma ${turma?turma.name:''} — código ${code}. ${valeNota ? 'Vale nota (entra em Exercícios de fixação da ' + unidade + ').' : 'Não vale nota (só para treino).'} ${assessment.endAt ? 'Prazo: até ' + planoDataCurta(assessment.endAt) + ', 23h59.' : 'Sem prazo.'} Os alunos já veem em “Provas”.${apoioIds.length ? ` Versão de apoio para ${apoioIds.length} aluno(s).` : ''}${aula.exercicio.desafio ? ' ⭐ Desafio extra liberado para quem acertar 80% ou mais.' : ''}`;
   render();
 }
 async function planoTrocarValeNota(code, vale){
@@ -21739,12 +21766,12 @@ async function planoCarregarPainel(){
     const dadasTs = Object.values(prog.dadas||{});
     const ultima = dadasTs.length ? Math.max(...dadasTs) : null;
     const hoje = planoAulaDeHoje(plano, prog);
-    const codes = Object.values(prog.exercicios||{});
+    const codes = Object.keys(prog.exercicios||{});
     const nomes = new Set((t.students||[]).map(st => nomeChave(st.name)));
     let somaPct = 0, contados = 0;
     const feitosPorAluno = {}; nomes.forEach(n => feitosPorAluno[n] = 0);
-    await Promise.all(codes.map(async code => {
-      const resp = await planoLerJson(`responses:${code}`, []);
+    await Promise.all(codes.map(async nAula => {
+      const resp = await planoRespostasDaAula(prog, nAula);
       const fizeram = new Set(resp.map(r => nomeChave(r.studentName)).filter(n => nomes.has(n)));
       fizeram.forEach(n => feitosPorAluno[n]++);
       if(nomes.size){ somaPct += fizeram.size / nomes.size; contados++; }
@@ -21780,7 +21807,8 @@ function renderPlanoPainel(){
     <div class="card" data-plano-painel>
       <div class="row" style="justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
         <h3 style="margin:0;">📊 Andamento das turmas</h3>
-        <button class="btn btn-ghost btn-sm" data-action="plano-painel-atualizar">${s.painelCarregando?'⏳ Atualizando…':'↻ Atualizar'}</button>
+        <span class="row" style="gap:6px;"><button class="btn btn-ghost btn-sm" data-action="relatorio-abrir" data-escopo="todas" data-b="1">📈 Resultados de todas as turmas</button>
+        <button class="btn btn-ghost btn-sm" data-action="plano-painel-atualizar">${s.painelCarregando?'⏳ Atualizando…':'↻ Atualizar'}</button></span>
       </div>
       <p class="muted" style="font-size:.84rem;">“Atrás das outras” compara com as turmas do mesmo plano. Quando o calendário de 2027 for ligado, a comparação passa a ser com a data prevista.</p>
       <div class="table-scroll"><table>
@@ -22147,6 +22175,7 @@ function planoQuestaoPorChave(plano, k){
   return q ? { q, aula, tipo } : null;
 }
 function alunoPodeVerAvaliacao(a, al){
+  if(a && Array.isArray(a.excetoAlunos) && (a.excetoAlunos.includes(al.matriculaStudentId) || (a.excetoAlunosNomes||[]).some(n => mesmoNomeAluno(n, al.name)))) return false;
   if(!a || !Array.isArray(a.somenteAlunos)) return true;
   return a.somenteAlunos.includes(al.matriculaStudentId) || (a.somenteAlunosNomes||[]).some(n => mesmoNomeAluno(n, al.name));
 }
@@ -22374,9 +22403,10 @@ async function planoAnalisarHabilidades(turmaId){
   const prog = s.prog[turmaId] || { exercicios:{} };
   const codes = Object.values(prog.exercicios||{});
   const entregas = {}; alunos.forEach(st => entregas[st.id] = { feitos:0, vencidosSemFazer:0 });
-  await Promise.all(codes.map(async code => {
+  await Promise.all(Object.keys(prog.exercicios||{}).map(async nAula => {
+    const code = prog.exercicios[nAula];
     const av = await planoLerJson(`assessment:${code}`, null);
-    const resp = await planoLerJson(`responses:${code}`, []);
+    const resp = await planoRespostasDaAula(prog, nAula);
     const fizeram = new Set(resp.map(r => nomeChave(r.studentName)));
     const venceu = av && av.endAt && new Date(av.endAt).getTime() < Date.now();
     alunos.forEach(st => { if(fizeram.has(nomeChave(st.name))) entregas[st.id].feitos++; else if(venceu) entregas[st.id].vencidosSemFazer++; });
@@ -22434,7 +22464,7 @@ async function carregarEstudarAluno(forcar){
   e.carregando = true; render();
   const ef = await planoCalcularEfetivo([al.turma]);
   const planoId = ef.efetivo[al.turma.id];
-  e.plano = planoId ? await planoLerJson(`plano-livro:${planoId}`, null) : null;
+  e.plano = planoId ? await planoLerDoc(planoId) : null;
   e.prog = await planoLerJson(`plano-livro-prog:${al.turma.id}`, { dadas:{}, exercicios:{} });
   e.slides = planoId ? await planoLerJson(`plano-livro-slides:${planoId}`, {}) : {};
   e.cfg = Object.assign(planoCfgPadrao(), await planoLerJson(`plano-config:${al.turma.id}`, {}));
@@ -22465,8 +22495,10 @@ function renderAlunoEstudarBlock(){
   const dadas = e.plano.aulas.filter(a => e.prog.dadas && e.prog.dadas[a.n]).sort((a,b) => e.prog.dadas[b.n] - e.prog.dadas[a.n]);
   if(!dadas.length) return '<div class="card"><h2>📖 Estudar</h2><p class="muted">Assim que o professor marcar as aulas como dadas, elas aparecem aqui com os slides e as questões para revisar.</p></div>';
   const item = a => {
-    const code = e.prog.exercicios && e.prog.exercicios[a.n];
+    const code = planoCodigoDoAluno(e.prog, a.n, al.matriculaStudentId);
     const feito = code ? estudarMinhaResposta(code) : null;
+    const desafioCode = e.prog.desafios && e.prog.desafios[a.n];
+    const desafioPend = desafioCode && (al.dashboardPendentes||[]).some(p => p.assessment.code===desafioCode);
     const aberta = e.aberta===a.n;
     let exHtml = '';
     if(code && !feito) exHtml = `<p style="margin:6px 0; font-size:.88rem;">📝 Você ainda não fez o exercício desta aula. <button class="btn btn-primary btn-sm" data-action="aluno-sub-view" data-sub="provas">Ir para Minhas provas</button></p>`;
@@ -22503,6 +22535,7 @@ function renderAlunoEstudarBlock(){
         ${(((planoState().videos[e.planoId]||{})[a.n])||[]).length ? planoVideosHtml(e.planoId, a.n, false) : ''}
         ${estudarMapaHtml(e, a)}
         ${exHtml}
+        ${desafioPend ? `<p style="margin:6px 0;"><button class="btn btn-primary btn-sm" data-action="dashboard-start-exam" data-code="${esc(desafioCode)}">⭐ Desafio extra liberado — fazer agora</button> <span class="muted" style="font-size:.8rem;">(não vale nota, vale +3 fichas)</span></p>` : ''}
         ${(() => { const f = (e.feedback||[]).find(x => x.n===a.n); return `<div style="margin-top:10px; font-size:.88rem;">Esta aula ajudou você a entender o conteúdo?
           <button class="btn btn-ghost btn-sm" data-action="estudar-feedback" data-n="${a.n}" data-v="1" style="${f&&f.util?'background:#cfead6;':''}">👍 Sim</button>
           <button class="btn btn-ghost btn-sm" data-action="estudar-feedback" data-n="${a.n}" data-v="0" style="${f&&!f.util?'background:#f4c7c3;':''}">👎 Não muito</button>
@@ -22811,6 +22844,7 @@ function avMontarSlides(d, opts){
   while(m && r < m.ramos.length) ramo();
   if((d.vf||[]).length) L.push({ t:'vf' });
   L.push({ t:'pratica' });
+  if((!estudo && opts && opts.grupo) || (estudo && d.debate)) L.push({ t:'grupo' });
   if(m) L.push({ t:'mapa-final' });
   L.push({ t:'volte' });
   if(!estudo) L.push({ t:'termometro' });
@@ -22845,6 +22879,7 @@ function avInjetarCss(){
   .av-ctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;color:#ddd;font-size:14px;}
   .av-ctrl .btn{min-width:44px;}
   .av-in{isolation:isolate;}
+  body.apoio-fonte .av-in{font-size:2.15cqw;}
   .av-in::before{content:'';position:absolute;inset:0;background:url(data:image/png;base64,${AV_MARCA_COR}) no-repeat 50% 56%/auto 76%;opacity:.05;z-index:-1;pointer-events:none;}
   .av-escuro::before,.av-azul::before{background-image:url(data:image/png;base64,${AV_MARCA_BRANCA});opacity:.06;}
   .av-in::after{content:'CEETIP Governador Marcelo Déda Chagas - DRE04';position:absolute;left:4.4cqw;bottom:1cqw;font-size:.5em;opacity:.55;pointer-events:none;}
@@ -22913,6 +22948,7 @@ function avSlideHtml(d, sl, ctx){
       <div style="color:#F3E7C0;font-size:1.3em;margin-top:.6em;">${esc(d.destaque[1])}</div></div>`;
   case 'nuvem': return avNuvemHtml(d, ctx);
   case 'mapa-inicio': case 'caderno': case 'leitura': case 'mapa-final': return avCadernoHtml(d, sl, ctx);
+  case 'grupo': return avGrupoHtml(d, sl, ctx);
   case 'termometro': return avTermoHtml(d, ctx);
   case 'vf': return avVfHtml(d, ctx);
   case 'figura': {
@@ -22993,7 +23029,7 @@ function avSlideHtml(d, sl, ctx){
       const sess = ctx.sess || {};
       return `<div class="av-in"><div class="av-t">Hora de praticar!</div>
         ${sess.atividadeCode ? `<div class="av-card az av-pop" style="text-align:center;padding:1.4em;"><div style="font-size:3em;">${avIc('FaMobileScreen', C.a)}</div><div style="font-size:1.3em;font-weight:700;color:${C.a};margin:.4em 0;">A atividade chegou!</div><div>Faça agora ou depois, em Minhas provas, até o prazo. Entregue no prazo e ganhe fichas 🎫</div>
-          <button class="btn btn-primary" data-action="av-fazer-atividade" data-code="${esc(sess.atividadeCode)}" style="margin-top:.8em;font-size:1em;">📝 Fazer agora</button></div>`
+          <button class="btn btn-primary" data-action="av-fazer-atividade" data-code="${esc(sess.atividadeApoio && (sess.atividadeApoio.alunos||[]).includes(state.aluno.matriculaStudentId) ? sess.atividadeApoio.code : sess.atividadeCode)}" style="margin-top:.8em;font-size:1em;">📝 Fazer agora</button></div>`
           : `<div class="av-card" style="text-align:center;padding:1.6em;"><div style="font-size:3em;animation:avPulso 1.4s infinite;">${avIc('FaStar', C.o)}</div><div style="font-size:1.2em;margin-top:.4em;">Aguarde: o professor vai escolher entre o <b>quiz por equipes</b> e a <b>atividade no tablet</b>.</div></div>`}
         <div class="av-fonte" style="margin-top:.6em;">No livro: ${esc(d.atividade)}</div></div>`;
     }
@@ -23026,8 +23062,8 @@ async function iniciarAulaViva(turmaId, n){
   await avCarregarRecursos(aula.slides);
   const cfg = await planoCfgCarregar(turmaId);
   if(!s.prog[turmaId]) await planoCarregarTurma(turmaId);
-  const sessCfg = { datashow: !!cfg.datashow, mapaModelo: cfg.mapaModelo, leitura: (cfg.leitura||{})[n] || 0 };
-  av.d = aula.slides; av.n = n; av.slides = avMontarSlides(aula.slides, { leitura: sessCfg.leitura }); av.resp = {}; av.int = {}; av.duvidas = {}; av.painel = null; av.marcando = false; av.ultimaChave = null;
+  const sessCfg = { datashow: !!cfg.datashow, mapaModelo: cfg.mapaModelo, leitura: (cfg.leitura||{})[n] || 0, grupo: (cfg.grupo||{})[n] || 0 };
+  av.d = aula.slides; av.n = n; av.slides = avMontarSlides(aula.slides, { leitura: sessCfg.leitura, grupo: sessCfg.grupo }); av.resp = {}; av.int = {}; av.duvidas = {}; av.painel = null; av.marcando = false; av.ultimaChave = null;
   av.sess = { id: cryptoId(), turmaId, planoId: plano.id, n, idx: 0, total: av.slides.length, revelado: false, fichasDadas: false,
     professorName: p.session ? p.session.displayName : 'Coordenação', startedAt: Date.now(), cfg: sessCfg };
   av.presenting = true;
@@ -23120,6 +23156,8 @@ async function aulaVivaPraticaAtividade(){
   if(!code){ await aplicarExercicioPlano(tid, n); code = (s.prog[tid] && s.prog[tid].exercicios || {})[n]; }
   if(!code) return;
   av.sess.atividadeCode = code; av.entregas = 0;
+  const ap = s.prog[tid] && s.prog[tid].apoio && s.prog[tid].apoio[n];
+  av.sess.atividadeApoio = ap ? { code: ap.code, alunos: ap.alunos } : null;
   await aulaVivaSalvarSessao();
   render();
 }
@@ -23127,7 +23165,7 @@ async function aulaVivaContarEntregas(){
   const av = aulaVivaState(); if(!av.sess || !av.sess.atividadeCode) return;
   const turma = (state.professor.turmas||[]).find(t => t.id===av.sess.turmaId);
   const nomes = new Set(((turma && turma.students)||[]).map(st => nomeChave(st.name)));
-  const resp = await liveLerJson(`responses:${av.sess.atividadeCode}`, []);
+  const resp = [].concat(await liveLerJson(`responses:${av.sess.atividadeCode}`, []), av.sess.atividadeApoio ? await liveLerJson(`responses:${av.sess.atividadeApoio.code}`, []) : []);
   const n = new Set(resp.map(r => nomeChave(r.studentName)).filter(x => !nomes.size || nomes.has(x))).size;
   if(n !== av.entregas){ av.entregas = n; render(); }
 }
@@ -23168,13 +23206,13 @@ async function pollAulaVivaForAluno(){
   const ativa = sess && (Date.now() - (sess.at||0) < 3*3600*1000) ? sess : null;
   const antes = JSON.stringify(al.aulaViva||null);
   if(ativa){
-    if(!al.avPlano || al.avPlano.id!==ativa.planoId) al.avPlano = await planoLerJson(`plano-livro:${ativa.planoId}`, null);
+    if(!al.avPlano || al.avPlano.id!==ativa.planoId) al.avPlano = await planoLerDoc(ativa.planoId);
     const aula = al.avPlano && al.avPlano.aulas.find(a => a.n===ativa.n);
     if(aula && aula.slides){
       avInjetarCss();
       await avCarregarRecursos(aula.slides);
       if(!al.aulaViva || al.aulaViva.id!==ativa.id){ al.avMinha = null; }
-      al.aulaViva = ativa; al.avD = aula.slides; al.avSlides = avMontarSlides(aula.slides, { leitura: (ativa.cfg && ativa.cfg.leitura) || 0 });
+      al.aulaViva = ativa; al.avD = aula.slides; al.avSlides = avMontarSlides(aula.slides, { leitura: (ativa.cfg && ativa.cfg.leitura) || 0, grupo: (ativa.cfg && ativa.cfg.grupo) || 0 });
       if(ativa.modo==='quiz' && al.stage==='aulaviva'){ al.stage = 'dashboard'; al.avAutoVoltar = true; al.subview = 'inicio'; }
       else if(!ativa.modo && al.avAutoVoltar && al.stage==='dashboard'){ al.avAutoVoltar = false; al.stage = 'aulaviva'; }
     }
@@ -23203,7 +23241,7 @@ function renderAulaVivaAluno(){
   const ex = avAlunoExtrasHtml();
   const escuro = avTabletEscuro(s, sl);
   return `<div class="av-wrap"><div class="av-slide ${quieto?'av-quieto':''}" data-av-slide="${sl.t}" ${escuro?'data-av-escuro="1"':''}>${escuro ? avOlheQuadroHtml(al.avD, sl) : avSlideHtml(al.avD, sl, ctx)}${ex.faixaSorteio}${avFaixaDuvidaHtml(s, false)}</div>
-    <div class="av-ctrl"><span>${s.idx+1} / ${s.total}</span><button class="btn btn-sm" data-action="av-duvida-abrir" style="background:#C9A227;color:#3b1018;">❓ Dúvida</button>${ex.msg}<button class="btn btn-ghost btn-sm" data-action="av-sair" style="background:#fff;">Sair</button></div>${ex.modal}</div>`;
+ <div class="av-ctrl"><span>${s.idx+1} / ${s.total}</span>${alunoApoio().ouvir ? '<button class="btn btn-ghost btn-sm" data-action="av-ouvir" style="background:#fff;">🔊 Ouvir</button>' : ''}<button class="btn btn-sm" data-action="av-duvida-abrir" style="background:#C9A227;color:#3b1018;">❓ Dúvida</button>${ex.msg}<button class="btn btn-ghost btn-sm" data-action="av-sair" style="background:#fff;">Sair</button></div>${ex.modal}</div>`;
 }
 async function aulaVivaResponder(i){
   const al = state.aluno; const s = al.aulaViva;
@@ -23380,6 +23418,7 @@ async function avPollInterativo(){
   if(sl.t==='termometro') mudou = await avIntCarregar('termo') || mudou;
   if(sl.t==='vf' && av.sess.vf && av.sess.vf.fase==='pergunta') mudou = await avIntCarregar('vf-'+av.sess.vf.id) || mudou;
   if(sl.t==='figura' && av.sess.toque && av.sess.toque.fig===sl.i) mudou = await avIntCarregar('toque-'+av.sess.toque.id) || mudou;
+  if(sl.t==='grupo' && av.sess.grupos) mudou = await avIntCarregar('grupo-'+av.sess.grupos.id) || mudou;
   const duv = await avListar(`aula-viva-duvida:${av.sess.id}:`);
   if(JSON.stringify(duv) !== JSON.stringify(av.duvidas||{})){ av.duvidas = duv; mudou = true; }
   if(mudou) avRenderSeguro();
@@ -23610,7 +23649,7 @@ function avCtrlExtrasHtml(av){
     ${av.d && av.d.mapa ? `<button class="btn btn-ghost btn-sm" data-action="av-visto-abrir" style="background:#fff;" title="Visto no mapa mental do caderno">📒 Visto</button>` : ''}
     <button class="btn btn-sm ${novas?'av-pisca':''}" data-action="av-duvidas" style="background:${novas?'#C9A227':'#fff'};color:#3b1018;" data-av-duvidas-n="${novas}">❓ Dúvidas${novas?` (${novas})`:''}</button>`;
 }
-function avChave(sess, extra){ return [sess.idx, sess.revelado, sess.vf ? sess.vf.id+sess.vf.i+sess.vf.fase : '', sess.toque ? sess.toque.id+sess.toque.fase : '', extra||''].join('|'); }
+function avChave(sess, extra){ return [sess.idx, sess.revelado, sess.vf ? sess.vf.id+sess.vf.i+sess.vf.fase : '', sess.toque ? sess.toque.id+sess.toque.fase : '', sess.grupos ? sess.grupos.id : '', extra||''].join('|'); }
 
 // ---------- Aluno ----------
 async function avAlunoSalvarInt(tipo, valor){
@@ -23698,6 +23737,7 @@ document.addEventListener('input', (e) => {
   if(e.target.id==='backup-confirmacao'){ const r = backupState().restaurar; if(r) r.confirmacao = e.target.value; }
   if(e.target.id==='av-duvida-txt') state.aluno.avDuvidaTxt = e.target.value;
   if(e.target.id==='av-nuvem-txt'){ avMeu().nuvemRascunho = e.target.value; }
+  if(e.target.id==='av-grupo-txt'){ avMeu().grupoRascunho = e.target.value; }
 });
 document.addEventListener('change', async (e) => {
   if(e.target.id==='av-toque-comando'){ const av = aulaVivaState(); if(av.sess && av.sess.toque){ av.sess.toque.comando = e.target.value.trim().slice(0,120); await aulaVivaSalvarSessao(); avRenderSeguro(); } }
@@ -23725,7 +23765,7 @@ const VISTO_FATOR = { c:1, i:0.5, s:0 };
 const VISTO_FICHAS = { c:3, i:1, s:0 };
 const VISTO_TXT = { c:'✅ completo', i:'½ incompleto', s:'✖ sem mapa' };
 const MAPA_RESPOSTA = '📒 Mapa mental feito no caderno (vale o visto do professor)';
-function planoCfgPadrao(){ return { datashow:false, mapaModelo:'estudar', mapaNoExercicio:true, leitura:{} }; }
+function planoCfgPadrao(){ return { datashow:false, mapaModelo:'estudar', mapaNoExercicio:true, leitura:{}, grupo:{} }; }
 function planoCfg(turmaId){ const s = planoState(); return (s.cfg||{})[turmaId] || planoCfgPadrao(); }
 async function planoCfgCarregar(turmaId){
   const s = planoState(); s.cfg = s.cfg || {};
@@ -23734,7 +23774,7 @@ async function planoCfgCarregar(turmaId){
 }
 async function planoCfgMudar(turmaId, mexer){
   const s = planoState(); s.cfg = s.cfg || {};
-  const c = Object.assign(planoCfgPadrao(), s.cfg[turmaId]||{}); c.leitura = Object.assign({}, c.leitura||{});
+  const c = Object.assign(planoCfgPadrao(), s.cfg[turmaId]||{}); c.leitura = Object.assign({}, c.leitura||{}); c.grupo = Object.assign({}, c.grupo||{});
   mexer(c); s.cfg[turmaId] = c; render();
   try{ await window.storage.set(`plano-config:${turmaId}`, JSON.stringify(c), true); }catch(e){}
 }
@@ -23784,7 +23824,7 @@ function avMapaHtml(m, opts){
 }
 // ---------- Slides do caderno ----------
 const AV_TIPOS_CADERNO = ['mapa-inicio', 'caderno', 'leitura'];
-const AV_TIPOS_INTERATIVOS = ['nuvem', 'relampago', 'resposta', 'vf', 'pratica', 'termometro'];
+const AV_TIPOS_INTERATIVOS = ['nuvem', 'relampago', 'resposta', 'vf', 'pratica', 'termometro', 'grupo'];
 function avCadernoHtml(d, sl, ctx){
   const C = { v:'#6B1F2E', o:'#C9A227', a:'#1F4E79' };
   const m = d.mapa; const sess = ctx.sess || {};
@@ -23909,8 +23949,7 @@ async function planoDarVisto(turmaId, n, marcas){
   render();
   if(fichas.length){ try{ await awardFichasLote(turmaId, fichas); }catch(e){} }
   // nota: o mapa compõe o exercício de fixação da aula
-  const code = ((s.prog[turmaId]||{}).exercicios||{})[n];
-  if(code){
+  for(const code of planoCodigosDaAula(s.prog[turmaId]||{}, n)){
     let a = planoAvaliacaoPorCodigo(code) || await planoLerJson(`assessment:${code}`, null);
     const qm = a && (a.questions||[]).find(q => q.mapaCaderno);
     if(qm){
@@ -24005,10 +24044,478 @@ function estudarMapaHtml(e, a){
   </div>`;
 }
 
+/* ======================= PLANO EM PARTES (abaixo do limite de 1 MB por documento) =======================
+   plano-livro:<id>               → cabeçalho (sem as aulas) + { partes: N }
+   plano-livro-parte:<id>:<k>     → um pedaço da lista de aulas (até ~600 KB)
+   Planos antigos (tudo num documento só, sem "partes") continuam sendo lidos normalmente. */
+const PLANO_PARTE_MAX = 600 * 1024;
+function planoTamanho(o){ try{ return new TextEncoder().encode(JSON.stringify(o)).length; }catch(e){ return JSON.stringify(o).length * 2; } }
+async function planoLerDoc(id){
+  const cab = await planoLerJson(`plano-livro:${id}`, null);
+  if(!cab) return null;
+  if(!cab.partes) return cab;
+  const partes = await Promise.all(Array.from({ length: cab.partes }, (_, k) => planoLerJson(`plano-livro-parte:${id}:${k}`, [])));
+  const pl = Object.assign({}, cab, { aulas: [].concat(...partes) });
+  delete pl.partes;
+  return pl;
+}
+async function planoSalvarDoc(pl){
+  const antigo = await planoLerJson(`plano-livro:${pl.id}`, null);
+  const partes = []; let atual = [], tam = 0;
+  (pl.aulas || []).forEach(a => { const t = planoTamanho(a); if(atual.length && tam + t > PLANO_PARTE_MAX){ partes.push(atual); atual = []; tam = 0; } atual.push(a); tam += t; });
+  if(atual.length || !partes.length) partes.push(atual);
+  for(let k = 0; k < partes.length; k++) await window.storage.set(`plano-livro-parte:${pl.id}:${k}`, JSON.stringify(partes[k]), true);
+  const cab = Object.assign({}, pl); delete cab.aulas; cab.partes = partes.length;
+  await window.storage.set(`plano-livro:${pl.id}`, JSON.stringify(cab), true);
+  for(let k = partes.length; k < ((antigo && antigo.partes) || 0); k++){ try{ await window.storage.delete(`plano-livro-parte:${pl.id}:${k}`, true); }catch(e){} }
+  return partes.length;
+}
+async function planoApagarDoc(id){
+  const cab = await planoLerJson(`plano-livro:${id}`, null);
+  for(let k = 0; k < ((cab && cab.partes) || 0); k++){ try{ await window.storage.delete(`plano-livro-parte:${id}:${k}`, true); }catch(e){} }
+  try{ await window.storage.delete(`plano-livro:${id}`, true); }catch(e){}
+}
+
+/* ======================= INCLUSÃO: apoio por aluno =======================
+   aluno.apoio = { ouvir, fonteGrande, tempoExtra, versaoApoio } (marcado pelo professor/coordenação em Turmas) */
+const APOIO_ITENS = [['ouvir','🔊 Leitura em voz alta das questões'], ['fonteGrande','🔠 Letra maior'], ['tempoExtra','⏱️ Tempo extra (+50% na prova com horário; +2 dias nos exercícios)'], ['versaoApoio','🧩 Recebe a versão de apoio dos exercícios']];
+function alunoApoio(){
+  const al = state.aluno;
+  if(!al.turma || !al.matriculaStudentId) return {};
+  const st = (al.turma.students||[]).find(x => x.id===al.matriculaStudentId);
+  return (st && st.apoio) || {};
+}
+function apoioResumo(s){ const a = s.apoio || {}; const ic = { ouvir:'🔊', fonteGrande:'🔠', tempoExtra:'⏱️', versaoApoio:'🧩' }; return Object.keys(ic).filter(k => a[k]).map(k => ic[k]).join(''); }
+function apoioPainelHtml(t, s){
+  const a = s.apoio || {};
+  return `<div data-apoio-painel="${esc(s.id)}" style="margin:6px 0 10px 28px; background:#f4f8fc; border-radius:8px; padding:8px 10px; font-size:.86rem;">
+    <strong>♿ Apoio para ${esc(s.name)}</strong> <span class="muted">(para alunos com laudo, acompanhamento do AEE ou dificuldade de leitura)</span>
+    ${APOIO_ITENS.map(([k, txt]) => `<label style="display:block; text-transform:none; font-weight:400; cursor:pointer; margin-top:4px;"><input type="checkbox" data-action="apoio-marcar" data-tid="${esc(t.id)}" data-sid="${esc(s.id)}" data-k="${k}" ${a[k]?'checked':''} style="width:auto;"> ${txt}</label>`).join('')}
+  </div>`;
+}
+async function apoioMarcar(turmaId, sid, k, v){
+  const t = (state.professor.turmas||[]).find(x => x.id===turmaId); if(!t) return;
+  const s = (t.students||[]).find(x => x.id===sid); if(!s) return;
+  s.apoio = Object.assign({}, s.apoio||{}, { [k]: !!v });
+  Object.keys(s.apoio).forEach(x => { if(!s.apoio[x]) delete s.apoio[x]; });
+  if(!Object.keys(s.apoio).length) delete s.apoio;
+  render();
+  await saveTurmasToStorage();
+}
+// Ouvir: usa a voz do próprio aparelho (não passa pelo Firebase)
+function ouvirTexto(txt){
+  try{
+    if(!('speechSynthesis' in window)){ alert('Este aparelho não tem leitura em voz alta.'); return; }
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(String(txt||'').replace(/\s+/g, ' '));
+    u.lang = 'pt-BR'; u.rate = 0.95;
+    const voz = window.speechSynthesis.getVoices().find(v => /pt[-_]BR/i.test(v.lang));
+    if(voz) u.voice = voz;
+    window.speechSynthesis.speak(u);
+  }catch(e){}
+}
+function ouvirQuestaoTexto(q){
+  const L = ['A','B','C','D','E'];
+  const ops = (q.options||[]).map((o, i) => `Alternativa ${L[i]}: ${o.text}.`).join(' ');
+  return `${q.text||''}. ${q.comando||''} ${ops}`;
+}
+function ouvirBotao(qid){ return `<button type="button" class="btn btn-ghost btn-sm" data-action="ouvir-questao" data-qid="${esc(qid)}" style="float:right; padding:2px 8px;" title="Ouvir a questão">🔊 Ouvir</button>`; }
+// tempo extra: estende o fim da janela da prova só para o aluno marcado
+function apoioFimEstendido(a){
+  if(!a || !a.endAt || state.view!=='aluno' || !alunoApoio().tempoExtra) return null;
+  const fim = new Date(a.endAt).getTime();
+  if(a.startAt){ const ini = new Date(a.startAt).getTime(); return fim + Math.max(0, fim - ini) * 0.5; }
+  return fim + 2 * 86400000;
+}
+
+/* ======================= EXERCÍCIOS EM 3 NÍVEIS =======================
+   Padrão (todos) · Apoio (3 alternativas, para quem o professor marcar) · Desafio extra (libera para quem fez 80%+) */
+function planoQuestoesApoio(questoes){
+  return questoes.map(q => {
+    if(q.type!=='mc' || (q.options||[]).length <= 3) return Object.assign({}, q, { id: cryptoId() });
+    const certa = q.options.find(o => o.id===q.correctOptionId);
+    const erradas = q.options.filter(o => o.id!==q.correctOptionId);
+    let h = 0; for(const ch of q.text) h = (h*31 + ch.charCodeAt(0)) | 0;
+    const duas = [erradas[Math.abs(h) % erradas.length], erradas[(Math.abs(h) + 1) % erradas.length]];
+    const ops = [certa, ...duas].map(o => ({ id: cryptoId(), text: o.text }));
+    const ordem = Math.abs(h) % 3; const arr = ops.slice(1); arr.splice(ordem, 0, ops[0]);
+    return Object.assign({}, q, { id: cryptoId(), options: arr, correctOptionId: ops[0].id, apoio: true });
+  });
+}
+function planoApoioSel(turmaId){
+  const s = planoState(); s.apoioSel = s.apoioSel || {};
+  if(!s.apoioSel[turmaId]){
+    const t = (state.professor.turmas||[]).find(x => x.id===turmaId);
+    s.apoioSel[turmaId] = ((t && t.students) || []).filter(st => st.apoio && st.apoio.versaoApoio).map(st => st.id);
+  }
+  return s.apoioSel[turmaId];
+}
+async function planoSugerirApoio(turmaId){
+  const s = planoState(); const prog = s.prog[turmaId] || { exercicios:{} };
+  const t = (state.professor.turmas||[]).find(x => x.id===turmaId); if(!t) return;
+  const soma = {}, cont = {};
+  await Promise.all(Object.values(prog.exercicios||{}).map(async code => {
+    const a = planoAvaliacaoPorCodigo(code) || await planoLerJson(`assessment:${code}`, null); if(!a) return;
+    const max = (a.questions||[]).reduce((x, q) => x + (q.points||0), 0) || 10;
+    (await planoLerJson(`responses:${code}`, [])).forEach(r => { const k = nomeChave(r.studentName); soma[k] = (soma[k]||0) + (r.total||0)/max; cont[k] = (cont[k]||0) + 1; });
+  }));
+  const sel = new Set(planoApoioSel(turmaId));
+  t.students.forEach(st => { const k = nomeChave(st.name); if(cont[k] >= 2 && soma[k]/cont[k] < 0.5) sel.add(st.id); });
+  s.apoioSel[turmaId] = [...sel]; s.apoioAberto = true; render();
+}
+function planoApoioHtml(turmaId, aula){
+  const s = planoState(); const sel = planoApoioSel(turmaId);
+  const t = (state.professor.turmas||[]).find(x => x.id===turmaId);
+  const alunos = ((t && t.students) || []).slice().sort((a,b) => a.name.localeCompare(b.name, 'pt-BR'));
+  return `<div data-apoio-sel style="font-size:.85rem; margin-top:6px;">🧩 <strong>Versão de apoio</strong> (mesmas questões, com 3 alternativas): ${sel.length} aluno(s)
+    <button class="btn btn-ghost btn-sm" data-action="apoio-sel-abrir">${s.apoioAberto ? 'fechar' : '✏️ escolher'}</button>
+    ${s.apoioAberto ? `<div style="margin-top:6px; max-height:200px; overflow:auto; border:1px solid #eee; border-radius:8px; padding:6px 8px;">
+      <button class="btn btn-ghost btn-sm" data-action="apoio-sugerir" data-tid="${esc(turmaId)}">💡 Sugerir pelos resultados (média abaixo de 50%)</button>
+      ${alunos.map(st => `<label style="display:block; text-transform:none; font-weight:400; cursor:pointer;"><input type="checkbox" data-action="apoio-sel" data-tid="${esc(turmaId)}" data-sid="${esc(st.id)}" ${sel.includes(st.id)?'checked':''} style="width:auto;"> ${esc(st.name)} ${apoioResumo(st)}</label>`).join('')}
+    </div>` : ''}
+    ${aula.exercicio && aula.exercicio.desafio ? '<span class="muted"> · ⭐ desafio extra liberado para quem acertar 80% ou mais</span>' : ''}</div>`;
+}
+// códigos do exercício de uma aula: padrão, apoio e desafio
+function planoCodigoDoAluno(prog, n, sid){
+  const ap = prog && prog.apoio && prog.apoio[n];
+  if(ap && sid && (ap.alunos||[]).includes(sid)) return ap.code;
+  return prog && prog.exercicios && prog.exercicios[n];
+}
+function planoCodigosDaAula(prog, n){ return [prog && prog.exercicios && prog.exercicios[n], prog && prog.apoio && prog.apoio[n] && prog.apoio[n].code].filter(Boolean); }
+async function planoRespostasDaAula(prog, n){
+  const listas = await Promise.all(planoCodigosDaAula(prog, n).map(c => planoLerJson(`responses:${c}`, [])));
+  return [].concat(...listas);
+}
+// desafio: só aparece para quem acertou 80% ou mais das questões objetivas do exercício da aula
+function desafioVisivel(a, realizadas){
+  if(!a || !a.origemPlano || !a.origemPlano.desafio) return true;
+  return (realizadas||[]).some(r => r.assessment.origemPlano && !r.assessment.origemPlano.desafio && r.assessment.origemPlano.aula===a.origemPlano.aula
+    && r.assessment.origemPlano.planoId===a.origemPlano.planoId && (() => { const obj = (r.assessment.questions||[]).filter(q => q.type==='mc' && !q.annulled); const ans = r.response.answers || {}; const max = obj.reduce((x, q) => x + (q.points||0), 0); const obt = obj.filter(q => ans[q.id]===q.correctOptionId).reduce((x, q) => x + (q.points||0), 0); return max>0 && obt/max >= 0.8; })());
+}
+
+/* ======================= REVISÃO ESPAÇADA =======================
+   revisao-fila:<turmaId>:<alunoId> = { itens:[{ id, texto, comando, opcoes, correta, explicacao, origem, prox, etapa }], feitos }
+   Errou no exercício → volta em 1 semana; acertou → volta em 1 mês; acertou de novo → sai da fila. Errou na revisão → volta em 3 dias. */
+const DIA_MS = 86400000;
+function revisaoChave(turmaId, sid){ return `revisao-fila:${turmaId}:${sid}`; }
+async function revisaoAdicionarErros(a, result){
+  const al = state.aluno;
+  if(!a || !a.origemPlano || a.origemPlano.desafio || a.origemPlano.diagnostica || a.origemPlano.recuperacao || !al.turma || !al.matriculaStudentId) return;
+  const novos = [];
+  (a.questions||[]).forEach(q => {
+    if(q.type!=='mc' || q.annulled) return;
+    if(result.answers && result.answers[q.id]===q.correctOptionId) return;
+    const correta = (q.options||[]).findIndex(o => o.id===q.correctOptionId);
+    if(correta<0) return;
+    novos.push({ id: a.code + ':' + q.id, texto: q.text, comando: q.comando||'', opcoes: q.options.map(o => o.text), correta, explicacao: q.explicacao||'', origem: a.title, prox: Date.now() + 7*DIA_MS, etapa: 1 });
+  });
+  if(!novos.length) return;
+  try{
+    await window.storage.update(revisaoChave(al.turma.id, al.matriculaStudentId), raw => {
+      let f; try{ f = raw ? JSON.parse(raw) : null; }catch(e){ f = null; }
+      f = f || { itens: [], feitos: 0 };
+      const ids = new Set(f.itens.map(x => x.id));
+      novos.forEach(n => { if(!ids.has(n.id)) f.itens.push(n); });
+      f.itens = f.itens.slice(-40);
+      return JSON.stringify(f);
+    });
+    al.revisao2 = null;
+  }catch(e){}
+}
+function revisaoState(){ const al = state.aluno; if(!al.revisao2) al.revisao2 = { fila:null, carregando:false, sessao:null }; return al.revisao2; }
+async function revisaoCarregar(){
+  const al = state.aluno; const r = revisaoState();
+  if(r.carregando || !al.turma || !al.matriculaStudentId) return;
+  r.carregando = true;
+  r.fila = await planoLerJson(revisaoChave(al.turma.id, al.matriculaStudentId), { itens: [], feitos: 0 });
+  r.carregando = false; render();
+}
+function revisaoVencidas(){ const r = revisaoState(); return ((r.fila && r.fila.itens) || []).filter(x => x.prox <= Date.now()); }
+function renderAlunoRevisaoBlock(){
+  const r = revisaoState();
+  if(!r.fila){ if(!r.carregando) setTimeout(revisaoCarregar, 0); return ''; }
+  const S = r.sessao; const L = ['A','B','C','D','E'];
+  if(S){
+    if(S.i >= S.itens.length){
+      const ac = S.resultados.filter(Boolean).length;
+      return `<div class="card" data-revisao-fim><h3 style="margin-top:0;">🔁 Revisão rápida concluída</h3><p>Você acertou <strong>${ac} de ${S.itens.length}</strong>. ${ac===S.itens.length ? 'Excelente! Essas questões voltam daqui a um mês para fixar de vez.' : 'As que você errou voltam em 3 dias — é assim que o cérebro guarda melhor.'}</p>${S.fichas ? '<p>🎫 +1 ficha pela revisão.</p>' : ''}<button class="btn btn-ghost btn-sm" data-action="revisao-fechar">Fechar</button></div>`;
+    }
+    const q = S.itens[S.i]; const resp = S.resposta;
+    return `<div class="card" data-revisao-q>
+      <div class="row" style="justify-content:space-between; align-items:center;"><h3 style="margin:0;">🔁 Revisão rápida · ${S.i+1} de ${S.itens.length}</h3>
+      <button class="btn btn-ghost btn-sm" data-action="ouvir-revisao">🔊 Ouvir</button></div>
+      <div class="muted" style="font-size:.8rem;">De: ${esc(q.origem)}</div>
+      <p style="white-space:pre-line; margin:8px 0;">${esc(q.texto)}</p>${q.comando ? `<p style="font-weight:600;">${esc(q.comando)}</p>` : ''}
+      ${q.opcoes.map((o, i) => { const cls = resp==null ? '' : i===q.correta ? 'background:#cfead6;' : i===resp ? 'background:#f4c7c3;' : '';
+        return `<button class="btn btn-ghost btn-block" data-action="revisao-resp" data-i="${i}" ${resp!=null?'disabled':''} style="text-align:left; margin:4px 0; ${cls}"><b>${L[i]})</b> ${esc(o)}</button>`; }).join('')}
+      ${resp!=null ? `<div style="margin-top:6px; padding:8px 10px; border-radius:8px; background:${resp===q.correta?'#e9f6ec':'#fdecec'};"><strong>${resp===q.correta?'✅ Acertou!':'❌ Ainda não.'}</strong> ${esc(q.explicacao||'')}</div>
+        <button class="btn btn-primary btn-sm" data-action="revisao-proxima" style="margin-top:8px;">${S.i+1 < S.itens.length ? 'Próxima' : 'Terminar'}</button>` : ''}
+    </div>`;
+  }
+  const v = revisaoVencidas();
+  if(!v.length) return '';
+  return `<div class="card" data-revisao-convite style="border:2px solid #1F4E79;">
+    <h3 style="margin-top:0;">🔁 Revisão rápida (2 minutos)</h3>
+    <p style="margin:0 0 8px;">${Math.min(3, v.length)} questão(ões) que você errou em aulas anteriores voltaram para você tentar de novo. Relembrar depois de alguns dias é o que faz a matéria ficar na memória.</p>
+    <button class="btn btn-primary" data-action="revisao-comecar">Começar</button></div>`;
+}
+function revisaoComecar(){
+  const r = revisaoState();
+  r.sessao = { itens: revisaoVencidas().slice(0, 3), i: 0, resposta: null, resultados: [], fichas: false };
+  render();
+}
+function revisaoResponder(i){ const S = revisaoState().sessao; if(!S || S.resposta!=null) return; S.resposta = i; S.resultados[S.i] = i===S.itens[S.i].correta; render(); }
+async function revisaoProxima(){
+  const r = revisaoState(); const S = r.sessao; if(!S) return;
+  S.i++; S.resposta = null;
+  if(S.i >= S.itens.length){
+    const al = state.aluno;
+    const res = {}; S.itens.forEach((q, k) => res[q.id] = S.resultados[k]);
+    try{
+      const novo = await window.storage.update(revisaoChave(al.turma.id, al.matriculaStudentId), raw => {
+        let f; try{ f = raw ? JSON.parse(raw) : null; }catch(e){ f = null; }
+        f = f || { itens: [], feitos: 0 };
+        const fica = [];
+        f.itens.forEach(x => {
+          if(!(x.id in res)){ fica.push(x); return; }
+          if(res[x.id]){ if(x.etapa>=2){ f.feitos = (f.feitos||0) + 1; return; } fica.push(Object.assign({}, x, { etapa: 2, prox: Date.now() + 30*DIA_MS })); }
+          else fica.push(Object.assign({}, x, { etapa: 1, prox: Date.now() + 3*DIA_MS }));
+        });
+        f.itens = fica; f.ultima = Date.now();
+        return JSON.stringify(f);
+      });
+      try{ r.fila = JSON.parse(novo); }catch(e){}
+    }catch(e){}
+    if(S.resultados.some(Boolean)){ S.fichas = true; try{ await awardFichas(al.turma.id, al.matriculaStudentId, 1, 'Fez a revisão rápida', 'revisao'); }catch(e){} }
+  }
+  render();
+}
+
+/* ======================= AVALIAÇÃO DIAGNÓSTICA + RELATÓRIO DE RESULTADOS ======================= */
+async function planoAplicarDiagnostica(turmaId, b){
+  const s = planoState(); const plano = s.planos[s.turmaPlano[turmaId]];
+  const lista = plano && plano.diagnosticas && plano.diagnosticas[String(b)];
+  if(!lista || !lista.length) return;
+  const prog = s.prog[turmaId] || { dadas:{}, exercicios:{} };
+  if(prog.diagnosticas && prog.diagnosticas[b]){ alert('A diagnóstica deste bimestre já foi aplicada (código ' + prog.diagnosticas[b] + ').'); return; }
+  const disc = planoDisciplinaDoProfessor(plano.disciplina||''); const sess = state.professor.session;
+  const code = genCode();
+  const pts = Math.round(10 / lista.length * 100) / 100;
+  const questions = lista.map(q => { const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
+    const nq = { id: cryptoId(), type:'mc', text: q.texto, points: pts, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo: 'Diagnóstica', options, correctOptionId: options[q.correta].id, explicacao: q.explicacao||'' };
+    if(q.comando) nq.comando = q.comando; return nq; });
+  const a = { code, title: `Avaliação diagnóstica — ${b}º bimestre (${plano.disciplina||''})`, instrumento: 'diagnostica', unidade: UNIDADES[Math.max(0, Math.min(3, b-1))],
+    disciplinaId: disc ? disc.id : null, disciplinaName: disc ? disc.name : (plano.disciplina||null), turmaIds: [turmaId], questions,
+    startAt: null, endAt: planoPrazoParaEndAt('7'), agendaTurmas: {}, resultRelease: { mode:'imediato', releaseAt:'' }, securityEnabled: false, minMinutesPerQuestion: null, exigeLiberacao: false,
+    origemPlano: { planoId: plano.id, turmaId, diagnostica: b }, professorId: sess ? sess.id : null, professorName: sess ? sess.displayName : 'Coordenação', createdAt: Date.now(), updatedAt: null };
+  await window.storage.set(`assessment:${code}`, JSON.stringify(a), true);
+  (state.professor.assessments = state.professor.assessments||[]).unshift(a);
+  const fresh = await planoLerJson(`plano-livro-prog:${turmaId}`, prog);
+  fresh.diagnosticas = Object.assign({}, fresh.diagnosticas||{}, { [b]: code });
+  s.prog[turmaId] = Object.assign({}, prog, fresh); await planoSalvarProg(turmaId);
+  s.msg = `✅ Diagnóstica do ${b}º bimestre aplicada — código ${code}. Peça para a turma fazer antes da aula 1 (prazo de 7 dias). Ela entra em “Diagnóstica” nas notas e serve de ponto de partida para o relatório de resultados.`;
+  render();
+}
+function planoDiagnosticaHtml(turmaId, plano, prog){
+  const bs = Object.keys(plano.diagnosticas||{}); if(!bs.length) return '';
+  return `<div class="card" data-plano-diag><h3 style="margin-top:0;">🩺 Avaliação diagnóstica</h3>
+    <p class="muted" style="font-size:.86rem; margin-top:0;">Aplique antes de começar o bimestre: mostra o que a turma já sabe e, comparada com a prova do bimestre, mede quanto ela avançou (no 📈 relatório de resultados).</p>
+    ${bs.map(b => { const code = prog.diagnosticas && prog.diagnosticas[b];
+      return `<div style="margin:4px 0; font-size:.9rem;">${b}º bimestre · ${plano.diagnosticas[b].length} questões · ${code ? `✅ aplicada — código <strong>${esc(code)}</strong>` : `<button class="btn btn-primary btn-sm" data-action="plano-diag-aplicar" data-b="${b}">Aplicar à turma</button>`}</div>`; }).join('')}
+  </div>`;
+}
+async function relatorioCalcular(turmaId, b){
+  const s = planoState();
+  const turma = (state.professor.turmas||[]).find(t => t.id===turmaId);
+  const alunos = (turma && turma.students) || [];
+  const nomes = {}; alunos.forEach(st => nomes[nomeChave(st.name)] = st);
+  const unidade = UNIDADES[Math.max(0, Math.min(3, b-1))];
+  const prog = s.prog[turmaId] || await planoLerJson(`plano-livro-prog:${turmaId}`, { dadas:{}, exercicios:{} });
+  const plano = s.planos[s.turmaPlano[turmaId]] || null;
+  const todas = await Promise.all(((await window.storage.list('assessment:', true)).keys||[]).map(k => planoLerJson(k, null)));
+  const daTurma = todas.filter(a => a && assessmentTurmaIds(a).includes(turmaId));
+  const diags = daTurma.filter(a => a.origemPlano && a.origemPlano.diagnostica==b);
+  const provas = daTurma.filter(a => a.instrumento==='avaliacao' && a.unidade===unidade);
+  const medir = async lista => {
+    const porAluno = {}, porHab = {};
+    for(const a of lista){
+      const max = (a.questions||[]).reduce((x, q) => x + (q.annulled ? 0 : (q.points||0)), 0) || 10;
+      (await planoLerJson(`responses:${a.code}`, [])).forEach(r => {
+        const st = nomes[nomeChave(r.studentName)]; if(!st) return;
+        const p = porAluno[st.id] = porAluno[st.id] || [0, 0]; p[0] += (r.total||0)/max; p[1]++;
+        (a.questions||[]).forEach(q => { const m = /^ENEM (H\d+)/.exec(q.descritorSaeb||''); if(!m || q.type!=='mc' || q.annulled) return;
+          const h = porHab[m[1]] = porHab[m[1]] || [0, 0]; h[0] += (r.answers && r.answers[q.id]===q.correctOptionId) ? 1 : 0; h[1]++; });
+      });
+    }
+    const vals = Object.values(porAluno).map(x => x[0]/x[1]);
+    return { porAluno, porHab, n: vals.length, media: vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length * 100) : null };
+  };
+  const [D, P] = [await medir(diags), await medir(provas)];
+  let melhoraram = 0, ambos = 0;
+  Object.keys(D.porAluno).forEach(id => { if(P.porAluno[id]){ ambos++; if(P.porAluno[id][0]/P.porAluno[id][1] > D.porAluno[id][0]/D.porAluno[id][1]) melhoraram++; } });
+  // exercícios do bimestre (padrão + apoio)
+  const aulasB = plano ? plano.aulas.filter(a => a.bimestre===b).map(a => a.n) : Object.keys(prog.exercicios||{}).map(Number);
+  let somaEntrega = 0, nEx = 0, somaAcerto = 0, nAcerto = 0;
+  for(const n of aulasB){
+    if(!planoCodigosDaAula(prog, n).length) continue;
+    const resp = (await planoRespostasDaAula(prog, n)).filter(r => nomes[nomeChave(r.studentName)]);
+    const fizeram = new Set(resp.map(r => nomeChave(r.studentName)));
+    if(alunos.length){ somaEntrega += fizeram.size / alunos.length; nEx++; }
+    resp.forEach(r => { somaAcerto += Math.min(1, (r.total||0) / 10); nAcerto++; });
+  }
+  const termo = Object.entries(await planoLerJson(`plano-termometro:${turmaId}`, {})).filter(([n, x]) => aulasB.includes(Number(n)) && x && x.total).map(([, x]) => x);
+  const visto = await planoLerJson(`plano-visto:${turmaId}`, {});
+  const vv = Object.entries(visto||{}).filter(([n]) => aulasB.includes(Number(n))).flatMap(([, o]) => Object.values(o||{}));
+  const filas = await Promise.all(alunos.map(st => planoLerJson(revisaoChave(turmaId, st.id), null)));
+  const revisoes = filas.reduce((x, f) => x + ((f && f.feitos) || 0), 0);
+  const comApoio = alunos.filter(st => st.apoio && Object.keys(st.apoio).length).length;
+  return { turmaId, turma: turma ? turma.name : '?', b, diag: D, prova: P, ganho: (D.media!=null && P.media!=null) ? P.media - D.media : null, melhoraram, ambos,
+    entrega: nEx ? Math.round(somaEntrega/nEx*100) : null, acertoEx: nAcerto ? Math.round(somaAcerto/nAcerto*100) : null, exercicios: nEx,
+    termoOk: termo.length ? Math.round(termo.reduce((x, t) => x + t.ok/t.total, 0)/termo.length*100) : null,
+    cadernos: vv.length ? Math.round(vv.reduce((x, v) => x + (VISTO_FATOR[v.v]||0), 0)/vv.length*100) : null,
+    revisoes, comApoio, alunos: alunos.length, aulasDadas: aulasB.filter(n => prog.dadas && prog.dadas[n]).length, totalAulas: aulasB.length, em: Date.now() };
+}
+async function relatorioAbrir(turmaIds, b){
+  const s = planoState();
+  s.relatorio = { b, carregando: true, linhas: [] }; render();
+  for(const t of turmaIds){ try{ if(!s.prog[t]) await planoCarregarTurma(t); s.relatorio.linhas.push(await relatorioCalcular(t, b)); }catch(e){} }
+  s.relatorio.carregando = false; render();
+}
+function relatorioCsv(){
+  const r = planoState().relatorio; if(!r) return;
+  const cab = ['Turma','Bimestre','Aulas dadas','Diagnóstica (%)','Prova do bimestre (%)','Ganho (pontos)','Alunos que melhoraram','Alunos com as duas','Entrega de exercícios (%)','Acerto nos exercícios (%)','Termômetro: entenderam (%)','Cadernos com visto (%)','Revisões concluídas','Alunos com apoio'];
+  const linhas = r.linhas.map(l => [l.turma, l.b, `${l.aulasDadas}/${l.totalAulas}`, l.diag.media, l.prova.media, l.ganho, l.melhoraram, l.ambos, l.entrega, l.acertoEx, l.termoOk, l.cadernos, l.revisoes, l.comApoio]);
+  const habs = [...new Set(r.linhas.flatMap(l => [...Object.keys(l.diag.porHab), ...Object.keys(l.prova.porHab)]))].sort();
+  const extra = [[], ['Por habilidade (ENEM)'], ['Turma', ...habs.flatMap(h => [h + ' diagnóstica %', h + ' prova %'])]].concat(r.linhas.map(l => [l.turma, ...habs.flatMap(h => [l.diag.porHab[h] ? Math.round(l.diag.porHab[h][0]/l.diag.porHab[h][1]*100) : '', l.prova.porHab[h] ? Math.round(l.prova.porHab[h][0]/l.prova.porHab[h][1]*100) : ''])]));
+  const csv = [cab, ...linhas, ...extra].map(l => l.map(v => v==null ? '' : `"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  a.href = url; a.download = `resultados-${r.b}bimestre-${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+function renderRelatorio(){
+  const r = planoState().relatorio; if(!r) return '';
+  const cor = v => v==null ? '#999' : v >= 70 ? '#1d6b31' : v >= 50 ? '#a4521b' : '#b3261e';
+  const pc = v => v==null ? '—' : `<strong style="color:${cor(v)};">${v}%</strong>`;
+  return `<div class="card" data-relatorio>
+    <div class="row" style="justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+      <h3 style="margin:0;">📈 Resultados — ${r.b}º bimestre</h3>
+      <div class="row" style="gap:6px;"><button class="btn btn-ghost btn-sm" data-action="relatorio-csv" ${r.carregando?'disabled':''}>⬇️ Planilha (CSV)</button><button class="btn btn-ghost btn-sm" data-action="relatorio-imprimir" ${r.carregando?'disabled':''}>🖨️ Imprimir</button><button class="btn btn-ghost btn-sm" data-action="relatorio-fechar">Fechar</button></div>
+    </div>
+    <p class="muted" style="font-size:.84rem;">Compara a <strong>diagnóstica</strong> (antes) com a <strong>prova do bimestre</strong> (depois), nas mesmas habilidades do ENEM, e junta os sinais do dia a dia: entrega e acerto dos exercícios, termômetro, cadernos e revisões.</p>
+    ${r.carregando && !r.linhas.length ? '<p>⏳ Calculando…</p>' : ''}
+    ${r.linhas.map(l => {
+      const habs = [...new Set([...Object.keys(l.diag.porHab), ...Object.keys(l.prova.porHab)])].sort((a,b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
+      const pct = x => x ? Math.round(x[0]/x[1]*100) : null;
+      return `<div data-relatorio-turma="${esc(l.turmaId)}" style="border:1px solid #eadfd0; border-radius:10px; padding:10px 12px; margin:10px 0;">
+        <div class="row" style="justify-content:space-between; flex-wrap:wrap; gap:6px;"><strong style="font-size:1.05rem;">${esc(l.turma)}</strong><span class="muted" style="font-size:.82rem;">${l.aulasDadas}/${l.totalAulas} aulas dadas · ${l.alunos} alunos${l.comApoio ? ` · ${l.comApoio} com apoio` : ''}</span></div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin-top:8px; font-size:.86rem;">
+          <div>🩺 Diagnóstica<br>${pc(l.diag.media)} <span class="muted">(${l.diag.n} alunos)</span></div>
+          <div>📝 Prova do bimestre<br>${pc(l.prova.media)} <span class="muted">(${l.prova.n} alunos)</span></div>
+          <div>📈 Avanço<br>${l.ganho==null ? '<span class="muted">aguarda as duas</span>' : `<strong style="color:${l.ganho>=0?'#1d6b31':'#b3261e'};">${l.ganho>=0?'+':''}${l.ganho} pontos</strong>`}${l.ambos ? `<br><span class="muted">${l.melhoraram} de ${l.ambos} alunos melhoraram</span>` : ''}</div>
+          <div>📤 Entrega dos exercícios<br>${pc(l.entrega)}</div>
+          <div>✅ Acerto nos exercícios<br>${pc(l.acertoEx)}</div>
+          <div>🌡️ Entenderam a aula<br>${pc(l.termoOk)}</div>
+          <div>📒 Cadernos com visto<br>${pc(l.cadernos)}</div>
+          <div>🔁 Revisões concluídas<br><strong>${l.revisoes}</strong></div>
+        </div>
+        ${habs.length ? `<details style="margin-top:8px;"><summary style="cursor:pointer; font-size:.86rem;">Por habilidade do ENEM (antes × depois)</summary>
+          ${habs.map(h => { const d = pct(l.diag.porHab[h]), p = pct(l.prova.porHab[h]);
+            return `<div style="display:grid; grid-template-columns:3em 1fr 1fr; gap:6px; align-items:center; font-size:.8rem; margin:3px 0;" title="${esc((typeof HAB_TEXTO!=='undefined' && HAB_TEXTO[h])||'')}"><strong>${h}</strong>
+              <div style="background:#eee; border-radius:4px; height:12px; position:relative;"><div style="width:${d||0}%; height:100%; background:#b9a9ad; border-radius:4px;"></div><span style="position:absolute; right:4px; top:-2px; font-size:.72rem;">${d==null?'—':d+'%'}</span></div>
+              <div style="background:#eee; border-radius:4px; height:12px; position:relative;"><div style="width:${p||0}%; height:100%; background:#6B1F2E; border-radius:4px;"></div><span style="position:absolute; right:4px; top:-2px; font-size:.72rem; color:${p>60?'#fff':'#222'};">${p==null?'—':p+'%'}</span></div></div>`; }).join('')}
+          <div class="muted" style="font-size:.75rem;">Barra clara = diagnóstica · barra vinho = prova do bimestre</div></details>` : ''}
+      </div>`; }).join('')}
+  </div>`;
+}
+
+/* ======================= TRABALHO EM GRUPO NA AULA AO VIVO ======================= */
+const GRUPO_PAPEIS = [['🎤','Relator','escreve no tablet a conclusão do grupo'], ['🧭','Coordenador','garante que todos falem'], ['✍️','Escriba','anota as ideias no caderno'], ['⏱️','Guardião do tempo','avisa quando faltar 2 minutos']];
+function avGrupoPresentes(av){
+  const t = (state.professor.turmas||[]).find(x => x.id===av.sess.turmaId);
+  const alunos = (t && t.students) || [];
+  const ativos = new Set([...Object.keys(av.resp||{}), ...Object.values(av.int||{}).flatMap(o => Object.keys(o||{}))]);
+  const pres = alunos.filter(s => ativos.has(s.id));
+  return pres.length >= Math.max(4, alunos.length * 0.5) ? pres : alunos;
+}
+async function avGrupoFormar(){
+  const av = aulaVivaState(); if(!av.sess) return;
+  const lista = avGrupoPresentes(av).slice();
+  for(let i = lista.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [lista[i], lista[j]] = [lista[j], lista[i]]; }
+  const nG = Math.max(1, Math.round(lista.length / 4));
+  const grupos = Array.from({ length: nG }, (_, g) => ({ g: g + 1, membros: [] }));
+  lista.forEach((s, i) => grupos[i % nG].membros.push({ id: s.id, nome: s.name }));
+  grupos.forEach(G => G.membros.forEach((m, k) => m.papel = k < GRUPO_PAPEIS.length ? k : 2)); // 5º membro em diante: escriba (só 1 relator por grupo)
+  const min = (av.sess.cfg && av.sess.cfg.grupo) || 10;
+  av.sess.grupos = { id: cryptoId(), lista: grupos, ini: Date.now(), min, fichas: [] };
+  av.int = av.int || {};
+  render(); await aulaVivaSalvarSessao();
+}
+async function avGrupoFichas(g){
+  const av = aulaVivaState(); const G = av.sess && av.sess.grupos; if(!G) return;
+  if((G.fichas||[]).includes(g)) return;
+  G.fichas = [...(G.fichas||[]), g]; render(); await aulaVivaSalvarSessao();
+  const grupo = G.lista.find(x => x.g===g);
+  try{ await awardFichasLote(av.sess.turmaId, grupo.membros.map(m => ({ studentId: m.id, amount: 2, motivo: 'Trabalho em grupo da aula', categoria: 'aulaviva' }))); }catch(e){}
+}
+function avGrupoHtml(d, sl, ctx){
+  const C = { v:'#6B1F2E', o:'#C9A227', a:'#1F4E79' };
+  const G = ctx.sess && ctx.sess.grupos;
+  const perg = d.debate || d.pergunta;
+  const barra = G ? `<div class="av-barra" style="background:#eee;"><div style="animation:avBarra ${G.min*60}s linear both;animation-delay:-${((Date.now()-G.ini)/1000).toFixed(1)}s;"></div></div>` : '';
+  if(ctx.estudo) return `<div class="av-in"><div class="av-t">👥 Para debater</div><div style="font-size:1.3em;">${esc(perg)}</div><div class="av-card" style="margin-top:1em;">Converse com um colega ou com alguém da sua casa e escreva a conclusão em 2 frases no caderno.</div></div>`;
+  if(ctx.modo==='prof'){
+    if(!G) return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">👥 Trabalho em grupo</div>${avCirc('FaUsers', C.v, '#fff', 2.2)}</div>
+      <div class="av-card ou" style="font-size:1.25em;color:${C.v};"><b>Para debater:</b> ${esc(perg)}</div>
+      <div style="margin-top:.8em;">Grupos de 4, com papéis: ${GRUPO_PAPEIS.map(p => `${p[0]} ${p[1]}`).join(' · ')}. O relator envia a conclusão pelo tablet.</div>
+      <button class="btn btn-primary" data-action="av-grupo-formar" style="margin-top:1em;font-size:1em;">👥 Formar os grupos agora</button></div>`;
+    const resp = ctx.int['grupo-' + G.id] || {};
+    const porGrupo = {}; Object.values(resp).forEach(r => { if(r && r.g) porGrupo[r.g] = r; });
+    const nL = Math.ceil(G.lista.length / Math.min(4, G.lista.length));
+    return `<div class="av-in" style="font-size:${G.lista.length > 8 ? 1.1 : G.lista.length > 4 ? 1.2 : 1.35}em;"><div class="av-row" style="justify-content:space-between;"><div class="av-t" style="font-size:1em;margin-bottom:.2em;">👥 ${esc(perg)}</div></div>${barra}
+      <div style="display:grid;grid-template-columns:repeat(${Math.min(4, G.lista.length)},1fr);grid-template-rows:repeat(${nL},auto);gap:.5em;margin-top:.4em;max-height:78%;overflow:hidden;">
+        ${G.lista.map(gr => { const c = porGrupo[gr.g]; return `<div class="av-card ${c?'':'cz'}" data-av-grupo="${gr.g}" style="${c?'background:#E9F6EC;color:#222;':'color:#555;'}font-size:.8em;padding:.5em .7em;">
+          <b style="color:${C.v};">Grupo ${gr.g}</b> <span style="font-size:.85em;">${gr.membros.map(m => `${GRUPO_PAPEIS[m.papel][0]} ${esc(firstName(m.nome))}`).join(' · ')}</span>
+          <div style="margin-top:.3em;">${c ? `“${esc(c.texto)}”` : '<i>aguardando o relator…</i>'}</div>
+          ${c ? `<button class="btn btn-ghost btn-sm" data-action="av-grupo-fichas" data-g="${gr.g}" style="margin-top:.3em;background:#fff;" ${(G.fichas||[]).includes(gr.g)?'disabled':''}>${(G.fichas||[]).includes(gr.g)?'✓ +2 fichas dadas':'⭐ +2 fichas para o grupo'}</button>` : ''}</div>`; }).join('')}
+      </div></div>`;
+  }
+  // tablet
+  const al = state.aluno;
+  if(!G) return `<div class="av-in av-azul"><div class="av-t">👥 Trabalho em grupo</div><div style="font-size:1.3em;">${esc(perg)}</div><div style="margin-top:1em;color:#F3E7C0;">Aguarde: o professor vai formar os grupos.</div></div>`;
+  const meu = G.lista.find(gr => gr.membros.some(m => m.id===al.matriculaStudentId));
+  if(!meu) return `<div class="av-in av-azul"><div class="av-t">👥 Trabalho em grupo</div><div style="font-size:1.3em;">${esc(perg)}</div><div style="margin-top:1em;color:#F3E7C0;">Procure o professor para entrar num grupo.</div></div>`;
+  const eu = meu.membros.find(m => m.id===al.matriculaStudentId); const papel = GRUPO_PAPEIS[eu.papel];
+  const enviado = ctx.meu && ctx.meu.grupo && ctx.meu.grupo.id===G.id;
+  return `<div class="av-in av-azul"><div class="av-row" style="justify-content:space-between;"><div class="av-t" style="margin-bottom:.2em;">👥 Grupo ${meu.g}</div><span style="font-size:1.3em;">${papel[0]} <b>${papel[1]}</b></span></div>${barra}
+    <div style="font-size:1.15em;margin:.4em 0;">${esc(perg)}</div>
+    <div style="color:#F3E7C0;font-size:.9em;">Seu papel: ${papel[2]}. Grupo: ${meu.membros.map(m => esc(firstName(m.nome)) + ' (' + GRUPO_PAPEIS[m.papel][1] + ')').join(', ')}.</div>
+    ${eu.papel===0 ? (enviado ? `<div class="av-card ou" style="color:${C.v};margin-top:.6em;">✔ Conclusão enviada: “${esc(ctx.meu.grupo.texto)}”. Pode enviar de novo para corrigir.</div>` : '') + `<div style="display:flex;gap:.4em;margin-top:.6em;"><textarea id="av-grupo-txt" maxlength="280" rows="2" style="flex:1;font-size:1em;border-radius:.4em;padding:.3em .5em;" placeholder="A conclusão do grupo, em 2 frases">${esc((ctx.meu && ctx.meu.grupoRascunho) || '')}</textarea><button class="btn" data-action="av-grupo-enviar" style="background:${C.o};color:${C.v};font-weight:700;">Enviar</button></div>` : '<div style="margin-top:.6em;">📵 Tablet para baixo: converse com o grupo.</div>'}
+  </div>`;
+}
+async function avAlunoGrupoEnviar(){
+  const al = state.aluno; const s = al.aulaViva; const G = s && s.grupos; if(!G) return;
+  const el = document.getElementById('av-grupo-txt'); const t = (el ? el.value : '').trim().slice(0, 280); if(!t) return;
+  const meu = G.lista.find(gr => gr.membros.some(m => m.id===al.matriculaStudentId)); if(!meu) return;
+  const m = avMeu(); m.grupo = { id: G.id, texto: t }; m.grupoRascunho = ''; render();
+  await avAlunoSalvarInt('grupo-' + G.id, { g: meu.g, texto: t });
+}
+function planoGrupoHtml(turmaId, aula){
+  if(!aula.slides) return '';
+  const c = planoCfg(turmaId); const m = (c.grupo||{})[aula.n] || 0;
+  return `<label style="font-size:.85rem; text-transform:none; font-weight:400;">👥 Trabalho em grupo: <select data-action="plano-cfg-grupo" data-tid="${esc(turmaId)}" data-n="${aula.n}" style="width:auto; padding:2px 4px;">
+    ${[0,8,10,15].map(v => `<option value="${v}" ${m===v?'selected':''}>${v ? v + ' min' : 'não fazer'}</option>`).join('')}</select></label>`;
+}
+
 // ---- Fichas por exercício do plano entregue no prazo ----
 async function planoFichasExercicio(a, result){
   const al = state.aluno;
   if(!a || !a.origemPlano || a.instrumento!=='exercicios' || a.origemPlano.recuperacao || !al.turma || !al.matriculaStudentId) return null;
+  if(a.origemPlano.desafio){
+    const q = (a.questions||[])[0]; if(!q || !(result.answers && result.answers[q.id]===q.correctOptionId)) return null;
+    try{ await awardFichas(al.turma.id, al.matriculaStudentId, 3, 'Acertou o desafio extra da aula', 'desafio'); }catch(e){ return null; }
+    return 3;
+  }
   if(a.endAt && Date.now() > new Date(a.endAt).getTime()) return null;
   const objetivas = (a.questions||[]).filter(q => q.type==='mc' && !q.annulled);
   const acertos = objetivas.filter(q => result.answers && result.answers[q.id]===q.correctOptionId).length;
@@ -24039,7 +24546,7 @@ async function planoCarregarResumoInicio(){
     const plano = await planoObter(s.turmaPlano[t.id]);
     if(!plano) continue;
     const prog = await planoLerJson(`plano-livro-prog:${t.id}`, { dadas:{}, exercicios:{} });
-    s.prog[t.id] = { dadas: prog.dadas||{}, exercicios: prog.exercicios||{} };
+    s.prog[t.id] = Object.assign({}, prog, { dadas: prog.dadas||{}, exercicios: prog.exercicios||{} });
     s.termo = s.termo || {}; s.termo[t.id] = await planoLerJson(`plano-termometro:${t.id}`, {});
     s.visto = s.visto || {}; s.visto[t.id] = await planoLerJson(`plano-visto:${t.id}`, {});
     linhas.push({ turmaId: t.id });
@@ -24150,20 +24657,21 @@ function planoAulaDetalheHtml(turmaId, plano, aula, prog, destaque){
         ? `<button class="btn btn-primary btn-sm" data-action="plano-apresentar" data-n="${aula.n}">▶️ Apresentar slides (${slot.totalSlides})</button>`
         : `<label class="btn btn-ghost btn-sm" style="cursor:pointer;">⬆️ Enviar PDF dos slides<input type="file" accept="application/pdf" data-action="plano-slide-unico" data-n="${aula.n}" style="display:none;"></label>`}
       ${aula.exercicio ? (codigo
-        ? `<span style="font-size:.85rem; background:#eef4fb; border-radius:8px; padding:6px 10px;">📝 Exercício aplicado · código <strong>${esc(codigo)}</strong>
+        ? `<span style="font-size:.85rem; background:#eef4fb; border-radius:8px; padding:6px 10px;">📝 Exercício aplicado · código <strong>${esc(codigo)}</strong>${prog.apoio && prog.apoio[aula.n] ? ` · 🧩 apoio <strong>${esc(prog.apoio[aula.n].code)}</strong> (${prog.apoio[aula.n].alunos.length})` : ''}${prog.desafios && prog.desafios[aula.n] ? ` · ⭐ desafio <strong>${esc(prog.desafios[aula.n])}</strong>` : ''}
              <label style="margin-left:8px; cursor:pointer;"><input type="checkbox" data-action="plano-vale-nota-aplicado" data-code="${esc(codigo)}" ${(!aval || aval.valeNota!==false)?'checked':''} style="width:auto;"> vale nota</label>
              <span data-prazo-aplicado style="margin-left:8px;">${aval && aval.endAt ? (new Date(aval.endAt).getTime() < Date.now() ? '⏰ prazo encerrado em ' : '⏰ até ') + planoDataCurta(aval.endAt) : '⏰ sem prazo'}</span>
              <select data-action="plano-estender-prazo" data-code="${esc(codigo)}" style="width:auto; margin-left:6px; padding:2px 4px;"><option value="">mudar prazo…</option><option value="2">+2 dias</option><option value="7">+7 dias</option><option value="0">tirar o prazo</option></select></span>`
         : `<label style="font-size:.85rem; cursor:pointer;"><input type="checkbox" data-action="plano-vale-nota" data-n="${aula.n}" ${vale?'checked':''} style="width:auto;"> Vale nota</label>
            <label style="font-size:.85rem;">Prazo: <select data-action="plano-prazo" data-n="${aula.n}" style="width:auto; padding:2px 4px;">${[['2','2 dias'],['7','7 dias (até a próxima semana)'],['14','14 dias'],['','sem prazo']].map(([v,t]) => `<option value="${v}" ${(s.prazo[aula.n]!=null ? s.prazo[aula.n] : '7')===v?'selected':''}>${t}</option>`).join('')}</select></label>
            <button class="btn btn-sm" style="background:var(--blue,#1F4E79); color:#fff;" data-action="plano-aplicar-exercicio" data-n="${aula.n}">📝 Aplicar exercício à turma (${aula.exercicio.questoes.length} questões${planoMapaDoExercicio(turmaId, aula) ? ' + mapa do caderno' : ''})</button>
-           <button class="btn btn-ghost btn-sm" data-action="plano-editar-exercicio" data-n="${aula.n}">✏️ Editar antes de aplicar</button>`)
+           <button class="btn btn-ghost btn-sm" data-action="plano-editar-exercicio" data-n="${aula.n}">✏️ Editar antes de aplicar</button>
+           ${planoApoioHtml(turmaId, aula)}`)
         : '<span class="muted" style="font-size:.8rem;">Exercício de fixação desta aula ainda não foi preparado.</span>'}
       ${dada
         ? `<button class="btn btn-ghost btn-sm" data-action="plano-desmarcar-dada" data-n="${aula.n}">↩ Desmarcar</button>`
         : `<button class="btn btn-ghost btn-sm" data-action="plano-marcar-dada" data-n="${aula.n}" style="border-color:#1d6b31; color:#1d6b31;">✅ Marcar aula como dada</button>`}
     </div>
-    ${aula.slides ? `<div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;">${planoLeituraHtml(turmaId, aula)}
+    ${aula.slides ? `<div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;">${planoLeituraHtml(turmaId, aula)}${planoGrupoHtml(turmaId, aula)}
       ${aula.slides.mapa ? (() => { const vs = planoVistoDe(turmaId, aula.n); const nv = Object.keys(vs).length; const tot = (((state.professor.turmas||[]).find(t=>t.id===turmaId)||{}).students||[]).length;
         return `<button class="btn btn-ghost btn-sm" data-action="plano-visto-abrir" data-tid="${esc(turmaId)}" data-n="${aula.n}" style="${dada && !nv ? 'border-color:#a4521b; color:#a4521b;' : ''}">📒 Visto no caderno (${nv}/${tot})</button>`; })() : ''}</div>` : ''}
     ${planoState().vistoAberto===aula.n && aula.slides && aula.slides.mapa ? `<div style="margin-top:8px; border:1px solid #eadfd0; border-radius:10px; padding:10px;">${renderVistoPainel(turmaId, aula.n, false)}</div>` : ''}
@@ -24258,9 +24766,12 @@ function renderPlanoLivro(){
         <select data-action="plano-bim-ferr" style="width:auto; padding:2px 6px;">${[1,2,3,4].filter(b => plano.aulas.some(a=>a.bimestre===b && a.exercicio)).map(b => `<option value="${b}" ${(s.bimFerramentas||(hoje?hoje.bimestre:1))===b?'selected':''}>${b}º</option>`).join('')}</select>
         <button class="btn btn-ghost btn-sm" data-action="plano-montar-prova" data-b="${s.bimFerramentas||(hoje?hoje.bimestre:1)}">📝 Montar prova</button>
         <button class="btn btn-ghost btn-sm" data-action="plano-recup-abrir" data-b="${s.bimFerramentas||(hoje?hoje.bimestre:1)}">♻️ Recuperação personalizada</button>
+        <button class="btn btn-ghost btn-sm" data-action="relatorio-abrir" data-escopo="turma" data-b="${s.bimFerramentas||(hoje?hoje.bimestre:1)}">📈 Resultados</button>
       </div>
     </div>
     ${s.registroAberto ? renderPlanoRegistro(turmaId) : ''}
+    ${renderRelatorio()}
+    ${planoDiagnosticaHtml(turmaId, plano, prog)}
     ${s.montarProva && s.montarProva.turmaId===turmaId ? renderMontarProva() : ''}
     ${s.recup && s.recup.turmaId===turmaId ? renderRecuperacao() : ''}
     ${hoje ? planoAulaDetalheHtml(turmaId, plano, hoje, prog, true) : '<div class="card"><h3>🎉 Todas as aulas do plano foram dadas!</h3></div>'}
@@ -24337,6 +24848,7 @@ async function computeGradesForAssessments(assessments, pesos, turma, unidade, o
     if(zeroFill){
       roster.forEach(name => {
         if(respondedNames.has(name)) return;
+        if(a && turma){ const st = (turma.students||[]).find(x => x.name===name); if(st && !alunoPodeVerAvaliacao(a, { matriculaStudentId: st.id, name: st.name })) return; }
         if(!acc[name]) acc[name] = { avaliacaoScores:[], diagnosticaScores:[], exerciciosScores:[], recuperacaoScores:[], exerciciosEntregues:0 };
         const doCaderno = bucketKey==='exerciciosScores' ? vistoPontosParaNota(a, vistosCaderno, turma, name) : 0;
         acc[name][bucketKey].push(max>0 ? doCaderno/max : 0);
@@ -24918,7 +25430,7 @@ async function loadStudentDashboard(){
   realizadas.sort((x,y) => y.response.submittedAt - x.response.submittedAt);
   pendentes.sort((x,y) => (x.assessment.startAt?new Date(x.assessment.startAt).getTime():0) - (y.assessment.startAt?new Date(y.assessment.startAt).getTime():0));
   al.dashboardRealizadas = realizadas;
-  al.dashboardPendentes = pendentes;
+  al.dashboardPendentes = pendentes.filter(pd => desafioVisivel(pd.assessment, realizadas));
   al.dashboardLoading = false;
   if(window.pendingAlunoSub){ al.subview = window.pendingAlunoSub; window.pendingAlunoSub = null; }
   render();
@@ -25176,7 +25688,7 @@ async function submitAnswers(forcado){
   al.stage = resultReleased(a) ? 'resultado' : 'enviado';
   al.fichasMsg = null;
   render();
-  if(!jaGravado && a.origemPlano){ planoFichasExercicio(a, result).then(q => { if(q){ al.fichasMsg = { code: a.code, qtd: q }; render(); } }); }
+  if(!jaGravado && a.origemPlano){ planoFichasExercicio(a, result).then(q => { if(q){ al.fichasMsg = { code: a.code, qtd: q }; render(); } }); revisaoAdicionarErros(a, result); }
 }
 
 /* ---------------- EVENT DELEGATION ---------------- */
@@ -25425,6 +25937,24 @@ document.addEventListener('click', (e) => {
   else if(act==='av-sair'){ exitFullscreenSafe(); state.aluno.stage = 'dashboard'; render(); }
   else if(act==='av-responder'){ aulaVivaResponder(parseInt(btn.dataset.i)); }
   else if(act==='av-nuvem-ocultar'){ avNuvemOcultar(btn.dataset.w); }
+  else if(act==='av-grupo-formar'){ avGrupoFormar(); }
+  else if(act==='av-grupo-fichas'){ avGrupoFichas(parseInt(btn.dataset.g)); }
+  else if(act==='av-grupo-enviar'){ avAlunoGrupoEnviar(); }
+  else if(act==='av-ouvir'){ const el = document.querySelector('.av-slide'); if(el) ouvirTexto(el.innerText); }
+  else if(act==='ouvir-questao'){ const q = ((state.aluno.assessment||{}).questions||[]).find(x => x.id===btn.dataset.qid); if(q) ouvirTexto(ouvirQuestaoTexto(q)); }
+  else if(act==='ouvir-revisao'){ const S = revisaoState().sessao; const q = S && S.itens[S.i]; if(q) ouvirTexto(`${q.texto}. ${q.comando} ` + q.opcoes.map((o, i) => `Alternativa ${'ABCDE'[i]}: ${o}.`).join(' ')); }
+  else if(act==='apoio-abrir'){ state.professor.apoioAberto = state.professor.apoioAberto===btn.dataset.sid ? null : btn.dataset.sid; render(); }
+  else if(act==='apoio-sel-abrir'){ const s = planoState(); s.apoioAberto = !s.apoioAberto; render(); }
+  else if(act==='apoio-sugerir'){ planoSugerirApoio(btn.dataset.tid); }
+  else if(act==='revisao-comecar'){ revisaoComecar(); }
+  else if(act==='revisao-resp'){ revisaoResponder(parseInt(btn.dataset.i)); }
+  else if(act==='revisao-proxima'){ revisaoProxima(); }
+  else if(act==='revisao-fechar'){ revisaoState().sessao = null; render(); }
+  else if(act==='plano-diag-aplicar'){ planoAplicarDiagnostica(planoState().turmaSel, parseInt(btn.dataset.b)); }
+  else if(act==='relatorio-abrir'){ const s = planoState(); const b = parseInt(btn.dataset.b)||1; const ids = btn.dataset.escopo==='todas' ? planoTurmasVisiveis().filter(t => s.turmaPlano[t.id]).map(t => t.id) : [s.turmaSel]; relatorioAbrir(ids, b); window.scrollTo(0,0); }
+  else if(act==='relatorio-csv'){ relatorioCsv(); }
+  else if(act==='relatorio-fechar'){ planoState().relatorio = null; render(); }
+  else if(act==='relatorio-imprimir'){ const el = document.querySelector('[data-relatorio]'); if(el){ el.querySelectorAll('details').forEach(d => d.open = true); const w = window.open('', '_blank'); if(w){ w.document.write(`<html><head><meta charset="utf-8"><title>Resultados</title><style>body{font-family:Arial,sans-serif;padding:20px;} button{display:none;} .muted{color:#666;}</style></head><body><h2>CEETIP Governador Marcelo Déda Chagas - DRE04</h2>${el.innerHTML}</body></html>`); w.document.close(); w.focus(); w.print(); } } }
   else if(act==='av-caderno-dica'){ avCadernoDica(parseInt(btn.dataset.k)); }
   else if(act==='av-leitura-iniciar'){ avLeituraIniciar(parseInt(btn.dataset.i)); }
   else if(act==='av-visto-abrir'){ const av = aulaVivaState(); planoVistoCarregar(av.sess.turmaId).then(() => { av.painel = 'visto'; render(); }); }
@@ -26201,6 +26731,9 @@ document.addEventListener('change', (e) => {
   if(act==='plano-cfg-datashow'){ planoCfgMudar(el.dataset.tid, c => { c.datashow = el.checked; }); return; }
   if(act==='plano-cfg-modelo'){ planoCfgMudar(el.dataset.tid, c => { c.mapaModelo = el.value; }); return; }
   if(act==='plano-cfg-mapaex'){ planoCfgMudar(el.dataset.tid, c => { c.mapaNoExercicio = el.checked; }); return; }
+  if(act==='plano-cfg-grupo'){ planoCfgMudar(el.dataset.tid, c => { c.grupo[el.dataset.n] = parseInt(el.value)||0; }); return; }
+  if(act==='apoio-marcar'){ apoioMarcar(el.dataset.tid, el.dataset.sid, el.dataset.k, el.checked); return; }
+  if(act==='apoio-sel'){ const s = planoState(); const l = new Set(planoApoioSel(el.dataset.tid)); if(el.checked) l.add(el.dataset.sid); else l.delete(el.dataset.sid); s.apoioSel[el.dataset.tid] = [...l]; render(); return; }
   if(act==='plano-cfg-leitura'){ planoCfgMudar(el.dataset.tid, c => { c.leitura[el.dataset.n] = parseInt(el.value)||0; }); return; }
   if(act==='plano-estender-prazo'){ if(el.value!=='') planoEstenderPrazo(el.dataset.code, el.value); return; }
   if(act==='plano-vale-nota'){ planoState().valeNota[parseInt(el.dataset.n)] = el.checked; return; }
