@@ -671,7 +671,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-14-1300</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-15-0030</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -1966,6 +1966,9 @@ function renderProfessor(){
   if(p.subview==='slides' && p.slides.presentationMode && p.slides.current){
     return renderSlidesPresentation();
   }
+  if(p.aulaViva && p.aulaViva.presenting && p.aulaViva.sess){
+    return renderAulaVivaProf();
+  }
   const topBar = `
     <div class="row" style="align-items:center; justify-content:space-between; margin-bottom:10px; flex-wrap:wrap; gap:8px;">
       <span class="row" style="align-items:center; gap:8px; font-size:.85rem; flex:1 1 auto; min-width:0;">
@@ -2018,6 +2021,7 @@ function renderProfessor(){
     { action:'sub-view', sub:'leitura', icon:'🔍', label:'Leitura de Gabaritos', group:'🖨️ Provas em Papel' },
     { action:'sub-view', sub:'avulso', icon:'🗒️', label:'Gabarito Avulso', group:'🖨️ Provas em Papel' },
 
+    { action:'sub-view', sub:'planolivro', icon:'🗓️', label:'Plano de Aulas do Livro', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'livros', icon:'📘', label:'Livro Didático', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'mural', icon:'📌', label:'Mural de Avisos', group:'🎮 Recursos & Interação' },
     { action:'sub-view', sub:'material', icon:'📎', label:'Material da Turma', group:'🎮 Recursos & Interação' },
@@ -2048,6 +2052,7 @@ function renderProfessor(){
   else if(p.subview==='leitura') content = renderLeituraGabaritos();
   else if(p.subview==='avulso') content = renderGabaritoAvulso();
   else if(p.subview==='livros') content = renderLivrosDidaticos(false);
+  else if(p.subview==='planolivro') content = renderPlanoLivro();
   else if(p.subview==='painel') content = renderProfessorPainel();
   else if(p.subview==='mural') content = renderMuralAvisos(true);
   else if(p.subview==='material') content = renderMateriais();
@@ -7570,6 +7575,7 @@ function renderQuestionEditor(q, idx, showRemove){
         </div>
       </div>
       <textarea data-action="q-text" data-qid="${q.id}" placeholder="Enunciado da questão">${esc(q.text)}</textarea>
+      ${q.comando!=null ? `<label style="font-size:.8rem; margin-top:4px;">Comando (aparece depois da imagem)</label><textarea data-action="q-comando" data-qid="${q.id}" placeholder="Comando da questão">${esc(q.comando)}</textarea>` : ''}
       <div class="row">
         <input type="text" data-action="q-descritor" data-qid="${q.id}" value="${esc(q.descritorSaeb||'')}" placeholder="Descritor SAEB (ex: D19)">
         <input type="text" data-action="q-conteudo" data-qid="${q.id}" value="${esc(q.conteudo||'')}" placeholder="Conteúdo (ex: Frações)">
@@ -7578,6 +7584,122 @@ function renderQuestionEditor(q, idx, showRemove){
       ${extra}
     </div>
   `;
+}
+
+
+// ---- Correção de dissertativas com apoio da IA (o professor sempre revisa e confirma) ----
+function iaCorrState(){
+  const p = state.professor; const code = p.resultsFor ? p.resultsFor.code : '';
+  if(!p.iaCorr || p.iaCorr.code !== code) p.iaCorr = { code, carregando:false, progresso:'', erro:'', sug:{} };
+  return p.iaCorr;
+}
+function iaCorrChave(r, qid){ return `${r.studentName}::${r.submittedAt}::${qid}`; }
+function iaPromptDissertativa(q, resposta){
+  return `Você é um professor do Ensino Médio corrigindo uma questão dissertativa de um aluno brasileiro.
+Questão: ${q.text}
+Resposta esperada (modelo do professor): ${q.modelAnswer || '(não informada — use seu conhecimento do conteúdo)'}
+Valor da questão: ${q.points} pontos.
+Resposta do aluno: ${resposta}
+
+Dê uma nota de 0 a ${q.points}, em passos de 0,5. Avalie se as ideias principais da resposta esperada aparecem, mesmo com outras palavras. Não desconte por ortografia. Resposta pessoal coerente com o tema vale ponto. Resposta em branco, sem sentido ou fora do tema vale 0.
+Responda SOMENTE com JSON: {"nota": número, "comentario": "uma ou duas frases curtas para o aluno, em português, dizendo o que acertou e o que faltou, de forma encorajadora"}`;
+}
+function iaArredondaNota(n, max){ n = Math.round(Number(n)*2)/2; if(isNaN(n)) return null; return Math.max(0, Math.min(max, n)); }
+async function iaSugerirDissertativas(somenteIdx){
+  const p = state.professor; const a = p.resultsFor; const st = iaCorrState();
+  if(st.carregando) return;
+  guardarRascunhoCorrecao();
+  const tarefas = [];
+  p.responses.forEach((r, idx) => {
+    if(somenteIdx!=null && idx!==somenteIdx) return;
+    (r.details||[]).forEach(d => {
+      if(!d.pending) return;
+      const q = a.questions.find(x=>x.id===d.questionId);
+      if(!q || q.type!=='dissertativa') return;
+      const chave = iaCorrChave(r, q.id);
+      if(st.sug[chave] && st.sug[chave].nota!=null) return;
+      tarefas.push({ r, q, chave });
+    });
+  });
+  if(!tarefas.length){ st.erro = 'Não há dissertativas pendentes sem sugestão.'; render(); return; }
+  st.carregando = true; st.erro = '';
+  for(let i=0; i<tarefas.length; i++){
+    const { r, q, chave } = tarefas[i];
+    st.progresso = `Analisando ${i+1} de ${tarefas.length}…`; render();
+    const resposta = String(r.answers[q.id]||'').trim();
+    if(!resposta){ st.sug[chave] = { nota:0, comentario:'Resposta em branco.' }; continue; }
+    try{
+      const out = await callGeminiJSON(iaPromptDissertativa(q, resposta), p.myIaKey || null);
+      const nota = iaArredondaNota(out && out.nota, q.points);
+      st.sug[chave] = nota==null ? { erro:'resposta inesperada da IA' } : { nota, comentario: String((out && out.comentario)||'').slice(0,400) };
+    }catch(e){
+      st.sug[chave] = { erro: iaErrorMessage(e) };
+      if(['IA_NAO_CONFIGURADA','IA_CHAVE_INVALIDA'].includes(e.message)){ st.erro = iaErrorMessage(e); break; }
+    }
+  }
+  st.carregando = false; st.progresso = '';
+  render();
+}
+function guardarRascunhoCorrecao(){
+  const p = state.professor; if(p.correctingResponseIdx==null) return;
+  const r = p.responses[p.correctingResponseIdx]; if(!r) return;
+  p.correcaoRascunho = p.correcaoRascunho || {};
+  r.details.forEach((d, di) => {
+    const el = document.getElementById(`correct-score-${p.correctingResponseIdx}-${di}`);
+    if(el && el.value!=='') p.correcaoRascunho[iaCorrChave(r, d.questionId)] = el.value;
+  });
+}
+async function iaAceitarTodasSugestoes(){
+  const p = state.professor; const a = p.resultsFor; const st = iaCorrState();
+  let n = 0, alunos = 0;
+  p.responses.forEach(r => {
+    let mexeu = false;
+    (r.details||[]).forEach(d => {
+      if(!d.pending) return;
+      const sg = st.sug[iaCorrChave(r, d.questionId)];
+      if(!sg || sg.nota==null) return;
+      d.score = sg.nota; d.pending = false;
+      d.feedback = (sg.comentario ? sg.comentario + ' ' : '') + '(Correção sugerida pela IA e revisada pelo professor.)';
+      n++; mexeu = true;
+    });
+    if(mexeu){ r.total = r.details.reduce((s,d)=>s+(d.score||0),0); if(!r.details.some(d=>d.pending)) alunos++; }
+  });
+  if(!n){ alert('Não há sugestões para aplicar.'); return; }
+  if(!confirm(`Lançar ${n} nota(s) sugerida(s) pela IA? Confira a tabela antes — depois ainda dá para corrigir uma a uma lançando a nota manualmente.`)) return;
+  await window.storage.set(`responses:${a.code}`, JSON.stringify(p.responses), true);
+  p.correcoesPendentesCount = Math.max(0, (p.correcoesPendentesCount||0) - alunos);
+  p.correctingResponseIdx = null;
+  render();
+}
+function renderIaCorrecaoCard(a, responses){
+  const pend = [];
+  responses.forEach((r, idx) => (r.details||[]).forEach(d => {
+    if(!d.pending) return; const q = a.questions.find(x=>x.id===d.questionId);
+    if(q && q.type==='dissertativa') pend.push({ r, idx, q });
+  }));
+  if(!pend.length) return '';
+  const st = iaCorrState();
+  const comSug = pend.filter(x => { const sg = st.sug[iaCorrChave(x.r, x.q.id)]; return sg && sg.nota!=null; });
+  return `
+    <div class="card" data-ia-correcao style="background:#f4f0fb; border:1px solid #cdbfe8; margin-top:16px;">
+      <h3 style="margin-top:0;">🤖 Correção das dissertativas com apoio da IA</h3>
+      <p class="muted" style="font-size:.86rem; margin-top:0;">${pend.length} resposta(s) dissertativa(s) esperando correção. A IA compara cada resposta com a resposta-modelo e sugere nota e comentário. <strong>Nada é lançado sem você conferir e confirmar.</strong></p>
+      ${st.erro ? `<p class="err">${esc(st.erro)}</p>` : ''}
+      ${st.carregando ? `<p>⏳ ${esc(st.progresso)}</p>` : `<button class="btn btn-primary btn-sm" data-action="ia-sugerir-todas">🤖 Sugerir notas para todas as pendentes</button>`}
+      ${comSug.length ? `
+        <div class="table-scroll" style="margin-top:10px;"><table>
+          <tr><th>Aluno</th><th>Resposta</th><th>Nota sugerida</th><th>Comentário para o aluno</th></tr>
+          ${comSug.map(x => { const sg = st.sug[iaCorrChave(x.r, x.q.id)]; return `<tr>
+            <td>${esc(x.r.studentName)}</td>
+            <td style="font-size:.85rem; max-width:320px;">${esc(String(x.r.answers[x.q.id]||'(em branco)'))}</td>
+            <td><strong>${String(sg.nota).replace('.',',')}</strong> / ${x.q.points}</td>
+            <td style="font-size:.85rem;">${esc(sg.comentario||'')}</td></tr>`; }).join('')}
+        </table></div>
+        <div class="row" style="margin-top:10px; gap:8px; flex-wrap:wrap;">
+          <button class="btn btn-primary btn-sm" data-action="ia-aceitar-todas">✅ Conferi — lançar as ${comSug.length} nota(s)</button>
+          <span class="muted" style="font-size:.82rem;">Discorda de alguma? Clique em "Corrigir" no aluno e mude a nota antes.</span>
+        </div>` : ''}
+    </div>`;
 }
 
 function renderCorrectResponsePanel(a, r, idx){
@@ -7591,9 +7713,17 @@ function renderCorrectResponsePanel(a, r, idx){
           if(!q) return '';
           return `
             <div style="margin-top:10px;">
-              <p style="margin:0 0 4px;"><strong>${esc(q.text)}</strong></p>
+              <p style="margin:0 0 4px;"><strong>${esc(q.text)}${q.comando?' '+esc(q.comando):''}</strong></p>
               <p class="muted" style="margin:0 0 6px;">Resposta do aluno: ${esc(r.answers[q.id]||'(em branco)')}</p>
-              <input type="number" min="0" max="${q.points}" step="0.5" id="correct-score-${idx}-${d.di}" placeholder="Nota (0 a ${q.points})" style="max-width:160px;">
+              ${q.modelAnswer ? `<p style="margin:0 0 6px; font-size:.85rem;">📖 <strong>Resposta esperada:</strong> ${esc(q.modelAnswer)}</p>` : ''}
+              ${(() => { const st = iaCorrState(); const ch = iaCorrChave(r, q.id); const sg = st.sug[ch]; const rasc = (state.professor.correcaoRascunho||{})[ch];
+                 const val = rasc!=null ? rasc : (sg && sg.nota!=null ? sg.nota : '');
+                 return `<div class="row" style="gap:8px; align-items:center; flex-wrap:wrap;">
+                   <input type="number" min="0" max="${q.points}" step="0.5" id="correct-score-${idx}-${d.di}" value="${val}" placeholder="Nota (0 a ${q.points})" style="max-width:160px;">
+                   ${st.carregando ? '<span class="muted">⏳ IA analisando…</span>' : `<button class="btn btn-ghost btn-sm" data-action="ia-sugerir-resposta" data-idx="${idx}">🤖 Sugerir nota com IA</button>`}
+                 </div>
+                 ${sg && sg.nota!=null ? `<p style="margin:4px 0 0; font-size:.85rem; background:#f4f0fb; border-radius:6px; padding:6px 8px;">🤖 Sugestão: <strong>${String(sg.nota).replace('.',',')}</strong> — ${esc(sg.comentario||'')}</p>` : ''}
+                 ${sg && sg.erro ? `<p class="err" style="margin:4px 0 0;">${esc(sg.erro)}</p>` : ''}`; })()}
             </div>
           `;
         }).join('')}
@@ -7654,6 +7784,7 @@ function renderResults(){
       ${renderStatCards(responses.length, avg, best, worst, max)}
       ${renderQuestionChart(a, responses, max, true)}
       ${renderDistributionChart(responses, max)}
+      ${renderIaCorrecaoCard(a, responses)}
       <h3 style="margin-top:22px;">Respostas individuais</h3>
       <div class="table-scroll">
       <table>
@@ -8073,7 +8204,7 @@ function renderAiGen(){
               <input type="checkbox" data-action="toggle-ai-result" data-idx="${idx}" ${g.selected.includes(idx)?'checked':''} style="margin-top:4px;">
               <span>
                 <span class="q-tag">${questionTagLabel(q.type)} · ${q.points} pt(s)</span><br>
-                <strong>${esc(q.text)}</strong>
+                <strong>${esc(q.text)}${q.comando?' '+esc(q.comando):''}</strong>
                 ${q.type==='mc' ? '<br>' + q.options.map(o => (o.id===q.correctOptionId?'✓ ':'• ') + esc(o.text)).join('<br>') : ''}
                 ${q.type==='vf' ? '<br>Resposta correta: ' + (q.correctBool?'Verdadeiro':'Falso') : ''}
                 ${q.type==='dissertativa' ? '<br><span class="muted">Resposta modelo: ' + esc(q.modelAnswer) + '</span>' : ''}
@@ -8151,7 +8282,7 @@ function renderPasteImport(){
               <input type="checkbox" data-action="toggle-paste-result" data-idx="${idx}" ${g.selected.includes(idx)?'checked':''} style="margin-top:4px;">
               <span>
                 <span class="q-tag">${questionTagLabel(q.type)} · ${q.points} pt(s)</span><br>
-                <strong>${esc(q.text)}</strong>
+                <strong>${esc(q.text)}${q.comando?' '+esc(q.comando):''}</strong>
                 ${q.type==='mc' ? '<br>' + q.options.map(o => (o.id===q.correctOptionId?'✓ ':'• ') + esc(o.text)).join('<br>') : ''}
                 ${q.type==='vf' ? '<br>Resposta correta: ' + (q.correctBool?'Verdadeiro':'Falso') : ''}
                 ${q.type==='dissertativa' ? '<br><span class="muted">Resposta modelo: ' + esc(q.modelAnswer) + '</span>' : ''}
@@ -8199,7 +8330,7 @@ function renderBookImport(){
               <input type="checkbox" data-action="toggle-book-result" data-idx="${idx}" ${b.extractSelected.includes(idx)?'checked':''} style="margin-top:4px;">
               <span>
                 <span class="q-tag">${questionTagLabel(q.type)} · ${q.points} pt(s)</span><br>
-                <strong>${esc(q.text)}</strong>
+                <strong>${esc(q.text)}${q.comando?' '+esc(q.comando):''}</strong>
                 ${q.type==='mc' ? '<br>' + q.options.map(o => (o.id===q.correctOptionId?'✓ ':'• ') + esc(o.text)).join('<br>') : ''}
                 ${q.type==='vf' ? '<br>Resposta correta: ' + (q.correctBool?'Verdadeiro':'Falso') : ''}
                 ${q.type==='dissertativa' ? '<br><span class="muted">Resposta modelo: ' + esc(q.modelAnswer) + '</span>' : ''}
@@ -10592,6 +10723,9 @@ function renderCoordenador(){
   if(c.subview==='slides' && state.professor.slides.presentationMode && state.professor.slides.current){
     return renderSlidesPresentation();
   }
+  if(state.professor.aulaViva && state.professor.aulaViva.presenting && state.professor.aulaViva.sess){
+    return renderAulaVivaProf();
+  }
   const topBar = `
     <div class="row" style="align-items:center; justify-content:space-between; margin-bottom:10px;">
       <span class="muted" style="font-size:.85rem;">Painel do coordenador</span>
@@ -10628,6 +10762,7 @@ function renderCoordenador(){
     { action:'coord-sub-view', sub:'enquete', icon:'📣', label:'Enquete Relâmpago', group:'📢 Comunicação' },
     { action:'coord-sub-view', sub:'bloco', icon:'🖨️', label:'Bloco de Provas', group:'🖨️ Provas em Papel' },
     { action:'coord-sub-view', sub:'avulso', icon:'🗒️', label:'Gabarito Avulso', group:'🖨️ Provas em Papel' },
+    { action:'coord-sub-view', sub:'planolivro', icon:'🗓️', label:'Plano de Aulas do Livro', group:'🎮 Recursos de Aula' },
     { action:'coord-sub-view', sub:'livros', icon:'📘', label:'Livros Didáticos', group:'🎮 Recursos de Aula' },
     { action:'coord-sub-view', sub:'quiz', icon:'🎮', label:'Quiz por Equipes', group:'🎮 Recursos de Aula' },
     { action:'coord-sub-view', sub:'roleta', icon:'🎡', label:'Roleta de Sorteio', group:'🎮 Recursos de Aula' },
@@ -10662,6 +10797,7 @@ function renderCoordenador(){
   else if(c.subview==='bloco') content = renderBlocoProvas(c.assessments);
   else if(c.subview==='avulso') content = renderGabaritoAvulso();
   else if(c.subview==='livros') content = renderLivrosDidaticos(true);
+  else if(c.subview==='planolivro') content = renderPlanoLivro();
   else if(c.subview==='mural') content = renderMuralAvisos(true);
   else if(c.subview==='enquete') content = renderEnqueteRelampago();
   else if(c.subview==='quiz') content = renderQuizEquipes();
@@ -15329,6 +15465,7 @@ function renderAluno(){
   if(al.stage==='matricula-login') return renderMatriculaLogin();
   if(al.stage==='dashboard') return renderStudentDashboard();
   if(al.stage==='apresentacao') return renderSlidesApresentacaoAluno();
+  if(al.stage==='aulaviva') return renderAulaVivaAluno();
   if(al.stage==='material-slides') return renderMaterialSlidesAluno();
   if(al.stage==='envio-tarefa') return renderEnvioTarefaForm();
   if(al.stage==='preencher-mapa') return renderPreencherMapaForm();
@@ -15595,6 +15732,7 @@ function renderAlunoMuralAvisosBlock(){
 // Aba "Início": visão geral — recomendações, temporada/gamificação, ranking, trilha e avisos.
 function renderAlunoInicioBlock(){
   const blocos = [
+    renderAlunoPrazoBlock(),
     renderAlunoRecomendacoesBlock(),
     renderAlunoTemporadaBlock(),
     renderAlunoRankingTrilhaBlock(),
@@ -15637,6 +15775,7 @@ function renderStudentDashboard(){
     ${renderAlunoSocioUrgente()}
     ${renderAlunoNovidadesBanner()}
     ${renderCarrosselCampanha(muralSlidesComConquistas((al.campanha.itens||[]).filter(campanhaNoAr), al.campanha.loaded && !al.campanha.loading))}
+    ${renderAlunoAulaVivaBlock()}
     ${renderAlunoSlidesBlock()}
     ${renderAlunoEnqueteBlock()}
     ${renderAlunoQuizBlock()}
@@ -15650,6 +15789,7 @@ function renderStudentDashboard(){
     { action:'aluno-sub-view', sub:'boletim', icon:'🧮', label:'Boletim', group:'📊 Painel' },
     { action:'aluno-sub-view', sub:'socio', icon:'💛', label:'Avaliação Socioemocional', group:'📊 Painel', badge: socioState().loaded ? socioPendentes().length : 0 },
 
+    { action:'aluno-sub-view', sub:'estudar', icon:'📖', label:'Estudar (aulas dadas)', group:'📚 Estudos' },
     { action:'aluno-sub-view', sub:'tarefas', icon:'🗂️', label:'Tarefas', group:'📚 Estudos' },
     { action:'aluno-sub-view', sub:'mapas', icon:'🧠', label:'Mapa Mental', group:'📚 Estudos' },
     { action:'aluno-sub-view', sub:'diario', icon:'📷', label:'Diário de Bordo', group:'📚 Estudos' },
@@ -15671,6 +15811,7 @@ function renderStudentDashboard(){
   if(al.subview==='provas') content = renderAlunoProvasBlock();
   else if(al.subview==='boletim') content = renderAlunoBoletimScreen();
   else if(al.subview==='socio') content = renderAlunoSocioBlock();
+  else if(al.subview==='estudar') content = renderAlunoEstudarBlock();
   else if(al.subview==='tarefas') content = alunoSubviewOuVazio(renderAlunoTarefasBlock(), 'Nenhuma tarefa por aqui ainda.');
   else if(al.subview==='mapas') content = alunoSubviewOuVazio(renderAlunoMapasBlock(), 'Nenhum mapa mental disponível ainda.');
   else if(al.subview==='diario') content = renderAlunoDiarioBlock();
@@ -15809,6 +15950,14 @@ function renderNome(){
   `;
 }
 
+// Questão no padrão ENEM (tem "comando"): a última linha do texto-base é a fonte → letra menor
+function qTextoBaseHtml(q){
+  const t = String(q.text||'');
+  if(!q.comando) return esc(t);
+  const i = t.lastIndexOf('\n');
+  if(i<0) return esc(t);
+  return esc(t.slice(0,i)) + `\n<span style="display:block; text-align:right; font-size:.78rem; color:#666; font-style:italic;">${esc(t.slice(i+1))}</span>`;
+}
 function renderQuestionField(q, al){
   if(q.type==='mc'){
     return q.options.map(o => `
@@ -15838,8 +15987,9 @@ function renderResponder(){
   const qs = questionsList.map((q, idx) => `
       <div class="q-card">
         <div class="q-head"><span class="q-tag">Questão ${idx+1} · ${q.points} pt(s)</span></div>
-        <p style="margin-top:0;">${esc(q.text)}</p>
+        <p style="margin-top:0; white-space:pre-line;">${qTextoBaseHtml(q)}</p>
         ${q.image ? `<div class="img-preview"><img src="${q.image}" alt="Imagem da questão"></div>` : ''}
+        ${q.comando ? `<p style="margin:8px 0 0; font-weight:600;">${esc(q.comando)}</p>` : ''}
         ${renderQuestionField(q, al)}
       </div>
     `).join('');
@@ -15880,8 +16030,9 @@ function renderResponderTimed(){
       <div style="margin-top:14px;">
         <div class="q-card">
           <div class="q-head"><span class="q-tag">Questão ${idx+1} · ${q.points} pt(s)</span></div>
-          <p style="margin-top:0;">${esc(q.text)}</p>
+          <p style="margin-top:0; white-space:pre-line;">${qTextoBaseHtml(q)}</p>
           ${q.image ? `<div class="img-preview"><img src="${q.image}" alt="Imagem da questão"></div>` : ''}
+          ${q.comando ? `<p style="margin:8px 0 0; font-weight:600;">${esc(q.comando)}</p>` : ''}
           ${renderQuestionField(q, al)}
         </div>
       </div>
@@ -15915,8 +16066,17 @@ function renderResultadoAluno(){
           <span class="q-tag">Questão ${idx+1}${q.annulled?' · anulada':''}</span>
           <strong>${q.annulled ? 'anulada' : d.pending ? 'em revisão' : d.score + ' / ' + q.points}</strong>
         </div>
-        <p style="margin-top:0;">${esc(q.text)}</p>
+        <p style="margin-top:0; white-space:pre-line;">${esc(q.text)}</p>
+        ${q.comando ? `<p style="margin:8px 0 0; font-weight:600;">${esc(q.comando)}</p>` : ''}
         <p class="muted">Sua resposta: ${esc(answerLabel)}</p>
+        ${(q.type==='mc' && q.explicacao && !q.annulled && a.instrumento==='exercicios') ? (() => {
+          const certa = q.options.find(o=>o.id===q.correctOptionId);
+          const acertou = answer===q.correctOptionId;
+          return `<div data-explicacao="${acertou?'certo':'errado'}" style="border-radius:8px; padding:8px 10px; margin:6px 0; background:${acertou?'#e9f6ec':'#fdf0e6'};">
+            <strong>${acertou ? '✅ Você acertou!' : '❌ A resposta certa é: ' + esc(certa?certa.text:'')}</strong>
+            <div style="margin-top:4px; font-size:.9rem;">💡 ${esc(q.explicacao)}</div></div>`;
+        })() : ''}
+        ${(q.type==='dissertativa' && q.modelAnswer && !d.pending && (a.origemPlano || a.instrumento==='exercicios')) ? `<div style="border-radius:8px; padding:8px 10px; margin:6px 0; background:#eef4fb; font-size:.9rem;"><strong>📖 Resposta esperada:</strong> ${esc(q.modelAnswer)}</div>` : ''}
         ${q.annulled ? '<p class="muted" style="font-style:italic;">Esta questão foi anulada pelo professor. Os pontos dela foram redistribuídos entre as demais.</p>' : ''}
         ${d.feedback ? `<p class="fb">${esc(d.feedback)}</p>` : ''}
       </div>
@@ -15927,6 +16087,7 @@ function renderResultadoAluno(){
       <h2 class="center">${esc(a.title)}</h2>
       <div class="score-big">${r.total} / ${max}</div>
       <p class="score-sub">Resultado de ${esc(r.studentName)}</p>
+      ${(state.aluno.fichasMsg && state.aluno.fichasMsg.code===a.code) ? `<div class="q-card" data-fichas-ganhas style="background:#fff4d6; border:1px solid #C9A227; text-align:center;"><strong>🎫 +${state.aluno.fichasMsg.qtd} fichas</strong> por entregar o exercício no prazo${state.aluno.fichasMsg.qtd>3?' e acertar 80% ou mais':''}!</div>` : ''}
       ${r.comentarioProfessor ? `<div class="q-card" style="background:var(--tint-teal);"><strong>💬 Comentário do professor</strong><p style="margin:6px 0 0;">${esc(r.comentarioProfessor)}</p></div>` : ''}
       ${details}
       ${backButtonHtml('Responder outra avaliação')}
@@ -16962,9 +17123,16 @@ async function saveAssessment(){
   const isEditing = !!p.editingCode;
   const code = isEditing ? p.editingCode : genCode();
   const existingAssessment = isEditing ? p.assessments.find(x=>x.code===code) : null;
+  // Campos especiais (Plano do Livro, recuperação personalizada, tarefa importada) não aparecem no formulário:
+  // ao editar, são mantidos; ao criar pelo Plano do Livro, vêm do próprio rascunho.
+  const preservar = {};
+  if(existingAssessment) ['valeNota','origemPlano','somenteAlunos','somenteAlunosNomes','importadoTarefa','tarefaId'].forEach(k => { if(existingAssessment[k]!==undefined) preservar[k] = existingAssessment[k]; });
+  if(!isEditing && a.valeNota===false) preservar.valeNota = false;
+  if(!isEditing && a.origemPlano) preservar.origemPlano = a.origemPlano;
+  const tituloFinal = a.tituloFixo || (existingAssessment && existingAssessment.origemPlano ? existingAssessment.title : computeAssessmentTitle(a));
   const assessment = {
     code,
-    title: computeAssessmentTitle(a),
+    title: tituloFinal,
     instrumento: a.instrumento,
     unidade: a.unidade,
     disciplinaId: a.disciplinaId || null,
@@ -16982,8 +17150,11 @@ async function saveAssessment(){
     professorName: isEditing && existingAssessment ? existingAssessment.professorName : state.professor.session.displayName,
     createdAt: isEditing && existingAssessment ? existingAssessment.createdAt : Date.now(),
     updatedAt: isEditing ? Date.now() : null,
+    ...preservar,
   };
   await window.storage.set(`assessment:${code}`, JSON.stringify(assessment), true);
+  const voltarAoPlano = !isEditing && a.origemPlano && a.origemPlano.aula && a.origemPlano.turmaId;
+  if(voltarAoPlano){ try{ await planoRegistrarExercicio(a.origemPlano.turmaId, a.origemPlano.aula, code); }catch(e){} }
   state.professor.newAssessment = freshAssessment();
   state.professor.editingCode = null;
   state.professor.mode = 'list';
@@ -16994,6 +17165,7 @@ async function saveAssessment(){
     alert('Avaliação atualizada.');
   } else {
     p.assessments.unshift(assessment);
+    if(voltarAoPlano){ p.subview = 'planolivro'; planoState().msg = `✅ Exercício da aula ${a.origemPlano.aula} (editado por você) aplicado — código ${code}.`; render(); return; }
     render();
     alert('Avaliação criada! Código para compartilhar com a turma: ' + code);
   }
@@ -17857,8 +18029,9 @@ function buildStudentPage(a){
     }
     return `
       <div class="pv-q">
-        <div class="pv-q-head">${idx+1}. (${q.points} pt${q.points!=1?'s':''}) ${esc(q.text)}</div>
+        <div class="pv-q-head" style="white-space:pre-line;">${idx+1}. (${q.points} pt${q.points!=1?'s':''}) ${esc(q.text)}</div>
         ${q.image ? `<img class="pv-q-img" src="${q.image}" alt="">` : ''}
+        ${q.comando ? `<div class="pv-q-head" style="font-weight:700;">${esc(q.comando)}</div>` : ''}
         ${field}
       </div>
     `;
@@ -19570,9 +19743,10 @@ async function saveCorrectResponse(idx){
     const q = a.questions.find(x=>x.id===d.questionId);
     const val = Number(input.value);
     if(input.value==='' || isNaN(val) || val<0 || (q && val>q.points)){ ok = false; return; }
+    const sg = iaCorrState().sug[iaCorrChave(r, d.questionId)];
     d.score = val;
     d.pending = false;
-    d.feedback = 'Corrigido manualmente pelo professor.';
+    d.feedback = (sg && sg.nota===val && sg.comentario) ? sg.comentario + ' (Correção sugerida pela IA e revisada pelo professor.)' : 'Corrigido manualmente pelo professor.';
   });
   if(!ok){ alert('Preencha uma nota válida para cada questão pendente.'); return; }
   r.total = r.details.reduce((s,d)=>s+(d.score||0),0);
@@ -20608,7 +20782,1833 @@ async function getNotasManuais(professorId, turmaId, unidade, disciplinaId){
     return r2.value ? JSON.parse(r2.value) : {};
   }catch(e){ return {}; }
 }
+/* ======================= PLANO DE AULAS DO LIVRO ======================= */
+// A coordenação importa (uma vez) o arquivo .json com os planos de 80 aulas, escolhe qual versão
+// cada turma segue, e o professor vê a "aula de hoje", apresenta os slides, aplica o exercício
+// de fixação (valendo nota ou não) e marca a aula como dada.
+// Chaves no banco:
+//   plano-livro-index            → lista resumida dos planos importados
+//   plano-livro:<planoId>        → o plano completo (aulas)
+//   plano-livro-turmas           → { turmaId: planoId }
+//   plano-livro-prog:<turmaId>   → { dadas:{n:quando}, exercicios:{n:codigo} }
+//   plano-livro-slides:<planoId> → { n: { deckId, title, totalSlides } }
+function planoState(){
+  if(!state.planoLivro) state.planoLivro = { carregado:false, carregando:false, index:[], planos:{}, turmaPlano:{}, prog:{}, slides:{}, turmaSel:'', aulaAberta:null, msg:'', erro:'', enviando:null, valeNota:{}, prazo:{}, verTodas:false, painel:null, painelCarregando:false, erros:{}, errosCarregando:null, revisaoVale:false, montarProva:null, registroAberto:false, registroFiltro:'todas', recup:null, bimFerramentas:null, hab:{}, habCarregando:null, videos:{}, feedback:{}, videoRascunho:{}, feedbackRascunho:{} };
+  return state.planoLivro;
+}
+async function planoLerJson(key, padrao){
+  try{ const r = await window.storage.get(key, true); return r && r.value ? JSON.parse(r.value) : padrao; }catch(e){ return padrao; }
+}
+async function carregarPlanoLivro(forcar){
+  const s = planoState();
+  if(s.carregando || (s.carregado && !forcar)) return;
+  s.carregando = true; render();
+  s.index = await planoLerJson('plano-livro-index', []);
+  await planoAtualizarEfetivo();
+  s.carregando = false; s.carregado = true;
+  const turmas = planoTurmasVisiveis();
+  if(!s.turmaSel || !turmas.some(t=>t.id===s.turmaSel)){
+    const comPlano = turmas.find(t => s.turmaPlano[t.id]);
+    s.turmaSel = comPlano ? comPlano.id : '';
+  }
+  if(s.turmaSel) await planoCarregarTurma(s.turmaSel);
+  render();
+}
+function planoTurmasVisiveis(){
+  return (professorTurmas()||[]).slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'', 'pt-BR', {numeric:true}));
+}
+async function planoObter(planoId){
+  const s = planoState();
+  if(!planoId) return null;
+  if(!s.planos[planoId]) s.planos[planoId] = await planoLerJson(`plano-livro:${planoId}`, null);
+  if(!s.slides[planoId]) s.slides[planoId] = await planoLerJson(`plano-livro-slides:${planoId}`, {});
+  await planoCarregarExtras(planoId);
+  return s.planos[planoId];
+}
+async function planoCarregarTurma(turmaId){
+  const s = planoState();
+  if(!turmaId) return;
+  s.prog[turmaId] = await planoLerJson(`plano-livro-prog:${turmaId}`, { dadas:{}, exercicios:{} });
+  if(!s.prog[turmaId].dadas) s.prog[turmaId].dadas = {};
+  if(!s.prog[turmaId].exercicios) s.prog[turmaId].exercicios = {};
+  await planoObter(s.turmaPlano[turmaId]);
+}
+function planoPodeImportar(){
+  return state.view==='coordenador' || !!(state.professor.session && state.professor.session.viaCoord);
+}
+async function importarPlanoLivro(file){
+  const s = planoState();
+  s.msg = ''; s.erro = '';
+  if(!file) return;
+  let pac;
+  try{ pac = JSON.parse(await file.text()); }catch(e){ s.erro = 'Esse arquivo não é um plano válido (precisa ser o .json do plano de aulas).'; render(); return; }
+  const planos = pac && pac.tipo==='plano-livro' && Array.isArray(pac.planos) ? pac.planos : (pac && Array.isArray(pac.aulas) ? [pac] : null);
+  if(!planos || !planos.length){ s.erro = 'Não encontrei planos de aula dentro desse arquivo.'; render(); return; }
+  s.enviando = { atual:0, total:planos.length, texto:'Importando planos...' }; render();
+  const index = await planoLerJson('plano-livro-index', []);
+  for(const pl of planos){
+    if(!pl.id || !Array.isArray(pl.aulas)) continue;
+    await window.storage.set(`plano-livro:${pl.id}`, JSON.stringify(pl), true);
+    s.planos[pl.id] = pl;
+    const resumo = { id:pl.id, titulo:pl.titulo||pl.id, disciplina:pl.disciplina||'', serie:pl.serie||'', versao:pl.versao||'', descricao:pl.descricao||'', totalAulas:pl.aulas.length, comExercicios: pl.aulas.filter(a=>a.exercicio).length, importadoEm: Date.now() };
+    const i = index.findIndex(x=>x.id===pl.id);
+    if(i>=0) index[i] = resumo; else index.push(resumo);
+    s.enviando.atual++; render();
+  }
+  await window.storage.set('plano-livro-index', JSON.stringify(index), true);
+  s.index = index;
+  if(pac && pac.icones){ try{ await window.storage.set('plano-livro-icones', JSON.stringify(pac.icones), true); AV_ICONES = null; }catch(e){} }
+  // imagens das questões de prova (mapas e fotos do livro): cada uma num documento próprio
+  const imgs = Object.entries((pac && pac.imagens) || {});
+  for(let i=0; i<imgs.length; i++){
+    s.enviando = { atual:i+1, total:imgs.length, texto:'Guardando as imagens das questões...' }; render();
+    try{ await window.storage.set(`plano-livro-img:${imgs[i][0]}`, JSON.stringify(imgs[i][1]), true); }catch(e){}
+  }
+  await planoCriarRegrasPadrao(planos.filter(pl => pl.id && Array.isArray(pl.aulas)));
+  await planoAtualizarEfetivo(); s.painel = null;
+  s.enviando = null;
+  s.msg = `✅ ${planos.length} plano(s) importado(s). As turmas já foram vinculadas automaticamente pela disciplina e pela série (Versão A). Confira abaixo e troque a versão se quiser.`;
+  render();
+}
+async function excluirPlanoLivro(planoId){
+  if(!confirm('Remover este plano do app? As turmas que usam este plano ficarão sem plano (o progresso já marcado é mantido).')) return;
+  const s = planoState();
+  s.index = (await planoLerJson('plano-livro-index', [])).filter(x=>x.id!==planoId);
+  await window.storage.set('plano-livro-index', JSON.stringify(s.index), true);
+  try{ await window.storage.delete(`plano-livro:${planoId}`, true); }catch(e){}
+  const tp = await planoLerJson('plano-livro-turmas', {});
+  Object.keys(tp).forEach(t => { if(tp[t]===planoId) delete tp[t]; });
+  await window.storage.set('plano-livro-turmas', JSON.stringify(tp), true);
+  const regras = await planoLerJson('plano-livro-regras', {});
+  Object.keys(regras).forEach(k => { if(regras[k]===planoId) delete regras[k]; });
+  await window.storage.set('plano-livro-regras', JSON.stringify(regras), true);
+  delete s.planos[planoId];
+  await planoAtualizarEfetivo(); s.painel = null;
+  render();
+}
+async function definirPlanoTurma(turmaId, planoId){
+  const s = planoState();
+  const tp = await planoLerJson('plano-livro-turmas', {});
+  if(planoId) tp[turmaId] = planoId; else delete tp[turmaId];   // '' = volta para o automático; '__nenhum' = desliga
+  await window.storage.set('plano-livro-turmas', JSON.stringify(tp), true);
+  await planoAtualizarEfetivo(); s.painel = null;
+  if(!s.turmaSel && s.turmaPlano[turmaId]) s.turmaSel = turmaId;
+  if(s.turmaSel===turmaId) await planoCarregarTurma(turmaId);
+  render();
+}
+async function planoSalvarProg(turmaId){
+  const s = planoState();
+  await window.storage.set(`plano-livro-prog:${turmaId}`, JSON.stringify(s.prog[turmaId]), true);
+}
+async function planoMarcarDada(turmaId, n, dada){
+  const s = planoState();
+  const prog = s.prog[turmaId] || { dadas:{}, exercicios:{} };
+  // relê do banco antes de gravar (outro aparelho pode ter marcado outra aula)
+  const fresh = await planoLerJson(`plano-livro-prog:${turmaId}`, prog);
+  fresh.dadas = fresh.dadas || {}; fresh.exercicios = fresh.exercicios || {};
+  if(dada) fresh.dadas[n] = Date.now(); else delete fresh.dadas[n];
+  s.prog[turmaId] = fresh;
+  await planoSalvarProg(turmaId);
+  s.painel = null;
+  if(dada) s.aulaAberta = n;   // a aula fica aberta na lista para o professor avaliar (piloto)
+  render();
+}
+function planoAulaDeHoje(plano, prog){
+  if(!plano) return null;
+  return plano.aulas.find(a => !(prog && prog.dadas && prog.dadas[a.n])) || null;
+}
+function planoDisciplinaDoProfessor(nome){
+  const alvo = normalizarTextoPlano(nome);
+  return (state.professor.disciplinas||[]).find(d => normalizarTextoPlano(d.name).includes(alvo) || alvo.includes(normalizarTextoPlano(d.name))) || null;
+}
+function normalizarTextoPlano(t){ return String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim(); }
+function planoQuestoesParaAvaliacao(ex){
+  const qs = ex.questoes || [];
+  const nMc = qs.filter(q=>q.tipo==='mc').length;
+  const temDiss = qs.some(q=>q.tipo==='dissertativa');
+  const ptsDiss = temDiss ? 2 : 0;
+  const ptsMc = nMc ? Math.round(((10 - ptsDiss) / nMc) * 100) / 100 : 0;
+  return qs.map(q => {
+    if(q.tipo==='mc'){
+      const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
+      return { id: cryptoId(), type:'mc', text: q.texto, points: ptsMc, image:null, annulled:false, descritorSaeb:'', conteudo:'', options, correctOptionId: options[q.correta] ? options[q.correta].id : null, explicacao: q.explicacao||'' };
+    }
+    return { id: cryptoId(), type:'dissertativa', text: q.texto, points: ptsDiss, image:null, annulled:false, descritorSaeb:'', conteudo:'', modelAnswer: q.modelo||'' };
+  });
+}
+async function aplicarExercicioPlano(turmaId, n){
+  const s = planoState();
+  const plano = s.planos[s.turmaPlano[turmaId]];
+  const aula = plano && plano.aulas.find(a=>a.n===n);
+  if(!aula || !aula.exercicio){ alert('Esta aula ainda não tem exercício de fixação pronto.'); return; }
+  const prog = s.prog[turmaId] || { dadas:{}, exercicios:{} };
+  if(prog.exercicios && prog.exercicios[n]){ alert('O exercício desta aula já foi aplicado a esta turma (código ' + prog.exercicios[n] + ').'); return; }
+  const valeNota = s.valeNota[n] !== false;
+  const prazoDias = s.prazo[n]!=null ? s.prazo[n] : '7';
+  const turma = (state.professor.turmas||[]).find(t=>t.id===turmaId);
+  const unidade = UNIDADES[Math.max(0, Math.min(3, (aula.bimestre||1)-1))];
+  const disc = planoDisciplinaDoProfessor(plano.disciplina||'');
+  const sess = state.professor.session;
+  const code = genCode();
+  const assessment = {
+    code,
+    title: aula.exercicio.titulo || `Exercício de fixação — Aula ${n}`,
+    instrumento: 'exercicios',
+    unidade,
+    disciplinaId: disc ? disc.id : null,
+    disciplinaName: disc ? disc.name : (plano.disciplina||null),
+    turmaIds: [turmaId],
+    questions: planoQuestoesParaAvaliacao(aula.exercicio),
+    startAt: null, endAt: planoPrazoParaEndAt(prazoDias), agendaTurmas: {},
+    resultRelease: { mode:'imediato', releaseAt:'' },
+    securityEnabled: false,
+    minMinutesPerQuestion: null,
+    exigeLiberacao: false,
+    valeNota,
+    origemPlano: { planoId: plano.id, aula: n, turmaId },
+    professorId: sess ? sess.id : null,
+    professorName: sess ? sess.displayName : 'Coordenação',
+    createdAt: Date.now(), updatedAt: null,
+  };
+  await window.storage.set(`assessment:${code}`, JSON.stringify(assessment), true);
+  (state.professor.assessments = state.professor.assessments||[]).unshift(assessment);
+  if(state.coordenador && Array.isArray(state.coordenador.assessments)) state.coordenador.assessments.unshift(assessment);
+  const fresh = await planoLerJson(`plano-livro-prog:${turmaId}`, prog);
+  fresh.dadas = fresh.dadas || {}; fresh.exercicios = fresh.exercicios || {};
+  fresh.exercicios[n] = code;
+  s.prog[turmaId] = fresh; s.painel = null;
+  await planoSalvarProg(turmaId);
+  s.msg = `✅ Exercício da aula ${n} aplicado à turma ${turma?turma.name:''} — código ${code}. ${valeNota ? 'Vale nota (entra em Exercícios de fixação da ' + unidade + ').' : 'Não vale nota (só para treino).'} ${assessment.endAt ? 'Prazo: até ' + planoDataCurta(assessment.endAt) + ', 23h59.' : 'Sem prazo.'} Os alunos já veem em “Provas”.`;
+  render();
+}
+async function planoTrocarValeNota(code, vale){
+  let a = null;
+  try{ const r = await window.storage.get(`assessment:${code}`, true); a = JSON.parse(r.value); }catch(e){}
+  if(!a){ alert('Não encontrei esse exercício (pode ter sido excluído).'); return; }
+  a.valeNota = !!vale; a.updatedAt = Date.now();
+  await window.storage.set(`assessment:${code}`, JSON.stringify(a), true);
+  [state.professor.assessments, state.coordenador && state.coordenador.assessments].forEach(lista => {
+    if(!Array.isArray(lista)) return;
+    const i = lista.findIndex(x=>x.code===code); if(i>=0) lista[i] = a;
+  });
+  planoState().msg = vale ? `O exercício ${code} agora VALE nota.` : `O exercício ${code} agora NÃO vale nota (fica só como treino).`;
+  render();
+}
+// Prazo do exercício: N dias a partir de hoje, até 23:59 (mesmo formato do campo de data da avaliação)
+function planoPrazoParaEndAt(dias){
+  if(!dias) return null;
+  const d = new Date(); d.setDate(d.getDate() + Number(dias));
+  const z = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}T23:59`;
+}
+function planoDataCurta(endAt){ if(!endAt) return ''; const d = new Date(endAt); return isNaN(d) ? '' : d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' }); }
+async function planoEstenderPrazo(code, dias){
+  let a = null;
+  try{ const r = await window.storage.get(`assessment:${code}`, true); a = JSON.parse(r.value); }catch(e){}
+  if(!a) return;
+  const base = a.endAt && new Date(a.endAt).getTime() > Date.now() ? new Date(a.endAt) : new Date();
+  base.setDate(base.getDate() + Number(dias));
+  const z = n => String(n).padStart(2,'0');
+  a.endAt = dias==='0' ? null : `${base.getFullYear()}-${z(base.getMonth()+1)}-${z(base.getDate())}T23:59`;
+  if(a.agendaTurmas) Object.keys(a.agendaTurmas).forEach(t => { if(a.agendaTurmas[t]) a.agendaTurmas[t].endAt = ''; });
+  a.updatedAt = Date.now();
+  await window.storage.set(`assessment:${code}`, JSON.stringify(a), true);
+  [state.professor.assessments, state.coordenador && state.coordenador.assessments].forEach(lista => { if(!Array.isArray(lista)) return; const i = lista.findIndex(x=>x.code===code); if(i>=0) lista[i] = a; });
+  planoState().msg = a.endAt ? `Prazo do exercício ${code} agora vai até ${planoDataCurta(a.endAt)}, 23h59.` : `O exercício ${code} ficou sem prazo.`;
+  render();
+}
+function planoAvaliacaoPorCodigo(code){
+  return (state.professor.assessments||[]).find(a=>a.code===code) || ((state.coordenador&&state.coordenador.assessments)||[]).find(a=>a.code===code) || null;
+}
+// ---- Slides: o professor envia os PDFs (aula-01.pdf, aula-02.pdf...) de uma vez só ----
+async function planoPdfParaDeck(file, title, onProgress){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  const total = Math.min(pdf.numPages, SLIDES_MAX_PAGES);
+  const deckId = cryptoId();
+  for(let i=1; i<=total; i++){
+    if(onProgress) onProgress(i, total);
+    let dataUrl;
+    try{
+      const page = await pdf.getPage(i);
+      const vp = page.getViewport({ scale: 1 });
+      const scale = 1280 / vp.width;
+      const svp = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(svp.width); canvas.height = Math.round(svp.height);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+      await page.render({ canvasContext: ctx, viewport: svp }).promise;
+      dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+      if(dataUrl.length > 950000) dataUrl = canvas.toDataURL('image/jpeg', 0.35);
+    }catch(e){ dataUrl = slideFailurePlaceholder(i); }
+    try{ await window.storage.set(`slide-img:${deckId}:${i-1}`, JSON.stringify(dataUrl), true); }
+    catch(e){ await window.storage.set(`slide-img:${deckId}:${i-1}`, JSON.stringify(slideFailurePlaceholder(i)), true); }
+  }
+  const meta = { id: deckId, title, totalSlides: total, createdAt: Date.now(), professorName: state.professor.session ? state.professor.session.displayName : 'Coordenação', origemPlano: true };
+  const decks = await planoLerJson('slides-decks', []);
+  decks.push(meta);
+  await window.storage.set('slides-decks', JSON.stringify(decks), true);
+  state.professor.slides.decks = decks;
+  return meta;
+}
+function planoNumeroDoArquivo(nome){
+  const m = String(nome||'').match(/aula[\s_-]*0*(\d{1,3})/i) || String(nome||'').match(/^0*(\d{1,3})\b/);
+  return m ? parseInt(m[1],10) : null;
+}
+async function enviarSlidesPlano(files, planoId, nFixo){
+  const s = planoState();
+  const plano = s.planos[planoId];
+  if(!plano){ alert('Escolha primeiro a turma (e o plano dela).'); return; }
+  const lista = Array.from(files||[]).filter(f => /\.pdf$/i.test(f.name) || f.type==='application/pdf');
+  if(!lista.length){ alert('Selecione arquivos PDF (por exemplo: aula-01.pdf, aula-02.pdf...).'); return; }
+  const mapa = await planoLerJson(`plano-livro-slides:${planoId}`, {});
+  const ignorados = [];
+  s.erro = ''; s.msg = '';
+  for(let k=0; k<lista.length; k++){
+    const f = lista[k];
+    const n = nFixo || planoNumeroDoArquivo(f.name);
+    const aula = n && plano.aulas.find(a=>a.n===n);
+    if(!aula){ ignorados.push(f.name); continue; }
+    if(f.size > SLIDES_MAX_FILE_MB*1024*1024){ ignorados.push(f.name + ' (grande demais)'); continue; }
+    try{
+      const meta = await planoPdfParaDeck(f, `Aula ${String(n).padStart(2,'0')} — ${aula.tituloCurto || aula.tema}`, (i,total) => { s.enviando = { atual:k+1, total:lista.length, texto:`Aula ${n}: slide ${i} de ${total}` }; render(); });
+      mapa[n] = { deckId: meta.id, title: meta.title, totalSlides: meta.totalSlides };
+      await window.storage.set(`plano-livro-slides:${planoId}`, JSON.stringify(mapa), true);
+    }catch(e){ ignorados.push(f.name + ' (não abriu)'); }
+  }
+  s.slides[planoId] = mapa;
+  s.enviando = null;
+  const ok = lista.length - ignorados.length;
+  s.msg = `✅ ${ok} apresentação(ões) ligada(s) às aulas.` + (ignorados.length ? ` Não usei: ${ignorados.join(', ')} — o nome do arquivo precisa ter o número da aula (ex.: aula-07.pdf).` : '');
+  render();
+}
+async function apresentarSlidesPlano(turmaId, n){
+  const s = planoState();
+  const planoId = s.turmaPlano[turmaId];
+  const slot = s.slides[planoId] && s.slides[planoId][n];
+  if(!slot){ alert('Esta aula ainda não tem slides enviados.'); return; }
+  const p = state.professor;
+  await loadSlidesDecks();
+  if(!(p.slides.decks||[]).some(d=>d.id===slot.deckId)){ alert('A apresentação desta aula foi excluída. Envie o PDF de novo.'); return; }
+  p.slides.selectedDeckId = slot.deckId;
+  p.slides.turmaId = turmaId;
+  if(state.view==='coordenador') state.coordenador.subview = 'slides'; else p.subview = 'slides';
+  stopSlidesPoll();
+  await iniciarApresentacaoSlides(state.view==='coordenador' ? 'Coordenação' : (p.session?p.session.displayName:'Professor'));
+  p.slides.presentationMode = true;
+  slidesPollInterval = setInterval(refreshProfessorSlides, 2000);
+  render();
+}
+// ---- Painel da coordenação: em que aula está cada turma ----
+async function planoCarregarPainel(){
+  const s = planoState();
+  if(s.painelCarregando) return;
+  s.painelCarregando = true; render();
+  const turmas = planoTurmasVisiveis().filter(t => s.turmaPlano[t.id]);
+  const linhas = await Promise.all(turmas.map(async t => {
+    const plano = await planoObter(s.turmaPlano[t.id]);
+    const prog = await planoLerJson(`plano-livro-prog:${t.id}`, { dadas:{}, exercicios:{} });
+    const dadasTs = Object.values(prog.dadas||{});
+    const ultima = dadasTs.length ? Math.max(...dadasTs) : null;
+    const hoje = planoAulaDeHoje(plano, prog);
+    const codes = Object.values(prog.exercicios||{});
+    const nomes = new Set((t.students||[]).map(st => nomeChave(st.name)));
+    let somaPct = 0, contados = 0;
+    const feitosPorAluno = {}; nomes.forEach(n => feitosPorAluno[n] = 0);
+    await Promise.all(codes.map(async code => {
+      const resp = await planoLerJson(`responses:${code}`, []);
+      const fizeram = new Set(resp.map(r => nomeChave(r.studentName)).filter(n => nomes.has(n)));
+      fizeram.forEach(n => feitosPorAluno[n]++);
+      if(nomes.size){ somaPct += fizeram.size / nomes.size; contados++; }
+    }));
+    const semEntregar = codes.length ? Object.values(feitosPorAluno).filter(f => f/codes.length < 0.5).length : 0;
+    return { turmaId:t.id, turma:t.name, plano: plano ? plano.titulo : '?', total: plano ? plano.aulas.length : 0,
+      dadas: dadasTs.length, aulaAtual: hoje ? hoje.n : null, temaAtual: hoje ? hoje.tema : 'plano concluído',
+      ultima, exercicios: codes.length, entrega: contados ? Math.round(somaPct/contados*100) : null, semEntregar };
+  }));
+  s.painel = { linhas, em: Date.now() };
+  s.painelCarregando = false;
+  render();
+}
+function renderPlanoPainel(){
+  const s = planoState();
+  if(!Object.keys(s.turmaPlano||{}).length) return '';
+  if(!s.painel && !s.painelCarregando){ setTimeout(()=>planoCarregarPainel(), 0); }
+  if(!s.painel) return '<div class="card"><h3 style="margin-top:0;">📊 Andamento das turmas</h3><p class="muted">Carregando…</p></div>';
+  const dia = 24*3600*1000;
+  const linhas = s.painel.linhas.slice().sort((a,b)=>(a.turma||'').localeCompare(b.turma||'', 'pt-BR', {numeric:true}));
+  const porPlano = {};
+  linhas.forEach(l => { (porPlano[l.plano] = porPlano[l.plano] || []).push(l.dadas); });
+  const mediana = arr => { const v = arr.slice().sort((a,b)=>a-b); return v.length ? v[Math.floor((v.length-1)/2)] : 0; };
+  return `
+    <div class="card" data-plano-painel>
+      <div class="row" style="justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <h3 style="margin:0;">📊 Andamento das turmas</h3>
+        <button class="btn btn-ghost btn-sm" data-action="plano-painel-atualizar">${s.painelCarregando?'⏳ Atualizando…':'↻ Atualizar'}</button>
+      </div>
+      <p class="muted" style="font-size:.84rem;">“Atrás das outras” compara com as turmas do mesmo plano. Quando o calendário de 2027 for ligado, a comparação passa a ser com a data prevista.</p>
+      <div class="table-scroll"><table>
+        <tr><th>Turma</th><th>Plano</th><th>Aulas dadas</th><th>Está na aula</th><th>Última aula marcada</th><th>Exercícios</th><th>Entrega média</th><th>Sem entregar</th><th></th></tr>
+        ${linhas.map(l => {
+          const pct = l.total ? Math.round(l.dadas/l.total*100) : 0;
+          const atras = (porPlano[l.plano]||[]).length > 1 && l.dadas <= mediana(porPlano[l.plano]) - 3;
+          const parado = l.ultima && (Date.now() - l.ultima) > 10*dia;
+          const alertas = [atras ? '⚠️ atrás das outras' : '', parado ? '⏸ parada há ' + Math.floor((Date.now()-l.ultima)/dia) + ' dias' : '', !l.ultima ? '⏳ ainda não começou' : ''].filter(Boolean).join('<br>');
+          return `<tr data-painel-turma="${esc(l.turmaId)}">
+            <td><strong>${esc(l.turma)}</strong>${alertas?`<div style="font-size:.78rem; color:#a4521b;">${alertas}</div>`:''}</td>
+            <td style="font-size:.82rem;">${esc(l.plano)}</td>
+            <td>${l.dadas}/${l.total} <span class="muted">(${pct}%)</span><div style="background:#eee; border-radius:6px; height:6px; margin-top:3px;"><div style="width:${pct}%; height:100%; background:var(--wine,#6B1F2E); border-radius:6px;"></div></div></td>
+            <td style="font-size:.84rem;">${l.aulaAtual ? 'Aula ' + l.aulaAtual + ' — ' + esc(l.temaAtual) : '🎉 ' + esc(l.temaAtual)}</td>
+            <td>${l.ultima ? new Date(l.ultima).toLocaleDateString('pt-BR') : '—'}</td>
+            <td>${l.exercicios}</td>
+            <td>${l.entrega==null ? '—' : `<span style="color:${l.entrega<60?'#b3261e':l.entrega<80?'#a4521b':'#1d6b31'}; font-weight:600;">${l.entrega}%</span>`}</td>
+            <td>${l.semEntregar ? `<span style="color:#b3261e; font-weight:700;">🚨 ${l.semEntregar}</span>` : (l.exercicios ? '0' : '—')}</td>
+            <td><button class="btn btn-ghost btn-sm" data-action="plano-ver-turma" data-tid="${esc(l.turmaId)}">Ver</button></td>
+          </tr>`; }).join('')}
+      </table></div>
+      <p class="muted" style="font-size:.8rem;">Entrega média = em média, quantos alunos da turma responderam os exercícios aplicados pelo plano. Sem entregar = alunos que fizeram menos da metade (os nomes aparecem em “Habilidades e entregas”, ao clicar em Ver).</p>
+    </div>`;
+}
+// ---- (1) O que a turma mais errou: análise das respostas dos exercícios do plano ----
+async function planoAnalisarErros(turmaId){
+  const s = planoState();
+  s.errosCarregando = turmaId; render();
+  const plano = s.planos[s.turmaPlano[turmaId]];
+  const prog = s.prog[turmaId] || { exercicios:{} };
+  const turma = (state.professor.turmas||[]).find(t=>t.id===turmaId);
+  const nomes = new Set(((turma && turma.students)||[]).map(st => nomeChave(st.name)));
+  const porAula = [], questoes = [];
+  await Promise.all(Object.entries(prog.exercicios||{}).map(async ([nStr, code]) => {
+    const n = parseInt(nStr);
+    const aula = plano && plano.aulas.find(a=>a.n===n);
+    const av = await planoLerJson(`assessment:${code}`, null) || planoAvaliacaoPorCodigo(code);
+    if(!av) return;
+    const resp = (await planoLerJson(`responses:${code}`, [])).filter(r => !nomes.size || nomes.has(nomeChave(r.studentName)));
+    let acertosAula = 0, totalAula = 0;
+    (av.questions||[]).forEach((q, qi) => {
+      if(q.type!=='mc' || q.annulled) return;
+      let tot = 0, cert = 0; const erradas = {};
+      resp.forEach(r => {
+        const ans = r.answers ? r.answers[q.id] : undefined;
+        if(ans===undefined || ans===null) return;
+        tot++;
+        if(ans===q.correctOptionId) cert++; else erradas[ans] = (erradas[ans]||0) + 1;
+      });
+      if(!tot) return;
+      acertosAula += cert; totalAula += tot;
+      const top = Object.entries(erradas).sort((a,b)=>b[1]-a[1])[0];
+      const optTxt = id => { const o = q.options.find(x=>x.id===id); return o ? o.text : ''; };
+      questoes.push({ n, qi, code, tema: aula ? (aula.tituloCurto||aula.tema) : ('Aula '+n), texto: q.text, pct: Math.round(cert/tot*100), respostas: tot,
+        certa: optTxt(q.correctOptionId), errada: top ? optTxt(top[0]) : '', erradaQtd: top ? top[1] : 0, q });
+    });
+    if(totalAula) porAula.push({ n, tema: aula ? (aula.tituloCurto||aula.tema) : ('Aula '+n), paginas: aula ? aula.paginas : '', pct: Math.round(acertosAula/totalAula*100), alunos: resp.length });
+  }));
+  porAula.sort((a,b)=>a.pct-b.pct || a.n-b.n);
+  questoes.sort((a,b)=>a.pct-b.pct || a.n-b.n);
+  s.erros[turmaId] = { porAula, questoes, em: Date.now() };
+  s.errosCarregando = null;
+  render();
+}
+function renderPlanoErros(turmaId, destaque){
+  const s = planoState();
+  const prog = s.prog[turmaId] || {};
+  if(!Object.keys(prog.exercicios||{}).length) return '';
+  const e = s.erros[turmaId];
+  const cor = p => p < 50 ? '#b3261e' : p < 70 ? '#a4521b' : '#1d6b31';
+  let corpo;
+  if(s.errosCarregando===turmaId) corpo = '<p>⏳ Analisando as respostas…</p>';
+  else if(!e) corpo = `<button class="btn btn-primary btn-sm" data-action="plano-analisar-erros">📉 Analisar as respostas da turma</button>`;
+  else if(!e.questoes.length) corpo = '<p class="muted">Ainda não há respostas nos exercícios aplicados.</p>';
+  else {
+    const fracas = e.porAula.filter(a=>a.pct<70);
+    const rev = e.questoes.filter(q=>q.pct<70).slice(0,10);
+    corpo = `
+      <p style="margin:0 0 6px;"><strong>Conteúdos para revisar</strong> (aulas com menos de 70% de acerto):</p>
+      ${fracas.length ? `<ul style="margin:0 0 10px 18px;">${fracas.slice(0,6).map(a => `<li><span style="color:${cor(a.pct)}; font-weight:700;">${a.pct}%</span> — Aula ${a.n}: ${esc(a.tema)}${a.paginas?` <span class="muted">(livro ${esc(a.paginas)})</span>`:''} <span class="muted">· ${a.alunos} aluno(s)</span></li>`).join('')}</ul>` : '<p class="muted">🎉 A turma passou de 70% de acerto em todas as aulas.</p>'}
+      <details ${destaque?'open':''}><summary style="cursor:pointer; font-weight:600;">Questões mais erradas (${Math.min(8, e.questoes.length)})</summary>
+        <div class="table-scroll"><table style="font-size:.85rem;">
+          <tr><th>Acerto</th><th>Aula</th><th>Questão</th><th>Resposta certa</th><th>Erro mais comum</th></tr>
+          ${e.questoes.slice(0,8).map(q => `<tr><td style="color:${cor(q.pct)}; font-weight:700;">${q.pct}%</td><td>${q.n}</td><td style="max-width:320px;">${esc(q.texto)}</td><td>${esc(q.certa)}</td><td>${q.errada ? esc(q.errada) + ` <span class="muted">(${q.erradaQtd})</span>` : '—'}</td></tr>`).join('')}
+        </table></div>
+      </details>
+      <div class="row" style="gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+        ${rev.length ? `<button class="btn btn-sm" style="background:var(--blue,#1F4E79); color:#fff;" data-action="plano-aplicar-revisao">📝 Aplicar lista de revisão (${rev.length} questões mais erradas)</button>
+          <label style="font-size:.85rem; cursor:pointer;"><input type="checkbox" data-action="plano-revisao-vale" ${s.revisaoVale?'checked':''} style="width:auto;"> Vale nota</label>` : ''}
+        <button class="btn btn-ghost btn-sm" data-action="plano-analisar-erros">↻ Atualizar</button>
+        <span class="muted" style="font-size:.8rem;">Atualizado às ${new Date(e.em).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>
+      </div>`;
+  }
+  return `<div class="card" data-plano-erros style="${destaque?'border:2px solid #a4521b;':''}">
+    <h3 style="margin-top:0;">📉 O que a turma mais errou</h3>
+    <p class="muted" style="font-size:.85rem; margin-top:0;">Junta as respostas de todos os exercícios aplicados pelo plano nesta turma. Use na aula de revisão para focar no que a turma não entendeu.</p>
+    ${corpo}</div>`;
+}
+function planoClonarQuestao(q, pontos){
+  const c = cloneQuestionForUse(q);
+  c.points = pontos;
+  return c;
+}
+function planoPontosIguais(qs, total){
+  if(!qs.length) return qs;
+  const base = Math.floor((total / qs.length) * 100) / 100;
+  qs.forEach(q => q.points = base);
+  qs[qs.length-1].points = Math.round((total - base*(qs.length-1))*100)/100;
+  return qs;
+}
+async function aplicarListaRevisao(turmaId){
+  const s = planoState();
+  const e = s.erros[turmaId];
+  if(!e) return;
+  const rev = e.questoes.filter(q=>q.pct<70).slice(0,10);
+  if(!rev.length) return;
+  const plano = s.planos[s.turmaPlano[turmaId]];
+  const bim = Math.max(...rev.map(q => { const a = plano.aulas.find(x=>x.n===q.n); return a ? a.bimestre : 1; }));
+  const disc = planoDisciplinaDoProfessor(plano.disciplina||'');
+  const sess = state.professor.session;
+  const code = genCode();
+  const assessment = {
+    code, title: `Revisão — o que a turma mais errou (${plano.disciplina||''} ${bim}º bim.)`,
+    instrumento:'exercicios', unidade: UNIDADES[Math.max(0, Math.min(3, bim-1))],
+    disciplinaId: disc ? disc.id : null, disciplinaName: disc ? disc.name : (plano.disciplina||null),
+    turmaIds:[turmaId], questions: planoPontosIguais(rev.map(q => planoClonarQuestao(q.q, 1)), 10),
+    startAt:null, endAt: planoPrazoParaEndAt('7'), agendaTurmas:{}, resultRelease:{ mode:'imediato', releaseAt:'' },
+    securityEnabled:false, minMinutesPerQuestion:null, exigeLiberacao:false, valeNota: !!s.revisaoVale,
+    origemPlano:{ planoId: plano.id, revisao:true, turmaId },
+    professorId: sess ? sess.id : null, professorName: sess ? sess.displayName : 'Coordenação', createdAt: Date.now(), updatedAt:null,
+  };
+  await window.storage.set(`assessment:${code}`, JSON.stringify(assessment), true);
+  (state.professor.assessments = state.professor.assessments||[]).unshift(assessment);
+  if(state.coordenador && Array.isArray(state.coordenador.assessments)) state.coordenador.assessments.unshift(assessment);
+  s.msg = `✅ Lista de revisão aplicada (código ${code}) com as ${rev.length} questões mais erradas. ${assessment.valeNota ? 'Vale nota.' : 'Não vale nota (treino).'} Prazo de 7 dias. Os alunos veem a explicação de cada questão ao terminar.`;
+  render();
+}
+
+// ---- (2) Montar a prova do bimestre com as questões das aulas dadas ----
+function planoSugerirSelecao(turmaId, bimestre, fonte){
+  const s = planoState();
+  const plano = s.planos[s.turmaPlano[turmaId]];
+  const aulas = plano.aulas.filter(a => a.bimestre===bimestre && a.exercicio);
+  const erros = s.erros[turmaId];
+  const sel = {};
+  const qtd = () => Object.keys(sel).length;
+  // (a) questões dos exercícios: as mais erradas pela turma (até 5, no máximo 2 por aula)
+  const maisErradas = (limite) => {
+    if(!erros) return;
+    const porAula = {};
+    erros.questoes.filter(q => q.pct<70 && aulas.some(a=>a.n===q.n)).forEach(q => {
+      if(qtd() >= limite || (porAula[q.n]||0) >= 2) return;
+      sel[`${q.n}:${q.qi}`] = true; porAula[q.n] = (porAula[q.n]||0) + 1;
+    });
+  };
+  // (b) completa com uma questão por aula (rodízio), do tipo pedido
+  const completar = (limite, tipo, ordemAulas) => {
+    let rodada = 0;
+    while(qtd() < limite && rodada < 5){
+      for(const a of ordemAulas){
+        if(qtd() >= limite) break;
+        const lista = tipo==='p'
+          ? (a.exercicio.questoesProva||[]).map((q,qi)=>({ k:`${a.n}:p${qi}` }))
+          : a.exercicio.questoes.map((q,qi)=>({ q, k:`${a.n}:${qi}` })).filter(x=>x.q.tipo==='mc');
+        const livres = lista.filter(x => !sel[x.k]);
+        const jaTem = Object.keys(sel).filter(k => k.startsWith(a.n+':')).length;
+        if(livres.length && jaTem <= rodada) sel[livres[(a.n + rodada) % livres.length].k] = true;
+      }
+      rodada++;
+    }
+  };
+  // aulas em que a turma foi pior vêm primeiro (para as inéditas cobrirem o que precisa)
+  const pctAula = n => { const x = erros && erros.porAula.find(a=>a.n===n); return x ? x.pct : 100; };
+  const piores = aulas.slice().sort((a,b) => pctAula(a.n) - pctAula(b.n) || a.n - b.n);
+  if(fonte==='ineditas'){ completar(10, 'p', piores); }
+  else if(fonte==='misturar'){ maisErradas(5); completar(5, 'x', aulas); completar(10, 'p', piores); }
+  else { maisErradas(5); completar(10, 'x', aulas); }
+  return sel;
+}
+function planoAbrirMontarProva(turmaId, bimestre){
+  const s = planoState();
+  const fonte = 'exercicios';
+  s.montarProva = { turmaId, bimestre, fonte, sel: planoSugerirSelecao(turmaId, bimestre, fonte) };
+  render();
+  setTimeout(() => { const el = document.querySelector('[data-montar-prova]'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }, 50);
+}
+function renderMontarProva(){
+  const s = planoState(); const m = s.montarProva;
+  if(!m) return '';
+  const plano = s.planos[s.turmaPlano[m.turmaId]];
+  if(!plano) return '';
+  const prog = s.prog[m.turmaId] || { dadas:{} };
+  const aulas = plano.aulas.filter(a => a.bimestre===m.bimestre && a.exercicio);
+  const erros = s.erros[m.turmaId];
+  const pctDe = (n, qi) => { const q = erros && erros.questoes.find(x=>x.n===n && x.qi===qi); return q ? q.pct : null; };
+  const nSel = Object.values(m.sel).filter(Boolean).length;
+  const pts = nSel ? (10/nSel).toFixed(2).replace('.',',') : '0';
+  return `<div class="card" data-montar-prova style="border:2px solid var(--wine,#6B1F2E);">
+    <div class="row" style="justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+      <h3 style="margin:0;">📝 Montar a prova do ${m.bimestre}º bimestre</h3>
+      <button class="btn btn-ghost btn-sm" data-action="plano-fechar-prova">Fechar</button>
+    </div>
+    ${(() => {
+      const temIneditas = aulas.some(a => (a.exercicio.questoesProva||[]).length);
+      const op = (v, t, d) => `<label style="display:flex; gap:8px; align-items:flex-start; font-weight:400; text-transform:none; margin:4px 0; cursor:pointer; ${!temIneditas && v!=='exercicios' ? 'opacity:.5;' : ''}">
+          <input type="radio" name="plano-fonte" data-action="plano-prova-fonte" value="${v}" ${m.fonte===v?'checked':''} ${!temIneditas && v!=='exercicios' ? 'disabled' : ''} style="width:auto; margin-top:3px;">
+          <span><strong>${t}</strong><br><span class="muted" style="font-size:.82rem;">${d}</span></span></label>`;
+      return `<div style="background:#f7f3ea; border-radius:8px; padding:8px 12px; margin:8px 0;">
+        <div style="font-weight:700; margin-bottom:4px;">Quais questões usar?</div>
+        ${op('exercicios','Dos exercícios de fixação','A turma já resolveu. Bom para conferir se aprendeu com a correção — mas favorece quem decorou.')}
+        ${op('ineditas','Inéditas (a turma nunca viu)','2 questões novas por aula, feitas só para prova. Mede melhor o aprendizado.')}
+        ${op('misturar','Misturar','Metade dos exercícios (as mais erradas) e metade inéditas.')}
+        ${temIneditas ? '' : '<p class="muted" style="font-size:.8rem; margin:4px 0 0;">Este plano ainda não tem questões inéditas. Peça à coordenação para importar o arquivo do plano atualizado.</p>'}
+      </div>`;
+    })()}
+    <p class="muted" style="font-size:.86rem;">Já deixei 10 sugeridas — ${m.fonte==='ineditas' ? 'começando pelas aulas em que a turma acertou menos.' : m.fonte==='misturar' ? 'as mais erradas pela turma e inéditas das aulas mais fracas.' : (erros ? 'primeiro as que a turma mais errou e depois uma por aula.' : 'uma por aula.')} Marque ou desmarque à vontade. Depois você confere tudo no formulário normal da prova (datas, liberação, papel).</p>
+    <div style="position:sticky; top:0; background:var(--card-bg,#fff); padding:6px 0; z-index:1;"><strong>${nSel} questão(ões) selecionada(s)</strong> · ${pts} ponto(s) cada · total 10
+      <button class="btn btn-primary btn-sm" data-action="plano-criar-prova" style="margin-left:8px;" ${nSel?'':'disabled'}>Continuar no formulário da prova →</button></div>
+    ${aulas.map(a => `
+      <details ${Object.keys(m.sel).some(k => m.sel[k] && k.startsWith(a.n+':'))?'open':''} style="margin:6px 0;">
+        <summary style="cursor:pointer;"><strong>Aula ${a.n}</strong> — ${esc(a.tituloCurto||a.tema)} ${prog.dadas&&prog.dadas[a.n]?'':'<span class="muted">(ainda não dada)</span>'} · ${Object.keys(m.sel).filter(k => m.sel[k] && k.startsWith(a.n+':')).length} marcada(s)${(() => { const x = erros && erros.porAula.find(y=>y.n===a.n); return x ? ` · <span style="color:${x.pct<50?'#b3261e':x.pct<70?'#a4521b':'#1d6b31'};">turma acertou ${x.pct}%</span>` : ''; })()}</summary>
+        ${m.fonte!=='exercicios' ? (a.exercicio.questoesProva||[]).map((q,qi) => `
+          <label style="display:flex; gap:8px; align-items:flex-start; font-weight:400; text-transform:none; margin:6px 0 6px 10px; font-size:.88rem;">
+            <input type="checkbox" data-action="plano-prova-q" data-k="${a.n}:p${qi}" ${m.sel[`${a.n}:p${qi}`]?'checked':''} style="width:auto; margin-top:3px;">
+            <span><span style="background:#e6f0fa; color:#1F4E79; border-radius:6px; padding:0 6px; font-size:.75rem; font-weight:700;">INÉDITA · ENEM${q.habilidade?' '+esc(q.habilidade):''}</span>${q.imagem?' <span title="tem imagem do livro">🖼️</span>':''}
+              <span style="display:block; font-size:.82rem; color:#555; white-space:pre-line; margin:2px 0;">${esc(q.texto)}</span>
+              ${q.comando?`<strong>${esc(q.comando)}</strong>`:''}<br><span class="muted">✓ ${esc(q.opcoes[q.correta]||'')}</span></span>
+          </label>`).join('') : ''}
+        ${m.fonte==='ineditas' ? '' : a.exercicio.questoes.map((q,qi) => q.tipo!=='mc' ? '' : (() => { const p = pctDe(a.n, qi); return `
+          <label style="display:flex; gap:8px; align-items:flex-start; font-weight:400; text-transform:none; margin:6px 0 6px 10px; font-size:.88rem;">
+            <input type="checkbox" data-action="plano-prova-q" data-k="${a.n}:${qi}" ${m.sel[`${a.n}:${qi}`]?'checked':''} style="width:auto; margin-top:3px;">
+            <span><span style="background:#f3ece0; color:#7a5a1f; border-radius:6px; padding:0 6px; font-size:.75rem; font-weight:700;">EXERCÍCIO</span> ${esc(q.texto)} ${p!=null ? `<span style="font-weight:700; color:${p<50?'#b3261e':p<70?'#a4521b':'#1d6b31'};">(${p}% de acerto)</span>` : ''}<br><span class="muted">✓ ${esc(q.opcoes[q.correta]||'')}</span></span>
+          </label>`; })()).join('')}
+      </details>`).join('')}
+  </div>`;
+}
+async function planoCriarProva(){
+  const s = planoState(); const m = s.montarProva; const p = state.professor;
+  if(state.view==='coordenador'){ alert('Para montar a prova, entre no painel do professor (Professores → 👁 Entrar no painel) e abra o Plano de Aulas do Livro por lá.'); return; }
+  const plano = s.planos[s.turmaPlano[m.turmaId]];
+  const questoes = [];
+  plano.aulas.filter(a => a.bimestre===m.bimestre && a.exercicio).forEach(a => {
+    const add = (q, inedita) => {
+      const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
+      const nova = { id: cryptoId(), type:'mc', text: q.texto, points: 1, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo: `Aula ${a.n} — ${a.tituloCurto||a.tema}`, options, correctOptionId: options[q.correta].id, explicacao: q.explicacao||'', inedita: !!inedita };
+      if(q.comando) nova.comando = q.comando;
+      if(q.imagem) nova._imagemPlano = q.imagem;
+      questoes.push(nova);
+    };
+    a.exercicio.questoes.forEach((q,qi) => { if(m.sel[`${a.n}:${qi}`] && q.tipo==='mc') add(q, false); });
+    (a.exercicio.questoesProva||[]).forEach((q,qi) => { if(m.sel[`${a.n}:p${qi}`]) add(q, true); });
+  });
+  if(!questoes.length) return;
+  // busca as imagens (mapas e fotos do livro) guardadas na importação do plano
+  let semImagem = 0;
+  for(const q of questoes){
+    if(!q._imagemPlano) continue;
+    const img = await planoLerJson(`plano-livro-img:${q._imagemPlano}`, null);
+    if(img) q.image = img; else semImagem++;
+    delete q._imagemPlano;
+  }
+  planoPontosIguais(questoes, 10);
+  const disc = planoDisciplinaDoProfessor(plano.disciplina||'');
+  const na = freshAssessment();
+  na.instrumento = 'avaliacao';
+  na.unidade = UNIDADES[Math.max(0, Math.min(3, m.bimestre-1))];
+  na.disciplinaId = disc ? disc.id : '';
+  na.turmaIds = [m.turmaId];
+  na.questions = questoes;
+  p.newAssessment = na; p.editingCode = null; p.editingResponseCount = 0; p.pickerOpen = false; p.pickerSelected = [];
+  s.montarProva = null;
+  p.subview = 'avaliacoes'; p.mode = 'new';
+  render();
+  window.scrollTo(0,0);
+  const nIned = questoes.filter(q=>q.inedita).length;
+  alert(`Prova montada com ${questoes.length} questões (10 pontos)${nIned ? ` — ${nIned} inédita(s) no padrão ENEM` : ''}.${semImagem ? ` Atenção: ${semImagem} imagem(ns) não foram encontradas — peça à coordenação para importar o plano de novo.` : ''} Confira no formulário — datas, liberação e segurança — e clique em salvar. Para imprimir, use depois o Bloco de Provas.`);
+}
+
+// ---- (3) Registro de conteúdo para o diário ----
+function planoRegistroLinhas(turmaId, filtro){
+  const s = planoState();
+  const plano = s.planos[s.turmaPlano[turmaId]];
+  const prog = s.prog[turmaId] || { dadas:{} };
+  if(!plano) return [];
+  return plano.aulas.filter(a => prog.dadas && prog.dadas[a.n]).map(a => ({ a, quando: prog.dadas[a.n] }))
+    .filter(({ a, quando }) => {
+      if(!filtro || filtro==='todas') return true;
+      if(filtro.startsWith('b')) return a.bimestre === parseInt(filtro.slice(1));
+      if(filtro.startsWith('m')){ const d = new Date(quando); return `${d.getFullYear()}-${d.getMonth()+1}` === filtro.slice(1); }
+      return true;
+    })
+    .sort((x,y) => x.quando - y.quando || x.a.n - y.a.n)
+    .map(({ a, quando }) => ({
+      data: new Date(quando).toLocaleDateString('pt-BR'),
+      aula: a.n,
+      conteudo: a.tituloCurto || a.tema.replace(/\s*\(parte \d+ de \d+\)\s*$/,''),
+      capitulo: a.capitulo || '',
+      paginas: a.paginas || '',
+      objetivo: a.objetivo || '',
+      bncc: a.bncc || '',
+      atividade: (a.exercicios_livro||[]).map(e => typeof e==='string'?e:(e.t||'')).join('; ') + (prog.exercicios && prog.exercicios[a.n] ? ((a.exercicios_livro||[]).length?'; ':'') + 'Exercício de fixação no app' : ''),
+    }));
+}
+function planoRegistroTexto(linhas){
+  return linhas.map(l => `${l.data} — Aula ${l.aula}: ${l.conteudo}${(l.capitulo||l.paginas)?` (${[l.capitulo, l.paginas?'livro '+l.paginas:''].filter(Boolean).join('; ')})`:''}.${l.bncc?` Habilidades: ${l.bncc}.`:''}${l.atividade?` Atividades: ${l.atividade}.`:''}`).join('\n');
+}
+function renderPlanoRegistro(turmaId){
+  const s = planoState();
+  if(!s.registroAberto) return `<button class="btn btn-ghost btn-sm" data-action="plano-registro-abrir">📋 Registro para o diário</button>`;
+  const prog = s.prog[turmaId] || { dadas:{} };
+  const meses = [...new Set(Object.values(prog.dadas||{}).map(t => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth()+1}`; }))].sort();
+  const nomeMes = k => { const [y,m] = k.split('-'); return new Date(+y, +m-1, 1).toLocaleDateString('pt-BR', { month:'long', year:'numeric' }); };
+  const filtro = s.registroFiltro || 'todas';
+  const linhas = planoRegistroLinhas(turmaId, filtro);
+  return `<div class="card" data-plano-registro>
+    <div class="row" style="justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+      <h3 style="margin:0;">📋 Registro de conteúdo para o diário</h3>
+      <button class="btn btn-ghost btn-sm" data-action="plano-registro-fechar">Fechar</button>
+    </div>
+    <p class="muted" style="font-size:.85rem;">Só entram as aulas marcadas como dadas, com a data em que foram marcadas. Copie e cole no diário da SEDUC, ou baixe a planilha.</p>
+    <div class="row" style="gap:8px; flex-wrap:wrap; align-items:center;">
+      <label style="font-size:.85rem;">Período: <select data-action="plano-registro-filtro" style="width:auto;">
+        <option value="todas" ${filtro==='todas'?'selected':''}>Todas as aulas dadas</option>
+        ${[1,2,3,4].map(b => `<option value="b${b}" ${filtro==='b'+b?'selected':''}>${b}º bimestre</option>`).join('')}
+        ${meses.map(k => `<option value="m${k}" ${filtro==='m'+k?'selected':''}>${nomeMes(k)}</option>`).join('')}
+      </select></label>
+      <button class="btn btn-primary btn-sm" data-action="plano-registro-copiar" ${linhas.length?'':'disabled'}>📄 Copiar texto</button>
+      <button class="btn btn-ghost btn-sm" data-action="plano-registro-xlsx" ${linhas.length?'':'disabled'}>⬇️ Baixar planilha</button>
+    </div>
+    ${linhas.length ? `<div class="table-scroll" style="margin-top:10px;"><table style="font-size:.84rem;">
+      <tr><th>Data</th><th>Aula</th><th>Conteúdo</th><th>Livro</th><th>Habilidades (BNCC)</th><th>Atividades</th></tr>
+      ${linhas.map(l => `<tr><td>${l.data}</td><td>${l.aula}</td><td>${esc(l.conteudo)}</td><td>${esc(l.paginas)}</td><td>${esc(l.bncc)}</td><td>${esc(l.atividade)}</td></tr>`).join('')}
+    </table></div>` : '<p class="muted">Nenhuma aula dada nesse período.</p>'}
+  </div>`;
+}
+async function planoRegistroCopiar(turmaId){
+  const s = planoState();
+  const txt = planoRegistroTexto(planoRegistroLinhas(turmaId, s.registroFiltro||'todas'));
+  try{ await navigator.clipboard.writeText(txt); s.msg = '📄 Texto copiado. Agora é só colar no diário.'; }
+  catch(e){ window.prompt('Copie o texto abaixo (Ctrl+C):', txt); }
+  render();
+}
+function planoRegistroXlsx(turmaId){
+  const s = planoState();
+  const turma = (state.professor.turmas||[]).find(t=>t.id===turmaId);
+  const linhas = planoRegistroLinhas(turmaId, s.registroFiltro||'todas');
+  const ws = XLSX.utils.json_to_sheet(linhas.map(l => ({ 'Data': l.data, 'Aula': l.aula, 'Conteúdo': l.conteudo, 'Capítulo': l.capitulo, 'Livro': l.paginas, 'Objetivo': l.objetivo, 'Habilidades (BNCC)': l.bncc, 'Atividades': l.atividade })));
+  ws['!cols'] = [{wch:11},{wch:6},{wch:50},{wch:40},{wch:12},{wch:50},{wch:30},{wch:40}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Registro');
+  XLSX.writeFile(wb, `registro-conteudo-${(turma?turma.name:'turma').replace(/[^a-z0-9]+/gi,'-')}.xlsx`);
+}
+
+// ---- Recuperação personalizada: parte comum (igual para todos) + parte personalizada (aulas mais fracas de cada aluno) ----
+function planoQuestaoPorChave(plano, k){
+  // k = 'r:n:i' (banco da recuperação) · 'p:n:i' (inédita de prova) · 'x:n:i' (exercício)
+  const [tipo, nS, iS] = String(k).split(':');
+  const aula = plano.aulas.find(a=>a.n===parseInt(nS));
+  if(!aula || !aula.exercicio) return null;
+  const lista = tipo==='r' ? aula.exercicio.questoesRecuperacao : tipo==='p' ? aula.exercicio.questoesProva : aula.exercicio.questoes;
+  const q = (lista||[])[parseInt(iS)];
+  return q ? { q, aula, tipo } : null;
+}
+function alunoPodeVerAvaliacao(a, al){
+  if(!a || !Array.isArray(a.somenteAlunos)) return true;
+  return a.somenteAlunos.includes(al.matriculaStudentId) || (a.somenteAlunosNomes||[]).some(n => mesmoNomeAluno(n, al.name));
+}
+async function planoAbrirRecuperacao(turmaId, bimestre){
+  const s = planoState();
+  const plano = s.planos[s.turmaPlano[turmaId]];
+  const turma = (state.professor.turmas||[]).find(t=>t.id===turmaId);
+  if(!plano || !turma) return;
+  s.recup = { turmaId, bimestre, carregando:true }; render();
+  const unidade = UNIDADES[Math.max(0, Math.min(3, bimestre-1))];
+  const todas = await Promise.all(((await window.storage.list('assessment:', true)).keys||[]).map(k => planoLerJson(k, null)));
+  const daTurma = todas.filter(a => a && assessmentTurmaIds(a).includes(turmaId) && a.unidade===unidade);
+  const provas = daTurma.filter(a => a.instrumento==='avaliacao').sort((a,b)=>b.createdAt-a.createdAt);
+  const prova = provas.find(a => (a.questions||[]).some(q => /^Aula \d+/.test(q.conteudo||''))) || provas[0] || null;
+  const prog = s.prog[turmaId] || { exercicios:{} };
+  const aulasBim = plano.aulas.filter(a => a.bimestre===bimestre && a.exercicio);
+  const nAulas = new Set(aulasBim.map(a=>a.n));
+  // respostas: exercícios do plano + prova
+  const fontes = [];
+  Object.entries(prog.exercicios||{}).forEach(([n, code]) => { if(nAulas.has(parseInt(n))) fontes.push({ code, aulaFixa: parseInt(n) }); });
+  if(prova) fontes.push({ code: prova.code, prova: true });
+  const desempenho = {};   // nomeChave → { n: [acertos, total] }
+  let notaProva = {};
+  const maxProva = prova ? prova.questions.reduce((x,q)=>x+(q.points||0),0) : 0;
+  await Promise.all(fontes.map(async f => {
+    const av = f.prova ? prova : (await planoLerJson(`assessment:${f.code}`, null));
+    if(!av) return;
+    const resp = await planoLerJson(`responses:${f.code}`, []);
+    resp.forEach(r => {
+      const nk = nomeChave(r.studentName);
+      if(f.prova) notaProva[nk] = maxProva ? Math.round(r.total/maxProva*100)/10 : null;
+      (av.questions||[]).forEach(q => {
+        if(q.type!=='mc' || q.annulled) return;
+        const n = f.aulaFixa || (() => { const m = /^Aula (\d+)/.exec(q.conteudo||''); return m ? parseInt(m[1]) : null; })();
+        if(!n || !nAulas.has(n)) return;
+        const d = (desempenho[nk] = desempenho[nk] || {}); d[n] = d[n] || [0,0];
+        d[n][1]++; if(r.answers && r.answers[q.id]===q.correctOptionId) d[n][0]++;
+      });
+    });
+  }));
+  // inéditas de prova que já caíram na prova (não podem se repetir)
+  const textosProva = new Set(prova ? prova.questions.map(q=>q.text) : []);
+  // desempenho da turma por aula → parte comum: 5 aulas mais fracas da turma, 1 questão do banco de recuperação de cada
+  const turmaAula = {};
+  Object.values(desempenho).forEach(d => Object.entries(d).forEach(([n,[a,t]]) => { const x = turmaAula[n] = turmaAula[n] || [0,0]; x[0]+=a; x[1]+=t; }));
+  const pct = (x) => x && x[1] ? x[0]/x[1] : 1;
+  const ordemTurma = aulasBim.slice().sort((a,b) => pct(turmaAula[a.n]) - pct(turmaAula[b.n]) || a.n - b.n);
+  const comuns = ordemTurma.filter(a => (a.exercicio.questoesRecuperacao||[]).length).slice(0,5).map(a => `r:${a.n}:0`);
+  const alunos = {};
+  (turma.students||[]).forEach(st => {
+    const nk = nomeChave(st.name);
+    const nota = notaProva[nk];
+    const d = desempenho[nk] || {};
+    const fez = nota!=null;
+    const fracas = aulasBim.slice().sort((a,b) => (d[a.n]?pct(d[a.n]):0.5) - (d[b.n]?pct(d[b.n]):0.5) || pct(turmaAula[a.n]) - pct(turmaAula[b.n]) || a.n - b.n).map(a=>a.n);
+    alunos[st.id] = { nome: st.name, nota, fez, incluir: !fez || nota < 5, fracas: fracas.slice(0,5), pers: [] };
+  });
+  s.recup = { turmaId, bimestre, unidade, provaCode: prova ? prova.code : null, provaTitulo: prova ? prova.title : null, comuns, alunos, textosProva: [...textosProva], inicio:'', fim:'', pedirLiberacao:false, carregando:false };
+  Object.keys(alunos).forEach(sid => planoRecupSortearPers(sid));
+  render();
+  setTimeout(() => { const el = document.querySelector('[data-recuperacao]'); if(el) el.scrollIntoView({ behavior:'smooth', block:'start' }); }, 50);
+}
+function planoRecupPool(n){
+  // questões disponíveis de uma aula para a parte personalizada (nunca vistas pelo aluno)
+  const s = planoState(); const r = s.recup;
+  const plano = s.planos[s.turmaPlano[r.turmaId]];
+  const aula = plano.aulas.find(a=>a.n===n);
+  if(!aula || !aula.exercicio) return [];
+  const ks = [];
+  (aula.exercicio.questoesRecuperacao||[]).forEach((q,i) => ks.push(`r:${n}:${i}`));
+  (aula.exercicio.questoesProva||[]).forEach((q,i) => { if(!r.textosProva.includes(q.texto)) ks.push(`p:${n}:${i}`); });
+  return ks.filter(k => !r.comuns.includes(k));
+}
+function planoRecupSortearPers(sid){
+  const s = planoState(); const r = s.recup; const al = r.alunos[sid];
+  const usadas = new Set(r.comuns);
+  const pers = [];
+  // 5 questões: percorre as aulas mais fracas do aluno, no máximo 2 por aula
+  for(let rodada=0; rodada<2 && pers.length<5; rodada++){
+    for(const n of al.fracas){
+      if(pers.length>=5) break;
+      const livre = planoRecupPool(n).filter(k => !usadas.has(k));
+      if(livre[rodada] || livre[0]){ const k = livre[0]; pers.push(k); usadas.add(k); }
+    }
+  }
+  // completa com qualquer aula do bimestre, se faltar
+  if(pers.length<5){
+    const plano = s.planos[s.turmaPlano[r.turmaId]];
+    for(const a of plano.aulas.filter(a=>a.bimestre===r.bimestre && a.exercicio)){
+      for(const k of planoRecupPool(a.n)){ if(pers.length<5 && !usadas.has(k)){ pers.push(k); usadas.add(k); } }
+    }
+  }
+  al.pers = pers;
+}
+function planoRecupTrocar(sid, idx){
+  const s = planoState(); const r = s.recup; const al = r.alunos[sid];
+  const atual = al.pers[idx];
+  const n = parseInt(atual.split(':')[1]);
+  const usadas = new Set([...r.comuns, ...al.pers]);
+  const opcoes = planoRecupPool(n).filter(k => !usadas.has(k));
+  if(opcoes.length){ al.pers[idx] = opcoes[0]; }
+  else {
+    // sem outra questão da mesma aula: pega da próxima aula fraca
+    for(const m of al.fracas){ const o = planoRecupPool(m).filter(k => !usadas.has(k)); if(o.length){ al.pers[idx] = o[0]; break; } }
+  }
+  render();
+}
+function renderRecuperacao(){
+  const s = planoState(); const r = s.recup;
+  if(!r) return '';
+  if(r.carregando) return '<div class="card" data-recuperacao><p>⏳ Analisando o desempenho de cada aluno…</p></div>';
+  const plano = s.planos[s.turmaPlano[r.turmaId]];
+  const resumoQ = (k, extra) => { const x = planoQuestaoPorChave(plano, k); if(!x) return ''; return `<li style="margin:3px 0; font-size:.85rem;"><span class="muted">Aula ${x.aula.n}</span> · ${x.q.imagem?'🖼️ ':''}${esc(x.q.comando || x.q.texto)} ${x.q.habilidade?`<span style="font-size:.72rem; background:#e6f0fa; color:#1F4E79; border-radius:5px; padding:0 4px;">${esc(x.q.habilidade)}</span>`:''}${extra||''}</li>`; };
+  const ids = Object.keys(r.alunos).sort((a,b) => r.alunos[a].nome.localeCompare(r.alunos[b].nome,'pt-BR'));
+  const nIncl = ids.filter(id => r.alunos[id].incluir).length;
+  return `<div class="card" data-recuperacao style="border:2px solid #1d6b31;">
+    <div class="row" style="justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+      <h3 style="margin:0;">♻️ Recuperação personalizada — ${r.bimestre}º bimestre (${esc(r.unidade)})</h3>
+      <button class="btn btn-ghost btn-sm" data-action="plano-recup-fechar">Fechar</button>
+    </div>
+    <p class="muted" style="font-size:.86rem;">${r.provaCode ? `Base: prova <strong>${esc(r.provaTitulo||'')}</strong> (${esc(r.provaCode)}) e os exercícios do plano.` : 'Ainda não há prova bimestral desta unidade — a análise usa só os exercícios do plano.'} Cada aluno recebe <strong>10 questões no padrão ENEM, 1 ponto cada</strong>: 5 comuns a todos + 5 das aulas em que <em>ele</em> foi pior, sempre questões que ele ainda não viu. Vale a maior nota entre a recuperação e a NP1.</p>
+    <div style="background:#eef6ef; border-radius:8px; padding:8px 12px; margin:8px 0;">
+      <strong>Parte comum (igual para todos)</strong> — aulas em que a turma teve menor acerto:
+      <ol style="margin:4px 0 0 18px;">${r.comuns.map(k => resumoQ(k)).join('')}</ol>
+    </div>
+    <div class="row" style="gap:10px; flex-wrap:wrap; align-items:flex-end; margin:8px 0;">
+      <label style="font-size:.85rem;">Abre em<input type="datetime-local" data-action="plano-recup-campo" data-campo="inicio" value="${esc(r.inicio)}"></label>
+      <label style="font-size:.85rem;">Fecha em<input type="datetime-local" data-action="plano-recup-campo" data-campo="fim" value="${esc(r.fim)}"></label>
+      <label style="font-size:.85rem; cursor:pointer;"><input type="checkbox" data-action="plano-recup-campo" data-campo="pedirLiberacao" ${r.pedirLiberacao?'checked':''} style="width:auto;"> Só abrir quando eu liberar</label>
+    </div>
+    <h4 style="margin:12px 0 4px;">Alunos (${nIncl} selecionado(s))</h4>
+    <p class="muted" style="font-size:.8rem; margin:0 0 6px;">Já vêm marcados quem tirou menos de 5 na prova ou não fez. Toque em 🔁 para trocar uma questão.</p>
+    ${ids.map(id => { const a = r.alunos[id]; return `
+      <details data-recup-aluno="${esc(id)}" style="border-bottom:1px solid var(--border,#eee); padding:6px 0;">
+        <summary style="cursor:pointer; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <input type="checkbox" data-action="plano-recup-incluir" data-sid="${esc(id)}" ${a.incluir?'checked':''} style="width:auto;" onclick="event.stopPropagation();">
+          <strong>${esc(a.nome)}</strong>
+          <span class="muted" style="font-size:.82rem;">${a.fez ? 'prova: ' + String(a.nota).replace('.',',') : 'não fez a prova'} · mais fraco nas aulas ${a.fracas.slice(0,3).join(', ')}</span>
+        </summary>
+        <ol start="6" style="margin:6px 0 0 18px;">${a.pers.map((k,i) => resumoQ(k, ` <button class="btn btn-ghost btn-sm" style="padding:0 6px;" data-action="plano-recup-trocar" data-sid="${esc(id)}" data-i="${i}" title="trocar">🔁</button>`)).join('')}</ol>
+      </details>`; }).join('')}
+    <div class="row" style="gap:8px; margin-top:12px; flex-wrap:wrap; align-items:center;">
+      <button class="btn btn-primary" data-action="plano-recup-criar" ${nIncl?'':'disabled'}>✅ Criar ${nIncl} recuperação(ões) personalizada(s)</button>
+      <span class="muted" style="font-size:.8rem;">Cada aluno só enxerga a sua. Depois, elas aparecem em Avaliações e podem ser editadas.</span>
+    </div>
+  </div>`;
+}
+async function planoRecupCriar(){
+  const s = planoState(); const r = s.recup;
+  const plano = s.planos[s.turmaPlano[r.turmaId]];
+  const turma = (state.professor.turmas||[]).find(t=>t.id===r.turmaId);
+  if(r.inicio && r.fim && new Date(r.fim) <= new Date(r.inicio)){ alert('O horário de fechamento deve ser depois da abertura.'); return; }
+  const disc = planoDisciplinaDoProfessor(plano.disciplina||'');
+  const sess = state.professor.session;
+  const imgCache = {};
+  const montarQ = async (k) => {
+    const x = planoQuestaoPorChave(plano, k); if(!x) return null;
+    const q = x.q;
+    const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
+    const nova = { id: cryptoId(), type:'mc', text: q.texto, points: 1, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo: `Aula ${x.aula.n} — ${x.aula.tituloCurto||x.aula.tema}`, options, correctOptionId: options[q.correta].id, explicacao: q.explicacao||'', inedita: true };
+    if(q.comando) nova.comando = q.comando;
+    if(q.imagem){ if(!(q.imagem in imgCache)) imgCache[q.imagem] = await planoLerJson(`plano-livro-img:${q.imagem}`, null); if(imgCache[q.imagem]) nova.image = imgCache[q.imagem]; }
+    return nova;
+  };
+  const ids = Object.keys(r.alunos).filter(id => r.alunos[id].incluir);
+  let criadas = 0;
+  s.enviando = { atual:0, total:ids.length, texto:'Criando as recuperações...' }; render();
+  for(const sid of ids){
+    const al = r.alunos[sid];
+    const qs = (await Promise.all([...r.comuns, ...al.pers].map(montarQ))).filter(Boolean);
+    const code = genCode();
+    const assessment = {
+      code, title: `Recuperação ${plano.disciplina||''} — ${r.unidade} — ${al.nome}`,
+      instrumento:'recuperacao', unidade: r.unidade,
+      disciplinaId: disc ? disc.id : null, disciplinaName: disc ? disc.name : (plano.disciplina||null),
+      turmaIds:[r.turmaId], questions: planoPontosIguais(qs, 10),
+      startAt: r.inicio || null, endAt: r.fim || null, agendaTurmas:{},
+      resultRelease:{ mode:'imediato', releaseAt:'' }, securityEnabled:true, minMinutesPerQuestion: 2, exigeLiberacao: !!r.pedirLiberacao,
+      somenteAlunos:[sid], somenteAlunosNomes:[al.nome],
+      origemPlano:{ planoId: plano.id, recuperacao:true, turmaId: r.turmaId, bimestre: r.bimestre, comuns: r.comuns.slice(), pers: al.pers.slice() },
+      professorId: sess ? sess.id : null, professorName: sess ? sess.displayName : 'Coordenação', createdAt: Date.now(), updatedAt:null,
+    };
+    await window.storage.set(`assessment:${code}`, JSON.stringify(assessment), true);
+    (state.professor.assessments = state.professor.assessments||[]).unshift(assessment);
+    if(state.coordenador && Array.isArray(state.coordenador.assessments)) state.coordenador.assessments.unshift(assessment);
+    criadas++; s.enviando.atual = criadas; render();
+  }
+  s.enviando = null; s.recup = null;
+  s.msg = `✅ ${criadas} recuperação(ões) personalizada(s) criada(s) para a turma ${turma?turma.name:''}. Cada aluno só vê a sua, em “Provas”.${r.pedirLiberacao ? ' Lembre de liberar em Liberações.' : ''} Para a nota, vale a maior entre a recuperação e a NP1.`;
+  render();
+}
+
+// ---- Habilidades do ENEM (por turma e por aluno) + busca ativa de quem não entrega ----
+const HAB_ENEM_CH = {
+  H1:'Interpretar fontes documentais sobre aspectos da cultura', H2:'Analisar a produção da memória pelas sociedades', H3:'Associar manifestações culturais do presente a seus processos históricos',
+  H4:'Comparar pontos de vista sobre aspectos da cultura', H5:'Identificar a diversidade do patrimônio cultural', H6:'Interpretar representações gráficas e cartográficas',
+  H7:'Identificar relações de poder entre as nações', H8:'Analisar a ação dos Estados nos fluxos populacionais', H9:'Comparar organizações políticas e socioeconômicas em diferentes escalas',
+  H10:'Reconhecer a dinâmica dos movimentos sociais', H16:'Identificar o papel das técnicas e tecnologias no trabalho e na vida social', H17:'Analisar o impacto das novas tecnologias na territorialização da produção',
+  H18:'Analisar processos de produção e circulação de riquezas', H19:'Reconhecer transformações técnicas no uso dos espaços rural e urbano', H20:'Selecionar argumentos sobre as novas tecnologias e o trabalho',
+  H21:'Identificar o papel dos meios de comunicação', H26:'Identificar a ocupação dos meios físicos e as relações com a paisagem', H27:'Analisar criticamente as interações sociedade–natureza',
+  H28:'Relacionar tecnologias e impactos socioambientais', H29:'Reconhecer a função dos recursos naturais', H30:'Avaliar preservação e degradação da vida no planeta',
+};
+async function planoAnalisarHabilidades(turmaId){
+  const s = planoState();
+  s.habCarregando = turmaId; render();
+  const turma = (state.professor.turmas||[]).find(t=>t.id===turmaId);
+  const alunos = (turma && turma.students) || [];
+  const porNome = {}; alunos.forEach(st => porNome[nomeChave(st.name)] = st);
+  const todas = await Promise.all(((await window.storage.list('assessment:', true)).keys||[]).map(k => planoLerJson(k, null)));
+  const avs = todas.filter(a => a && assessmentTurmaIds(a).includes(turmaId) && (a.questions||[]).some(q => /^ENEM H\d+/.test(q.descritorSaeb||'')));
+  const turmaH = {}, alunoH = {};
+  await Promise.all(avs.map(async av => {
+    const resp = await planoLerJson(`responses:${av.code}`, []);
+    resp.forEach(r => {
+      const st = porNome[nomeChave(r.studentName)]; if(!st) return;
+      av.questions.forEach(q => {
+        const m = /^ENEM (H\d+)/.exec(q.descritorSaeb||''); if(!m || q.type!=='mc' || q.annulled) return;
+        const h = m[1]; const ok = r.answers && r.answers[q.id]===q.correctOptionId ? 1 : 0;
+        const t = turmaH[h] = turmaH[h] || [0,0]; t[0]+=ok; t[1]++;
+        const a = (alunoH[st.id] = alunoH[st.id] || {}); const x = a[h] = a[h] || [0,0]; x[0]+=ok; x[1]++;
+      });
+    });
+  }));
+  // busca ativa: entregas dos exercícios do plano
+  const prog = s.prog[turmaId] || { exercicios:{} };
+  const codes = Object.values(prog.exercicios||{});
+  const entregas = {}; alunos.forEach(st => entregas[st.id] = { feitos:0, vencidosSemFazer:0 });
+  await Promise.all(codes.map(async code => {
+    const av = await planoLerJson(`assessment:${code}`, null);
+    const resp = await planoLerJson(`responses:${code}`, []);
+    const fizeram = new Set(resp.map(r => nomeChave(r.studentName)));
+    const venceu = av && av.endAt && new Date(av.endAt).getTime() < Date.now();
+    alunos.forEach(st => { if(fizeram.has(nomeChave(st.name))) entregas[st.id].feitos++; else if(venceu) entregas[st.id].vencidosSemFazer++; });
+  }));
+  s.hab[turmaId] = { turmaH, alunoH, avaliacoes: avs.length, entregas, totalEx: codes.length, em: Date.now() };
+  s.habCarregando = null;
+  render();
+}
+function renderPlanoHabilidades(turmaId){
+  const s = planoState();
+  const turma = (state.professor.turmas||[]).find(t=>t.id===turmaId);
+  const d = s.hab[turmaId];
+  const cor = p => p==null ? '#eee' : p < 50 ? '#f4c7c3' : p < 70 ? '#fde3c2' : '#cfead6';
+  const pctTxt = x => x && x[1] ? Math.round(x[0]/x[1]*100) : null;
+  let corpo;
+  if(s.habCarregando===turmaId) corpo = '<p>⏳ Analisando…</p>';
+  else if(!d) corpo = `<button class="btn btn-primary btn-sm" data-action="plano-analisar-hab">🎯 Analisar habilidades e entregas</button>`;
+  else {
+    const hs = Object.keys(d.turmaH).sort((a,b)=>parseInt(a.slice(1))-parseInt(b.slice(1)));
+    const alunos = ((turma && turma.students)||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+    const tabelaHab = hs.length ? `
+      <div class="table-scroll"><table style="font-size:.84rem;">
+        <tr><th>Habilidade</th><th>O que avalia</th><th>Acerto da turma</th><th>Alunos abaixo de 50%</th></tr>
+        ${hs.map(h => { const p = pctTxt(d.turmaH[h]); const baixos = alunos.filter(st => { const x = d.alunoH[st.id] && d.alunoH[st.id][h]; const v = pctTxt(x); return v!=null && v<50; });
+          return `<tr><td><strong>${h}</strong></td><td>${esc(HAB_ENEM_CH[h]||'')}</td><td style="background:${cor(p)}; font-weight:700; text-align:center;">${p}%</td><td style="font-size:.8rem;">${baixos.length ? baixos.map(st=>esc(st.name.split(' ')[0])).join(', ') : '—'}</td></tr>`; }).join('')}
+      </table></div>
+      <details style="margin-top:8px;"><summary style="cursor:pointer; font-weight:600;">Mapa por aluno</summary>
+        <div class="table-scroll"><table style="font-size:.78rem;">
+          <tr><th>Aluno</th>${hs.map(h=>`<th>${h}</th>`).join('')}</tr>
+          ${alunos.map(st => `<tr><td>${esc(st.name)}</td>${hs.map(h => { const v = pctTxt(d.alunoH[st.id] && d.alunoH[st.id][h]); return `<td style="background:${cor(v)}; text-align:center;">${v==null?'—':v+'%'}</td>`; }).join('')}</tr>`).join('')}
+        </table></div>
+      </details>` : '<p class="muted">Ainda não há provas com habilidades do ENEM respondidas por esta turma. Elas aparecem quando a prova é montada com questões inéditas.</p>';
+    const sem = alunos.map(st => ({ st, e: d.entregas[st.id] || { feitos:0, vencidosSemFazer:0 } }))
+      .filter(x => d.totalEx && (x.e.vencidosSemFazer >= 2 || x.e.feitos/d.totalEx < 0.5))
+      .sort((a,b) => b.e.vencidosSemFazer - a.e.vencidosSemFazer || a.e.feitos - b.e.feitos);
+    corpo = `
+      <h4 style="margin:6px 0;">🎯 Habilidades do ENEM</h4>${tabelaHab}
+      <h4 style="margin:14px 0 6px;">🚨 Busca ativa: quem não está entregando os exercícios</h4>
+      ${!d.totalEx ? '<p class="muted">Nenhum exercício aplicado ainda.</p>' : sem.length ? `<ul style="margin:0 0 0 18px; font-size:.86rem;">${sem.map(x => `<li data-sem-entregar="${esc(x.st.id)}"><strong>${esc(x.st.name)}</strong> — fez ${x.e.feitos} de ${d.totalEx}${x.e.vencidosSemFazer?` · <span style="color:#b3261e;">${x.e.vencidosSemFazer} com prazo vencido sem fazer</span>`:''}</li>`).join('')}</ul>
+        <p class="muted" style="font-size:.8rem;">Sugestão: conversar com o aluno e avisar a coordenação — quem para de entregar costuma aparecer depois no relatório de risco de reprovação.</p>` : '<p style="color:#1d6b31;">✅ Todos estão entregando pelo menos metade dos exercícios.</p>'}
+      <div class="row" style="gap:8px; align-items:center; margin-top:8px;"><button class="btn btn-ghost btn-sm" data-action="plano-analisar-hab">↻ Atualizar</button><span class="muted" style="font-size:.8rem;">${d.avaliacoes} avaliação(ões) com habilidades · ${d.totalEx} exercício(s)</span></div>`;
+  }
+  return `<div class="card" data-plano-hab><h3 style="margin-top:0;">📈 Habilidades e entregas da turma</h3>${corpo}</div>`;
+}
+
+// ---- Aluno: "Estudar" (aulas já dadas, slides, questões que errou) e lembrete de prazo ----
+function estudarState(){
+  const al = state.aluno;
+  if(!al.estudar) al.estudar = { carregado:false, carregando:false, plano:null, prog:null, slides:{}, aberta:null, deck:null, treino:{} };
+  return al.estudar;
+}
+async function carregarEstudarAluno(forcar){
+  const al = state.aluno; const e = estudarState();
+  if(!al.turma || e.carregando || (e.carregado && !forcar)) return;
+  e.carregando = true; render();
+  const ef = await planoCalcularEfetivo([al.turma]);
+  const planoId = ef.efetivo[al.turma.id];
+  e.plano = planoId ? await planoLerJson(`plano-livro:${planoId}`, null) : null;
+  e.prog = await planoLerJson(`plano-livro-prog:${al.turma.id}`, { dadas:{}, exercicios:{} });
+  e.slides = planoId ? await planoLerJson(`plano-livro-slides:${planoId}`, {}) : {};
+  e.planoId = planoId || null;
+  if(planoId){ const ps = planoState(); ps.videos[planoId] = await planoLerJson(`plano-livro-videos:${planoId}`, {}); e.feedback = (await planoLerJson(`plano-feedback:${planoId}`, [])).filter(f => f.quem==='aluno' && f.autorId===al.matriculaStudentId); }
+  e.carregando = false; e.carregado = true;
+  render();
+}
+function estudarMinhaResposta(code){
+  const al = state.aluno;
+  const r = (al.dashboardRealizadas||[]).find(x => x.assessment.code===code);
+  return r || null;
+}
+async function estudarAbrirSlides(n, idx){
+  const e = estudarState();
+  const slot = e.slides[n]; if(!slot) return;
+  const i = Math.max(0, Math.min(slot.totalSlides-1, idx||0));
+  e.deck = { n, idx:i, total: slot.totalSlides, img: null };
+  render();
+  e.deck.img = await getSlideImg(slot.deckId, i);
+  render();
+}
+function renderAlunoEstudarBlock(){
+  const al = state.aluno; const e = estudarState();
+  if(!e.carregado){ setTimeout(()=>carregarEstudarAluno(), 0); return '<div class="card"><p class="muted">Carregando…</p></div>'; }
+  if(!e.plano) return '<div class="card"><h2>📖 Estudar</h2><p class="muted">Sua turma ainda não segue um plano de aulas do livro.</p></div>';
+  const dadas = e.plano.aulas.filter(a => e.prog.dadas && e.prog.dadas[a.n]).sort((a,b) => e.prog.dadas[b.n] - e.prog.dadas[a.n]);
+  if(!dadas.length) return '<div class="card"><h2>📖 Estudar</h2><p class="muted">Assim que o professor marcar as aulas como dadas, elas aparecem aqui com os slides e as questões para revisar.</p></div>';
+  const item = a => {
+    const code = e.prog.exercicios && e.prog.exercicios[a.n];
+    const feito = code ? estudarMinhaResposta(code) : null;
+    const aberta = e.aberta===a.n;
+    let exHtml = '';
+    if(code && !feito) exHtml = `<p style="margin:6px 0; font-size:.88rem;">📝 Você ainda não fez o exercício desta aula. <button class="btn btn-primary btn-sm" data-action="aluno-sub-view" data-sub="provas">Ir para Minhas provas</button></p>`;
+    else if(feito){
+      const qs = feito.assessment.questions.filter(q => q.type==='mc' && !q.annulled);
+      const erradas = qs.filter(q => feito.response.answers[q.id]!==q.correctOptionId);
+      exHtml = `<p style="margin:6px 0; font-size:.88rem;">📝 No exercício você acertou <strong>${qs.length - erradas.length} de ${qs.length}</strong> questões objetivas.</p>
+        ${erradas.length ? `<div style="margin-top:6px;"><strong style="font-size:.9rem;">🔁 Treine as que você errou</strong> <span class="muted" style="font-size:.8rem;">(não vale nota)</span>
+          ${erradas.map(q => { const t = e.treino[q.id]; const certa = q.options.find(o=>o.id===q.correctOptionId);
+            return `<div class="q-card" data-treino="${esc(q.id)}" style="margin:8px 0;">
+              <p style="margin:0 0 6px; white-space:pre-line;">${esc(q.text)}</p>
+              ${q.options.map(o => `<button class="btn btn-ghost btn-sm" data-action="estudar-treino" data-qid="${esc(q.id)}" data-oid="${esc(o.id)}" data-code="${esc(code)}" style="display:block; width:100%; text-align:left; margin:4px 0; ${t && t.oid===o.id ? (o.id===q.correctOptionId?'background:#cfead6;':'background:#f4c7c3;') : ''}">${esc(o.text)}</button>`).join('')}
+              ${t ? `<div style="margin-top:6px; padding:8px; border-radius:8px; background:${t.ok?'#e9f6ec':'#fdf0e6'};"><strong>${t.ok?'✅ Agora sim!':'❌ Ainda não. A certa é: ' + esc(certa?certa.text:'')}</strong>${q.explicacao?`<div style="font-size:.88rem; margin-top:4px;">💡 ${esc(q.explicacao)}</div>`:''}</div>` : ''}
+            </div>`; }).join('')}</div>` : '<p style="color:#1d6b31; font-size:.88rem;">🎉 Você acertou todas! Que tal rever os slides mesmo assim?</p>'}`;
+    }
+    const slot = e.slides[a.n];
+    const deck = e.deck && e.deck.n===a.n ? e.deck : null;
+    return `<div class="card" data-estudar-aula="${a.n}" style="margin-bottom:10px;">
+      <div class="row" style="justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
+        <div><div class="muted" style="font-size:.8rem;">Aula ${a.n} · ${new Date(e.prog.dadas[a.n]).toLocaleDateString('pt-BR')}${a.paginas?' · livro '+esc(a.paginas):''}</div>
+        <strong>${esc(a.tituloCurto || a.tema)}</strong></div>
+        <button class="btn btn-ghost btn-sm" data-action="estudar-abrir" data-n="${a.n}">${aberta?'Fechar':'Estudar esta aula'}</button>
+      </div>
+      ${aberta ? `
+        ${a.objetivo ? `<p style="font-size:.88rem; margin:8px 0 4px;"><strong>O que você precisa saber:</strong> ${esc(a.objetivo)}</p>` : ''}
+        ${(!slot && a.slides) ? (() => { const sv = e.av && e.av.n===a.n ? e.av : null; const lista = avMontarSlides(a.slides);
+            if(!sv) return `<button class="btn btn-primary btn-sm" data-action="estudar-av" data-n="${a.n}" data-i="0">🖥️ Ver os slides da aula (${lista.length})</button>`;
+            avInjetarCss(); if(!AV_ICONES || (a.slides.figuras||[]).some(f => !(f.f in AV_IMG))){ avCarregarRecursos(a.slides).then(render); }
+            return `<div style="margin:8px 0;"><div class="av-slide" style="width:100%;">${avSlideHtml(a.slides, lista[sv.idx], { modo:'aluno', n:a.n, revelado:true, minha:null })}</div>
+              <div class="row" style="justify-content:space-between; align-items:center; margin-top:6px;"><button class="btn btn-ghost btn-sm" data-action="estudar-av" data-n="${a.n}" data-i="${sv.idx-1}" ${sv.idx===0?'disabled':''}>← Anterior</button><span class="muted">${sv.idx+1} / ${lista.length}</span><button class="btn btn-ghost btn-sm" data-action="estudar-av" data-n="${a.n}" data-i="${Math.min(lista.length-1, sv.idx+1)}" ${sv.idx>=lista.length-1?'disabled':''}>Próximo →</button></div></div>`; })() : ''}
+        ${slot ? (deck ? `<div style="margin:8px 0;">${deck.img ? `<img src="${deck.img}" alt="Slide" style="width:100%; border-radius:8px; border:1px solid #ddd;">` : '<div class="spinner"></div>'}
+            <div class="row" style="justify-content:space-between; align-items:center; margin-top:6px;"><button class="btn btn-ghost btn-sm" data-action="estudar-slide" data-n="${a.n}" data-i="${deck.idx-1}" ${deck.idx===0?'disabled':''}>← Anterior</button><span class="muted">${deck.idx+1} / ${deck.total}</span><button class="btn btn-ghost btn-sm" data-action="estudar-slide" data-n="${a.n}" data-i="${deck.idx+1}" ${deck.idx>=deck.total-1?'disabled':''}>Próximo →</button></div></div>`
+          : `<button class="btn btn-primary btn-sm" data-action="estudar-slide" data-n="${a.n}" data-i="0">🖥️ Ver os slides da aula (${slot.totalSlides})</button>`) : ''}
+        ${(((planoState().videos[e.planoId]||{})[a.n])||[]).length ? planoVideosHtml(e.planoId, a.n, false) : ''}
+        ${exHtml}
+        ${(() => { const f = (e.feedback||[]).find(x => x.n===a.n); return `<div style="margin-top:10px; font-size:.88rem;">Esta aula ajudou você a entender o conteúdo?
+          <button class="btn btn-ghost btn-sm" data-action="estudar-feedback" data-n="${a.n}" data-v="1" style="${f&&f.util?'background:#cfead6;':''}">👍 Sim</button>
+          <button class="btn btn-ghost btn-sm" data-action="estudar-feedback" data-n="${a.n}" data-v="0" style="${f&&!f.util?'background:#f4c7c3;':''}">👎 Não muito</button>
+          ${f ? '<span class="muted" style="font-size:.78rem;">Obrigado!</span>' : ''}</div>`; })()}` : ''}
+    </div>`;
+  };
+  return `<h2>📖 Estudar</h2>
+    <p class="muted" style="margin-top:-6px;">As aulas que já aconteceram: reveja os slides (bom para quem faltou) e treine as questões que você errou.</p>
+    ${dadas.map(item).join('')}`;
+}
+// lembrete no Início: exercícios e provas com prazo acabando
+function renderAlunoPrazoBlock(){
+  const al = state.aluno;
+  const agora = Date.now(), dia = 86400000;
+  const urg = (al.dashboardPendentes||[]).filter(p => p.assessment.endAt && !p.aguardandoLiberacao && p.status!=='antes')
+    .map(p => ({ p, fim: new Date(p.assessment.endAt).getTime() }))
+    .filter(x => x.fim > agora && x.fim - agora <= 3*dia)
+    .sort((a,b) => a.fim - b.fim);
+  if(!urg.length) return '';
+  const quando = fim => { const hoje = new Date(); hoje.setHours(23,59,59,999); if(fim <= hoje.getTime()) return 'acaba <strong>hoje</strong>'; if(fim <= hoje.getTime()+dia) return 'acaba <strong>amanhã</strong>'; const d0 = new Date(); d0.setHours(0,0,0,0); const d1 = new Date(fim); d1.setHours(0,0,0,0); return `acaba em <strong>${Math.round((d1-d0)/dia)} dias</strong>`; };
+  return `<div class="card" data-lembrete-prazo style="background:#fff4e5; border:1px solid #f0b46b;">
+    <h3 style="margin-top:0;">⏰ Não esqueça!</h3>
+    ${urg.map(x => `<div class="row" style="justify-content:space-between; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid #f3d7b0; flex-wrap:wrap;">
+      <span>${esc(x.p.assessment.title)}${x.p.assessment.disciplinaName?` <span class="muted">· ${esc(x.p.assessment.disciplinaName)}</span>`:''} — ${quando(x.fim)} (${new Date(x.fim).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}, ${new Date(x.fim).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})})</span>
+      <button class="btn btn-primary btn-sm" data-action="dashboard-start-exam" data-code="${esc(x.p.assessment.code)}">Fazer agora</button></div>`).join('')}
+  </div>`;
+}
+
+
+// ---- Editar o exercício antes de aplicar (abre o formulário normal já preenchido) ----
+async function planoRegistrarExercicio(turmaId, n, code){
+  const s = planoState();
+  const fresh = await planoLerJson(`plano-livro-prog:${turmaId}`, { dadas:{}, exercicios:{} });
+  fresh.dadas = fresh.dadas || {}; fresh.exercicios = fresh.exercicios || {};
+  fresh.exercicios[n] = code;
+  s.prog[turmaId] = fresh; s.painel = null;
+  await window.storage.set(`plano-livro-prog:${turmaId}`, JSON.stringify(fresh), true);
+}
+function planoEditarExercicio(turmaId, n){
+  const s = planoState(); const p = state.professor;
+  if(state.view==='coordenador'){ alert('Para editar e aplicar, entre no painel do professor (Professores → 👁 Entrar no painel).'); return; }
+  const plano = s.planos[s.turmaPlano[turmaId]];
+  const aula = plano && plano.aulas.find(a=>a.n===n);
+  if(!aula || !aula.exercicio) return;
+  const disc = planoDisciplinaDoProfessor(plano.disciplina||'');
+  const na = freshAssessment();
+  na.instrumento = 'exercicios';
+  na.unidade = UNIDADES[Math.max(0, Math.min(3, (aula.bimestre||1)-1))];
+  na.disciplinaId = disc ? disc.id : '';
+  na.turmaIds = [turmaId];
+  na.questions = planoQuestoesParaAvaliacao(aula.exercicio);
+  na.securityEnabled = false; na.exigeLiberacao = false; na.minMinutesPerQuestion = null;
+  na.endAt = planoPrazoParaEndAt(s.prazo[n]!=null ? s.prazo[n] : '7') || '';
+  na.valeNota = s.valeNota[n] !== false;
+  na.tituloFixo = aula.exercicio.titulo || `Exercício de fixação — Aula ${n}`;
+  na.origemPlano = { planoId: plano.id, aula: n, turmaId, editado: true };
+  p.newAssessment = na; p.editingCode = null; p.editingResponseCount = 0; p.pickerOpen = false; p.pickerSelected = [];
+  p.subview = 'avaliacoes'; p.mode = 'new';
+  render(); window.scrollTo(0,0);
+}
+// ---- Vídeos escolhidos pelos professores (ficam para todas as turmas do mesmo plano) ----
+async function planoCarregarExtras(planoId){
+  const s = planoState();
+  if(!s.videos[planoId]) s.videos[planoId] = await planoLerJson(`plano-livro-videos:${planoId}`, {});
+  if(!s.feedback[planoId]) s.feedback[planoId] = await planoLerJson(`plano-feedback:${planoId}`, []);
+}
+async function planoSalvarVideo(planoId, n, url, titulo){
+  const s = planoState();
+  url = String(url||'').trim(); titulo = String(titulo||'').trim();
+  if(!/^https?:\/\//i.test(url)){ alert('Cole o link completo do vídeo (começando com https://).'); return; }
+  const mapa = await planoLerJson(`plano-livro-videos:${planoId}`, {});
+  const lista = mapa[n] = mapa[n] || [];
+  if(lista.some(v => v.url===url)){ alert('Esse vídeo já está salvo nesta aula.'); return; }
+  const quem = state.professor.session ? state.professor.session.displayName : 'Coordenação';
+  lista.push({ id: cryptoId(), url, t: titulo || 'Vídeo recomendado', por: quem, porId: state.professor.session ? state.professor.session.id : null, em: Date.now() });
+  await window.storage.set(`plano-livro-videos:${planoId}`, JSON.stringify(mapa), true);
+  s.videos[planoId] = mapa; s.videoRascunho = {};
+  s.msg = '⭐ Vídeo salvo. Ele aparece para os outros professores que usam este plano e para os alunos em “Estudar”.';
+  render();
+}
+async function planoRemoverVideo(planoId, n, id){
+  if(!confirm('Remover este vídeo da aula?')) return;
+  const s = planoState();
+  const mapa = await planoLerJson(`plano-livro-videos:${planoId}`, {});
+  mapa[n] = (mapa[n]||[]).filter(v => v.id!==id);
+  await window.storage.set(`plano-livro-videos:${planoId}`, JSON.stringify(mapa), true);
+  s.videos[planoId] = mapa; render();
+}
+function planoVideosHtml(planoId, n, editavel){
+  const s = planoState();
+  const lista = ((s.videos[planoId]||{})[n]) || [];
+  const meuId = state.professor.session ? state.professor.session.id : null;
+  const r = (s.videoRascunho||{})[n] || {};
+  return `<div style="margin:6px 0; padding:8px 10px; background:#fffaf0; border-radius:8px;">
+    <strong style="font-size:.88rem;">⭐ Vídeos escolhidos pelos professores</strong>
+    ${lista.length ? lista.map(v => `<div style="font-size:.86rem; margin:3px 0;">🎬 <a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.t)}</a> <span class="muted">· ${esc(v.por)}</span>${editavel && (v.porId===meuId || state.view==='coordenador') ? ` <button class="btn btn-ghost btn-sm" style="padding:0 6px;" data-action="plano-video-remover" data-n="${n}" data-id="${esc(v.id)}">✕</button>` : ''}</div>`).join('') : '<div class="muted" style="font-size:.82rem;">Nenhum ainda. Achou um bom vídeo na busca? Cole o link aqui para os colegas.</div>'}
+    ${editavel ? `<div class="row" style="gap:6px; margin-top:6px; flex-wrap:wrap;">
+      <input type="text" data-action="plano-video-campo" data-n="${n}" data-campo="url" value="${esc(r.url||'')}" placeholder="Link do vídeo (YouTube...)" style="flex:2 1 200px;">
+      <input type="text" data-action="plano-video-campo" data-n="${n}" data-campo="t" value="${esc(r.t||'')}" placeholder="Título (opcional)" style="flex:1 1 140px;">
+      <button class="btn btn-ghost btn-sm" data-action="plano-video-salvar" data-n="${n}">Salvar vídeo</button></div>` : ''}
+  </div>`;
+}
+// ---- Avaliação do piloto: professor (como foi a aula) e alunos (a aula ajudou?) ----
+async function planoRegistrarFeedback(planoId, item){
+  const lista = await planoLerJson(`plano-feedback:${planoId}`, []);
+  const i = lista.findIndex(f => f.n===item.n && f.turmaId===item.turmaId && f.quem===item.quem && f.autorId===item.autorId);
+  if(i>=0) lista[i] = { ...lista[i], ...item, em: Date.now() }; else lista.push({ ...item, em: Date.now() });
+  await window.storage.set(`plano-feedback:${planoId}`, JSON.stringify(lista), true);
+  return lista;
+}
+function planoFeedbackProfHtml(planoId, turmaId, n){
+  const s = planoState();
+  const meuId = state.professor.session ? state.professor.session.id : 'coord';
+  const f = (s.feedback[planoId]||[]).find(x => x.n===n && x.turmaId===turmaId && x.quem==='prof' && x.autorId===meuId);
+  const ops = [[4,'😀','Muito boa'],[3,'🙂','Boa'],[2,'😐','Mais ou menos'],[1,'🙁','Não funcionou']];
+  return `<div data-feedback-prof="${n}" style="margin-top:8px; padding:8px 10px; background:#f3f7fb; border-radius:8px;">
+    <strong style="font-size:.86rem;">💬 Piloto: como foi esta aula?</strong>
+    <div class="row" style="gap:6px; margin-top:4px; flex-wrap:wrap; align-items:center;">
+      ${ops.map(([v,e,t]) => `<button class="btn btn-ghost btn-sm" data-action="plano-feedback-prof" data-n="${n}" data-v="${v}" title="${t}" style="${f && f.nota===v ? 'background:#d8e7f6; border-color:#1F4E79;' : ''}">${e} ${t}</button>`).join('')}
+    </div>
+    <div class="row" style="gap:6px; margin-top:6px;">
+      <input type="text" data-action="plano-feedback-texto" data-n="${n}" value="${esc((s.feedbackRascunho||{})[n]!=null ? s.feedbackRascunho[n] : (f && f.texto) || '')}" placeholder="O que ajustar? (slides, exercício, tempo...)" style="flex:1;">
+      <button class="btn btn-ghost btn-sm" data-action="plano-feedback-prof" data-n="${n}" data-v="${f?f.nota:0}">Enviar</button>
+    </div>
+    ${f ? '<div class="muted" style="font-size:.78rem; margin-top:4px;">✔ Obrigado! Sua avaliação foi registrada (dá para mudar).</div>' : ''}
+  </div>`;
+}
+async function planoEnviarFeedbackProf(n, v){
+  const s = planoState(); const turmaId = s.turmaSel; const planoId = s.turmaPlano[turmaId];
+  const texto = ((s.feedbackRascunho||{})[n] || '').trim();
+  const meuId = state.professor.session ? state.professor.session.id : 'coord';
+  const anterior = (s.feedback[planoId]||[]).find(x => x.n===n && x.turmaId===turmaId && x.quem==='prof' && x.autorId===meuId);
+  const nota = v || (anterior ? anterior.nota : 0);
+  if(!nota){ alert('Escolha primeiro uma carinha 😀🙂😐🙁.'); return; }
+  s.feedback[planoId] = await planoRegistrarFeedback(planoId, { n, turmaId, quem:'prof', autorId: meuId, autor: state.professor.session ? state.professor.session.displayName : 'Coordenação', nota, texto: texto || (anterior ? anterior.texto : '') });
+  if(s.feedbackRascunho) delete s.feedbackRascunho[n];
+  render();
+}
+function renderPlanoFeedbackResumo(planoId){
+  const s = planoState();
+  const lista = s.feedback[planoId] || [];
+  if(!lista.length) return '';
+  const plano = s.planos[planoId];
+  const porAula = {};
+  lista.forEach(f => { const a = porAula[f.n] = porAula[f.n] || { prof:[], sim:0, nao:0, coment:[] }; if(f.quem==='prof'){ a.prof.push(f.nota); if(f.texto) a.coment.push(`${f.autor}: ${f.texto}`); } else { if(f.util) a.sim++; else a.nao++; } });
+  const emo = m => m>=3.5?'😀':m>=2.5?'🙂':m>=1.5?'😐':'🙁';
+  return `<details class="card" data-plano-feedback style="padding:12px 16px;"><summary style="cursor:pointer; font-weight:700;">💬 Avaliação do piloto (${lista.length} resposta(s))</summary>
+    <div class="table-scroll" style="margin-top:8px;"><table style="font-size:.84rem;">
+      <tr><th>Aula</th><th>Professores</th><th>Alunos: a aula ajudou?</th><th>Comentários</th></tr>
+      ${Object.keys(porAula).map(Number).sort((a,b)=>a-b).map(n => { const a = porAula[n]; const m = a.prof.length ? a.prof.reduce((x,y)=>x+y,0)/a.prof.length : null; const aula = plano && plano.aulas.find(x=>x.n===n);
+        return `<tr><td>Aula ${n}${aula?` — ${esc(aula.tituloCurto||aula.tema)}`:''}</td><td>${m==null?'—':emo(m)+' ('+a.prof.length+')'}</td><td>${a.sim+a.nao ? `👍 ${a.sim} · 👎 ${a.nao}` : '—'}</td><td style="font-size:.8rem;">${a.coment.map(esc).join('<br>')||'—'}</td></tr>`; }).join('')}
+    </table></div></details>`;
+}
+
+// ---- Vínculo automático: disciplina + série → plano (versão padrão da escola) ----
+// Se um professor tem a disciplina do plano (ex.: Geografia) numa turma da série do plano (1ª série PG, 1ª série ST...),
+// a turma passa a seguir o plano sozinha. A coordenação ainda pode fixar outra versão ou desligar numa turma.
+function planoSerieNum(txt){
+  const t = String(txt||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+  const m = t.match(/(\d)\s*(?:a|o|º|ª|°)?\s*(?:serie|ano|s\b)/) || t.match(/^\s*(\d)(?!\d)/) || t.match(/(?:^|\s)([1-3])(?=[a-z]|\s|$)/) || t.match(/\b(\d)\s*[ao]\b/);
+  return m ? m[1] : null;
+}
+function planoChaveRegra(disciplina, serie){ return `${normalizarTextoPlano(disciplina)}|${planoSerieNum(serie)||serie}`; }
+function planoDiscCasa(nomeDisciplinaProfessor, disciplinaPlano){
+  const a = normalizarTextoPlano(nomeDisciplinaProfessor), b = normalizarTextoPlano(disciplinaPlano);
+  return !!a && !!b && (a===b || a.includes(b) || b.includes(a));
+}
+// Lê as disciplinas de TODOS os professores (o vínculo vale mesmo antes do professor entrar no app)
+async function planoLerVinculosProfessores(){
+  let lista = [];
+  try{ lista = await fetchProfessoresList(); }catch(e){ lista = []; }
+  return Promise.all(lista.map(async pr => {
+    const disciplinas = await planoLerJson(`disciplinas:${pr.id}`, []);
+    return { id: pr.id, nome: pr.displayName || pr.email || 'Professor(a)', disciplinas: Array.isArray(disciplinas) ? disciplinas : [] };
+  }));
+}
+// Calcula o plano de cada turma: manual (coordenação) > automático (regra disciplina + série) > nenhum
+async function planoCalcularEfetivo(turmas, opts){
+  const manual = (opts && opts.manual) || await planoLerJson('plano-livro-turmas', {});
+  const regras = (opts && opts.regras) || await planoLerJson('plano-livro-regras', {});
+  const index = (opts && opts.index) || await planoLerJson('plano-livro-index', []);
+  const profs = (opts && opts.profs) || await planoLerVinculosProfessores();
+  const porId = {}; index.forEach(pl => porId[pl.id] = pl);
+  const efetivo = {}, origem = {};
+  (turmas||[]).forEach(t => {
+    const m = manual[t.id];
+    if(m && m!=='__nenhum' && porId[m]){ efetivo[t.id] = m; origem[t.id] = { tipo:'manual' }; return; }
+    if(m==='__nenhum'){ origem[t.id] = { tipo:'desligado' }; return; }
+    const serie = planoSerieNum(t.name);
+    if(!serie) return;
+    for(const pr of profs){
+      for(const d of pr.disciplinas){
+        if(!(d.turmaIds||[]).includes(t.id)) continue;
+        const regra = Object.entries(regras).find(([k, planoId]) => {
+          const [disc, s] = k.split('|');
+          return s===serie && planoId && porId[planoId] && planoDiscCasa(d.name, disc);
+        });
+        if(regra){ efetivo[t.id] = regra[1]; origem[t.id] = { tipo:'auto', professor: pr.nome, disciplina: d.name }; return; }
+      }
+    }
+  });
+  return { efetivo, origem, manual, regras };
+}
+async function planoAtualizarEfetivo(){
+  const s = planoState();
+  const turmas = state.professor.turmas || [];
+  const r = await planoCalcularEfetivo(turmas, { index: s.index });
+  s.turmaPlanoManual = r.manual; s.regras = r.regras; s.origem = r.origem;
+  s.turmaPlano = r.efetivo;
+  s.efetivoEm = Date.now();
+}
+// Ao importar: cria a regra "disciplina + série → Versão A" se ainda não houver regra para aquela série
+async function planoCriarRegrasPadrao(planos){
+  const regras = await planoLerJson('plano-livro-regras', {});
+  let mudou = false;
+  planos.slice().sort((a,b) => String(a.versao).localeCompare(String(b.versao))).forEach(pl => {
+    const k = planoChaveRegra(pl.disciplina, pl.serie);
+    if(!(k in regras)){ regras[k] = pl.id; mudou = true; }
+  });
+  if(mudou) await window.storage.set('plano-livro-regras', JSON.stringify(regras), true);
+  return regras;
+}
+async function planoDefinirRegra(chave, planoId){
+  const regras = await planoLerJson('plano-livro-regras', {});
+  regras[chave] = planoId || null;
+  await window.storage.set('plano-livro-regras', JSON.stringify(regras), true);
+  const s = planoState();
+  await planoAtualizarEfetivo(); s.painel = null;
+  if(s.turmaSel) await planoCarregarTurma(s.turmaSel);
+  render();
+}
+function renderPlanoRegras(){
+  const s = planoState();
+  const grupos = {};
+  s.index.forEach(pl => { const k = planoChaveRegra(pl.disciplina, pl.serie); (grupos[k] = grupos[k] || { disciplina: pl.disciplina, serie: pl.serie, planos: [] }).planos.push(pl); });
+  const ks = Object.keys(grupos).sort();
+  if(!ks.length) return '';
+  return `<h4 style="margin:14px 0 6px;">Vínculo automático (disciplina + série)</h4>
+    <p class="muted" style="font-size:.84rem; margin:0 0 6px;">Toda turma da série em que um professor tem a disciplina vinculada segue o plano escolhido aqui — 1ª série PG, 1ª série ST etc. Professor novo na turma? O plano já aparece para ele.</p>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:8px;">
+      ${ks.map(k => { const g = grupos[k]; const atual = (s.regras||{})[k] || '';
+        return `<label style="font-size:.85rem;">${esc(g.disciplina)} · ${esc(g.serie)}<select data-action="plano-regra" data-k="${esc(k)}" style="width:100%;">
+          <option value="" ${!atual?'selected':''}>— não vincular automaticamente —</option>
+          ${g.planos.map(pl => `<option value="${esc(pl.id)}" ${atual===pl.id?'selected':''}>Versão ${esc(pl.versao)} — ${esc(pl.descricao||'')}</option>`).join('')}
+        </select></label>`; }).join('')}
+    </div>`;
+}
+
+
+// ---- Quiz por Equipes já montado com as perguntas do exercício da aula ----
+function planoAbrirQuiz(turmaId, n){
+  const s = planoState(); const p = state.professor;
+  if(state.view==='coordenador'){ alert('Para usar o quiz, entre no painel do professor (Professores → 👁 Entrar no painel).'); return; }
+  const plano = s.planos[s.turmaPlano[turmaId]];
+  const aula = plano && plano.aulas.find(a=>a.n===n);
+  if(!aula || !aula.exercicio) return;
+  const qs = aula.exercicio.questoes.filter(q => q.tipo==='mc').map(q => ({ id: cryptoId(), text: q.texto, options: q.opcoes.slice(), correctIndex: q.correta, durationSeconds: 30 }));
+  if(!qs.length) return;
+  p.quiz.setup = { turmaId, numTeams: 2, teams: [], questions: qs };
+  const turma = (p.turmas||[]).find(t=>t.id===turmaId);
+  if(turma && (turma.students||[]).length >= 2){ try{ quizAutoMontarEquipes(); }catch(e){} }
+  p.subview = 'quiz';
+  stopQuizPoll();
+  refreshProfessorQuiz();
+  quizPollInterval = setInterval(refreshProfessorQuiz, 1000);
+  render(); window.scrollTo(0,0);
+}
+
+/* ======================= AULA AO VIVO (slides do plano dentro do app) ======================= */
+// O app monta a aula a partir do plano (sem PDF): animações de verdade, esquemas em passos e a
+// pergunta-relâmpago respondida nos tablets. Sessão em `aula-viva:<turmaId>`; cada resposta em
+// `aula-viva-resp:<sessId>:<alunoId>` (um documento por aluno, para ninguém sobrescrever ninguém).
+const AV_IMG = {};
+let AV_ICONES = null;
+let aulaVivaPollInterval = null;
+function avSvgSeguro(svg){ return typeof svg==='string' && /^<svg[\s>]/.test(svg) && !/<script|\son\w+=|javascript:/i.test(svg) ? svg : ''; }
+async function avCarregarRecursos(d){
+  if(!AV_ICONES) AV_ICONES = await planoLerJson('plano-livro-icones', {});
+  const keys = new Set();
+  (d.figuras||[]).forEach(f => keys.add(f.f));
+  if(d.esquema && d.esquema.fig) keys.add(d.esquema.fig);
+  await Promise.all([...keys].filter(k => !(k in AV_IMG)).map(async k => { AV_IMG[k] = await planoLerJson(`plano-livro-img:${k}`, null); }));
+}
+function avIc(nome, cor, extra){ const svg = avSvgSeguro((AV_ICONES||{})[nome]); return svg ? `<span class="av-ic" style="color:${cor};${extra||''}">${svg}</span>` : ''; }
+function avCirc(nome, fundo, cor, tam){ return `<span class="av-circ" style="background:${fundo}; width:${tam}em; height:${tam}em;">${avIc(nome, cor, `font-size:${(tam*0.55).toFixed(2)}em;`)}</span>`; }
+function avPassosEsquema(e){ return ({ comparar:2, quatro:4, tres:3, linha:(e.itens||[]).length, passos:(e.itens||[]).length, encolher:4, limite:3, figura:1 })[e.tipo] || 1; }
+function avMontarSlides(d){
+  const L = [{ t:'capa' }, { t:'retomada' }, { t:'aprender' }];
+  if(d.destaque) L.push({ t:'destaque' });
+  (d.figuras||[]).forEach((f, i) => L.push({ t:'figura', i }));
+  const passos = avPassosEsquema(d.esquema);
+  for(let k=0; k<passos; k++) L.push({ t:'esquema', k, passos });
+  L.push({ t:'relampago' }, { t:'resposta' }, { t:'conceito' }, { t:'atividade' }, { t:'volte' }, { t:'proxima' });
+  return L;
+}
+function avInjetarCss(){
+  if(document.getElementById('av-css')) return;
+  const st = document.createElement('style'); st.id = 'av-css';
+  st.textContent = `
+  .av-wrap{position:fixed;inset:0;background:#141414;z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;}
+  .av-slide{container-type:inline-size;width:min(100vw, calc((100vh - 70px) * 16 / 9));aspect-ratio:16/9;position:relative;overflow:hidden;background:#fff;color:#222;font-family:Calibri,Carlito,Arial,sans-serif;border-radius:6px;}
+  .av-in{position:absolute;inset:0;padding:3.6cqw 4.4cqw;font-size:1.9cqw;line-height:1.3;animation:avFade .45s ease both;}
+  .av-escuro{background:#6B1F2E;color:#fff;} .av-azul{background:#1F4E79;color:#fff;}
+  .av-t{font-family:Cambria,Caladea,Georgia,serif;font-weight:700;color:#6B1F2E;font-size:1.75em;line-height:1.12;margin:0 0 .7em;}
+  .av-escuro .av-t,.av-azul .av-t{color:#fff;}
+  .av-card{background:#F6EEF0;border-radius:.6em;padding:.8em 1em;}
+  .av-card.az{background:#DCE6F1;} .av-card.ou{background:#F3E7C0;} .av-card.cz{background:#eee;color:#bbb;}
+  .av-g2{display:grid;grid-template-columns:1fr 1fr;gap:.9em;} .av-g3{display:grid;grid-template-columns:repeat(3,1fr);gap:.9em;align-items:end;}
+  .av-row{display:flex;gap:.8em;align-items:center;}
+  .av-circ{display:inline-flex;align-items:center;justify-content:center;border-radius:50%;flex:0 0 auto;}
+  .av-ic{display:inline-flex;line-height:0;} .av-ic svg{width:1em;height:1em;}
+  .av-pop{animation:avPop .55s cubic-bezier(.2,1.4,.4,1) both;}
+  .av-fonte{font-size:.55em;color:#777;}
+  .av-big{font-family:Cambria,Caladea,Georgia,serif;font-weight:700;font-size:3.6em;line-height:1.05;}
+  .av-op{display:block;width:100%;text-align:left;border:2px solid rgba(255,255,255,.35);background:rgba(255,255,255,.08);color:#fff;border-radius:.5em;padding:.45em .8em;margin:.3em 0;font-size:1em;cursor:pointer;}
+  .av-op.sel{background:#C9A227;color:#3b1018;border-color:#C9A227;} .av-op.ok{background:#1d6b31;border-color:#1d6b31;} .av-op.no{background:#8a2a2a;border-color:#8a2a2a;}
+  .av-bar{height:.55em;border-radius:.3em;background:rgba(255,255,255,.25);overflow:hidden;margin-top:.15em;} .av-bar>div{height:100%;background:#C9A227;}
+  .av-ctrl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;color:#ddd;font-size:14px;}
+  .av-ctrl .btn{min-width:44px;}
+  @keyframes avFade{from{opacity:0;transform:translateY(1.2cqw)}to{opacity:1;transform:none}}
+  @keyframes avPop{0%{opacity:0;transform:scale(.8)}100%{opacity:1;transform:scale(1)}}
+  @keyframes avEncolhe{from{transform:scale(var(--de,1.3))}to{transform:scale(1)}}
+  @keyframes avPulso{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  `;
+  document.head.appendChild(st);
+}
+function avOpcoesHtml(d, ctx){
+  const r = d.relampago; const L = ['A','B','C','D','E'];
+  const total = Object.keys(ctx.resp||{}).length;
+  const cont = r.opcoes.map((_, i) => Object.values(ctx.resp||{}).filter(x => x.op===i).length);
+  return r.opcoes.map((o, i) => {
+    let cls = '';
+    if(ctx.revelado) cls = i===r.correta ? 'ok' : (ctx.minha===i ? 'no' : '');
+    else if(ctx.minha===i) cls = 'sel';
+    const barra = (ctx.modo==='prof' && ctx.revelado) ? `<div class="av-bar"><div style="width:${total ? Math.round(cont[i]/total*100) : 0}%"></div></div>` : '';
+    const contTxt = (ctx.modo==='prof' && ctx.revelado) ? ` <span style="float:right;">${cont[i]}</span>` : '';
+    const attrs = ctx.modo==='aluno' && !ctx.revelado ? `data-action="av-responder" data-i="${i}"` : 'disabled';
+    return `<button class="av-op ${cls}" ${attrs}><b>${L[i]})</b> ${esc(o)}${contTxt}${barra}</button>`;
+  }).join('');
+}
+function avSlideHtml(d, sl, ctx){
+  const C = { v:'#6B1F2E', o:'#C9A227', a:'#1F4E79' };
+  const img = (k, alt) => AV_IMG[k] ? `<img src="${AV_IMG[k]}" alt="" style="max-width:100%;max-height:${alt||38}cqw;object-fit:contain;border-radius:.3em;">` : '<div class="av-fonte">(imagem não importada)</div>';
+  const L = ['A','B','C','D','E'];
+  const r = d.relampago;
+  switch(sl.t){
+  case 'capa': return `<div class="av-in av-escuro">
+      <div style="position:absolute;right:4cqw;top:3cqw;opacity:.35;font-size:9em;">${avIc(d.iconeAula, '#C98A9A')}</div>
+      <div style="color:${C.o};font-weight:700;letter-spacing:.15em;font-size:.8em;margin-top:1.5em;">AULA ${String(ctx.n).padStart(2,'0')} · LIVRO ${esc(d.paginas||'')}</div>
+      <div class="av-t" style="font-size:2.4em;margin-top:1.6em;">${esc(d.titulo)}</div>
+      <div style="color:#F3E7C0;">${esc(d.capitulo||'')}</div>
+      <div class="av-card ou av-pop" style="position:absolute;left:4.4cqw;right:4.4cqw;bottom:4cqw;color:${C.v};font-size:1.15em;animation-delay:.3s;"><b>Para começar:</b> <i>${esc(d.pergunta)}</i></div></div>`;
+  case 'retomada': {
+    if(!d.anterior) return `<div class="av-in"><div class="av-t">Começando a Geografia do Ensino Médio</div><div class="av-g3" style="align-items:stretch;">
+      ${[['Introdução','O espaço geográfico e seus conceitos'],['Capítulo 1','Representações cartográficas e escalas'],['Revisão e prova','Aulas 19 e 20 do bimestre']].map(([t,x],i)=>`<div class="av-card ${i===0?'ou':''} av-pop" style="animation-delay:${i*.15}s;min-height:9em;"><div class="av-t" style="font-size:1.3em;">${t}</div>${x}</div>`).join('')}</div></div>`;
+    const a = d.anterior;
+    return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Na aula passada…</div>${avCirc('FaClockRotateLeft', C.a, '#fff', 2.2)}</div>
+      <div class="av-card" style="font-size:1.15em;"><b style="color:${C.v}">Aula ${a.n}:</b> ${esc(a.ideia)}</div>
+      <div class="av-g2" style="margin-top:.9em;">${a.pontos.map((p,i)=>`<div class="av-card az av-pop" style="animation-delay:${.2+i*.15}s;">${esc(p)}</div>`).join('')}</div>
+      <div style="margin-top:.9em;color:${C.a};"><b>Conceito que já sabemos:</b> ${esc(a.conceito)}</div></div>`;
+  }
+  case 'aprender': return `<div class="av-in"><div class="av-t">${esc(d.ideia)}</div><div class="av-g2">
+      ${d.pontos.map((p,i)=>`<div class="av-card av-pop av-row" style="animation-delay:${i*.18}s;align-items:flex-start;min-height:5.2em;">${avCirc((d.iconesCards||[])[i]||d.iconeAula, C.o, C.v, 2.3)}<div>${esc(p)}</div></div>`).join('')}</div></div>`;
+  case 'destaque': return `<div class="av-in av-escuro" style="text-align:center;">
+      <div class="av-pop" style="margin-top:1em;">${avCirc(d.iconeAula, C.o, C.v, 3.2)}</div>
+      <div class="av-big av-pop" style="margin-top:.4em;animation-delay:.25s;">${esc(d.destaque[0])}</div>
+      <div style="color:#F3E7C0;font-size:1.3em;margin-top:.6em;">${esc(d.destaque[1])}</div></div>`;
+  case 'figura': {
+    const f = d.figuras[sl.i];
+    return `<div class="av-in"><div class="av-t">${esc(f.titulo||f.leg)}</div>
+      <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:1em;height:72%;">
+        <div style="display:flex;align-items:center;justify-content:center;height:100%;">${img(f.f)}</div>
+        <div class="av-card" style="overflow:hidden;"><b style="color:${C.v}">${esc(f.leg)}</b>
+          <ul style="margin:.6em 0 0 1em;padding:0;">${(f.perguntas||[]).map((q,i)=>`<li class="av-pop" style="margin:.35em 0;animation-delay:${.3+i*.25}s;">${esc(q)}</li>`).join('')}</ul>
+          <div class="av-fonte" style="margin-top:.6em;">Fonte: livro didático de Geografia (volume único), p. ${f.p}. Uso pedagógico interno.</div></div></div></div>`;
+  }
+  case 'esquema': {
+    const e = d.esquema, k = sl.k, ic = e.icones||[];
+    const novo = i => i===k ? 'av-pop' : '';
+    let corpo = '';
+    if(e.tipo==='comparar'){
+      const lado = (dados, cls, cor, nomeIc, i) => i>k ? `<div class="av-card cz" style="min-height:12em;display:flex;align-items:center;justify-content:center;font-size:3em;">?</div>`
+        : `<div class="av-card ${cls} ${novo(i)}" style="min-height:12em;"><div class="av-row" style="margin-bottom:.5em;">${nomeIc?avCirc(nomeIc, cor, '#fff', 2):''}<b style="font-family:Cambria,Georgia,serif;font-size:1.3em;color:${cor};">${esc(dados[0])}</b></div><ul style="margin:0 0 0 1em;padding:0;">${dados[1].map(x=>`<li style="margin:.3em 0;">${esc(x)}</li>`).join('')}</ul></div>`;
+      corpo = `<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:.8em;align-items:center;">${lado(e.a,'',C.v,ic[0],0)}<div class="av-circ" style="background:${C.o};width:2.4em;height:2.4em;font-size:1.4em;font-weight:700;color:${C.v};">×</div>${lado(e.b,'az',C.a,ic[1],1)}</div>`;
+    } else if(e.tipo==='quatro'){
+      corpo = `<div class="av-g2">${e.itens.map((it,i)=> i>k ? `<div class="av-card cz" style="min-height:5.5em;"></div>` : `<div class="av-card ${i%3===0?'ou':''} ${novo(i)}" style="min-height:5.5em;"><div class="av-row">${ic[i]?avCirc(ic[i], C.v, '#fff', 2):''}<b style="font-family:Cambria,Georgia,serif;font-size:1.25em;color:${C.v};">${esc(it[0])}</b></div><div style="margin-top:.4em;">${esc(it[1])}</div></div>`).join('')}</div>`;
+    } else if(e.tipo==='tres'){
+      corpo = `<div class="av-g3" style="height:68%;">${e.itens.map((it,i)=>{ const h = 55 + i*20; return i>k ? `<div class="av-card cz" style="height:${h}%;"></div>` : `<div class="av-card ${['','ou','az'][i]} ${novo(i)}" style="height:${h}%;"><div class="av-row" style="justify-content:space-between;"><b style="font-family:Cambria,Georgia,serif;font-size:1.4em;color:${C.v};">${esc(it[0])}</b>${ic[i]?avCirc(ic[i], C.a, '#fff', 1.8):''}</div><div style="color:${C.a};font-weight:700;">${esc(it[1])}</div><div style="margin-top:.3em;">${esc(it[2])}</div></div>`; }).join('')}</div><div class="av-fonte" style="text-align:right;">mais detalhe →</div>`;
+    } else if(e.tipo==='linha' || e.tipo==='passos'){
+      corpo = `${e.tipo==='passos' ? `<div class="av-card ou" style="text-align:center;font-size:1.6em;font-weight:700;color:${C.v};width:50%;margin:0 auto .8em;">D = d × N</div>` : ''}
+        <div style="display:flex;gap:.5em;align-items:stretch;">${e.itens.map((it,i)=> `${i>0?`<div style="align-self:center;color:${i<=k?C.o:'#ddd'};font-size:1.6em;">➜</div>`:''}` + (i>k ? `<div class="av-card cz" style="flex:1;min-height:10em;"></div>` : `<div class="av-card ${i===k?'ou':''} ${novo(i)}" style="flex:1;min-height:10em;text-align:center;">${ic[i]?avCirc(ic[i], i===k?C.v:'#8C3A4B', '#fff', 2.2):''}<div style="font-weight:700;color:${C.v};margin:.4em 0;">${esc(it[0])}</div><div style="${e.tipo==='passos'?`font-weight:700;color:${C.a};`:''}">${esc(it[1])}</div>${it[2]&&e.tipo!=='passos'?`<div style="font-weight:700;color:${C.a};margin-top:.4em;">${esc(it[2])}</div>`:''}</div>`)).join('')}</div>`;
+    } else if(e.tipo==='encolher'){
+      const it = e.itens[k]; const tams = [10, 7.5, 5, 2.8];
+      corpo = `<div style="display:grid;grid-template-columns:1.1fr 1fr;gap:1em;height:74%;">
+        <div class="av-card az" style="display:flex;align-items:center;justify-content:center;"><div style="font-size:${tams[k]}em;color:${C.a};animation:avEncolhe 1s ease both;--de:${k>0 ? (tams[k-1]/tams[k]).toFixed(2) : 1.2};">${avIc('FaEarthAmericas', C.a)}</div></div>
+        <div class="av-card"><div class="av-row">${avCirc(it[3], C.v, '#fff', 2.6)}<b style="font-size:1.5em;color:${C.v};">${esc(it[0])}</b></div>
+          <div style="margin-top:.6em;font-size:1.15em;">${esc(it[1])}</div>
+          <div class="av-pop" style="font-size:2.2em;font-weight:700;color:${C.a};margin-top:.3em;animation-delay:.4s;">${esc(it[2])}</div>
+          <div style="font-style:italic;color:#666;margin-top:.5em;">Quanto mais rápido o transporte, menor o mundo parece.</div></div></div>`;
+    } else if(e.tipo==='limite'){
+      corpo = `<div class="av-fonte" style="text-align:center;font-style:italic;">Ex.: Santana do Livramento (Brasil) e Rivera (Uruguai)</div>
+        <div style="position:relative;height:70%;display:grid;grid-template-columns:1fr 1fr;gap:6%;margin-top:.4em;">
+          <div class="av-card az" style="position:relative;"><b style="color:${C.a};font-size:1.3em;">País A</b><div style="position:absolute;left:1em;bottom:.8em;font-size:2.4em;">${avIc('FaFlag', C.a)}</div></div>
+          <div class="av-card ou" style="position:relative;text-align:right;"><b style="color:${C.v};font-size:1.3em;">País B</b><div style="position:absolute;right:1em;bottom:.8em;font-size:2.4em;">${avIc('FaFlag', C.v)}</div></div>
+          ${k>=2 ? `<div class="av-pop" style="position:absolute;left:30%;right:30%;top:0;bottom:0;background:rgba(201,162,39,.35);border:2px dashed ${C.o};display:flex;align-items:center;justify-content:center;"><div style="background:#fff;padding:.5em;border-radius:.4em;text-align:center;font-weight:700;color:#7A5A1F;font-size:.85em;max-width:85%;">${avIc('FaHandshake','#7A5A1F','font-size:1.6em;display:block;margin:0 auto .2em;')}FRONTEIRA: a faixa dos dois lados, onde as pessoas trabalham, compram, estudam e convivem</div></div>` : ''}
+          ${k>=1 ? `<div class="av-pop" style="position:absolute;left:calc(50% - .25em);width:.5em;top:-.4em;bottom:-.4em;background:${C.v};"></div><div style="position:absolute;left:50%;transform:translateX(-50%);bottom:-2.2em;font-weight:700;color:${C.v};font-size:.85em;text-align:center;white-space:nowrap;">LIMITE: a linha que separa</div>` : ''}
+        </div>`;
+    } else if(e.tipo==='figura'){
+      corpo = `<div style="height:75%;display:flex;align-items:center;justify-content:center;">${img(e.fig, 40)}</div><div class="av-fonte" style="text-align:center;">Fonte: livro didático, p. ${e.p}.</div>`;
+    }
+    return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">${esc(e.titulo)}</div>${sl.passos>1?`<span class="av-fonte">${k+1} / ${sl.passos}</span>`:''}</div>${corpo}</div>`;
+  }
+  case 'relampago': {
+    const total = Object.keys(ctx.resp||{}).length;
+    return `<div class="av-in av-azul"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Pergunta-relâmpago</div><span style="font-size:2.6em;animation:avPulso 1.2s infinite;">${avIc('FaBolt', C.o)}</span></div>
+      <div style="font-weight:700;font-size:1.2em;margin-bottom:.4em;">${esc(r.texto)}</div>
+      ${avOpcoesHtml(d, ctx)}
+      <div style="margin-top:.5em;color:#F3E7C0;font-size:.9em;">${ctx.modo==='prof' ? (ctx.revelado ? `Resposta: <b>${L[r.correta]}</b> · ${total} resposta(s)` : `📱 Respondam no tablet · <b>${total}</b> resposta(s) até agora`) : (ctx.revelado ? (ctx.minha===r.correta ? '✅ Você acertou!' : (ctx.minha==null ? 'Resposta: ' + L[r.correta] : '❌ A certa é a ' + L[r.correta])) : (ctx.minha!=null ? '✔ Resposta enviada! Aguarde o professor revelar.' : 'Toque na sua resposta.'))}</div></div>`;
+  }
+  case 'resposta': return `<div class="av-in"><div class="av-t">Resposta: ${L[r.correta]}</div>
+      ${r.opcoes.map((o,i)=>`<div style="margin:.2em 0;${i===r.correta?'color:#1d6b31;font-weight:700;':'color:#999;'}">${L[i]}) ${esc(o)}</div>`).join('')}
+      <div class="av-card av-pop av-row" style="background:#E9F6EC;margin-top:.9em;animation-delay:.3s;">${avIc('FaLightbulb','#1d6b31','font-size:2em;')}<div><b style="color:#1d6b31;">Por quê?</b> ${esc(r.explicacao)}</div></div></div>`;
+  case 'conceito': return `<div class="av-in av-escuro"><div class="av-row">${avCirc('FaPenToSquare', C.o, C.v, 2.4)}<b style="color:${C.o};letter-spacing:.12em;">ANOTE NO CADERNO</b></div>
+      <div class="av-t av-pop" style="font-size:2.3em;margin-top:1em;">${esc(d.conceito[0])}</div><div style="font-size:1.35em;color:#F3E7C0;">${esc(d.conceito[1])}</div></div>`;
+  case 'atividade': return `<div class="av-in"><div class="av-t">Mãos à obra</div><div class="av-g2">
+      <div class="av-card av-pop" style="min-height:12em;"><div class="av-row">${avCirc('FaBookOpen', C.v, '#fff', 2.2)}<b style="color:${C.v};">No livro</b></div><div style="margin-top:.7em;font-size:1.1em;">${esc(d.atividade)}</div></div>
+      <div class="av-card az av-pop" style="min-height:12em;animation-delay:.2s;"><div class="av-row">${avCirc('FaMobileScreen', C.a, '#fff', 2.2)}<b style="color:${C.a};">No app — exercício de fixação</b></div><div style="margin-top:.7em;font-size:1.1em;">5 questões objetivas + 1 questão do livro. Ao terminar, você vê a resposta certa e a explicação. Entregue no prazo e ganhe fichas 🎫</div></div></div></div>`;
+  case 'volte': return `<div class="av-in av-azul"><div class="av-t">Volte à pergunta inicial</div><div style="font-size:1.6em;font-style:italic;margin:1.2em 0;">${esc(d.pergunta)}</div>
+      <div class="av-card ou" style="color:${C.v};font-weight:700;">Escreva no caderno, em até 3 linhas, a sua resposta com o que aprendeu hoje.</div></div>`;
+  case 'proxima': { const p = d.proxima||{}; return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Na próxima aula…</div>${avCirc('FaArrowRight', C.v, '#fff', 2.2)}</div>
+      <div class="av-g2" style="grid-template-columns:1.6fr 1fr;"><div class="av-card" style="min-height:11em;"><div style="color:${C.o};font-weight:700;letter-spacing:.12em;font-size:.8em;">AULA ${String(p.n||'').padStart(2,'0')}${p.paginas?' · LIVRO '+esc(p.paginas):''}</div><div class="av-t" style="font-size:1.6em;margin-top:.5em;">${esc(p.titulo||'')}</div><div>${p.tipo==='Avaliação'?'Traga o livro e revise o caderno: é dia de prova.':'Traga o livro. Se puder, leia as páginas antes.'}</div></div>
+      <div class="av-card az"><b style="color:${C.a};">Até lá, no app:</b><ul style="margin:.5em 0 0 1em;padding:0;"><li>Minhas provas → exercício desta aula</li><li>Estudar → slides e questões que errou</li><li>Faltou? Tudo fica em Estudar.</li></ul></div></div></div>`; }
+  }
+  return '<div class="av-in"></div>';
+}
+// ---- Professor ----
+function aulaVivaState(){ const p = state.professor; if(!p.aulaViva) p.aulaViva = { presenting:false, sess:null, d:null, slides:[], resp:{}, n:null }; return p.aulaViva; }
+async function aulaVivaSalvarSessao(){
+  const av = aulaVivaState(); if(!av.sess) return;
+  av.sess.at = Date.now();
+  await window.storage.set(`aula-viva:${av.sess.turmaId}`, JSON.stringify(av.sess), true);
+}
+async function iniciarAulaViva(turmaId, n){
+  const s = planoState(); const p = state.professor; const av = aulaVivaState();
+  const plano = s.planos[s.turmaPlano[turmaId]];
+  const aula = plano && plano.aulas.find(a => a.n===n);
+  if(!aula || !aula.slides){ alert('Esta aula ainda não tem slides prontos no plano.'); return; }
+  avInjetarCss();
+  await avCarregarRecursos(aula.slides);
+  av.d = aula.slides; av.n = n; av.slides = avMontarSlides(aula.slides); av.resp = {};
+  av.sess = { id: cryptoId(), turmaId, planoId: plano.id, n, idx: 0, total: av.slides.length, revelado: false, fichasDadas: false,
+    professorName: p.session ? p.session.displayName : 'Coordenação', startedAt: Date.now() };
+  av.presenting = true;
+  await aulaVivaSalvarSessao();
+  requestFullscreenSafe();
+  clearInterval(aulaVivaPollInterval);
+  aulaVivaPollInterval = setInterval(aulaVivaPollProf, 2000);
+  render();
+}
+async function aulaVivaIr(delta){
+  const av = aulaVivaState(); if(!av.sess) return;
+  const novo = Math.max(0, Math.min(av.slides.length-1, av.sess.idx + delta));
+  if(novo===av.sess.idx) return;
+  av.sess.idx = novo;
+  const t = av.slides[novo].t;
+  if(t==='resposta' && !av.sess.revelado){ await aulaVivaRevelar(true); return; }
+  if(t==='relampago') await aulaVivaCarregarRespostas();
+  render();
+  await aulaVivaSalvarSessao();
+}
+async function aulaVivaCarregarRespostas(){
+  const av = aulaVivaState(); if(!av.sess) return;
+  const pref = `aula-viva-resp:${av.sess.id}:`;
+  let keys = [];
+  try{ keys = ((await window.storage.list(pref, true)).keys)||[]; }catch(e){}
+  const out = {};
+  await Promise.all(keys.map(async k => { const v = await planoLerJson(k, null); if(v) out[k.slice(pref.length)] = v; }));
+  av.resp = out;
+}
+async function aulaVivaPollProf(){
+  const av = aulaVivaState();
+  if(!av.presenting || !av.sess){ clearInterval(aulaVivaPollInterval); return; }
+  const t = av.slides[av.sess.idx] && av.slides[av.sess.idx].t;
+  if(t==='relampago' || t==='resposta'){
+    const antes = JSON.stringify(av.resp);
+    await aulaVivaCarregarRespostas();
+    if(JSON.stringify(av.resp)!==antes) render();
+  }
+}
+async function aulaVivaRevelar(irParaResposta){
+  const av = aulaVivaState(); if(!av.sess) return;
+  await aulaVivaCarregarRespostas();
+  av.sess.revelado = true;
+  render();
+  await aulaVivaSalvarSessao();
+  // fichas: 1 por participar + 1 por acertar (uma vez por aula ao vivo)
+  if(!av.sess.fichasDadas){
+    av.sess.fichasDadas = true; await aulaVivaSalvarSessao();
+    const certa = av.d.relampago.correta;
+    for(const [sid, r] of Object.entries(av.resp)){
+      try{ await awardFichas(av.sess.turmaId, sid, r.op===certa ? 2 : 1, r.op===certa ? 'Acertou a pergunta-relâmpago da aula' : 'Respondeu a pergunta-relâmpago da aula', 'relampago'); }catch(e){}
+    }
+  }
+}
+async function encerrarAulaViva(){
+  const av = aulaVivaState();
+  clearInterval(aulaVivaPollInterval);
+  if(av.sess){ try{ await window.storage.delete(`aula-viva:${av.sess.turmaId}`, true); }catch(e){} }
+  av.presenting = false; av.sess = null;
+  exitFullscreenSafe();
+  render();
+}
+function renderAulaVivaProf(){
+  const av = aulaVivaState();
+  const sl = av.slides[av.sess.idx];
+  const ctx = { modo:'prof', n: av.n, resp: av.resp, revelado: av.sess.revelado };
+  return `<div class="av-wrap">
+    <div class="av-slide" data-av-slide="${sl.t}" data-av-idx="${av.sess.idx}">${avSlideHtml(av.d, sl, ctx)}</div>
+    <div class="av-ctrl">
+      <button class="btn btn-ghost btn-sm" data-action="av-ir" data-d="-1" ${av.sess.idx===0?'disabled':''} style="background:#fff;">◀</button>
+      <span>${av.sess.idx+1} / ${av.slides.length}</span>
+      <button class="btn btn-primary btn-sm" data-action="av-ir" data-d="1" ${av.sess.idx>=av.slides.length-1?'disabled':''}>▶</button>
+      ${sl.t==='relampago' && !av.sess.revelado ? `<button class="btn btn-sm" style="background:#C9A227;color:#3b1018;" data-action="av-revelar">⚡ Revelar resposta (${Object.keys(av.resp).length})</button>` : ''}
+      <span style="opacity:.7;">📡 tablets acompanham · ← → no teclado</span>
+      <button class="btn btn-ghost btn-sm" data-action="av-encerrar" style="background:#fff;">Encerrar</button>
+    </div></div>`;
+}
+// ---- Aluno ----
+async function pollAulaVivaForAluno(){
+  const al = state.aluno;
+  if((al.stage!=='dashboard' && al.stage!=='aulaviva') || !al.turma) return false;
+  const sess = await planoLerJson(`aula-viva:${al.turma.id}`, null);
+  const ativa = sess && (Date.now() - (sess.at||0) < 3*3600*1000) ? sess : null;
+  const antes = JSON.stringify(al.aulaViva||null);
+  if(ativa){
+    if(!al.avPlano || al.avPlano.id!==ativa.planoId) al.avPlano = await planoLerJson(`plano-livro:${ativa.planoId}`, null);
+    const aula = al.avPlano && al.avPlano.aulas.find(a => a.n===ativa.n);
+    if(aula && aula.slides){
+      avInjetarCss();
+      await avCarregarRecursos(aula.slides);
+      if(!al.aulaViva || al.aulaViva.id!==ativa.id){ al.avMinha = null; }
+      al.aulaViva = ativa; al.avD = aula.slides; al.avSlides = avMontarSlides(aula.slides);
+    }
+  } else {
+    al.aulaViva = null;
+    if(al.stage==='aulaviva'){ exitFullscreenSafe(); al.stage = 'dashboard'; }
+  }
+  return JSON.stringify(al.aulaViva||null)!==antes;
+}
+function renderAlunoAulaVivaBlock(){
+  const al = state.aluno; const s = al.aulaViva;
+  if(!s || !al.avD) return '';
+  return `<div class="card" data-av-convite style="border:2px solid #1F4E79; margin-bottom:16px; text-align:center;">
+    <h3 style="margin-top:0;">📡 Aula ao vivo: ${esc(al.avD.titulo)}</h3>
+    <p class="muted">${esc(s.professorName)} está apresentando a aula ${s.n}. Acompanhe e responda a pergunta-relâmpago pelo tablet.</p>
+    <button class="btn btn-primary btn-block" data-action="av-entrar">Entrar na aula</button></div>`;
+}
+function renderAulaVivaAluno(){
+  const al = state.aluno; const s = al.aulaViva;
+  if(!s || !al.avD) return `<div class="card"><h2>Aula encerrada</h2><p class="muted">O professor encerrou a aula ao vivo.</p><button class="btn btn-primary" data-action="av-sair">Voltar</button></div>`;
+  const sl = al.avSlides[Math.min(s.idx, al.avSlides.length-1)];
+  const ctx = { modo:'aluno', n: s.n, revelado: s.revelado, minha: al.avMinha };
+  return `<div class="av-wrap"><div class="av-slide" data-av-slide="${sl.t}">${avSlideHtml(al.avD, sl, ctx)}</div>
+    <div class="av-ctrl"><span>${s.idx+1} / ${s.total}</span><button class="btn btn-ghost btn-sm" data-action="av-sair" style="background:#fff;">Sair</button></div></div>`;
+}
+async function aulaVivaResponder(i){
+  const al = state.aluno; const s = al.aulaViva;
+  if(!s || s.revelado || !al.matriculaStudentId) return;
+  al.avMinha = i; render();
+  try{ await window.storage.set(`aula-viva-resp:${s.id}:${al.matriculaStudentId}`, JSON.stringify({ op:i, nome: al.name, at: Date.now() }), true); }catch(e){}
+}
+// ---- Fichas por exercício do plano entregue no prazo ----
+async function planoFichasExercicio(a, result){
+  const al = state.aluno;
+  if(!a || !a.origemPlano || a.instrumento!=='exercicios' || a.origemPlano.recuperacao || !al.turma || !al.matriculaStudentId) return null;
+  if(a.endAt && Date.now() > new Date(a.endAt).getTime()) return null;
+  const objetivas = (a.questions||[]).filter(q => q.type==='mc' && !q.annulled);
+  const acertos = objetivas.filter(q => result.answers && result.answers[q.id]===q.correctOptionId).length;
+  const bom = objetivas.length && acertos/objetivas.length >= 0.8;
+  const qtd = bom ? 5 : 3;
+  try{ await awardFichas(al.turma.id, al.matriculaStudentId, qtd, bom ? 'Entregou o exercício da aula no prazo e acertou 80% ou mais' : 'Entregou o exercício da aula no prazo', 'plano'); }catch(e){ return null; }
+  return qtd;
+}
+
+// ---- Tela ----
+function planoLinksHtml(lista, icone){
+  return (lista||[]).map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener" style="display:block; font-size:.85rem; margin:2px 0;">${icone} ${esc(l.t)}${l.busca?' <span class="muted">(busca)</span>':''}</a>`).join('');
+}
+function planoAulaDetalheHtml(turmaId, plano, aula, prog, destaque){
+  const s = planoState();
+  const slot = s.slides[plano.id] && s.slides[plano.id][aula.n];
+  const codigo = prog.exercicios && prog.exercicios[aula.n];
+  const aval = codigo ? planoAvaliacaoPorCodigo(codigo) : null;
+  const dada = !!(prog.dadas && prog.dadas[aula.n]);
+  const vale = s.valeNota[aula.n] !== false;
+  const recursos = planoLinksHtml(aula.video,'🎬') + planoLinksHtml(aula.podcast,'🎧') + planoLinksHtml(aula.filmes,'🎞️') + planoLinksHtml(aula.sites,'🌐') + planoLinksHtml(aula.questoes,'❓');
+  return `
+  <div class="card" data-plano-aula="${aula.n}" style="${destaque?'border:2px solid var(--wine,#6B1F2E);':''} margin-bottom:12px;">
+    <div class="row" style="justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
+      <div style="flex:1 1 300px; min-width:0;">
+        <div class="muted" style="font-size:.8rem;">${destaque?'<strong style="color:var(--wine,#6B1F2E);">📌 AULA DE HOJE</strong> · ':''}Aula ${aula.n} de ${plano.aulas.length} · ${aula.bimestre}º bimestre · semana ${aula.semana} · ${esc(aula.tipo||'')}${aula.paginas?' · livro '+esc(aula.paginas):''}</div>
+        <h3 style="margin:4px 0 6px;">${esc(aula.tituloCurto||aula.tema)}</h3>${aula.tituloCurto?`<div class="muted" style="font-size:.8rem; margin:-4px 0 6px;">${esc(aula.tema)}</div>`:''}
+        ${aula.objetivo?`<p style="margin:0 0 6px; font-size:.9rem;"><strong>Objetivo:</strong> ${esc(aula.objetivo)}</p>`:''}
+        ${aula.pergunta?`<p style="margin:0 0 6px; font-size:.9rem;"><strong>Pergunta para começar:</strong> <em>${esc(aula.pergunta)}</em></p>`:''}
+      </div>
+      ${dada?'<span class="badge" style="background:#e3f3e6; color:#1d6b31; padding:4px 10px; border-radius:12px; font-size:.8rem;">✅ Aula dada</span>':''}
+    </div>
+    ${(aula.roteiro||[]).length?`<details ${destaque?'open':''} style="margin:6px 0;"><summary style="cursor:pointer; font-weight:600;">🧭 Roteiro da aula (50 min)</summary><ol style="margin:6px 0 0 18px; font-size:.88rem;">${aula.roteiro.map(r=>`<li>${esc(r)}</li>`).join('')}</ol></details>`:''}
+    ${(aula.exercicios_livro||[]).length?`<p style="margin:6px 0; font-size:.88rem;">📖 <strong>No livro:</strong> ${(aula.exercicios_livro||[]).map(e=>esc(typeof e==='string'?e:(e.t||''))).join(' · ')}</p>`:''}
+    ${aula.tarefa?`<p style="margin:6px 0; font-size:.88rem;">🏠 <strong>Tarefa:</strong> ${esc(aula.tarefa)}</p>`:''}
+    ${planoVideosHtml(plano.id, aula.n, true)}
+    ${recursos?`<details style="margin:6px 0;"><summary style="cursor:pointer; font-weight:600;">🔎 Buscas prontas: vídeos, podcasts e questões</summary><div style="margin-top:6px;">${recursos}</div></details>`:''}
+    ${aula.tipo==='Revisão' ? `<p style="margin:8px 0; font-size:.88rem; background:#fdf0e6; border-radius:8px; padding:8px 10px;">📉 Veja no quadro <strong>“O que a turma mais errou”</strong> (logo abaixo) os conteúdos para revisar e aplique a lista de revisão com as questões mais erradas.</p>` : ''}
+    ${aula.tipo==='Avaliação' ? `<p style="margin:8px 0; display:flex; gap:8px; flex-wrap:wrap;"><button class="btn btn-primary btn-sm" data-action="plano-montar-prova" data-b="${aula.bimestre}">📝 Montar a prova do ${aula.bimestre}º bimestre com as questões das aulas</button><button class="btn btn-ghost btn-sm" data-action="plano-recup-abrir" data-b="${aula.bimestre}">♻️ Depois da prova: recuperação personalizada</button></p>` : ''}
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center;">
+      ${aula.slides ? `<button class="btn btn-primary btn-sm" data-action="plano-aula-viva" data-n="${aula.n}" title="Slides montados pelo app, com animações e a pergunta-relâmpago nos tablets">📡 Apresentar no app</button>` : ''}
+      ${aula.exercicio ? `<button class="btn btn-ghost btn-sm" data-action="plano-quiz" data-n="${aula.n}" title="Quiz por Equipes com as perguntas do exercício desta aula">🎮 Quiz da aula</button>` : ''}
+      ${slot
+        ? `<button class="btn btn-primary btn-sm" data-action="plano-apresentar" data-n="${aula.n}">▶️ Apresentar slides (${slot.totalSlides})</button>`
+        : `<label class="btn btn-ghost btn-sm" style="cursor:pointer;">⬆️ Enviar PDF dos slides<input type="file" accept="application/pdf" data-action="plano-slide-unico" data-n="${aula.n}" style="display:none;"></label>`}
+      ${aula.exercicio ? (codigo
+        ? `<span style="font-size:.85rem; background:#eef4fb; border-radius:8px; padding:6px 10px;">📝 Exercício aplicado · código <strong>${esc(codigo)}</strong>
+             <label style="margin-left:8px; cursor:pointer;"><input type="checkbox" data-action="plano-vale-nota-aplicado" data-code="${esc(codigo)}" ${(!aval || aval.valeNota!==false)?'checked':''} style="width:auto;"> vale nota</label>
+             <span data-prazo-aplicado style="margin-left:8px;">${aval && aval.endAt ? (new Date(aval.endAt).getTime() < Date.now() ? '⏰ prazo encerrado em ' : '⏰ até ') + planoDataCurta(aval.endAt) : '⏰ sem prazo'}</span>
+             <select data-action="plano-estender-prazo" data-code="${esc(codigo)}" style="width:auto; margin-left:6px; padding:2px 4px;"><option value="">mudar prazo…</option><option value="2">+2 dias</option><option value="7">+7 dias</option><option value="0">tirar o prazo</option></select></span>`
+        : `<label style="font-size:.85rem; cursor:pointer;"><input type="checkbox" data-action="plano-vale-nota" data-n="${aula.n}" ${vale?'checked':''} style="width:auto;"> Vale nota</label>
+           <label style="font-size:.85rem;">Prazo: <select data-action="plano-prazo" data-n="${aula.n}" style="width:auto; padding:2px 4px;">${[['2','2 dias'],['7','7 dias (até a próxima semana)'],['14','14 dias'],['','sem prazo']].map(([v,t]) => `<option value="${v}" ${(s.prazo[aula.n]!=null ? s.prazo[aula.n] : '7')===v?'selected':''}>${t}</option>`).join('')}</select></label>
+           <button class="btn btn-sm" style="background:var(--blue,#1F4E79); color:#fff;" data-action="plano-aplicar-exercicio" data-n="${aula.n}">📝 Aplicar exercício à turma (${aula.exercicio.questoes.length} questões)</button>
+           <button class="btn btn-ghost btn-sm" data-action="plano-editar-exercicio" data-n="${aula.n}">✏️ Editar antes de aplicar</button>`)
+        : '<span class="muted" style="font-size:.8rem;">Exercício de fixação desta aula ainda não foi preparado.</span>'}
+      ${dada
+        ? `<button class="btn btn-ghost btn-sm" data-action="plano-desmarcar-dada" data-n="${aula.n}">↩ Desmarcar</button>`
+        : `<button class="btn btn-ghost btn-sm" data-action="plano-marcar-dada" data-n="${aula.n}" style="border-color:#1d6b31; color:#1d6b31;">✅ Marcar aula como dada</button>`}
+    </div>
+    ${dada ? planoFeedbackProfHtml(plano.id, turmaId, aula.n) : ''}
+  </div>`;
+}
+function renderPlanoLivro(){
+  const s = planoState();
+  if(!s.carregado){ setTimeout(()=>carregarPlanoLivro(), 0); return '<div class="card"><p class="muted">Carregando planos de aula…</p></div>'; }
+  // vínculos podem ter mudado (coordenação ligou um professor a uma turma): recalcula de tempos em tempos
+  if(Date.now() - (s.efetivoEm||0) > 20000 && !s.recalculando){ s.recalculando = true; setTimeout(async () => { try{ await planoAtualizarEfetivo(); }catch(e){} s.recalculando = false; render(); }, 0); }
+  const turmas = planoTurmasVisiveis();
+  const podeImportar = planoPodeImportar();
+  const avisos = `${s.msg?`<div class="card" data-plano-msg style="background:#e9f6ec; border:1px solid #9fd3ab;">${esc(s.msg)}</div>`:''}${s.erro?`<div class="card" style="background:#fdecec; border:1px solid #e3a1a1;">${esc(s.erro)}</div>`:''}${s.enviando?`<div class="card" data-plano-enviando>⏳ ${esc(s.enviando.texto)} (${s.enviando.atual}/${s.enviando.total})… não feche esta tela.</div>`:''}`;
+  const opcoesPlano = sel => `<option value="">— sem plano —</option>` + s.index.map(pl => `<option value="${esc(pl.id)}" ${sel===pl.id?'selected':''}>${esc(pl.titulo)}</option>`).join('');
+  const blocoCoord = podeImportar ? `
+    <div class="card">
+      <h3 style="margin-top:0;">⚙️ Coordenação: planos e turmas</h3>
+      <p class="muted" style="font-size:.88rem; margin-top:0;">1) Importe o arquivo <strong>.json</strong> do plano (faz uma vez só). 2) Escolha qual versão cada turma segue. O professor passa a ver a “Aula de hoje”.</p>
+      <label class="btn btn-primary btn-sm" style="cursor:pointer;">📥 Importar plano (.json)<input type="file" id="plano-import-input" accept="application/json,.json" style="display:none;"></label>
+      ${s.index.length ? `<div style="margin-top:10px;">${s.index.map(pl => `<div class="row" style="justify-content:space-between; align-items:center; border-bottom:1px solid var(--border,#eee); padding:6px 0; gap:6px; flex-wrap:wrap;"><span style="font-size:.88rem;"><strong>${esc(pl.titulo)}</strong> · ${pl.totalAulas} aulas${pl.comExercicios?` · ${pl.comExercicios} com exercício pronto`:''}<br><span class="muted">${esc(pl.descricao||'')}</span></span><button class="btn btn-ghost btn-sm" data-action="plano-excluir" data-id="${esc(pl.id)}">Remover</button></div>`).join('')}</div>` : '<p class="muted" style="font-size:.85rem;">Nenhum plano importado ainda.</p>'}
+      ${s.index.length && turmas.length ? `
+      ${renderPlanoRegras()}
+      <h4 style="margin:14px 0 6px;">Turmas</h4>
+      <p class="muted" style="font-size:.82rem; margin:0 0 6px;">“Automático” segue a regra acima. Escolha uma versão só se esta turma precisar ser diferente.</p>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:8px;">
+        ${turmas.map(t => { const man = (s.turmaPlanoManual||{})[t.id] || ''; const o = (s.origem||{})[t.id]; const ef = s.turmaPlano[t.id]; const pl = ef && s.index.find(x=>x.id===ef);
+          return `<label style="font-size:.85rem;" data-turma-vinculo="${esc(t.id)}">${esc(t.name)}
+          <select data-action="plano-turma-versao" data-tid="${esc(t.id)}" style="width:100%;">
+            <option value="" ${!man?'selected':''}>Automático</option>
+            <option value="__nenhum" ${man==='__nenhum'?'selected':''}>Nenhum plano</option>
+            ${s.index.map(x => `<option value="${esc(x.id)}" ${man===x.id?'selected':''}>${esc(x.titulo)}</option>`).join('')}
+          </select>
+          <span style="display:block; font-size:.76rem; text-transform:none; font-weight:400; color:${pl?'#1d6b31':'#888'};">${pl ? (o && o.tipo==='auto' ? `✔ ${esc(pl.titulo)} — automático (${esc(o.professor)}, ${esc(o.disciplina)})` : `✔ ${esc(pl.titulo)} — escolhido pela coordenação`) : (o && o.tipo==='desligado' ? 'sem plano (desligado)' : 'sem plano — nenhum professor da disciplina do plano nesta turma')}</span></label>`; }).join('')}
+      </div>` : ''}
+    </div>` : '';
+  const turmasComPlano = turmas.filter(t => {
+    const pid = s.turmaPlano[t.id]; if(!pid) return false;
+    const p = state.professor;
+    if(state.view==='coordenador' || !p.session) return true;
+    const pl = s.index.find(x=>x.id===pid);
+    return (p.disciplinas||[]).some(d => (d.turmaIds||[]).includes(t.id) && (!pl || !pl.disciplina || planoDiscCasa(d.name, pl.disciplina)));
+  });
+  if(!turmasComPlano.length){
+    return `<h2>🗓️ Plano de Aulas do Livro</h2>${avisos}${blocoCoord}
+      <div class="card"><p>Nenhuma das suas turmas tem plano de aulas ainda.</p><p class="muted">${podeImportar ? 'Importe o plano e escolha a versão de cada turma no quadro acima.' : 'Peça à coordenação para importar o plano e escolher a versão da sua turma.'}</p></div>`;
+  }
+  const turmaId = turmasComPlano.some(t=>t.id===s.turmaSel) ? s.turmaSel : turmasComPlano[0].id;
+  if(turmaId !== s.turmaSel){ s.turmaSel = turmaId; setTimeout(async()=>{ await planoCarregarTurma(turmaId); render(); },0); }
+  const plano = s.planos[s.turmaPlano[turmaId]];
+  const prog = s.prog[turmaId] || { dadas:{}, exercicios:{} };
+  const seletor = `<label style="font-size:.9rem;">Turma: <select data-action="plano-turma-sel" style="min-width:200px;">${turmasComPlano.map(t=>`<option value="${esc(t.id)}" ${t.id===turmaId?'selected':''}>${esc(t.name)}</option>`).join('')}</select></label>`;
+  if(!plano) return `<h2>🗓️ Plano de Aulas do Livro</h2>${avisos}${blocoCoord}<div class="card">${seletor}<p class="muted">Carregando o plano da turma…</p></div>`;
+  const dadas = plano.aulas.filter(a => prog.dadas && prog.dadas[a.n]).length;
+  const pct = Math.round(dadas / plano.aulas.length * 100);
+  const hoje = planoAulaDeHoje(plano, prog);
+  const nSlides = Object.keys(s.slides[plano.id]||{}).length;
+  const porBim = [1,2,3,4].map(b => ({ b, aulas: plano.aulas.filter(a=>a.bimestre===b) })).filter(x=>x.aulas.length);
+  const lista = porBim.map(({b, aulas}) => `
+    <details ${hoje && hoje.bimestre===b ? 'open' : ''} style="margin-bottom:8px;">
+      <summary style="cursor:pointer; font-weight:700; padding:6px 0;">${b}º bimestre · ${aulas.filter(a=>prog.dadas&&prog.dadas[a.n]).length}/${aulas.length} aulas dadas</summary>
+      <div>${aulas.map(a => {
+        const dada = prog.dadas && prog.dadas[a.n];
+        const temSlide = s.slides[plano.id] && s.slides[plano.id][a.n];
+        const ex = prog.exercicios && prog.exercicios[a.n];
+        return `<div style="display:flex; gap:8px; align-items:center; padding:5px 4px; border-bottom:1px solid var(--border,#eee); font-size:.86rem; ${hoje&&hoje.n===a.n?'background:#fbf3df;':''}">
+          <span style="width:22px;">${dada?'✅':'⬜'}</span>
+          <span style="width:46px; color:#777;">Aula ${a.n}</span>
+          <span style="flex:1; min-width:0;">${esc(a.tituloCurto||a.tema)} <span class="muted">${a.paginas?'· '+esc(a.paginas):''}</span></span>
+          <span title="slides" style="opacity:${temSlide?1:.25};">🖥️</span>
+          <span title="exercício" style="opacity:${a.exercicio?(ex?1:.6):.2};">${ex?'📝✔':'📝'}</span>
+          <button class="btn btn-ghost btn-sm" data-action="plano-abrir-aula" data-n="${a.n}">${s.aulaAberta===a.n?'Fechar':'Abrir'}</button>
+        </div>${s.aulaAberta===a.n ? `<div style="padding:8px 0;">${planoAulaDetalheHtml(turmaId, plano, a, prog, false)}</div>` : ''}`;
+      }).join('')}</div>
+    </details>`).join('');
+  return `
+    <h2>🗓️ Plano de Aulas do Livro</h2>
+    ${avisos}
+    ${podeImportar ? renderPlanoPainel() + renderPlanoFeedbackResumo(s.turmaPlano[turmaId]) : ''}
+    <div class="card">
+      <div class="row" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+        ${seletor}
+        <span style="font-size:.88rem;"><strong>${esc(plano.titulo)}</strong></span>
+      </div>
+      <div style="margin-top:10px; background:#eee; border-radius:8px; height:12px; overflow:hidden;"><div data-plano-progresso="${pct}" style="width:${pct}%; height:100%; background:var(--wine,#6B1F2E);"></div></div>
+      <div class="muted" style="font-size:.82rem; margin-top:4px;">${dadas} de ${plano.aulas.length} aulas dadas (${pct}%) · ${nSlides} aula(s) com slides</div>
+      <div class="row" style="margin-top:8px; gap:6px; flex-wrap:wrap; align-items:center;">
+        ${s.registroAberto ? '' : renderPlanoRegistro(turmaId)}
+        <span style="font-size:.85rem; margin-left:6px;">Bimestre:</span>
+        <select data-action="plano-bim-ferr" style="width:auto; padding:2px 6px;">${[1,2,3,4].filter(b => plano.aulas.some(a=>a.bimestre===b && a.exercicio)).map(b => `<option value="${b}" ${(s.bimFerramentas||(hoje?hoje.bimestre:1))===b?'selected':''}>${b}º</option>`).join('')}</select>
+        <button class="btn btn-ghost btn-sm" data-action="plano-montar-prova" data-b="${s.bimFerramentas||(hoje?hoje.bimestre:1)}">📝 Montar prova</button>
+        <button class="btn btn-ghost btn-sm" data-action="plano-recup-abrir" data-b="${s.bimFerramentas||(hoje?hoje.bimestre:1)}">♻️ Recuperação personalizada</button>
+      </div>
+    </div>
+    ${s.registroAberto ? renderPlanoRegistro(turmaId) : ''}
+    ${s.montarProva && s.montarProva.turmaId===turmaId ? renderMontarProva() : ''}
+    ${s.recup && s.recup.turmaId===turmaId ? renderRecuperacao() : ''}
+    ${hoje ? planoAulaDetalheHtml(turmaId, plano, hoje, prog, true) : '<div class="card"><h3>🎉 Todas as aulas do plano foram dadas!</h3></div>'}
+    ${renderPlanoErros(turmaId, !!(hoje && hoje.tipo==='Revisão'))}
+    ${renderPlanoHabilidades(turmaId)}
+    <div class="card">
+      <h3 style="margin-top:0;">🖥️ Slides das aulas</h3>
+      <p class="muted" style="font-size:.86rem; margin-top:0;">Selecione <strong>vários PDFs de uma vez</strong>. O app liga cada arquivo à aula pelo número no nome: <code>aula-01.pdf</code> → Aula 1, <code>aula-02.pdf</code> → Aula 2…</p>
+      <label class="btn btn-primary btn-sm" style="cursor:pointer;">⬆️ Enviar PDFs dos slides<input type="file" id="plano-slides-input" accept="application/pdf" multiple style="display:none;"></label>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0;">📚 Todas as aulas</h3>
+      ${lista}
+    </div>
+    ${blocoCoord}`;
+}
+
 async function computeGradesForAssessments(assessments, pesos, turma, unidade, overrides){
+  // Exercício aplicado pelo Plano do Livro com "Vale nota" desligado é só treino: fica fora da nota.
+  assessments = (assessments||[]).filter(a => a.valeNota !== false);
   const roster = turma ? turma.students.map(s=>s.name) : [];
   const byInstrumento = { avaliacao:[], diagnostica:[], exercicios:[], recuperacao:[] };
   assessments.forEach(a => { const k = a.instrumento||'avaliacao'; if(byInstrumento[k]) byInstrumento[k].push(a); });
@@ -20982,6 +22982,12 @@ async function startExamFlow(){
     render();
     return;
   }
+  if(!alunoPodeVerAvaliacao(a, al)){
+    al.error = 'Esta avaliação foi preparada para outro aluno. Confira o código com o professor.';
+    al.stage = al.studentLoggedIn ? 'dashboard' : 'entrada';
+    render();
+    return;
+  }
   if(assessmentTemAgendaTurmas(a)){
     const tid = alunoTurmaIdReal(al);
     const ar = assessmentParaTurma(a, tid);
@@ -21181,6 +23187,7 @@ async function pollAlunoAtividadesAoVivo(){
     pollRoletaForAluno(),
     pollDueloForAluno(),
     pollSlidesForAluno(),
+    pollAulaVivaForAluno(),
   ]);
   // Só re-renderiza se algo de fato mudou — antes cada poll (5x a cada 2.5s) chamava
   // render() incondicionalmente, o que reconstruía a tela inteira o tempo todo e
@@ -21211,7 +23218,7 @@ async function loadStudentDashboard(){
     }));
     allAssessments = fetched.filter(Boolean);
   }catch(e){}
-  const mine = allAssessments.filter(a => assessmentTurmaIds(a).includes(al.turma.id)).map(a => assessmentParaTurma(a, al.turma.id));
+  const mine = allAssessments.filter(a => assessmentTurmaIds(a).includes(al.turma.id) && alunoPodeVerAvaliacao(a, al)).map(a => assessmentParaTurma(a, al.turma.id));
   const realizadas = [];
   const pendentes = [];
   const comResponses = await Promise.all(mine.map(async a => {
@@ -21238,6 +23245,7 @@ async function loadStudentDashboard(){
   al.dashboardRealizadas = realizadas;
   al.dashboardPendentes = pendentes;
   al.dashboardLoading = false;
+  if(window.pendingAlunoSub){ al.subview = window.pendingAlunoSub; window.pendingAlunoSub = null; }
   render();
   loadMateriaisSlidesDaTurma(al.turma.id);
   loadTarefasParaAluno();
@@ -21486,7 +23494,9 @@ async function submitAnswers(forcado){
   exitFullscreenSafe();
   al.result = jaGravado || result;
   al.stage = resultReleased(a) ? 'resultado' : 'enviado';
+  al.fichasMsg = null;
   render();
+  if(!jaGravado && a.origemPlano){ planoFichasExercicio(a, result).then(q => { if(q){ al.fichasMsg = { code: a.code, qtd: q }; render(); } }); }
 }
 
 /* ---------------- EVENT DELEGATION ---------------- */
@@ -21705,6 +23715,41 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-open-results'){ openCoordResults(btn.dataset.code); }
   else if(act==='coord-back-to-list'){ state.coordenador.mode='list'; state.coordenador.transferRespIdx=null; state.coordenador.transferError=''; render(); }
   else if(act==='coord-calc-notas'){ calcCoordNotas(); }
+  else if(act==='plano-abrir-aula'){ const s=planoState(); const n=parseInt(btn.dataset.n); s.aulaAberta = s.aulaAberta===n ? null : n; render(); }
+  else if(act==='plano-marcar-dada'){ planoState().msg=''; planoMarcarDada(planoState().turmaSel, parseInt(btn.dataset.n), true); }
+  else if(act==='plano-desmarcar-dada'){ planoState().msg=''; planoMarcarDada(planoState().turmaSel, parseInt(btn.dataset.n), false); }
+  else if(act==='plano-aplicar-exercicio'){ planoState().msg=''; aplicarExercicioPlano(planoState().turmaSel, parseInt(btn.dataset.n)); }
+  else if(act==='plano-apresentar'){ apresentarSlidesPlano(planoState().turmaSel, parseInt(btn.dataset.n)); }
+  else if(act==='plano-excluir'){ excluirPlanoLivro(btn.dataset.id); }
+  else if(act==='plano-painel-atualizar'){ planoCarregarPainel(); }
+  else if(act==='plano-aula-viva'){ iniciarAulaViva(planoState().turmaSel, parseInt(btn.dataset.n)); }
+  else if(act==='av-ir'){ aulaVivaIr(parseInt(btn.dataset.d)); }
+  else if(act==='av-revelar'){ aulaVivaRevelar(); }
+  else if(act==='av-encerrar'){ encerrarAulaViva(); }
+  else if(act==='av-entrar'){ avInjetarCss(); requestFullscreenSafe(); state.aluno.stage = 'aulaviva'; render(); }
+  else if(act==='av-sair'){ exitFullscreenSafe(); state.aluno.stage = 'dashboard'; render(); }
+  else if(act==='av-responder'){ aulaVivaResponder(parseInt(btn.dataset.i)); }
+  else if(act==='estudar-av'){ const e = estudarState(); e.av = { n: parseInt(btn.dataset.n), idx: Math.max(0, parseInt(btn.dataset.i)||0) }; render(); }
+  else if(act==='plano-quiz'){ planoAbrirQuiz(planoState().turmaSel, parseInt(btn.dataset.n)); }
+  else if(act==='plano-editar-exercicio'){ planoEditarExercicio(planoState().turmaSel, parseInt(btn.dataset.n)); }
+  else if(act==='plano-video-salvar'){ const s = planoState(); const n = parseInt(btn.dataset.n); const r = (s.videoRascunho||{})[n] || {}; planoSalvarVideo(s.turmaPlano[s.turmaSel], n, r.url, r.t); }
+  else if(act==='plano-video-remover'){ const s = planoState(); planoRemoverVideo(s.turmaPlano[s.turmaSel], parseInt(btn.dataset.n), btn.dataset.id); }
+  else if(act==='plano-feedback-prof'){ planoEnviarFeedbackProf(parseInt(btn.dataset.n), parseInt(btn.dataset.v)); }
+  else if(act==='plano-analisar-hab'){ planoAnalisarHabilidades(planoState().turmaSel); }
+  else if(act==='plano-analisar-erros'){ planoAnalisarErros(planoState().turmaSel); }
+  else if(act==='plano-aplicar-revisao'){ planoState().msg=''; aplicarListaRevisao(planoState().turmaSel); }
+  else if(act==='plano-montar-prova'){ planoAbrirMontarProva(planoState().turmaSel, parseInt(btn.dataset.b)); }
+  else if(act==='plano-fechar-prova'){ planoState().montarProva = null; render(); }
+  else if(act==='plano-recup-abrir'){ if(state.view==='coordenador'){ alert('Para montar a recuperação, entre no painel do professor (Professores → 👁 Entrar no painel).'); } else { planoState().montarProva=null; planoAbrirRecuperacao(planoState().turmaSel, parseInt(btn.dataset.b)); } }
+  else if(act==='plano-recup-fechar'){ planoState().recup = null; render(); }
+  else if(act==='plano-recup-trocar'){ planoRecupTrocar(btn.dataset.sid, parseInt(btn.dataset.i)); }
+  else if(act==='plano-recup-criar'){ planoRecupCriar(); }
+  else if(act==='plano-criar-prova'){ planoCriarProva(); }
+  else if(act==='plano-registro-abrir'){ planoState().registroAberto = true; render(); }
+  else if(act==='plano-registro-fechar'){ planoState().registroAberto = false; render(); }
+  else if(act==='plano-registro-copiar'){ planoRegistroCopiar(planoState().turmaSel); }
+  else if(act==='plano-registro-xlsx'){ planoRegistroXlsx(planoState().turmaSel); }
+  else if(act==='plano-ver-turma'){ const s=planoState(); s.turmaSel=btn.dataset.tid; s.aulaAberta=null; s.msg=''; planoCarregarTurma(btn.dataset.tid).then(()=>{ render(); const el=document.querySelector('[data-plano-aula]'); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); }); }
   else if(act==='risco-filtro'){ riscoState().filtro = btn.dataset.f; render(); }
   else if(act==='risco-turma'){ riscoState().turmaFiltro = btn.dataset.id; render(); }
   else if(act==='risco-visao'){ riscoState().visao = btn.dataset.v; render(); }
@@ -21938,6 +23983,9 @@ document.addEventListener('click', (e) => {
   else if(act==='open-comment-response'){ p.commentingResponseIdx = Number(btn.dataset.idx); render(); }
   else if(act==='close-comment-response'){ p.commentingResponseIdx = null; render(); }
   else if(act==='save-comment-response'){ saveCommentResponse(Number(btn.dataset.idx)); }
+  else if(act==='ia-sugerir-todas'){ iaSugerirDissertativas(null); }
+  else if(act==='ia-sugerir-resposta'){ iaSugerirDissertativas(Number(btn.dataset.idx)); }
+  else if(act==='ia-aceitar-todas'){ iaAceitarTodasSugestoes(); }
   else if(act==='save-correct-response'){ saveCorrectResponse(Number(btn.dataset.idx)); }
   else if(act==='export-pdf'){ exportAssessmentPdf(btn.dataset.code); }
   else if(act==='print-personal-gabaritos'){ printPersonalAnswerCards(btn.dataset.code); }
@@ -22128,6 +24176,10 @@ document.addEventListener('click', (e) => {
   else if(act==='student-logout'){ sairAluno(); }
   else if(act==='goto-aluno-livros'){ stopAlunoEnquetePoll(); al.stage='aluno-livros'; if(state.professor.livrosLoading){ loadLivros(); } render(); }
   else if(act==='back-to-student-dashboard'){ loadStudentDashboard(); }
+  else if(act==='estudar-abrir'){ const e = estudarState(); const n = parseInt(btn.dataset.n); e.aberta = e.aberta===n ? null : n; if(e.deck && e.deck.n!==n) e.deck = null; render(); }
+  else if(act==='estudar-feedback'){ const e = estudarState(); const al2 = state.aluno; if(e.planoId){ planoRegistrarFeedback(e.planoId, { n: parseInt(btn.dataset.n), turmaId: al2.turma.id, quem:'aluno', autorId: al2.matriculaStudentId, util: btn.dataset.v==='1' }).then(lista => { e.feedback = lista.filter(f => f.quem==='aluno' && f.autorId===al2.matriculaStudentId); render(); }); } }
+  else if(act==='estudar-slide'){ estudarAbrirSlides(parseInt(btn.dataset.n), parseInt(btn.dataset.i)); }
+  else if(act==='estudar-treino'){ const e = estudarState(); const r = estudarMinhaResposta(btn.dataset.code); const q = r && r.assessment.questions.find(x=>x.id===btn.dataset.qid); if(q){ e.treino[q.id] = { oid: btn.dataset.oid, ok: btn.dataset.oid===q.correctOptionId }; render(); } }
   else if(act==='dashboard-start-exam'){ stopAlunoEnquetePoll(); dashboardStartExam(btn.dataset.code); }
   else if(act==='dashboard-view-result'){ dashboardViewResult(btn.dataset.code); }
   else if(act==='find-assessment'){ findAssessment(); }
@@ -22233,6 +24285,8 @@ document.addEventListener('input', (e) => {
   const act = el.dataset ? el.dataset.action : null;
   const p = state.professor, al = state.aluno;
 
+  if(act==='plano-video-campo'){ const s = planoState(); const n = parseInt(el.dataset.n); s.videoRascunho = s.videoRascunho||{}; (s.videoRascunho[n] = s.videoRascunho[n]||{})[el.dataset.campo] = el.value; return; }
+  if(act==='plano-feedback-texto'){ const s = planoState(); s.feedbackRascunho = s.feedbackRascunho||{}; s.feedbackRascunho[parseInt(el.dataset.n)] = el.value; return; }
   if(el.id==='monitoria-horario-input'){ al.monitoria.novoVinculoHorario = el.value; }
   else if(el.id==='monitoria-edit-horario-input'){ al.monitoria.editHorarioValor = el.value; }
   else if(el.id==='coord-banner-titulo'){ campBannerState().titulo = el.value; }
@@ -22278,6 +24332,7 @@ document.addEventListener('input', (e) => {
   else if(el.id==='paste-text-input'){ p.pasteImport.text = el.value; }
   else if(el.id==='book-page-text'){ p.book.viewingText = el.value; }
   else if(act==='q-text'){ const q = findQuestionRef(el.dataset.qid); q.text = el.value; }
+  else if(act==='q-comando'){ const q = findQuestionRef(el.dataset.qid); q.comando = el.value; }
   else if(act==='q-descritor'){ const q = findQuestionRef(el.dataset.qid); q.descritorSaeb = el.value; }
   else if(act==='q-conteudo'){ const q = findQuestionRef(el.dataset.qid); q.conteudo = el.value; }
   else if(act==='q-points'){ const q = findQuestionRef(el.dataset.qid); q.points = parseFloat(el.value)||1; }
@@ -22405,6 +24460,23 @@ document.addEventListener('change', (e) => {
   const act = el.dataset ? el.dataset.action : null;
   const p = state.professor, al = state.aluno, c = state.coordenador;
   if(act==='biblio-categoria'){ const f = state.biblioteca.formLivro; if(f){ biblioGuardarCampos(); if(el.value==='__outra'){ f.categoriaOutra = true; f.categoria = f.categoriaNova||''; } else { f.categoriaOutra = false; f.categoria = el.value; } render(); } return; }
+  if(el.id==='plano-import-input'){ if(el.files[0]) importarPlanoLivro(el.files[0]); el.value=''; return; }
+  if(el.id==='plano-slides-input'){ const s=planoState(); const fs=Array.from(el.files||[]); el.value=''; enviarSlidesPlano(fs, s.turmaPlano[s.turmaSel]); return; }
+  if(act==='plano-slide-unico'){ const s=planoState(); const fs=Array.from(el.files||[]); el.value=''; enviarSlidesPlano(fs, s.turmaPlano[s.turmaSel], parseInt(el.dataset.n)); return; }
+  if(act==='plano-turma-versao'){ definirPlanoTurma(el.dataset.tid, el.value); return; }
+  if(act==='plano-regra'){ planoDefinirRegra(el.dataset.k, el.value); return; }
+  if(act==='plano-turma-sel'){ const s=planoState(); s.turmaSel=el.value; s.aulaAberta=null; s.msg=''; s.montarProva=null; planoCarregarTurma(el.value).then(render); return; }
+  if(act==='plano-bim-ferr'){ planoState().bimFerramentas = parseInt(el.value); render(); return; }
+  if(act==='plano-recup-incluir'){ const r = planoState().recup; if(r && r.alunos[el.dataset.sid]){ r.alunos[el.dataset.sid].incluir = el.checked; render(); } return; }
+  if(act==='plano-recup-campo'){ const r = planoState().recup; if(r){ r[el.dataset.campo] = el.type==='checkbox' ? el.checked : el.value; render(); } return; }
+  if(act==='plano-prova-fonte'){ const m = planoState().montarProva; if(m){ m.fonte = el.value; m.sel = planoSugerirSelecao(m.turmaId, m.bimestre, el.value); render(); } return; }
+  if(act==='plano-prova-q'){ const m = planoState().montarProva; if(m){ m.sel[el.dataset.k] = el.checked; render(); } return; }
+  if(act==='plano-revisao-vale'){ planoState().revisaoVale = el.checked; return; }
+  if(act==='plano-registro-filtro'){ planoState().registroFiltro = el.value; render(); return; }
+  if(act==='plano-prazo'){ planoState().prazo[parseInt(el.dataset.n)] = el.value; return; }
+  if(act==='plano-estender-prazo'){ if(el.value!=='') planoEstenderPrazo(el.dataset.code, el.value); return; }
+  if(act==='plano-vale-nota'){ planoState().valeNota[parseInt(el.dataset.n)] = el.checked; return; }
+  if(act==='plano-vale-nota-aplicado'){ planoTrocarValeNota(el.dataset.code, el.checked); return; }
   if(act==='risco-area'){ salvarAreaDisciplina(el.dataset.disc, el.value); return; }
   if(act==='risco-turma-select'){ riscoState().turmaFiltro = el.value; render(); return; }
   if(act==='sessao-cfg'){ salvarSessaoCampo(el.dataset.campo, el.value); return; }
@@ -22559,6 +24631,11 @@ document.addEventListener('change', (e) => {
 // Leitor de código de barras se comporta como teclado: digita os caracteres e manda Enter.
 // Capturamos o Enter nesse campo específico pra registrar a presença sem precisar de um botão.
 document.addEventListener('keydown', (e) => {
+  const avp = state.professor.aulaViva;
+  if(avp && avp.presenting && avp.sess && !(e.target && /input|textarea|select/i.test(e.target.tagName))){
+    if(e.key==='ArrowRight' || e.key===' ' || e.key==='PageDown'){ e.preventDefault(); aulaVivaIr(1); return; }
+    if(e.key==='ArrowLeft' || e.key==='PageUp'){ e.preventDefault(); aulaVivaIr(-1); return; }
+  }
   if(e.target && e.target.id==='chamada-scan-input' && e.key==='Enter'){
     e.preventDefault();
     const valor = e.target.value;
@@ -22567,6 +24644,16 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// Link/QR code dos slides: ?ir=provas (ou ?ir=estudar) abre a área do aluno já na tela certa (depois do login)
+(function checkAlunoDeepLink(){
+  const params = new URLSearchParams(location.search);
+  const ir = params.get('ir');
+  if(ir==='provas' || ir==='estudar'){
+    window.pendingAlunoSub = ir;
+    history.replaceState({}, '', location.pathname);
+    state.aluno.subview = ir;
+  }
+})();
 (function checkGradeDeepLink(){
   const params = new URLSearchParams(location.search);
   const code = params.get('prof_grade_code');
@@ -22580,7 +24667,10 @@ document.addEventListener('keydown', (e) => {
 
 render();
 carregarSessaoConfig();
-restaurarSessao();
+Promise.resolve(restaurarSessao()).catch(()=>{}).finally(() => {
+  // veio pelo QR code dos slides e não havia sessão salva: abre direto a entrada do aluno
+  if(window.pendingAlunoSub && state.view==='landing'){ state.view = 'aluno'; render(); }
+});
 </script>
 </body>
 </html>
