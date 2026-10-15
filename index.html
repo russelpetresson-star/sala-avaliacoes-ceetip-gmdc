@@ -671,7 +671,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-15-1400</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-15-1600</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -698,6 +698,7 @@
 <!-- Firebase (banco de dados) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 
 <!-- model-viewer (Realidade Aumentada no navegador, sem instalar app) -->
 <script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
@@ -841,7 +842,7 @@ window.storage = {
             tx.set(ref, { value: novo, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
             return novo;
           });
-        }catch(e){ ultimo = e; await new Promise(r => setTimeout(r, 120 + Math.random()*350*(i+1))); }
+        }catch(e){ ultimo = e; if(/permission/i.test(String((e && (e.code||e.message))||''))) throw e; await new Promise(r => setTimeout(r, 120 + Math.random()*350*(i+1))); }
       }
       throw ultimo;
     }
@@ -888,6 +889,7 @@ function liveAvisar(){
 function liveEsperar(e){ return e.ready ? null : Promise.race([e.pronto, new Promise(r => setTimeout(r, 8000))]); }
 // Valor (texto) de um documento, ou null se não existir
 async function liveLer(key){
+  await SEG_PRONTO;
   if(!liveSuportado()){ try{ return (await window.storage.get(key, true)).value; }catch(e){ return null; } }
   let e = LIVE_DOCS.get(key);
   if(!e){
@@ -911,6 +913,7 @@ async function liveLer(key){
 async function liveLerJson(key, padrao){ const v = await liveLer(key); if(v==null) return padrao; try{ const o = JSON.parse(v); return o==null ? padrao : o; }catch(e){ return padrao; } }
 // Todos os documentos que começam com o prefixo: { chaveSemPrefixo: valorTexto }
 async function liveListar(prefixo){
+  await SEG_PRONTO;
   const viaGet = async () => { try{ const r = await window.storage.list(prefixo, true); const out = {};
     for(const k of (r.keys||[])){ let v = r.values ? r.values[k] : undefined; if(v===undefined){ try{ v = (await window.storage.get(k, true)).value; }catch(x){ v = null; } } if(v!=null) out[k.slice(prefixo.length)] = v; } return out; }catch(e){ return {}; } };
   if(!liveListaSuportada()) return viaGet();
@@ -1030,6 +1033,356 @@ window.addEventListener('online', () => { connFailStreak = 0; setConnBanner(null
   }
   window.storage = { get: wrap('get'), set: wrap('set'), delete: wrap('delete'), list: wrap('list'), update: wrap('update') };
 })();
+
+/* -------- Cadastro das turmas: um documento por turma --------
+   Antes, todas as turmas (com todos os alunos, fichas e acessos) ficavam num único documento "turmas",
+   que cresce o ano inteiro e chegaria ao limite de 1 MB do Firebase. Agora:
+     turmas-index      → lista com os ids das turmas, na ordem
+     turmadoc:<id>     → uma turma (com seus alunos)
+   O resto do app continua lendo e gravando "turmas" como antes: esta camada monta e separa sozinha.
+   Na primeira leitura, o documento antigo é copiado para o novo formato (e guardado em "turmas-antigo-backup").
+   Ao gravar "turmas", fichas, histórico de fichas, contadores, temporada e dias de acesso dos alunos
+   sempre vêm do servidor (só mudam pelas funções próprias, em transação) — assim uma tela aberta há horas
+   não apaga as fichas que os alunos ganharam nesse meio-tempo. */
+const TURMAS_INDEX = 'turmas-index';
+function turmaDocChave(id){ return 'turmadoc:' + id; }
+const CAMPOS_DO_SERVIDOR = ['fichas', 'fichasHistorico', 'contadores', 'temporadaXp', 'fichasSemana', 'loginLog'];
+(function turmasDivididas(){
+  const base = window.storage; window.__storageBase = base;
+  let migrando = null;
+  async function lerIndex(){ try{ const v = JSON.parse((await base.get(TURMAS_INDEX, true)).value); return Array.isArray(v) ? v : null; }catch(e){ return null; } }
+  async function migrar(){
+    let bruto; try{ bruto = (await base.get('turmas', true)).value; }catch(e){ return null; }
+    let antigo; try{ antigo = JSON.parse(bruto); }catch(e){ return null; }
+    if(!Array.isArray(antigo)) return null;
+    try{ await base.set('turmas-antigo-backup', bruto, true); }catch(e){}
+    for(const t of antigo){ if(t && t.id) await base.set(turmaDocChave(t.id), JSON.stringify(t), true); }
+    const ids = antigo.filter(t => t && t.id).map(t => t.id);
+    await base.set(TURMAS_INDEX, JSON.stringify(ids), true);
+    return ids;
+  }
+  async function garantirIndex(){
+    let ids = await lerIndex();
+    if(!ids){ if(!migrando) migrando = migrar().finally(() => { migrando = null; }); ids = await migrando; }
+    return ids;
+  }
+  async function getTurmas(){
+    const ids = await garantirIndex();
+    if(!ids) throw new Error('not-found: turmas');
+    const docs = await Promise.all(ids.map(async id => { try{ return (await base.get(turmaDocChave(id), true)).value; }catch(e){ return null; } }));
+    const arr = [];
+    docs.forEach(v => { if(v) try{ arr.push(JSON.parse(v)); }catch(e){} });
+    return { key:'turmas', value: JSON.stringify(arr), shared: true };
+  }
+  function mesclarTurma(servidorRaw, escrita){
+    let sv = null; try{ sv = servidorRaw ? JSON.parse(servidorRaw) : null; }catch(e){ sv = null; }
+    const out = JSON.parse(JSON.stringify(escrita));
+    if(sv && Array.isArray(sv.students) && Array.isArray(out.students)){
+      const porId = {}; sv.students.forEach(a => { if(a && a.id) porId[a.id] = a; });
+      out.students.forEach(a => { const x = a && porId[a.id]; if(!x) return; CAMPOS_DO_SERVIDOR.forEach(c => { if(x[c]!==undefined) a[c] = x[c]; else delete a[c]; }); });
+    }
+    return out;
+  }
+  async function setTurmas(value){
+    const arr = JSON.parse(value);
+    if(!Array.isArray(arr)) throw new Error('turmas inválidas');
+    await garantirIndex();
+    for(const t of arr){
+      if(!t || !t.id) continue;
+      await base.update(turmaDocChave(t.id), raw => {
+        const novo = JSON.stringify(mesclarTurma(raw, t));
+        return novo===raw ? undefined : novo;
+      });
+    }
+    const ids = arr.filter(t => t && t.id).map(t => t.id);
+    await base.update(TURMAS_INDEX, raw => { const j = JSON.stringify(ids); return j===raw ? undefined : j; });
+    return { key:'turmas', value, shared: true };
+  }
+  window.storage = Object.assign({}, base, {
+    async get(key, shared){ return key==='turmas' ? getTurmas() : base.get(key, shared); },
+    async set(key, value, shared){ return key==='turmas' ? setTurmas(value) : base.set(key, value, shared); },
+    async update(key, fn){
+      if(key!=='turmas') return base.update(key, fn);
+      let atual = null; try{ atual = (await getTurmas()).value; }catch(e){}
+      const novo = fn(atual);
+      if(novo!==undefined) await setTurmas(novo);
+      return novo===undefined ? atual : novo;
+    },
+    garantirTurmas: garantirIndex,
+  });
+})();
+/* ======================= SEGURANÇA (fase 1): login no Firebase + regras do banco =======================
+   Todo aparelho entra no Firebase: alunos, monitores e biblioteca de forma anônima (automática);
+   coordenação e professores com conta própria (e-mail + senha). Professor só vira "equipe" depois de
+   confirmar o e-mail (link enviado pelo Firebase) e de estar na lista da coordenação (coleção "equipe").
+   As regras do banco (geradas no painel 🔐 Segurança) deixam gravar os dados de professor/coordenação
+   só para a equipe. Enquanto as regras não forem publicadas, nada muda no funcionamento. */
+const SEG_EMAIL_COORD = 'coordenacao@sala-ceetip.app';
+// Chaves que só a equipe pode gravar (alunos, monitores e biblioteca continuam gravando o resto)
+const SEG_SO_EQUIPE_PREFIXOS = ['assessment', 'pesos-instrumentos', 'notas-manuais', 'bloco-lancamentos', 'disciplinas', 'question-bank',
+  'plano-livro', 'plano-livro-img', 'plano-livro-prog', 'plano-livro-slides', 'plano-livro-videos', 'plano-config', 'plano-visto',
+  'plano-termometro', 'slide-img', 'gemini-api-key-professor', 'avulso-respostas', 'aula-viva', 'seg-teste'];
+const SEG_SO_EQUIPE_CHAVES = ['professores', 'coordenador-senha', 'coordenador-senha-salt', 'pin-liberacao', 'periodos-avaliacao', 'socio-config',
+  'sessao-config', 'gabaritos-avulsos', 'gemini-api-key', 'temporada-atual', 'slides-decks', 'avisos', 'cronograma', 'dias-letivos',
+  'turno-horarios', 'livros-didaticos', 'materiais-turma', 'tarefas', 'mapasmentais', 'lixeira', 'backup-ultimo', 'areas-disciplinas',
+  'busca-ativa-vinculos', 'plano-livro-index', 'plano-livro-regras', 'plano-livro-turmas', 'plano-livro-icones', 'blocos-provas',
+  'ra-items', 'rede-escola', 'monitoria-desempenho', 'monitoria-indicados', 'jovens-protagonistas-indicados', 'slides-historico',
+  'turmas-antigo-backup', 'seg-teste'];
+const SEG = { auth:null, pronto:false, anonimoErro:null, papel:'anonimo', avisoProf:'', coordErro:'' };
+let SEG_PRONTO_RES; const SEG_PRONTO = new Promise(r => { SEG_PRONTO_RES = r; });
+function segDisponivel(){ try{ return typeof firebase.auth === 'function'; }catch(e){ return false; } }
+function segSenhaFirebase(senha){ return 'ceetip#' + senha; }   // o Firebase exige 6+ caracteres; o app aceita senhas de 4
+async function segIniciar(){
+  if(!segDisponivel()){ SEG.pronto = true; SEG_PRONTO_RES(); return; }
+  try{
+    SEG.auth = firebase.auth();
+    await new Promise(res => { const des = SEG.auth.onAuthStateChanged(() => { des(); res(); }); setTimeout(res, 4000); });
+    if(!SEG.auth.currentUser){
+      try{ await SEG.auth.signInAnonymously(); }catch(e){ SEG.anonimoErro = (e && e.code) || 'erro'; }
+    }
+  }catch(e){ SEG.anonimoErro = (e && e.code) || 'erro'; }
+  segAtualizarPapel();
+  SEG.pronto = true; SEG_PRONTO_RES();
+}
+function segUsuario(){ return SEG.auth && SEG.auth.currentUser; }
+function segAtivo(){ return !!segUsuario(); }   // o Firebase Auth está ligado no projeto
+function segAtualizarPapel(){
+  const u = segUsuario();
+  SEG.papel = !u ? 'nenhum' : u.isAnonymous ? 'anonimo' : (u.email===SEG_EMAIL_COORD ? 'coordenacao' : (u.emailVerified ? 'professor' : 'professor-pendente'));
+}
+// Entra (ou cria a conta) no Firebase com e-mail e a senha do app
+async function segEntrarComEmail(email, senha){
+  if(!SEG.auth || !segAtivo()) return { ok:false, motivo:'sem-auth' };
+  const tentativas = [segSenhaFirebase(senha), senha];
+  const u = segUsuario();
+  if(u && !u.isAnonymous && u.email===email){ try{ await u.reload(); }catch(e){} segAtualizarPapel(); return { ok:true, user: segUsuario() }; }
+  for(const s of tentativas){
+    try{ const cred = await SEG.auth.signInWithEmailAndPassword(email, s); segAtualizarPapel(); return { ok:true, user: cred.user }; }
+    catch(e){ if(e && e.code==='auth/too-many-requests') return { ok:false, motivo:'muitas-tentativas' }; }
+  }
+  try{
+    const cred = await SEG.auth.createUserWithEmailAndPassword(email, segSenhaFirebase(senha));
+    segAtualizarPapel(); return { ok:true, user: cred.user, nova:true };
+  }catch(e){
+    if(e && e.code==='auth/email-already-in-use') return { ok:false, motivo:'senha-diferente' };
+    if(e && e.code==='auth/operation-not-allowed') return { ok:false, motivo:'email-desligado' };
+    return { ok:false, motivo: (e && e.code) || 'erro' };
+  }
+}
+async function segSair(){
+  if(!SEG.auth) return;
+  try{ const u = segUsuario(); if(u && !u.isAnonymous){ await SEG.auth.signOut(); await SEG.auth.signInAnonymously(); } }catch(e){}
+  segAtualizarPapel();
+}
+// ---------- Coordenação ----------
+async function segEntrarCoordenacao(senha){
+  SEG.coordErro = '';
+  if(!segAtivo()) return;
+  const r = await segEntrarComEmail(SEG_EMAIL_COORD, senha);
+  if(!r.ok){
+    SEG.coordErro = r.motivo==='senha-diferente' ? 'A conta da coordenação no Firebase foi criada com outra senha. Apague o usuário "' + SEG_EMAIL_COORD + '" em Authentication → Usuários no console do Firebase e entre de novo.'
+      : r.motivo==='email-desligado' ? 'Ative o login por "E-mail/senha" no Firebase (Authentication → Método de login).' : 'Não consegui entrar na conta da coordenação no Firebase (' + r.motivo + ').';
+    return;
+  }
+  try{ await segSincronizarEquipe(); }catch(e){}
+}
+async function segTrocarSenhaCoordenacao(nova){
+  const u = segUsuario();
+  if(!u || u.email!==SEG_EMAIL_COORD) return;
+  try{ await u.updatePassword(segSenhaFirebase(nova)); }catch(e){ SEG.coordErro = 'A senha do app mudou, mas a do Firebase não (' + ((e && e.code)||'erro') + '). Saia e entre de novo com a senha nova.'; }
+}
+// A coleção "equipe" (um documento por e-mail) diz quem é professor. Só a coordenação grava.
+async function segSincronizarEquipe(){
+  const u = segUsuario(); if(!u || u.email!==SEG_EMAIL_COORD) return;
+  const lista = await fetchProfessoresList();
+  const emails = new Set(lista.map(p => (p.email||'').toLowerCase()).filter(Boolean));
+  const col = db.collection('equipe');
+  let atuais = [];
+  try{ atuais = (await col.get()).docs.map(d => d.id); }catch(e){}
+  for(const e of emails){ if(!atuais.includes(e)){ const p = lista.find(x => (x.email||'').toLowerCase()===e); await col.doc(e).set({ nome: (p && (p.displayName||p.email)) || e, at: Date.now() }); } }
+  for(const e of atuais){ if(!emails.has(e)) await col.doc(e).delete(); }
+}
+// ---------- Professor ----------
+async function segEntrarProfessor(rec, senha){
+  SEG.avisoProf = '';
+  if(!segAtivo()) return { ok:true };
+  const email = (rec.email||'').toLowerCase();
+  const r = await segEntrarComEmail(email, senha);
+  if(!r.ok){
+    if(r.motivo==='senha-diferente') SEG.avisoProf = 'Sua conta de segurança tem outra senha. Toque em “Receber e-mail para redefinir” abaixo, crie a senha nova pelo link e entre de novo com ela.';
+    else if(r.motivo==='email-desligado') SEG.avisoProf = '';
+    else SEG.avisoProf = 'Não consegui ligar sua conta de segurança agora (' + r.motivo + '). Você pode continuar; tente entrar de novo mais tarde.';
+    return { ok:false, motivo:r.motivo };
+  }
+  const u = segUsuario();
+  try{ await u.reload(); }catch(e){}
+  segAtualizarPapel();
+  if(!segUsuario().emailVerified){
+    const ult = Number(localStorage.getItem('seg-verif-' + email) || 0);
+    if(r.nova || Date.now() - ult > 6*3600*1000){ try{ await segUsuario().sendEmailVerification(); localStorage.setItem('seg-verif-' + email, String(Date.now())); }catch(e){} }
+    SEG.avisoProf = `📧 Confirme seu e-mail: enviamos um link para ${email}. Abra o e-mail (veja também o spam), clique no link e depois saia e entre de novo no app. Sem isso, em breve você não vai conseguir salvar nada.`;
+  }
+  try{ await window.storage.set(`seg-status:${rec.id}`, JSON.stringify({ email, uid: segUsuario().uid, verificado: !!segUsuario().emailVerified, at: Date.now() }), true); }catch(e){}
+  return { ok:true };
+}
+async function segReenviarConfirmacao(){
+  const u = segUsuario(); if(!u || u.isAnonymous) return;
+  try{ await u.sendEmailVerification(); SEG.avisoProf = `📧 Enviamos outro link para ${u.email}. Depois de clicar nele, saia e entre de novo.`; }catch(e){ SEG.avisoProf = 'Não consegui reenviar agora (' + ((e && e.code)||'erro') + '). Tente daqui a alguns minutos.'; }
+  render();
+}
+async function segRedefinirSenha(email){
+  if(!SEG.auth) return;
+  try{ await SEG.auth.sendPasswordResetEmail(email); SEG.avisoProf = `📧 Enviamos um link para ${email} para criar a senha nova. Depois entre no app com a senha nova.`; }catch(e){ SEG.avisoProf = 'Não consegui enviar o e-mail (' + ((e && e.code)||'erro') + ').'; }
+  render();
+}
+function segAvisoProfHtml(){
+  if(!SEG.avisoProf) return '';
+  const u = segUsuario();
+  return `<div class="card" data-seg-aviso style="border:2px solid #C9A227; background:#fffaf0;">
+    <strong>🔐 Segurança da sua conta</strong><p style="margin:6px 0;">${esc(SEG.avisoProf)}</p>
+    <div class="row" style="gap:6px; flex-wrap:wrap;">
+      ${u && !u.isAnonymous && !u.emailVerified ? '<button class="btn btn-ghost btn-sm" data-action="seg-reenviar">📧 Reenviar o link</button>' : ''}
+      ${SEG.avisoProf.includes('outra senha') && state.professor.loginEmail ? `<button class="btn btn-ghost btn-sm" data-action="seg-redefinir" data-email="${esc(state.professor.loginEmail)}">📧 Receber e-mail para redefinir</button>` : ''}
+    </div></div>`;
+}
+// ---------- Regras do banco ----------
+function segRegrasTexto(uidCoord){
+  const pref = SEG_SO_EQUIPE_PREFIXOS.join('|');
+  const chaves = SEG_SO_EQUIPE_CHAVES.map(k => `'${k}'`).join(', ');
+  return `rules_version = '2';
+// Sala de Avaliações — CEETIP Governador Marcelo Déda Chagas - DRE04 · regras de segurança (fase 1)
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function logado() { return request.auth != null; }
+    function coordenacao() { return logado() && request.auth.uid == '${uidCoord || 'COLE_AQUI_O_UID_DA_COORDENACAO'}'; }
+    function professor() {
+      return logado() && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/equipe/$(request.auth.token.email));
+    }
+    function equipe() { return coordenacao() || professor(); }
+    function soEquipe(chave) {
+      return chave.matches('^(${pref}):.*') || chave in [${chaves}];
+    }
+    match /equipe/{email} {
+      allow read: if logado();
+      allow write: if coordenacao();
+    }
+    match /kv/{chave} {
+      allow read: if logado();
+      allow create, update, delete: if equipe() || (logado() && !soEquipe(chave));
+    }
+  }
+}`;
+}
+// Mesma regra, em JavaScript (usada nos testes e no "Testar proteção")
+function segPodeGravar(chave, papel){
+  if(papel==='coordenacao' || papel==='professor') return true;
+  if(papel==='nenhum') return false;
+  const so = SEG_SO_EQUIPE_PREFIXOS.some(p => chave.startsWith(p + ':')) || SEG_SO_EQUIPE_CHAVES.includes(chave);
+  return !so;
+}
+// Testa de verdade: um "aluno anônimo" tenta gravar numa chave só da equipe
+async function segTestarProtecao(){
+  const st = segState(); st.teste = '⏳ Testando…'; render();
+  try{
+    const nome = 'teste-seg-' + Date.now();
+    const app2 = firebase.initializeApp(firebaseConfig, nome);
+    await app2.auth().signInAnonymously();
+    try{
+      await app2.firestore().collection('kv').doc('seg-teste').set({ value: 'teste', updatedAt: Date.now() });
+      st.teste = '❌ As regras ainda NÃO estão protegendo: um aparelho anônimo conseguiu gravar dados da equipe. Confira se as regras foram publicadas.';
+    }catch(e){
+      st.teste = (e && /permission/i.test(e.code||e.message||'')) ? '✅ Proteção ativa: um aparelho de aluno não consegue gravar dados de professor ou coordenação.' : '⚠️ Teste inconclusivo (' + ((e && e.code)||'erro') + ').';
+    }
+    try{ await app2.auth().signOut(); await app2.delete(); }catch(e){}
+  }catch(e){ st.teste = '⚠️ Não consegui testar (' + ((e && e.code)||'erro') + '). O login anônimo está ativado no Firebase?'; }
+  render();
+}
+function segState(){ const c = state.coordenador; if(!c.seg) c.seg = { status:null, carregando:false, teste:'', mostrarRegras:false }; return c.seg; }
+async function segCarregarStatus(){
+  const st = segState(); if(st.carregando) return; st.carregando = true; render();
+  const lista = await fetchProfessoresList().catch(() => []);
+  const linhas = await Promise.all(lista.map(async p => { let s = null; try{ s = JSON.parse((await window.storage.get(`seg-status:${p.id}`, true)).value); }catch(e){} return { nome: p.displayName || p.email, email: p.email, ativo: !!p.activatedAt, s }; }));
+  let equipe = [];
+  try{ equipe = (await db.collection('equipe').get()).docs.map(d => d.id); }catch(e){}
+  st.status = { linhas, equipe, em: Date.now() };
+  st.carregando = false; render();
+}
+function renderSegurancaCard(){
+  const st = segState(); const u = segUsuario();
+  if(!st.status && !st.carregando) setTimeout(segCarregarStatus, 0);
+  const authOk = segAtivo();
+  const coordOk = u && u.email===SEG_EMAIL_COORD;
+  const linhas = (st.status && st.status.linhas) || [];
+  const confirmados = linhas.filter(l => l.s && l.s.verificado).length;
+  const passo = (ok, txt) => `<li style="margin:6px 0;">${ok ? '✅' : '⬜'} ${txt}</li>`;
+  return `<div class="card" data-seg-card>
+    <h3 style="margin-top:0;">🔐 Segurança dos dados (fase 1)</h3>
+    <p class="muted" style="font-size:.86rem; margin-top:0;">Hoje qualquer pessoa com conhecimento técnico consegue mexer no banco. Siga os passos para que só professores e coordenação possam alterar provas, notas, planos e cadastros.</p>
+    <ol style="padding-left:18px; font-size:.9rem; margin:0;">
+      ${passo(authOk && !SEG.anonimoErro, `No <a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/providers" target="_blank" rel="noopener">console do Firebase</a> → <strong>Authentication</strong> → <strong>Método de login</strong>, ative <strong>Anônimo</strong> e <strong>E-mail/senha</strong>. ${SEG.anonimoErro ? `<span style="color:#b3261e;">(ainda desligado: ${esc(SEG.anonimoErro)})</span>` : ''}`)}
+      ${passo(coordOk, `Saia e entre de novo na coordenação. ${coordOk ? `Código da coordenação (UID): <code data-seg-uid>${esc(u.uid)}</code>` : ''} ${SEG.coordErro ? `<span style="color:#b3261e;">${esc(SEG.coordErro)}</span>` : ''}`)}
+      ${passo(linhas.length && confirmados===linhas.filter(l => l.ativo).length && confirmados>0, `Cada professor entra uma vez no app e clica no link que chega no e-mail dele. <strong>${confirmados} de ${linhas.filter(l => l.ativo).length}</strong> professor(es) ativo(s) já confirmaram.`)}
+      ${passo(/✅/.test(st.teste||''), `Quando todos confirmarem, copie as regras abaixo e cole em <a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank" rel="noopener"><strong>Firestore → Regras</strong></a> → <strong>Publicar</strong>.`)}
+      ${passo(/✅/.test(st.teste||''), `Toque em <strong>Testar proteção</strong> para conferir. ${st.teste ? `<div style="margin-top:4px;">${esc(st.teste)}</div>` : ''}`)}
+    </ol>
+    <details style="margin-top:8px;"><summary style="cursor:pointer; font-size:.88rem;">👩‍🏫 Situação de cada professor</summary>
+      <div style="max-height:260px; overflow:auto; margin-top:6px;">${linhas.map(l => `<div data-seg-prof style="display:flex; justify-content:space-between; gap:8px; font-size:.85rem; border-bottom:1px solid #eee; padding:3px 0;"><span>${esc(l.nome)} <span class="muted">${esc(l.email)}</span></span><span>${l.s ? (l.s.verificado ? '✅ e-mail confirmado' : '⏳ falta clicar no link') : (l.ativo ? '⚪ ainda não entrou nesta versão' : '— não ativou o acesso')}</span></div>`).join('') || '<p class="muted">Nenhum professor cadastrado.</p>'}</div>
+      <button class="btn btn-ghost btn-sm" data-action="seg-atualizar" style="margin-top:6px;">↻ Atualizar</button>
+    </details>
+    <div class="row" style="gap:6px; flex-wrap:wrap; margin-top:10px;">
+      <button class="btn btn-primary btn-sm" data-action="seg-copiar-regras" ${coordOk ? '' : 'disabled title="Entre de novo na coordenação para gerar as regras com o seu código"'}>📋 Copiar regras</button>
+      <button class="btn btn-ghost btn-sm" data-action="seg-ver-regras">${st.mostrarRegras ? 'Esconder regras' : 'Ver regras'}</button>
+      <button class="btn btn-ghost btn-sm" data-action="seg-testar">🧪 Testar proteção</button>
+    </div>
+    ${st.mostrarRegras ? `<textarea readonly data-seg-regras style="width:100%; height:240px; font-family:monospace; font-size:.75rem; margin-top:8px;">${esc(segRegrasTexto(coordOk ? u.uid : ''))}</textarea>` : ''}
+    <p class="muted" style="font-size:.8rem; margin:8px 0 0;">O que esta fase ainda não resolve: as respostas das provas e as fichas continuam no aparelho do aluno, e um aluno com conhecimento técnico ainda poderia ler o gabarito. Para fechar isso é preciso a fase 2 (correção feita no servidor do Firebase).</p>
+  </div>`;
+}
+segIniciar();
+
+// Toda leitura/gravação espera o login no Firebase terminar (senão as regras recusariam)
+(function aguardarLogin(){
+  const b = window.storage;
+  let avisoEm = 0;
+  const negado = e => { const t = String((e && (e.code || e.message)) || ''); return /permission/i.test(t); };
+  window.storage = Object.assign({}, b);
+  ['get','set','delete','list','update'].forEach(m => {
+    window.storage[m] = async (...a) => {
+      await SEG_PRONTO;
+      try{ return await b[m](...a); }
+      catch(e){
+        if(negado(e) && m!=='get' && m!=='list' && Date.now() - avisoEm > 30000){
+          avisoEm = Date.now();
+          const pr = state.professor.session;
+          alert(pr ? '🔐 Não foi possível salvar: sua conta ainda não está liberada. Confirme o seu e-mail (link enviado pelo Firebase), saia e entre de novo no app.' : '🔐 Não foi possível salvar: esta ação é só para professores e coordenação.');
+        }
+        throw e;
+      }
+    };
+  });
+})();
+// Muda uma turma só (transação no documento dela). mexer(turma) devolve false para não gravar.
+async function turmaAtualizar(turmaId, mexer){
+  let resultado = null;
+  const tentar = () => window.storage.update(turmaDocChave(turmaId), raw => {
+    let t; try{ t = raw ? JSON.parse(raw) : null; }catch(e){ t = null; }
+    resultado = null;
+    if(!t) return undefined;
+    if(mexer(t)===false) return undefined;
+    resultado = t;
+    return JSON.stringify(t);
+  });
+  await window.storage.garantirTurmas();
+  await tentar();
+  if(resultado){
+    const lista = state.professor.turmas || [];
+    const i = lista.findIndex(x => x.id===turmaId);
+    if(i>=0) lista[i] = resultado; else lista.push(resultado);
+    if(state.aluno.turma && state.aluno.turma.id===turmaId) state.aluno.turma = resultado;
+  }
+  return resultado;
+}
 document.addEventListener('DOMContentLoaded', () => { if(navigator.onLine===false) setConnBanner('offline'); });
 
 /* -------- Instalação como app (PWA): manifesto e ícones gerados a partir do próprio logo -------- */
@@ -1392,21 +1745,18 @@ function computeConquistas(s){
 }
 async function registerStudentLogin(turmaId, studentId){
   const today = new Date().toISOString().slice(0,10);
-  let turmasFresh;
-  try{ const r = await window.storage.get('turmas', true); turmasFresh = JSON.parse(r.value); }catch(e){ turmasFresh = state.professor.turmas; }
-  const t = turmasFresh.find(x=>x.id===turmaId);
-  if(!t) return;
-  const s = t.students.find(x=>x.id===studentId);
-  if(!s) return;
-  ensureStudentGamification(s);
-  if(!s.loginLog.includes(today)){
-    s.loginLog.push(today);
-    await window.storage.set('turmas', JSON.stringify(turmasFresh), true);
-    state.professor.turmas = turmasFresh;
-    if(state.aluno.turma && state.aluno.turma.id===turmaId){
-      state.aluno.turma = turmasFresh.find(x=>x.id===turmaId);
-    }
-  }
+  const local = ((state.aluno.turma && state.aluno.turma.id===turmaId ? state.aluno.turma : (state.professor.turmas||[]).find(x=>x.id===turmaId)) || { students:[] }).students.find(x=>x.id===studentId);
+  if(local && Array.isArray(local.loginLog) && local.loginLog.includes(today)) return;
+  try{
+    await turmaAtualizar(turmaId, t => {
+      const s = (t.students||[]).find(x=>x.id===studentId);
+      if(!s) return false;
+      ensureStudentGamification(s);
+      if(s.loginLog.includes(today)) return false;
+      s.loginLog.push(today);
+      s.loginLog = s.loginLog.slice(-220);   // guarda só um ano letivo de dias de acesso
+    });
+  }catch(e){}
 }
 function studentAvatarHtml(s, size){
   ensureStudentGamification(s);
@@ -1447,13 +1797,9 @@ async function awardFichasLote(turmaId, itens){
   let temporada = null;
   try{ const t = await getTemporadaAtual(); if(isTemporadaAtiva(t)) temporada = t; }catch(e){}
   const sem = avSemanaChave();
-  let resultado = null, turmasNovas = null;
-  await window.storage.update('turmas', raw => {
-    let turmas; try{ turmas = raw ? JSON.parse(raw) : null; }catch(e){ turmas = null; }
-    resultado = null; turmasNovas = null;
-    if(!Array.isArray(turmas)) return undefined;
-    const t = turmas.find(x => x.id===turmaId);
-    if(!t) return undefined;
+  let resultado = null;
+  await turmaAtualizar(turmaId, t => {
+    resultado = null;
     const res = {};
     itens.forEach(it => {
       const s = (t.students||[]).find(x => x.id===it.studentId);
@@ -1471,14 +1817,9 @@ async function awardFichasLote(turmaId, itens){
       }
       res[it.studentId] = s.fichas;
     });
-    if(!Object.keys(res).length) return undefined;
-    resultado = res; turmasNovas = turmas;
-    return JSON.stringify(turmas);
+    if(!Object.keys(res).length) return false;
+    resultado = res;
   });
-  if(turmasNovas){
-    state.professor.turmas = turmasNovas;
-    if(state.aluno.turma && state.aluno.turma.id===turmaId) state.aluno.turma = turmasNovas.find(x => x.id===turmaId);
-  }
   return resultado;
 }
 async function awardFichas(turmaId, studentId, amount, motivo, categoria){
@@ -7518,6 +7859,7 @@ function renderProfessorInicio(){
   const liberacoesPendentes = p.unlockRequests.filter(r=>!r.released).length;
   return `
     ${renderGreetingHeader(p.session.displayName, 'Aqui está um resumo rápido do que precisa da sua atenção hoje.')}
+    ${segAvisoProfHtml()}
     ${renderInicioAulasCard()}
     ${renderDiarioCard()}
     ${renderUnidadeAtualCard()}
@@ -11132,11 +11474,15 @@ function renderCoordDashboard(){
       <div class="row" style="align-items:center; justify-content:space-between;">
         <h2>Painel executivo</h2>
         <div class="row" style="flex:0 0 auto; gap:8px;">
-          <button class="btn btn-ghost btn-sm" data-action="download-backup">Baixar backup completo</button>
+          <button class="btn btn-primary btn-sm" data-action="download-backup" data-modo="essencial" title="Todos os dados da escola, sem as imagens dos slides">💾 Fazer backup</button>
+          <button class="btn btn-ghost btn-sm" data-action="download-backup" data-modo="completo" title="Inclui também as imagens dos slides e os planos importados (arquivo maior)">Backup completo</button>
           <button class="btn btn-ghost btn-sm" data-action="coord-refresh-dashboard">Atualizar</button>
         </div>
       </div>
       <p class="muted">Visão geral da escola — atualizada sob demanda.</p>
+      ${backupResumoHtml()}
+      <details style="margin-top:8px;" ${backupState().restaurar ? 'open' : ''}><summary style="cursor:pointer; font-size:.85rem;">♻️ Restaurar um backup</summary>${backupRestaurarHtml()}</details>
+
       <div class="stat-grid" style="grid-template-columns:repeat(4,1fr);">
         ${cards.map(cd => `
           <div class="stat-card">
@@ -11224,6 +11570,7 @@ function renderCoordDashboard(){
         <button class="btn btn-ghost btn-sm" data-action="coord-limpar-slides-orfaos">Limpar imagens de slides órfãs</button>
       </div>
     </div>
+    ${renderSegurancaCard()}
   `;
 }
 
@@ -12992,60 +13339,137 @@ async function saveCoordPeriodos(){
   alert('Períodos salvos.');
 }
 
-async function downloadFullBackup(btn){
-  if(btn){ btn.disabled = true; btn.textContent = 'Gerando backup...'; }
-  const backup = { _meta: { exportedAt: new Date().toISOString(), version: 1 } };
-  // Todas as leituras do banco rodam em paralelo (antes eram centenas, uma atrás da outra) e o
-  // botão mostra o andamento em porcentagem.
-  let feitas = 0, total = 0;
-  let pctMax = 0;
-  const atualizarProgresso = () => { if(btn && total>0){ pctMax = Math.max(pctMax, Math.min(99, Math.round(feitas/total*100))); btn.textContent = `Gerando backup... ${pctMax}%`; } };
-  const lerJson = async (k) => {
-    try{ const r = await window.storage.get(k, true); return JSON.parse(r.value); }
-    catch(e){ return undefined; }
-    finally{ feitas++; atualizarProgresso(); }
-  };
-  const simpleKeys = ['turmas','professores','pin-liberacao','unlock-requests','periodos-avaliacao','livros-didaticos'];
-  const listar = async (prefixo) => { try{ const l = await window.storage.list(prefixo, true); return l.keys||[]; }catch(e){ return []; } };
-  const [chavesAssess, chavesResp] = await Promise.all([ listar('assessment:'), listar('responses:') ]);
-  total = simpleKeys.length + 1 + chavesAssess.length + chavesResp.length;
-  atualizarProgresso();
-
-  const [simples, senha, assessList, respList] = await Promise.all([
-    Promise.all(simpleKeys.map(lerJson)),
-    (async () => { try{ const r = await window.storage.get('coordenador-senha', true); return r.value; }catch(e){ return null; } finally{ feitas++; atualizarProgresso(); } })(),
-    Promise.all(chavesAssess.map(lerJson)),
-    Promise.all(chavesResp.map(lerJson))
-  ]);
-  simpleKeys.forEach((k,i) => { backup[k] = simples[i]===undefined ? null : simples[i]; });
-  backup['coordenador-senha'] = senha;
-  backup['assessments'] = {};
-  chavesAssess.forEach((k,i) => { if(assessList[i]!==undefined) backup['assessments'][k] = assessList[i]; });
-  backup['responses'] = {};
-  chavesResp.forEach((k,i) => { if(respList[i]!==undefined) backup['responses'][k] = respList[i]; });
-
-  backup['disciplinas'] = {};
-  backup['questionBanks'] = {};
-  backup['pesosInstrumentos'] = {};
-  const professores = backup['professores'] || [];
-  total += professores.length*3; atualizarProgresso();
-  await Promise.all(professores.map(async prof => {
-    const [d, qb, pi] = await Promise.all([ lerJson(`disciplinas:${prof.id}`), lerJson(`question-bank:${prof.id}`), lerJson(`pesos-instrumentos:${prof.id}`) ]);
-    if(d!==undefined) backup['disciplinas'][prof.id] = d;
-    if(qb!==undefined) backup['questionBanks'][prof.id] = qb;
-    if(pi!==undefined) backup['pesosInstrumentos'][prof.id] = pi;
-  }));
-
-  const blob = new Blob([JSON.stringify(backup, null, 2)], { type:'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `backup-sala-avaliacoes-${new Date().toISOString().slice(0,10)}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  if(btn){ btn.disabled = false; btn.textContent = 'Baixar backup completo'; }
+// ---------------- BACKUP: exportar e restaurar tudo ----------------
+// Formato 2: { _meta, docs: { chave: valorTexto } } — cópia fiel do banco (cada documento como está).
+// "Essencial" deixa de fora só o que é pesado e se refaz sozinho (imagens dos slides, planos importados) ou é passageiro (aula ao vivo).
+const BACKUP_FORA_ESSENCIAL = ['slide-img:', 'plano-livro-img:', 'plano-livro:', 'turmas-antigo-backup',
+  'aula-viva', 'quiz-resp:', 'slides-eng:', 'enquete-ativa:', 'quiz-ativo:', 'roleta-ativa:', 'duelo-ativo:', 'slides-sessao-ativa:'];
+function backupState(){ const c = state.coordenador; if(!c.backup) c.backup = { ultimo:null, carregado:false, restaurar:null, msg:'', erro:'', progresso:null }; return c.backup; }
+async function backupCarregarUltimo(){
+  const b = backupState(); if(b.carregando) return; b.carregando = true;
+  try{ const r = await window.storage.get('backup-ultimo', true); b.ultimo = JSON.parse(r.value); }catch(e){ b.ultimo = null; }
+  b.carregado = true; b.carregando = false; render();
+}
+function backupResumoHtml(){
+  const b = backupState();
+  if(!b.carregado){ setTimeout(backupCarregarUltimo, 0); }
+  const dias = b.ultimo ? Math.floor((Date.now() - b.ultimo.at) / 86400000) : null;
+  const alerta = dias==null || dias > 7;
+  return `<div data-backup-resumo style="margin-top:10px; font-size:.85rem; border-radius:8px; padding:8px 10px; background:${alerta?'#fdecec':'#eef7f0'};">
+    💾 ${b.ultimo ? `Último backup: <strong>${new Date(b.ultimo.at).toLocaleDateString('pt-BR')}</strong> (${dias===0?'hoje':dias===1?'ontem':'há '+dias+' dias'}, ${b.ultimo.total} documentos${b.ultimo.por?', por '+esc(b.ultimo.por):''})` : '<strong>Nenhum backup feito ainda.</strong>'}
+    ${alerta ? ' — <strong style="color:#b3261e;">faça um backup agora</strong> e guarde o arquivo num lugar seguro (pendrive ou Google Drive da escola). O ideal é uma vez por semana.' : ''}
+    ${b.msg ? `<div style="margin-top:4px; color:#1d6b31;">${esc(b.msg)}</div>` : ''}${b.erro ? `<div style="margin-top:4px; color:#b3261e;">${esc(b.erro)}</div>` : ''}
+  </div>`;
+}
+async function backupTodosOsDocs(){
+  const base = window.__storageBase || window.storage;
+  const r = await base.list('', true);
+  const out = {};
+  for(const k of (r.keys||[])){
+    let v = r.values ? r.values[k] : undefined;
+    if(v===undefined){ try{ v = (await base.get(k, true)).value; }catch(e){ v = undefined; } }
+    if(v!==undefined && v!==null) out[k] = v;
+  }
+  return out;
+}
+async function downloadFullBackup(btn, modo){
+  modo = modo || 'essencial';
+  const b = backupState(); b.msg = ''; b.erro = '';
+  const txt = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Gerando backup…'; }
+  try{
+    await window.storage.garantirTurmas();
+    const todos = await backupTodosOsDocs();
+    const docs = {};
+    Object.entries(todos).forEach(([k, v]) => {
+      if(modo==='essencial' && BACKUP_FORA_ESSENCIAL.some(p => k.startsWith(p))) return;
+      docs[k] = v;
+    });
+    const total = Object.keys(docs).length;
+    const quem = state.coordenador.session ? 'Coordenação' : (state.professor.session ? state.professor.session.displayName : '');
+    const pacote = { _meta: { versao: 2, app: 'Sala de Avaliações', escola: 'CEETIP Governador Marcelo Déda Chagas - DRE04', exportadoEm: new Date().toISOString(), modo, total }, docs };
+    const blob = new Blob([JSON.stringify(pacote)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `backup-sala-avaliacoes-${new Date().toISOString().slice(0,10)}${modo==='completo'?'-completo':''}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    const reg = { at: Date.now(), total, modo, por: quem, tamanhoKB: Math.round(blob.size/1024) };
+    try{ await window.storage.set('backup-ultimo', JSON.stringify(reg), true); }catch(e){}
+    b.ultimo = reg; b.carregado = true;
+    b.msg = `✅ Backup ${modo} baixado (${total} documentos, ${reg.tamanhoKB > 1024 ? (reg.tamanhoKB/1024).toFixed(1)+' MB' : reg.tamanhoKB+' KB'}). Guarde o arquivo em local seguro: ele tem dados pessoais dos alunos.`;
+  }catch(e){ b.erro = 'Não consegui gerar o backup: ' + ((e && e.message) || e) + '. Confira a internet e tente de novo.'; }
+  if(btn){ btn.disabled = false; btn.textContent = txt; }
+  render();
+}
+// Backup antigo (versão 1, do botão "Baixar backup completo" anterior) → documentos
+function backupV1ParaDocs(o){
+  const docs = {};
+  ['professores','pin-liberacao','unlock-requests','periodos-avaliacao','livros-didaticos'].forEach(k => { if(o[k]!=null) docs[k] = JSON.stringify(o[k]); });
+  if(o['coordenador-senha']!=null) docs['coordenador-senha'] = typeof o['coordenador-senha']==='string' ? o['coordenador-senha'] : JSON.stringify(o['coordenador-senha']);
+  Object.entries(o.assessments||{}).forEach(([k, v]) => docs[k] = JSON.stringify(v));
+  Object.entries(o.responses||{}).forEach(([k, v]) => docs[k] = JSON.stringify(v));
+  Object.entries(o.disciplinas||{}).forEach(([id, v]) => docs[`disciplinas:${id}`] = JSON.stringify(v));
+  Object.entries(o.questionBanks||{}).forEach(([id, v]) => docs[`question-bank:${id}`] = JSON.stringify(v));
+  Object.entries(o.pesosInstrumentos||{}).forEach(([id, v]) => docs[`pesos-instrumentos:${id}`] = JSON.stringify(v));
+  return { docs, turmas: Array.isArray(o.turmas) ? o.turmas : null };
+}
+async function backupLerArquivo(file){
+  const b = backupState(); b.erro = ''; b.msg = ''; b.restaurar = null;
+  let o; try{ o = JSON.parse(await file.text()); }catch(e){ b.erro = 'Esse arquivo não é um backup válido (.json).'; render(); return; }
+  let pac;
+  if(o && o._meta && o._meta.versao===2 && o.docs) pac = { docs: o.docs, turmas: null, meta: o._meta };
+  else if(o && o._meta && (o.turmas || o.assessments)) { const v1 = backupV1ParaDocs(o); pac = { docs: v1.docs, turmas: v1.turmas, meta: { versao:1, exportadoEm: o._meta.exportedAt, total: Object.keys(v1.docs).length + (v1.turmas ? 1 : 0) } }; }
+  else { b.erro = 'Não reconheci esse arquivo como backup da Sala de Avaliações.'; render(); return; }
+  b.restaurar = { nome: file.name, ...pac, modo: 'faltando', confirmacao: '' };
+  render();
+}
+function backupRestaurarHtml(){
+  const b = backupState(); const r = b.restaurar;
+  return `<div class="card" data-backup-restaurar>
+    <h3 style="margin-top:0;">♻️ Restaurar um backup</h3>
+    <p class="muted" style="font-size:.86rem; margin-top:0;">Use se algo foi apagado ou estragado. Escolha o arquivo .json do backup.</p>
+    <label class="btn btn-ghost btn-sm" style="cursor:pointer;">📂 Escolher arquivo de backup<input type="file" id="backup-restaurar-input" accept="application/json,.json" style="display:none;"></label>
+    ${r ? `<div style="margin-top:10px; font-size:.9rem;">
+        <div>Arquivo: <strong>${esc(r.nome)}</strong> · gerado em ${r.meta.exportadoEm ? new Date(r.meta.exportadoEm).toLocaleString('pt-BR') : '?'} · ${Object.keys(r.docs).length + (r.turmas?1:0)} documento(s)${r.meta.versao===1?' (formato antigo)':''}</div>
+        <label style="display:block; margin-top:8px; text-transform:none; font-weight:400; cursor:pointer;"><input type="radio" name="backup-modo" data-action="backup-modo" value="faltando" ${r.modo==='faltando'?'checked':''} style="width:auto;"> <strong>Só recuperar o que está faltando</strong> (recomendado: não mexe no que existe hoje)</label>
+        <label style="display:block; margin-top:4px; text-transform:none; font-weight:400; cursor:pointer;"><input type="radio" name="backup-modo" data-action="backup-modo" value="tudo" ${r.modo==='tudo'?'checked':''} style="width:auto;"> <strong>Voltar tudo para como estava no backup</strong> (substitui o que existe hoje — o que foi feito depois do backup se perde)</label>
+        <label style="display:block; margin-top:8px; font-size:.85rem;">Para confirmar, digite <strong>RESTAURAR</strong>: <input id="backup-confirmacao" value="${esc(r.confirmacao||'')}" style="width:160px; display:inline-block;"></label>
+        <button class="btn btn-primary btn-sm" data-action="backup-restaurar" style="margin-top:8px;" ${b.progresso?'disabled':''}>${b.progresso ? `⏳ Restaurando… ${b.progresso.feitos}/${b.progresso.total}` : '♻️ Restaurar agora'}</button>
+        <button class="btn btn-ghost btn-sm" data-action="backup-cancelar" style="margin-top:8px;">Cancelar</button>
+      </div>` : ''}
+  </div>`;
+}
+async function backupRestaurar(){
+  const b = backupState(); const r = b.restaurar; if(!r) return;
+  const conf = (document.getElementById('backup-confirmacao')||{}).value || '';
+  if(conf.trim().toUpperCase()!=='RESTAURAR'){ b.erro = 'Digite RESTAURAR para confirmar.'; render(); return; }
+  b.erro = ''; b.msg = '';
+  const base = window.__storageBase || window.storage;
+  let existentes = new Set();
+  if(r.modo==='faltando'){ try{ existentes = new Set(((await base.list('', true)).keys)||[]); }catch(e){ b.erro = 'Não consegui ler o banco atual. Confira a internet.'; render(); return; } }
+  const lista = Object.entries(r.docs).filter(([k]) => r.modo==='tudo' || !existentes.has(k));
+  b.progresso = { feitos:0, total: lista.length + (r.turmas?1:0) }; render();
+  let falhas = 0;
+  for(const [k, v] of lista){
+    try{ await base.set(k, v, true); }catch(e){ falhas++; }
+    b.progresso.feitos++; if(b.progresso.feitos % 10===0) render();
+  }
+  if(r.turmas){
+    try{
+      if(r.modo==='tudo') await window.storage.set('turmas', JSON.stringify(r.turmas), true);
+      else {
+        let atuais = []; try{ atuais = JSON.parse((await window.storage.get('turmas', true)).value); }catch(e){}
+        const faltam = r.turmas.filter(t => !atuais.some(a => a.id===t.id));
+        if(faltam.length) await window.storage.set('turmas', JSON.stringify([...atuais, ...faltam]), true);
+      }
+    }catch(e){ falhas++; }
+    b.progresso.feitos++;
+  }
+  b.progresso = null;
+  b.msg = `✅ Restauração concluída: ${lista.length + (r.turmas?1:0) - falhas} documento(s) gravado(s)${falhas ? `, ${falhas} com erro (tente de novo)` : ''}. Recarregue a página para ver os dados.`;
+  b.restaurar = null;
+  render();
 }
 
 async function calcExecDashboard(){
@@ -13577,6 +14001,7 @@ async function submitCoordLogin(){
     }
   } else { ok = (val === 'coord123'); }
   if(ok){
+    await segEntrarCoordenacao(val);
     await clearLoginFailures('coordenador', 'global');
     c.session = true; c.error='';
     render();
@@ -13686,6 +14111,7 @@ async function addProfessor(){
   list.push({ id: cryptoId(), email, disciplina, displayName:null, passwordHash:null, createdAt: Date.now(), activatedAt:null });
   await saveProfessoresListRaw(list);
   c.professores = list;
+  segSincronizarEquipe().catch(()=>{});
   render();
 }
 async function removeProfessor(id){
@@ -13696,6 +14122,7 @@ async function removeProfessor(id){
   const filtered = list.filter(p=>p.id!==id);
   await saveProfessoresListRaw(filtered);
   c.professores = filtered;
+  segSincronizarEquipe().catch(()=>{});
   if(rec) await moveToTrash('professor', rec.displayName || rec.email || 'Professor', rec);
   render();
 }
@@ -13945,6 +14372,7 @@ async function saveCoordPassword(){
   const newSalt = randomSaltHex();
   await window.storage.set('coordenador-senha-salt', newSalt, true);
   await window.storage.set('coordenador-senha', await hashTextSalted(val, newSalt), true);
+  await segTrocarSenhaCoordenacao(val);
   c.error='';
   c.changingPassword=false;
   render();
@@ -17425,6 +17853,7 @@ async function restaurarSessao(){
     if(s.role==='professor'){
       const rec = (await fetchProfessoresList()).find(x => x.id===s.id);
       if(!rec || !rec.passwordHash){ limparSessaoLocal(); return; }
+      if(segAtivo()){ const u = segUsuario(); if(!u || u.isAnonymous || u.email!==(rec.email||'').toLowerCase()){ limparSessaoLocal(); return; } }
       const p = state.professor;
       p.session = { id: rec.id, email: rec.email, displayName: rec.displayName, disciplina: rec.disciplina, coordNote: rec.coordNote||null, coordNoteDismissed:false, avatarEmoji: rec.avatarEmoji||null, avatarColor: rec.avatarColor||null, photoUrl: rec.photoUrl||null };
       state.view = 'professor';
@@ -17679,7 +18108,17 @@ async function submitLoginPassword(){
       await saveProfessoresListRaw(list);
     }
   }
+  if(!hashOk && segAtivo()){
+    // senha nova criada pelo link "redefinir" do Firebase: vale se a conta de segurança aceitar e o e-mail estiver confirmado
+    const r = await segEntrarComEmail((rec.email||'').toLowerCase(), pass);
+    if(r.ok && segUsuario() && segUsuario().emailVerified){
+      hashOk = true;
+      rec.passwordSalt = randomSaltHex(); rec.passwordHash = await hashTextSalted(pass, rec.passwordSalt);
+      try{ await saveProfessoresListRaw(list); }catch(e){}
+    } else if(r.ok){ await segSair(); }
+  }
   if(!hashOk){ p.loginError = 'Senha incorreta.'; await registerLoginFailure('professor', rec.email); render(); return; }
+  await segEntrarProfessor(rec, pass);
   await clearLoginFailures('professor', rec.email);
   p.session = { id: rec.id, email: rec.email, displayName: rec.displayName, disciplina: rec.disciplina, coordNote: rec.coordNote||null, coordNoteDismissed:false, avatarEmoji: rec.avatarEmoji||null, avatarColor: rec.avatarColor||null, photoUrl: rec.photoUrl||null };
   p.loginError = '';
@@ -17707,7 +18146,12 @@ async function submitLoginSetup(){
   rec.avatarEmoji = p.setupAvatarEmoji || null;
   rec.avatarColor = p.setupAvatarColor || null;
   rec.photoUrl = null;
-  await saveProfessoresListRaw(list);
+  const segR = await segEntrarProfessor(rec, pass);
+  try{ await saveProfessoresListRaw(list); }
+  catch(e){
+    p.loginError = '📧 Quase lá! Enviamos um link para ' + rec.email + '. Abra o e-mail, clique no link para confirmar e depois volte aqui e faça este cadastro de novo, com a mesma senha.';
+    render(); return;
+  }
   p.session = { id: rec.id, email: rec.email, displayName: name, disciplina: rec.disciplina, coordNote: rec.coordNote||null, coordNoteDismissed:false, avatarEmoji: rec.avatarEmoji, avatarColor: rec.avatarColor, photoUrl: rec.photoUrl };
   p.loginError = '';
   p.setupName = ''; p.setupPassword = ''; p.setupPassword2 = '';
@@ -17750,7 +18194,8 @@ function coordVoltarCoordenacao(){
 }
 function logoutProfessor(){
   const p = state.professor;
-  if(p.session && !p.session.viaCoord) limparSessaoLocal('professor');
+  if(p.session && !p.session.viaCoord){ limparSessaoLocal('professor'); const u = segUsuario(); if(u && u.email && u.email===(p.session.email||'').toLowerCase()) segSair(); }
+  SEG.avisoProf = '';
   p.session = null;
   p.loginStage = 'email';
   p.loginEmail = '';
@@ -23250,6 +23695,7 @@ document.addEventListener('click', (e) => {
   else if(w.dataset.tocar) avAlunoToque(x, y);
 });
 document.addEventListener('input', (e) => {
+  if(e.target.id==='backup-confirmacao'){ const r = backupState().restaurar; if(r) r.confirmacao = e.target.value; }
   if(e.target.id==='av-duvida-txt') state.aluno.avDuvidaTxt = e.target.value;
   if(e.target.id==='av-nuvem-txt'){ avMeu().nuvemRascunho = e.target.value; }
 });
@@ -24793,7 +25239,7 @@ document.addEventListener('click', (e) => {
   else if(act==='setup-avatar-emoji'){ p.setupAvatarEmoji = btn.dataset.emoji; render(); }
   else if(act==='setup-avatar-color'){ p.setupAvatarColor = btn.dataset.color; render(); }
   else if(act==='coord-login-submit'){ submitCoordLogin(); }
-  else if(act==='coord-logout'){ state.coordenador.session=false; state.coordenador.error=''; state.view='landing'; render(); resetIdleLogoutTimer(); }
+  else if(act==='coord-logout'){ segSair(); state.coordenador.session=false; state.coordenador.error=''; state.view='landing'; render(); resetIdleLogoutTimer(); }
   else if(act==='freq-login-submit'){ submitFreqMonitorLogin(); }
   else if(act==='freq-logout'){ state.freqMonitor.session=false; state.freqMonitor.error=''; state.freqMonitor.senhaInput=''; state.view='landing'; render(); resetIdleLogoutTimer(); }
   else if(act==='freq-monitor-subview'){ state.freqMonitor.subview = btn.dataset.sub; render(); }
@@ -24908,7 +25354,15 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-limpar-liberacoes'){ limparLiberacoesAntigas(); }
   else if(act==='coord-encerrar-atividades-travadas'){ encerrarAtividadesTravadas(); }
   else if(act==='coord-limpar-slides-orfaos'){ limparImagensOrfasDeSlides(); }
-  else if(act==='download-backup'){ downloadFullBackup(btn); }
+  else if(act==='download-backup'){ downloadFullBackup(btn, btn.dataset.modo); }
+  else if(act==='backup-restaurar'){ backupRestaurar(); }
+  else if(act==='seg-reenviar'){ segReenviarConfirmacao(); }
+  else if(act==='seg-redefinir'){ segRedefinirSenha(btn.dataset.email); }
+  else if(act==='seg-atualizar'){ segState().status = null; segCarregarStatus(); }
+  else if(act==='seg-ver-regras'){ const st = segState(); st.mostrarRegras = !st.mostrarRegras; render(); }
+  else if(act==='seg-testar'){ segTestarProtecao(); }
+  else if(act==='seg-copiar-regras'){ const u = segUsuario(); const txt = segRegrasTexto(u ? u.uid : ''); (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(() => alert('Regras copiadas! Cole no Firebase em Firestore → Regras e toque em Publicar.')).catch(() => { segState().mostrarRegras = true; render(); alert('Não consegui copiar sozinho: selecione o texto das regras e copie.'); }); }
+  else if(act==='backup-cancelar'){ backupState().restaurar = null; render(); }
   else if(act==='coord-save-periodos'){ saveCoordPeriodos(); }
   else if(act==='coord-add-professor'){ addProfessor(); }
   else if(act==='coord-remove-professor'){ removeProfessor(btn.dataset.id); }
@@ -25729,6 +26183,8 @@ document.addEventListener('change', (e) => {
   const p = state.professor, al = state.aluno, c = state.coordenador;
   if(act==='biblio-categoria'){ const f = state.biblioteca.formLivro; if(f){ biblioGuardarCampos(); if(el.value==='__outra'){ f.categoriaOutra = true; f.categoria = f.categoriaNova||''; } else { f.categoriaOutra = false; f.categoria = el.value; } render(); } return; }
   if(el.id==='plano-import-input'){ if(el.files[0]) importarPlanoLivro(el.files[0]); el.value=''; return; }
+  if(el.id==='backup-restaurar-input'){ if(el.files[0]) backupLerArquivo(el.files[0]); el.value=''; return; }
+  if(el.dataset && el.dataset.action==='backup-modo'){ const r = backupState().restaurar; if(r){ r.modo = el.value; render(); } return; }
   if(el.id==='plano-slides-input'){ const s=planoState(); const fs=Array.from(el.files||[]); el.value=''; enviarSlidesPlano(fs, s.turmaPlano[s.turmaSel]); return; }
   if(act==='plano-slide-unico'){ const s=planoState(); const fs=Array.from(el.files||[]); el.value=''; enviarSlidesPlano(fs, s.turmaPlano[s.turmaSel], parseInt(el.dataset.n)); return; }
   if(act==='plano-turma-versao'){ definirPlanoTurma(el.dataset.tid, el.value); return; }
