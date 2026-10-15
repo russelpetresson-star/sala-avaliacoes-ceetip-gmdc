@@ -673,7 +673,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-15-1800</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-15-2100</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -1124,7 +1124,7 @@ const SEG_EMAIL_COORD = 'coordenacao@sala-ceetip.app';
 const SEG_SO_EQUIPE_PREFIXOS = ['assessment', 'pesos-instrumentos', 'notas-manuais', 'bloco-lancamentos', 'disciplinas', 'question-bank',
   'plano-livro', 'plano-livro-parte', 'plano-livro-img', 'plano-livro-prog', 'plano-livro-slides', 'plano-livro-videos', 'plano-config', 'plano-visto',
   'plano-termometro', 'slide-img', 'gemini-api-key-professor', 'avulso-respostas', 'aula-viva', 'seg-teste'];
-const SEG_SO_EQUIPE_CHAVES = ['professores', 'coordenador-senha', 'coordenador-senha-salt', 'pin-liberacao', 'periodos-avaliacao', 'socio-config',
+const SEG_SO_EQUIPE_CHAVES = ['recursos-config', 'professores', 'coordenador-senha', 'coordenador-senha-salt', 'pin-liberacao', 'periodos-avaliacao', 'socio-config',
   'sessao-config', 'gabaritos-avulsos', 'gemini-api-key', 'temporada-atual', 'slides-decks', 'avisos', 'cronograma', 'dias-letivos',
   'turno-horarios', 'livros-didaticos', 'materiais-turma', 'tarefas', 'mapasmentais', 'lixeira', 'backup-ultimo', 'areas-disciplinas',
   'busca-ativa-vinculos', 'plano-livro-index', 'plano-livro-regras', 'plano-livro-turmas', 'plano-livro-icones', 'blocos-provas',
@@ -1586,25 +1586,21 @@ const AVATAR_COLORS = ['#5c1a2b','#2b6f76','#c98a2c','#3a6b35','#4a4a8a','#a8327
 /* ---------------- TOUR GUIADO ---------------- */
 const TOUR_STEPS = {
   professor: [
-    { icon:'👋', title:'Bem-vindo(a)!', text:'Vamos fazer um tour rápido pelas principais áreas do painel do professor. Você pode pular a qualquer momento.' },
-    { icon:'👥', title:'Turmas e Disciplinas', text:'Antes de criar avaliações, cadastre suas turmas (com a lista de alunos) e as disciplinas que você leciona, no menu lateral.' },
-    { icon:'📝', title:'Avaliações', text:'Crie provas com questões de múltipla escolha, verdadeiro/falso ou dissertativas. Compartilhe o código com a turma e receba as respostas já corrigidas.' },
-    { icon:'🤖', title:'Criar questões com IA', text:'No Banco de Questões, use a IA para gerar questões por tema, importar de um PDF (livro ou lista de exercícios) ou de um texto colado. Revise sempre o gabarito antes de usar. Precisa estar configurada pela coordenação (é gratuita).' },
-    { icon:'🧮', title:'Nota final e Recuperação Paralela', text:'Em cada turma, calcule a Nota Final do bimestre (NP1 + NP2). Alunos abaixo de 5 aparecem destacados como "Recuperação Paralela". Crie uma avaliação do tipo "Recuperação Paralela" : para quem a responder, vale a maior nota entre a recuperação e o NP1. Se alguma nota estiver errada, use "✏️ Editar notas manualmente" para corrigir qualquer instrumento na hora.' },
-    { icon:'🖨️', title:'Bloco de Provas e Gabarito Avulso', text:'Imprima provas em papel com cartão-resposta com QR code, ou monte um "Gabarito Avulso" para provas integradas com várias disciplinas no mesmo cartão.' },
-    { icon:'🔍', title:'Leitura de Gabaritos', text:'Depois de aplicar a prova em papel, fotografe o cartão-resposta preenchido pelo celular — o sistema lê e lança a nota automaticamente.' },
-    { icon:'📣', title:'Atividades ao vivo', text:'Enquete Relâmpago, Quiz por Equipes, Roleta de Sorteio e Apresentação de Slides deixam a aula mais interativa — os alunos participam pelo próprio tablet.' },
-    { icon:'🗂️', title:'Menu organizado por assunto', text:'O menu lateral está dividido em grupos: Avaliações & Notas, Turmas & Frequência, Professores, Acompanhamento do Aluno, Protagonismo, Comunicação, Provas em Papel, Recursos de Aula e Configurações (no fim). Também dá para digitar na busca do menu.' },
-    { icon:'⭐', title:'Atalhos favoritos', text:'Passe o mouse sobre um item do menu lateral e clique na estrelinha para fixá-lo no topo — assim as áreas que você mais usa ficam sempre à mão.' },
-    { icon:'🗑️', title:'Lixeira', text:'Excluiu algo por engano? Turmas, disciplinas, questões do banco e notas ficam guardadas na Lixeira por 30 dias e podem ser restauradas a qualquer momento.' },
-    { icon:'👤', title:'Meu perfil', text:'A qualquer momento, clique em "Meu perfil" no topo da tela para trocar sua foto ou escolher um avatar. Pronto — bom trabalho!' },
+    { icon:'👋', title:'Bem-vindo(a)!', text:'Vamos fazer um tour rápido. O menu tem só 5 partes, organizadas pela sua rotina. Você pode pular a qualquer momento.' },
+    { icon:'🏠', title:'Hoje', text:'Começa aqui: a aula de hoje de cada turma (com o botão para abrir e apresentar), a chamada e o que está esperando você — liberações, vistos e correções.' },
+    { icon:'👥', title:'Minhas turmas', text:'Tudo de uma turma em abas: Aulas do plano (slides, exercícios, diagnóstica, prova e recuperação), Notas e desempenho, Alunos (com o apoio ♿), Chamada e Frequência.' },
+    { icon:'📝', title:'Avaliações', text:'Crie provas em “+ Nova avaliação”, use o Banco de questões (com IA), imprima prova em papel, leia gabaritos pela câmera e atenda pedidos de liberação.' },
+    { icon:'🧮', title:'Notas', text:'Nota Final do bimestre = NP1 (avaliação) + NP2 (diagnóstica + exercícios + autoavaliação), com os pesos que você escolhe em Ajustes. Abaixo de 5 aparece como Recuperação Paralela.' },
+    { icon:'🧰', title:'Ferramentas', text:'Quiz, enquete, roleta, duelo, mapa mental, mural, materiais e tarefas ficam numa grade só. Muitos deles também aparecem prontos dentro dos slides da aula ao vivo.' },
+    { icon:'⚙️', title:'Ajustes', text:'Disciplinas e turmas que você leciona, pesos das notas e a Lixeira (itens excluídos ficam 30 dias e podem ser restaurados).' },
+    { icon:'👤', title:'Meu perfil', text:'No topo da tela você troca a foto ou o avatar. Pronto — bom trabalho!' },
   ],
   aluno: [
-    { icon:'👋', title:'Bem-vindo(a)!', text:'Agora que você já criou sua senha e escolheu seu avatar, vamos conhecer rapidinho o seu painel.' },
-    { icon:'📝', title:'Suas provas', text:'No painel você encontra as provas pendentes e as já realizadas, com os resultados assim que o professor liberar.' },
-    { icon:'📣', title:'Atividades da turma', text:'Quando o professor ativar uma enquete, quiz, roleta ou apresentação de slides, ela aparece aqui automaticamente para você participar.' },
-    { icon:'🏅', title:'Fichas e ranking', text:'Você ganha fichas participando das atividades da turma. Acompanhe sua pontuação e o ranking da turma no painel.' },
-    { icon:'📘', title:'Materiais de aula', text:'Reveja, no seu tempo, os slides que o professor já apresentou em sala. Bons estudos!' },
+    { icon:'👋', title:'Bem-vindo(a)!', text:'Agora que você já criou sua senha e escolheu seu avatar, vamos conhecer rapidinho o seu painel. Ele tem 5 partes no menu.' },
+    { icon:'🏠', title:'Início', text:'O que você precisa fazer agora: revisão rápida, prazos que estão chegando, desafios e o ranking da turma. Quando o professor começar uma aula ao vivo, ela aparece no topo.' },
+    { icon:'📝', title:'Provas e notas', text:'Suas provas pendentes e feitas, o boletim com as notas de cada bimestre e a avaliação socioemocional.' },
+    { icon:'📖', title:'Estudar', text:'As aulas que já foram dadas, com slides, mapa mental e treino das questões que você errou. Também ficam aqui tarefas, materiais e o livro didático.' },
+    { icon:'🏅', title:'Escola e Eu', text:'Em Escola: dúvidas, monitoria e transporte. Em Eu: suas conquistas, portfólio e diário de bordo. Você ganha fichas participando. Bons estudos!' },
   ],
   coordenador: [
     { icon:'👋', title:'Bem-vindo(a)!', text:'Vamos fazer um tour rápido pelo painel do coordenador. Você pode pular a qualquer momento.' },
@@ -2454,6 +2450,178 @@ function initCampanhaCarousel(){
   }
 }
 
+/* ======================= MENU ENXUTO (professor e aluno) =======================
+   Em vez de ~28 itens no menu, 5 seções. Cada seção mostra abas no topo com as telas dela.
+   As telas continuam as mesmas (p.subview / al.subview); só muda a forma de chegar nelas. */
+// Recursos que a coordenação pode desligar para a escola toda (somem dos menus; nada é apagado).
+const RECURSOS = [
+  { id:'quiz', icon:'🎮', label:'Quiz por Equipes', desc:'Perguntas no telão, equipes respondem', prof:'quiz', grupo:'sala' },
+  { id:'enquete', icon:'📣', label:'Enquete Relâmpago', desc:'Pergunta rápida e votação ao vivo', prof:'enquete', grupo:'sala' },
+  { id:'roleta', icon:'🎡', label:'Roleta de Sorteio', desc:'Sorteia alunos ou temas', prof:'roleta', grupo:'sala' },
+  { id:'duelo', icon:'⚔️', label:'Modo Duelo', desc:'Dois alunos disputam ao vivo', prof:'duelo', grupo:'sala' },
+  { id:'slides', icon:'🖥️', label:'Slides avulsos', desc:'Apresentar PDFs fora do plano', prof:'slides', grupo:'sala' },
+  { id:'ra', icon:'🕶️', label:'Realidade Aumentada', desc:'Modelos 3D pelo tablet', prof:'ra', aluno:'ra', grupo:'sala' },
+  { id:'livros', icon:'📘', label:'Livro Didático', desc:'O livro digital da disciplina', prof:'livros', grupo:'conteudo' },
+  { id:'mapas', icon:'🧠', label:'Mapa Mental', desc:'Mapas para os alunos completarem', prof:'mapas', aluno:'mapas', grupo:'conteudo' },
+  { id:'cronograma', icon:'📅', label:'Cronograma de Aulas', desc:'Agenda de aulas fora do plano', prof:'cronograma', aluno:'cronograma', grupo:'conteudo' },
+  { id:'mural', icon:'📌', label:'Mural de Avisos', desc:'Recados para as turmas', prof:'mural', grupo:'turma' },
+  { id:'material', icon:'📎', label:'Material da Turma', desc:'Arquivos e links para os alunos', prof:'material', aluno:'materiais', grupo:'turma' },
+  { id:'tarefas', icon:'🗂️', label:'Tarefas', desc:'Trabalhos com entrega e rubrica', prof:'tarefas', aluno:'tarefas', grupo:'turma' },
+  { id:'duvidas', icon:'❓', label:'Mural de Dúvidas', desc:'Perguntas dos alunos', prof:'duvidas', aluno:'duvidas', grupo:'turma' },
+  { id:'diario', icon:'📷', label:'Diário de Bordo', desc:'Registro do aluno com fotos', aluno:'diario' },
+  { id:'revisaocolegas', icon:'🔎', label:'Revisão de Colegas', desc:'Um aluno avalia o trabalho do outro', aluno:'revisao' },
+  { id:'monitoria', icon:'🧑‍🏫', label:'Monitoria', desc:'Alunos ajudam colegas', aluno:'monitoria' },
+  { id:'buscaativa', icon:'🚌', label:'Busca Ativa e Transporte', desc:'Avisos de falta e transporte', aluno:'buscaativa' },
+  { id:'campanha', icon:'📢', label:'Jovens Protagonistas', desc:'Campanhas feitas pelos alunos', aluno:'campanha' },
+  { id:'portfolio', icon:'🗂️', label:'Portfólio', desc:'Trabalhos do aluno reunidos', aluno:'portfolio' },
+  { id:'conquistas', icon:'🏅', label:'Hall de Conquistas', desc:'Medalhas e destaques', aluno:'conquistas' },
+  { id:'biblioteca', icon:'📚', label:'Biblioteca', desc:'Empréstimos de livros', aluno:'biblioteca' },
+];
+const FERR_GRUPOS = [['sala','🎯 Para usar na sala'], ['conteudo','📚 Conteúdo'], ['turma','💬 Comunicação com a turma']];
+function recursosState(){
+  const u = state.ui; if(!u.recursos) u.recursos = { ocultos: null, carregando: false };
+  if(u.recursos.ocultos===null && !u.recursos.carregando){
+    u.recursos.carregando = true;
+    planoLerJson('recursos-config', {}).then(c => { u.recursos.ocultos = (c && c.ocultos) || []; u.recursos.carregando = false; render(); }).catch(() => { u.recursos.ocultos = []; u.recursos.carregando = false; });
+  }
+  return u.recursos;
+}
+function recursoAtivo(id){ const o = recursosState().ocultos; return !o || !o.includes(id); }
+function recursoPorSub(role, sub){ return RECURSOS.find(r => r[role]===sub); }
+function subAtivo(role, sub){ const r = recursoPorSub(role, sub); return !r || recursoAtivo(r.id); }
+
+const PROF_SECOES = [
+  { id:'hoje', icon:'🏠', label:'Hoje', abas:[['inicio','Hoje']] },
+  { id:'turmas', icon:'👥', label:'Minhas turmas', abas:[['planolivro','🗓️ Aulas do plano'], ['painel','📊 Notas e desempenho'], ['turmas','👥 Alunos'], ['chamada','🪪 Chamada'], ['freqpainel','📈 Frequência']] },
+  { id:'aval', icon:'📝', label:'Avaliações', abas:[['avaliacoes','📝 Minhas avaliações'], ['banco','📚 Banco de questões'], ['bloco','🖨️ Prova em papel'], ['leitura','🔍 Ler gabaritos'], ['avulso','🗒️ Gabarito avulso'], ['liberacoes','🔓 Liberações']] },
+  { id:'ferr', icon:'🧰', label:'Ferramentas', abas:[['ferramentas','🧰 Ferramentas']].concat(RECURSOS.filter(r => r.prof).map(r => [r.prof, r.icon + ' ' + r.label])) },
+  { id:'ajustes', icon:'⚙️', label:'Ajustes', abas:[['disciplinas','📖 Disciplinas'], ['pesos','⚖️ Pesos das notas'], ['lixeira','🗑️ Lixeira']] },
+];
+const ALUNO_SECOES = [
+  { id:'inicio', icon:'🏠', label:'Início', abas:[['inicio','Início']] },
+  { id:'provas', icon:'📝', label:'Provas e notas', abas:[['provas','📝 Minhas provas'], ['boletim','🧮 Boletim'], ['socio','💛 Socioemocional']] },
+  { id:'estudar', icon:'📖', label:'Estudar', abas:[['estudar','📖 Aulas dadas'], ['tarefas','🗂️ Tarefas'], ['mapas','🧠 Mapas mentais'], ['materiais','📎 Materiais'], ['cronograma','📅 Cronograma'], ['ra','🕶️ Realidade aumentada'], ['@livros','📘 Livro didático']] },
+  { id:'escola', icon:'💬', label:'Escola', abas:[['duvidas','❓ Dúvidas'], ['revisao','🔎 Revisão de colegas'], ['monitoria','🧑‍🏫 Monitoria'], ['buscaativa','🚌 Transporte'], ['campanha','📢 Jovens Protagonistas']] },
+  { id:'eu', icon:'🏅', label:'Eu', abas:[['conquistas','🏅 Conquistas'], ['portfolio','🗂️ Portfólio'], ['diario','📷 Diário de bordo'], ['biblioteca','📚 Biblioteca']] },
+];
+function navSecaoDe(secoes, sub){ return secoes.find(s => s.abas.some(a => a[0]===sub)) || secoes[0]; }
+function navUltima(role, secId){ const u = state.ui; u.navUltima = u.navUltima || {}; return (u.navUltima[role]||{})[secId]; }
+function navLembrar(role, secId, sub){ const u = state.ui; u.navUltima = u.navUltima || {}; (u.navUltima[role] = u.navUltima[role] || {})[secId] = sub; }
+// itens do menu lateral: 1 por seção; clicar volta para a última aba usada naquela seção
+function navSidebarItens(role, secoes, sub, badges){
+  const atual = navSecaoDe(secoes, sub);
+  navLembrar(role, atual.id, sub);
+  const acao = role==='aluno' ? 'aluno-sub-view' : 'sub-view';
+  const itens = secoes.map(sec => {
+    let alvo;
+    if(sec.id==='ferr') alvo = 'ferramentas';                 // Ferramentas sempre abre a grade
+    else if(sec.id===atual.id) alvo = sub;                      // seção atual: a aba aberta (fica destacada)
+    else { alvo = navUltima(role, sec.id) || sec.abas[0][0]; if(!subAtivo(role, alvo)) alvo = sec.abas[0][0]; }
+    return { action: acao, sub: alvo, icon: sec.icon, label: sec.label, badge: (badges||{})[sec.id] || 0, _sec: sec.id };
+  });
+  return { atualSub: itens.find(i => i._sec===atual.id).sub, itens };
+}
+function navAbasHtml(role, secoes, sub, extra){
+  const sec = navSecaoDe(secoes, sub);
+  const acao = role==='aluno' ? 'aluno-sub-view' : 'sub-view';
+  if(sec.id==='ferr'){
+    if(sub==='ferramentas') return '';
+    const r = recursoPorSub('prof', sub);
+    return `<div class="nav-abas" data-nav-abas="ferr"><button class="nav-aba" data-action="sub-view" data-sub="ferramentas">← Todas as ferramentas</button><span class="nav-aba ativa" style="cursor:default;">${r ? r.icon + ' ' + esc(r.label) : ''}</span></div>`;
+  }
+  const abas = sec.abas.filter(a => a[0].startsWith('@') || subAtivo(role, a[0]));
+  if(abas.length < 2 && !extra) return '';
+  return `<div class="nav-abas" data-nav-abas="${sec.id}">${abas.map(([s, l]) => s==='@livros'
+      ? `<button class="nav-aba" data-action="goto-aluno-livros">${esc(l)}</button>`
+      : `<button class="nav-aba ${s===sub?'ativa':''}" data-action="${acao}" data-sub="${s}" ${s==='avaliacoes'?'data-lista="1"':''}>${esc(l)}</button>`).join('')}${extra||''}</div>`;
+}
+function renderFerramentas(){
+  const ativos = RECURSOS.filter(r => r.prof && recursoAtivo(r.id));
+  return `<div class="card" data-ferramentas>
+    <h2 style="margin-top:0;">🧰 Ferramentas</h2>
+    <p class="muted" style="margin-top:0;">Recursos para usar quando quiser, além do plano de aulas. Quiz, enquete, nuvem de palavras e trabalho em grupo também já aparecem dentro dos slides da <strong>aula ao vivo</strong>.</p>
+    ${FERR_GRUPOS.map(([g, titulo]) => { const lista = ativos.filter(r => r.grupo===g); if(!lista.length) return '';
+      return `<h3 style="margin:16px 0 8px; font-size:1rem;">${titulo}</h3><div class="ferr-grade">${lista.map(r => `<button class="ferr-tile" data-action="sub-view" data-sub="${r.prof}"><span class="ferr-ic">${r.icon}</span><span><strong>${esc(r.label)}</strong><span class="ferr-desc">${esc(r.desc)}</span></span></button>`).join('')}</div>`; }).join('')}
+  </div>`;
+}
+const NAV_CSS = `
+.nav-abas{display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; margin:0 0 14px; padding-bottom:4px; scrollbar-width:thin;}
+.nav-aba{flex:0 0 auto; border:1px solid var(--paper-line,#e4d9c8); background:var(--paper,#fff); color:var(--ink,#222); border-radius:999px; padding:6px 14px; font-size:.86rem; cursor:pointer; white-space:nowrap; font-family:inherit;}
+.nav-aba:hover{border-color:var(--wine,#6B1F2E);}
+.nav-aba.ativa{background:var(--wine,#6B1F2E); border-color:var(--wine,#6B1F2E); color:#fff; font-weight:600;}
+.nav-aba-extra{margin-left:auto;}
+.ferr-grade{display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px;}
+.ferr-tile{display:flex; gap:10px; align-items:center; text-align:left; border:1px solid var(--paper-line,#e4d9c8); background:var(--paper,#fff); color:var(--ink,#222); border-radius:12px; padding:12px; cursor:pointer; font-family:inherit; font-size:.92rem;}
+.ferr-tile:hover{border-color:var(--wine,#6B1F2E); box-shadow:0 2px 8px rgba(107,31,46,.12);}
+.ferr-ic{font-size:1.6rem; line-height:1;}
+.ferr-desc{display:block; font-size:.78rem; color:var(--ink-soft,#666); font-weight:400; margin-top:2px;}
+`;
+
+/* ======================= CONTADOR DE USO DAS TELAS =======================
+   Cada pessoa guarda as próprias contagens do mês num documento só (uso:<papel>:<id>:<AAAA-MM>),
+   gravado no máximo a cada 2 minutos — quase não pesa no Firebase. A coordenação vê o resumo. */
+const USO = { pend: {}, timer: null };   // pend['papel:id'] = { tela: contagem }
+function usoMarcar(role, sub, id){
+  if(!sub || !id) return;
+  const k = role + ':' + id;
+  const o = USO.pend[k] = USO.pend[k] || {};
+  o[sub] = (o[sub] || 0) + 1;
+  if(!USO.timer) USO.timer = setTimeout(usoGravar, 120000);
+}
+async function usoGravar(){
+  USO.timer = null;
+  const pend = USO.pend; USO.pend = {};
+  const mes = new Date().toISOString().slice(0, 7);
+  for(const [quem, cont] of Object.entries(pend)){
+    try{
+      await window.storage.update(`uso:${quem}:${mes}`, raw => {
+        let o; try{ o = raw ? JSON.parse(raw) : {}; }catch(e){ o = {}; }
+        Object.entries(cont).forEach(([k, v]) => o[k] = (o[k] || 0) + v);
+        return JSON.stringify(o);
+      });
+    }catch(e){}
+  }
+}
+try{ window.addEventListener('pagehide', () => { if(Object.keys(USO.pend).length) usoGravar(); }); }catch(e){}
+
+async function recursosResumoUso(){
+  const c = state.coordenador; c.usoResumo = { carregando: true }; render();
+  const meses = [0, 1].map(k => { const d = new Date(); d.setMonth(d.getMonth() - k); return d.toISOString().slice(0, 7); });
+  const tot = { professor: {}, aluno: {} }, pessoas = { professor: {}, aluno: {} };
+  try{
+    const ks = ((await window.storage.list('uso:', true)).keys || []).filter(k => meses.some(m => k.endsWith(':' + m)));
+    const docs = await Promise.all(ks.map(async k => [k, await planoLerJson(k, {})]));
+    docs.forEach(([k, o]) => { const [, role, id] = k.split(':'); if(!tot[role]) return;
+      Object.entries(o || {}).forEach(([sub, n]) => { tot[role][sub] = (tot[role][sub] || 0) + n; (pessoas[role][sub] = pessoas[role][sub] || new Set()).add(id); }); });
+  }catch(e){}
+  c.usoResumo = { tot, pessoas, meses };
+  render();
+}
+function renderRecursosCard(){
+  const c = state.coordenador; const R = recursosState(); const u = c.usoResumo;
+  const nome = (role, sub) => { const secs = role==='aluno' ? ALUNO_SECOES : PROF_SECOES; for(const s of secs){ const a = s.abas.find(x => x[0]===sub); if(a) return a[1]; } return sub; };
+  const tabela = role => { const t = (u && u.tot && u.tot[role]) || {}; const linhas = Object.entries(t).sort((a, b) => b[1] - a[1]);
+    if(!linhas.length) return '<p class="muted" style="font-size:.85rem;">Ainda sem registros.</p>';
+    return `<table style="width:100%; font-size:.84rem; border-collapse:collapse;">${linhas.map(([sub, n]) => `<tr style="border-bottom:1px solid #eee;"><td style="padding:3px 4px;">${esc(nome(role, sub))}</td><td style="text-align:right; padding:3px 4px;"><strong>${n}</strong> acesso(s)</td><td style="text-align:right; padding:3px 4px;" class="muted">${u.pessoas[role][sub].size} pessoa(s)</td></tr>`).join('')}</table>`; };
+  return `<div class="card" data-recursos-card>
+    <h3 style="margin-top:0;">🧰 Recursos do app</h3>
+    <p class="muted" style="font-size:.86rem; margin-top:0;">Desligue o que a escola não usa: some do menu de professores e alunos (nada é apagado, dá para religar quando quiser).</p>
+    ${R.ocultos===null ? '<div class="spinner"></div>' : `<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:2px 12px;">
+      ${RECURSOS.map(r => `<label style="text-transform:none; font-weight:400; cursor:pointer; font-size:.88rem;"><input type="checkbox" data-action="recurso-toggle" data-id="${r.id}" ${recursoAtivo(r.id)?'checked':''} style="width:auto;"> ${r.icon} ${esc(r.label)} <span class="muted" style="font-size:.75rem;">(${r.prof && r.aluno ? 'prof. e alunos' : r.prof ? 'professor' : 'alunos'})</span></label>`).join('')}
+    </div>`}
+    <h4 style="margin:16px 0 6px;">📊 O que está sendo usado (este mês e o anterior)</h4>
+    ${!u ? '<button class="btn btn-ghost btn-sm" data-action="recursos-uso">Ver uso das telas</button>' : u.carregando ? '<div class="spinner"></div>' : `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px;"><div><strong>Professores</strong>${tabela('professor')}</div><div><strong>Alunos</strong>${tabela('aluno')}</div></div>`}
+  </div>`;
+}
+async function recursoToggle(id, ligado){
+  const R = recursosState(); const o = new Set(R.ocultos || []);
+  if(ligado) o.delete(id); else o.add(id);
+  R.ocultos = [...o]; render();
+  try{ await window.storage.set('recursos-config', JSON.stringify({ ocultos: R.ocultos, em: Date.now() }), true); }catch(e){ alert('Não foi possível salvar agora. Tente de novo.'); }
+}
+
+try{ document.head.insertAdjacentHTML('beforeend', '<style>' + NAV_CSS + '</style>'); }catch(e){}
+
 /* ---------------- PROFESSOR ---------------- */
 
 function renderProfessor(){
@@ -2496,11 +2664,7 @@ function renderProfessor(){
       <span>👁 <strong>Modo coordenação:</strong> você está no painel de <strong>${esc(p.session.displayName)}</strong>. O que fizer aqui fica gravado como se fosse do professor.</span>
       <button class="btn btn-ghost btn-sm" data-action="coord-voltar-coordenacao" style="background:#fff;">↩ Voltar à coordenação</button>
     </div>` : ''}
-    <div class="row quick-actions-bar" style="gap:8px; flex-wrap:wrap; margin-bottom:14px;">
-      ${!(p.subview==='avaliacoes' && p.mode==='new') ? '<button class="btn btn-primary btn-sm" data-action="quick-new-assessment" style="flex:0 0 auto;">+ Nova avaliação</button>' : ''}
-      ${p.subview!=='avulso' ? '<button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="avulso" style="flex:0 0 auto;">🗒️ Gabarito Avulso</button>' : ''}
-    </div>
-    ${renderCarrosselCampanha(muralSlidesComConquistas(p.campanhaItens||[], !p.campanhaItensLoading))}
+    ${p.subview==='inicio' ? renderCarrosselCampanha(muralSlidesComConquistas(p.campanhaItens||[], !p.campanhaItensLoading)) : ''}
     ${(p.session.coordNote && !p.session.coordNoteDismissed) ? `
     <div style="background:var(--accent-yellow-bg,#fdf3e8); border:1px solid var(--yellow-dark); border-radius:8px; padding:12px 14px; margin-bottom:14px;">
       <strong style="font-size:.85rem;">📋 Recado da coordenação</strong>
@@ -2509,42 +2673,11 @@ function renderProfessor(){
     </div>
     ` : ''}
   `;
-  const sidebarItems = [
-    { action:'sub-view', sub:'inicio', icon:'🏠', label:'Início', group:'📊 Painel' },
-    { action:'sub-view', sub:'painel', icon:'📊', label:'Meu Painel', group:'📊 Painel' },
-
-    { action:'sub-view', sub:'avaliacoes', icon:'📝', label:'Avaliações', badge: p.correcoesPendentesCount || 0, group:'📝 Avaliações' },
-    { action:'sub-view', sub:'banco', icon:'📚', label:'Banco de questões', group:'📝 Avaliações' },
-    { action:'sub-view', sub:'disciplinas', icon:'📖', label:'Disciplinas', group:'📝 Avaliações' },
-    { action:'sub-view', sub:'pesos', icon:'⚖️', label:'Pesos das notas', group:'📝 Avaliações' },
-    { action:'sub-view', sub:'liberacoes', icon:'🔓', label:'Liberações', badge: liberacoesVisiveis().filter(r=>!r.released).length || 0, group:'📝 Avaliações' },
-
-    { action:'sub-view', sub:'turmas', icon:'👥', label:'Turmas', group:'👥 Turmas & Frequência' },
-    { action:'sub-view', sub:'chamada', icon:'🪪', label:'Chamada', badge: (p.freqHoje && p.freqHoje.data ? p.freqHoje.data.filter(l=>l.presentesCount===0).length : 0) || 0, group:'👥 Turmas & Frequência' },
-    { action:'sub-view', sub:'freqpainel', icon:'📊', label:'Painel de Frequência', group:'👥 Turmas & Frequência' },
-    { href:'https://sso.seduc.se.gov.br/', icon:'📋', label:'Fazer Chamada (SEDUC)', group:'👥 Turmas & Frequência' },
-
-    { action:'sub-view', sub:'bloco', icon:'🖨️', label:'Bloco de Provas', group:'🖨️ Provas em Papel' },
-    { action:'sub-view', sub:'leitura', icon:'🔍', label:'Leitura de Gabaritos', group:'🖨️ Provas em Papel' },
-    { action:'sub-view', sub:'avulso', icon:'🗒️', label:'Gabarito Avulso', group:'🖨️ Provas em Papel' },
-
-    { action:'sub-view', sub:'planolivro', icon:'🗓️', label:'Plano de Aulas do Livro', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'livros', icon:'📘', label:'Livro Didático', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'mural', icon:'📌', label:'Mural de Avisos', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'material', icon:'📎', label:'Material da Turma', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'tarefas', icon:'🗂️', label:'Tarefas', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'mapas', icon:'🧠', label:'Mapa Mental', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'cronograma', icon:'📅', label:'Cronograma de Aulas', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'duvidas', icon:'❓', label:'Mural de Dúvidas', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'enquete', icon:'📣', label:'Enquete Relâmpago', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'quiz', icon:'🎮', label:'Quiz por Equipes', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'roleta', icon:'🎡', label:'Roleta de Sorteio', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'duelo', icon:'⚔️', label:'Modo Duelo', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'slides', icon:'🖥️', label:'Apresentação de Slides', group:'🎮 Recursos & Interação' },
-    { action:'sub-view', sub:'ra', icon:'🕶️', label:'Realidade Aumentada', group:'🎮 Recursos & Interação' },
-
-    { action:'sub-view', sub:'lixeira', icon:'🗑️', label:'Lixeira', group:'🗑️ Lixeira' },
-  ];
+  const navProf = navSidebarItens('professor', PROF_SECOES, p.subview, {
+    turmas: (p.freqHoje && p.freqHoje.data ? p.freqHoje.data.filter(l=>l.presentesCount===0).length : 0) || 0,
+    aval: (p.correcoesPendentesCount || 0) + (liberacoesVisiveis().filter(r=>!r.released).length || 0),
+  });
+  const sidebarItems = navProf.itens;
   let content;
   if(p.profileEditorOpen) content = renderProfessorProfileEditor();
   else if(p.subview==='inicio') content = renderProfessorInicio();
@@ -2574,8 +2707,13 @@ function renderProfessor(){
   else if(p.subview==='slides') content = renderSlides();
   else if(p.subview==='ra') content = renderRealidadeAumentada(true);
   else if(p.subview==='lixeira') content = renderLixeira();
+  else if(p.subview==='ferramentas') content = renderFerramentas();
   else content = p.mode==='new' ? renderNewAssessment() : p.mode==='results' ? renderResults() : renderProfessorList();
-  return `<div class="app-topbar">${topBar}</div><div class="app-shell">${renderSidebar(sidebarItems, p.subview, 'professor')}<div class="app-main">${content}</div></div>`;
+  if(!p.profileEditorOpen){
+    const extra = navSecaoDe(PROF_SECOES, p.subview).id==='aval' && !(p.subview==='avaliacoes' && p.mode==='new') ? '<button class="nav-aba nav-aba-extra" data-action="quick-new-assessment" style="background:#C9A227; border-color:#C9A227; color:#3a2a00; font-weight:700;">+ Nova avaliação</button>' : '';
+    content = navAbasHtml('professor', PROF_SECOES, p.subview, extra) + content;
+  }
+  return `<div class="app-topbar">${topBar}</div><div class="app-shell">${renderSidebar(sidebarItems, navProf.atualSub, null)}<div class="app-main">${content}</div></div>`;
 }
 
 function renderProfessorLogin(){
@@ -7875,22 +8013,6 @@ function renderProfessorInicio(){
         </div>
       </div>
     ` : ''}
-    <div class="quick-shortcuts-row">
-      <button class="quick-shortcut-tile" data-action="sub-view" data-sub="painel">
-        <span class="qs-icon">📊</span>
-        <span>
-          <span class="qs-label">Meu Painel</span>
-          <span class="qs-sub">Notas, desempenho e conteúdo</span>
-        </span>
-      </button>
-      <button class="quick-shortcut-tile" data-action="sub-view" data-sub="avulso">
-        <span class="qs-icon">🗒️</span>
-        <span>
-          <span class="qs-label">Gabarito Avulso</span>
-          <span class="qs-sub">Corrigir prova integrada em papel</span>
-        </span>
-      </button>
-    </div>
   `;
 }
 function renderPeriodosCard(){
@@ -11576,6 +11698,7 @@ function renderCoordDashboard(){
       </div>
     </div>
     ${renderSegurancaCard()}
+    ${renderRecursosCard()}
   `;
 }
 
@@ -16336,7 +16459,7 @@ function renderAlunoMuralAvisosBlock(){
 // Aba "Início": visão geral — recomendações, temporada/gamificação, ranking, trilha e avisos.
 function renderAlunoInicioBlock(){
   const blocos = [
-    renderAlunoRevisaoBlock(),
+    renderAlunoRevisaoRapidaBlock(),
     renderAlunoPrazoBlock(),
     renderAlunoRecomendacoesBlock(),
     renderAlunoTemporadaBlock(),
@@ -16372,15 +16495,13 @@ function renderStudentDashboard(){
         </div>
         <div class="row" style="flex:0 0 auto; gap:8px;">
           <button class="btn btn-ghost btn-sm" data-action="start-tour" data-role="aluno" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.5);">🧭 Tour</button>
-          <button class="btn btn-ghost btn-sm" data-action="goto-aluno-livros" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.5);">📘 Livro Didático</button>
           <button class="btn btn-ghost btn-sm" data-action="student-logout" style="background:rgba(255,255,255,0.16); color:#fff; border:1px solid rgba(255,255,255,0.5);">Sair</button>
         </div>
       </div>
     </div>
 
     ${renderAlunoSocioUrgente()}
-    ${renderAlunoNovidadesBanner()}
-    ${renderCarrosselCampanha(muralSlidesComConquistas((al.campanha.itens||[]).filter(campanhaNoAr), al.campanha.loaded && !al.campanha.loading))}
+    ${(al.subview||'inicio')==='inicio' ? renderAlunoNovidadesBanner() + renderCarrosselCampanha(muralSlidesComConquistas((al.campanha.itens||[]).filter(campanhaNoAr), al.campanha.loaded && !al.campanha.loading)) : ''}
     ${renderAlunoAulaVivaBlock()}
     ${renderAlunoSlidesBlock()}
     ${renderAlunoEnqueteBlock()}
@@ -16389,29 +16510,8 @@ function renderStudentDashboard(){
     ${renderAlunoDueloBlock()}
   `;
 
-  const sidebarItems = [
-    { action:'aluno-sub-view', sub:'inicio', icon:'🏠', label:'Início', group:'📊 Painel' },
-    { action:'aluno-sub-view', sub:'provas', icon:'📝', label:'Minhas provas', group:'📊 Painel' },
-    { action:'aluno-sub-view', sub:'boletim', icon:'🧮', label:'Boletim', group:'📊 Painel' },
-    { action:'aluno-sub-view', sub:'socio', icon:'💛', label:'Avaliação Socioemocional', group:'📊 Painel', badge: socioState().loaded ? socioPendentes().length : 0 },
-
-    { action:'aluno-sub-view', sub:'estudar', icon:'📖', label:'Estudar (aulas dadas)', group:'📚 Estudos' },
-    { action:'aluno-sub-view', sub:'tarefas', icon:'🗂️', label:'Tarefas', group:'📚 Estudos' },
-    { action:'aluno-sub-view', sub:'mapas', icon:'🧠', label:'Mapa Mental', group:'📚 Estudos' },
-    { action:'aluno-sub-view', sub:'diario', icon:'📷', label:'Diário de Bordo', group:'📚 Estudos' },
-    { action:'aluno-sub-view', sub:'revisao', icon:'🔎', label:'Revisão de Colegas', group:'📚 Estudos' },
-    { action:'aluno-sub-view', sub:'materiais', icon:'📎', label:'Materiais', group:'📚 Estudos' },
-    { action:'aluno-sub-view', sub:'biblioteca', icon:'📚', label:'Biblioteca', group:'📚 Estudos' },
-    { action:'aluno-sub-view', sub:'cronograma', icon:'📅', label:'Cronograma de Aulas', group:'📚 Estudos' },
-    { action:'aluno-sub-view', sub:'ra', icon:'🕶️', label:'Realidade Aumentada', group:'📚 Estudos' },
-
-    { action:'aluno-sub-view', sub:'duvidas', icon:'❓', label:'Mural de Dúvidas', group:'💬 Comunidade' },
-    { action:'aluno-sub-view', sub:'monitoria', icon:'🧑‍🏫', label:'Monitoria de Desempenho', group:'💬 Comunidade' },
-    { action:'aluno-sub-view', sub:'buscaativa', icon:'🚌', label:'Busca Ativa e Transporte', group:'💬 Comunidade' },
-    { action:'aluno-sub-view', sub:'campanha', icon:'📢', label:'Jovens Protagonistas', group:'💬 Comunidade' },
-    { action:'aluno-sub-view', sub:'portfolio', icon:'🗂️', label:'Meu Portfólio', group:'💬 Comunidade' },
-    { action:'aluno-sub-view', sub:'conquistas', icon:'🏅', label:'Hall de Conquistas', group:'💬 Comunidade' },
-  ];
+  const navAluno = navSidebarItens('aluno', ALUNO_SECOES, (al.subview && subAtivo('aluno', al.subview)) ? al.subview : 'inicio', { provas: socioState().loaded ? socioPendentes().length : 0 });
+  const sidebarItems = navAluno.itens;
 
   let content;
   if(al.subview==='provas') content = renderAlunoProvasBlock();
@@ -16433,8 +16533,10 @@ function renderStudentDashboard(){
   else if(al.subview==='portfolio') content = renderAlunoPortfolioBlock();
   else if(al.subview==='conquistas') content = renderAlunoConquistasBlock();
   else content = renderAlunoInicioBlock();
+  if(al.subview && !subAtivo('aluno', al.subview)) content = renderAlunoInicioBlock();
+  content = navAbasHtml('aluno', ALUNO_SECOES, (al.subview && subAtivo('aluno', al.subview)) ? al.subview : 'inicio') + content;
 
-  return `<div class="app-topbar">${topBar}</div><div class="app-shell">${renderSidebar(sidebarItems, al.subview, 'aluno')}<div class="app-main">${content}</div></div>`;
+  return `<div class="app-topbar">${topBar}</div><div class="app-shell">${renderSidebar(sidebarItems, navAluno.atualSub, null)}<div class="app-main">${content}</div></div>`;
 }
 
 function renderExamLocked(){
@@ -22223,7 +22325,8 @@ async function planoAbrirRecuperacao(turmaId, bimestre){
   Object.values(desempenho).forEach(d => Object.entries(d).forEach(([n,[a,t]]) => { const x = turmaAula[n] = turmaAula[n] || [0,0]; x[0]+=a; x[1]+=t; }));
   const pct = (x) => x && x[1] ? x[0]/x[1] : 1;
   const ordemTurma = aulasBim.slice().sort((a,b) => pct(turmaAula[a.n]) - pct(turmaAula[b.n]) || a.n - b.n);
-  const comuns = ordemTurma.filter(a => (a.exercicio.questoesRecuperacao||[]).length).slice(0,5).map(a => `r:${a.n}:0`);
+  const diagUsadas = ((s.prog[turmaId] && s.prog[turmaId].diagUsadas) || {})[bimestre] || [];
+  const comuns = ordemTurma.map(a => (a.exercicio.questoesRecuperacao||[]).map((q,i) => `r:${a.n}:${i}`).find(k => !diagUsadas.includes(k))).filter(Boolean).slice(0,5);
   const alunos = {};
   (turma.students||[]).forEach(st => {
     const nk = nomeChave(st.name);
@@ -22247,7 +22350,8 @@ function planoRecupPool(n){
   const ks = [];
   (aula.exercicio.questoesRecuperacao||[]).forEach((q,i) => ks.push(`r:${n}:${i}`));
   (aula.exercicio.questoesProva||[]).forEach((q,i) => { if(!r.textosProva.includes(q.texto)) ks.push(`p:${n}:${i}`); });
-  return ks.filter(k => !r.comuns.includes(k));
+  const diag = ((s.prog[r.turmaId] && s.prog[r.turmaId].diagUsadas) || {})[r.bimestre] || [];
+  return ks.filter(k => !r.comuns.includes(k) && !diag.includes(k));
 }
 function planoRecupSortearPers(sid){
   const s = planoState(); const r = s.recup; const al = r.alunos[sid];
@@ -24231,7 +24335,7 @@ async function revisaoCarregar(){
   r.carregando = false; render();
 }
 function revisaoVencidas(){ const r = revisaoState(); return ((r.fila && r.fila.itens) || []).filter(x => x.prox <= Date.now()); }
-function renderAlunoRevisaoBlock(){
+function renderAlunoRevisaoRapidaBlock(){
   const r = revisaoState();
   if(!r.fila){ if(!r.carregando) setTimeout(revisaoCarregar, 0); return ''; }
   const S = r.sessao; const L = ['A','B','C','D','E'];
@@ -24292,37 +24396,90 @@ async function revisaoProxima(){
 }
 
 /* ======================= AVALIAÇÃO DIAGNÓSTICA + RELATÓRIO DE RESULTADOS ======================= */
+/* Diagnóstica do bimestre: só depois de dada pelo menos a METADE das aulas programadas do bimestre.
+   O professor escolhe quais aulas já dadas entram. Questões: as de recuperação dessas aulas (1 por aula em rodízio, até 10),
+   que ficam marcadas em prog.diagUsadas[b] para não se repetirem na recuperação personalizada. */
+function planoDiagAulas(plano, b){ return plano.aulas.filter(a => a.bimestre===b && a.exercicio && (a.exercicio.questoesRecuperacao||[]).length); }
+function planoDiagSel(turmaId, b, prog, plano){
+  const s = planoState(); s.diagSel = s.diagSel || {};
+  const k = turmaId + ':' + b;
+  const dadas = planoDiagAulas(plano, b).filter(a => prog.dadas && prog.dadas[a.n]).map(a => a.n);
+  s.diagSel[k] = s.diagSel[k] || {};
+  dadas.forEach(n => { if(!(n in s.diagSel[k])) s.diagSel[k][n] = true; });   // aula dada nova entra marcada
+  Object.keys(s.diagSel[k]).forEach(n => { if(!dadas.includes(Number(n))) delete s.diagSel[k][n]; });
+  return s.diagSel[k];
+}
+function planoDiagQuestoes(plano, nums){
+  const aulas = nums.map(n => plano.aulas.find(a => a.n===n)).filter(Boolean);
+  const out = [];
+  for(let r = 0; r < 4 && out.length < 10; r++){
+    for(const a of aulas){
+      if(out.length >= 10) break;
+      const lista = a.exercicio.questoesRecuperacao || [];
+      const i = lista.length - 1 - r;   // começa pela última (a primeira costuma ir para a recuperação comum)
+      if(i >= 0) out.push({ k: `r:${a.n}:${i}`, n: a.n, q: lista[i] });
+    }
+  }
+  return out;
+}
 async function planoAplicarDiagnostica(turmaId, b){
   const s = planoState(); const plano = s.planos[s.turmaPlano[turmaId]];
-  const lista = plano && plano.diagnosticas && plano.diagnosticas[String(b)];
-  if(!lista || !lista.length) return;
+  if(!plano) return;
   const prog = s.prog[turmaId] || { dadas:{}, exercicios:{} };
   if(prog.diagnosticas && prog.diagnosticas[b]){ alert('A diagnóstica deste bimestre já foi aplicada (código ' + prog.diagnosticas[b] + ').'); return; }
+  const prog_aulas = planoDiagAulas(plano, b);
+  const minimo = Math.ceil(prog_aulas.length / 2);
+  const dadas = prog_aulas.filter(a => prog.dadas && prog.dadas[a.n]).length;
+  if(dadas < minimo){ alert(`A diagnóstica só pode ser aplicada depois de dada pelo menos a metade das aulas do bimestre (${minimo} de ${prog_aulas.length}). Até agora: ${dadas}.`); return; }
+  const sel = planoDiagSel(turmaId, b, prog, plano);
+  const nums = Object.keys(sel).filter(n => sel[n]).map(Number).sort((x, y) => x - y);
+  if(!nums.length){ alert('Marque pelo menos uma aula para entrar na diagnóstica.'); return; }
+  const itens = planoDiagQuestoes(plano, nums);
+  if(!itens.length){ alert('As aulas marcadas não têm questões para a diagnóstica.'); return; }
   const disc = planoDisciplinaDoProfessor(plano.disciplina||''); const sess = state.professor.session;
   const code = genCode();
-  const pts = Math.round(10 / lista.length * 100) / 100;
-  const questions = lista.map(q => { const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
-    const nq = { id: cryptoId(), type:'mc', text: q.texto, points: pts, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo: 'Diagnóstica', options, correctOptionId: options[q.correta].id, explicacao: q.explicacao||'' };
-    if(q.comando) nq.comando = q.comando; return nq; });
-  const a = { code, title: `Avaliação diagnóstica — ${b}º bimestre (${plano.disciplina||''})`, instrumento: 'diagnostica', unidade: UNIDADES[Math.max(0, Math.min(3, b-1))],
+  const pts = Math.round(10 / itens.length * 100) / 100;
+  const imgCache = {};
+  const questions = [];
+  for(const { q } of itens){ const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
+    let image = null; if(q.imagem){ if(!(q.imagem in imgCache)) imgCache[q.imagem] = await planoLerJson(`plano-livro-img:${q.imagem}`, null); image = imgCache[q.imagem] || null; }
+    const nq = { id: cryptoId(), type:'mc', text: q.texto, points: pts, image, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo: 'Diagnóstica', options, correctOptionId: options[q.correta].id, explicacao: q.explicacao||'' };
+    if(q.comando) nq.comando = q.comando; questions.push(nq); }
+  const faixa = nums.length > 1 ? `aulas ${nums[0]} a ${nums[nums.length-1]}` : `aula ${nums[0]}`;
+  const a = { code, title: `Avaliação diagnóstica — ${b}º bimestre (${faixa})`, instrumento: 'diagnostica', unidade: UNIDADES[Math.max(0, Math.min(3, b-1))],
     disciplinaId: disc ? disc.id : null, disciplinaName: disc ? disc.name : (plano.disciplina||null), turmaIds: [turmaId], questions,
     startAt: null, endAt: planoPrazoParaEndAt('7'), agendaTurmas: {}, resultRelease: { mode:'imediato', releaseAt:'' }, securityEnabled: false, minMinutesPerQuestion: null, exigeLiberacao: false,
-    origemPlano: { planoId: plano.id, turmaId, diagnostica: b }, professorId: sess ? sess.id : null, professorName: sess ? sess.displayName : 'Coordenação', createdAt: Date.now(), updatedAt: null };
+    origemPlano: { planoId: plano.id, turmaId, diagnostica: b, aulas: nums }, professorId: sess ? sess.id : null, professorName: sess ? sess.displayName : 'Coordenação', createdAt: Date.now(), updatedAt: null };
   await window.storage.set(`assessment:${code}`, JSON.stringify(a), true);
   (state.professor.assessments = state.professor.assessments||[]).unshift(a);
   const fresh = await planoLerJson(`plano-livro-prog:${turmaId}`, prog);
   fresh.diagnosticas = Object.assign({}, fresh.diagnosticas||{}, { [b]: code });
+  fresh.diagUsadas = Object.assign({}, fresh.diagUsadas||{}, { [b]: itens.map(x => x.k) });
   s.prog[turmaId] = Object.assign({}, prog, fresh); await planoSalvarProg(turmaId);
-  s.msg = `✅ Diagnóstica do ${b}º bimestre aplicada — código ${code}. Peça para a turma fazer antes da aula 1 (prazo de 7 dias). Ela entra em “Diagnóstica” nas notas e serve de ponto de partida para o relatório de resultados.`;
+  s.msg = `✅ Diagnóstica do ${b}º bimestre aplicada — código ${code}, ${itens.length} questões (${faixa}), prazo de 7 dias. A nota compõe a NP2 do bimestre. As questões usadas não se repetem na recuperação.`;
   render();
 }
-function planoDiagnosticaHtml(turmaId, plano, prog){
-  const bs = Object.keys(plano.diagnosticas||{}); if(!bs.length) return '';
-  return `<div class="card" data-plano-diag><h3 style="margin-top:0;">🩺 Avaliação diagnóstica</h3>
-    <p class="muted" style="font-size:.86rem; margin-top:0;">Aplique antes de começar o bimestre: mostra o que a turma já sabe e, comparada com a prova do bimestre, mede quanto ela avançou (no 📈 relatório de resultados).</p>
-    ${bs.map(b => { const code = prog.diagnosticas && prog.diagnosticas[b];
-      return `<div style="margin:4px 0; font-size:.9rem;">${b}º bimestre · ${plano.diagnosticas[b].length} questões · ${code ? `✅ aplicada — código <strong>${esc(code)}</strong>` : `<button class="btn btn-primary btn-sm" data-action="plano-diag-aplicar" data-b="${b}">Aplicar à turma</button>`}</div>`; }).join('')}
-  </div>`;
+function planoDiagnosticaHtml(turmaId, plano, prog, b){
+  const aulas = planoDiagAulas(plano, b);
+  const head = `<div class="card" data-plano-diag><h3 style="margin-top:0;">🩺 Avaliação diagnóstica — ${b}º bimestre <span class="muted" style="font-size:.8rem; font-weight:400;">· compõe a NP2</span></h3>`;
+  if(!aulas.length) return head + `<p class="muted" style="margin:0;">As aulas deste bimestre ainda não têm questões prontas no app. A diagnóstica fica disponível quando o conteúdo do bimestre chegar.</p></div>`;
+  const code = prog.diagnosticas && prog.diagnosticas[b];
+  if(code) return head + `<p style="margin:0;">✅ Aplicada — código <strong>${esc(code)}</strong>. A nota entra na NP2 do bimestre; no 📈 Resultados você vê como a turma está e quem ficou abaixo de 5.</p></div>`;
+  const minimo = Math.ceil(aulas.length / 2);
+  const dadas = aulas.filter(a => prog.dadas && prog.dadas[a.n]);
+  const pct = Math.min(100, Math.round(dadas.length / minimo * 100));
+  if(dadas.length < minimo) return `<div data-plano-diag class="muted" style="font-size:.86rem; margin:0 0 14px; padding:8px 12px; border:1px dashed var(--paper-line,#ddd); border-radius:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <span>🩺 <strong>Diagnóstica do ${b}º bimestre</strong> (compõe a NP2) libera depois da metade das aulas: ${dadas.length} de ${minimo} — faltam ${minimo - dadas.length}.</span>
+    <span style="flex:1 1 120px; max-width:200px; background:#eee; border-radius:8px; height:8px; overflow:hidden;"><span style="display:block; width:${pct}%; height:100%; background:#C9A227;"></span></span></div>`;
+  const sel = planoDiagSel(turmaId, b, prog, plano);
+  const nums = Object.keys(sel).filter(n => sel[n]).map(Number);
+  const nq = planoDiagQuestoes(plano, nums).length;
+  return head + `<p class="muted" style="font-size:.86rem; margin-top:0;">✅ A turma já viu ${dadas.length} das ${aulas.length} aulas — pode aplicar agora (meio do bimestre) ou esperar o fim. Marque as aulas que entram (só aparecem as já dadas):</p>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:2px 10px; font-size:.86rem;">
+      ${dadas.map(a => `<label style="text-transform:none; font-weight:400; cursor:pointer;"><input type="checkbox" data-action="plano-diag-sel" data-b="${b}" data-n="${a.n}" ${sel[a.n]?'checked':''} style="width:auto;"> Aula ${a.n} — ${esc(a.tituloCurto||a.tema)}</label>`).join('')}
+    </div>
+    <div class="row" style="gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap;"><button class="btn btn-primary btn-sm" data-action="plano-diag-aplicar" data-b="${b}" ${nq?'':'disabled'}>Aplicar à turma</button>
+    <span class="muted" style="font-size:.84rem;">${nq} questões inéditas (estilo ENEM) das ${nums.length} aula(s) marcadas · prazo de 7 dias</span></div></div>`;
 }
 async function relatorioCalcular(turmaId, b){
   const s = planoState();
@@ -24348,7 +24505,8 @@ async function relatorioCalcular(turmaId, b){
       });
     }
     const vals = Object.values(porAluno).map(x => x[0]/x[1]);
-    return { porAluno, porHab, n: vals.length, media: vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length * 100) : null };
+    const abaixo = alunos.filter(st => porAluno[st.id] && porAluno[st.id][0]/porAluno[st.id][1] < 0.5).map(st => st.name).sort((x, y) => x.localeCompare(y, 'pt-BR'));
+    return { porAluno, porHab, abaixo, n: vals.length, media: vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length * 100) : null };
   };
   const [D, P] = [await medir(diags), await medir(provas)];
   let melhoraram = 0, ambos = 0;
@@ -24383,10 +24541,10 @@ async function relatorioAbrir(turmaIds, b){
 }
 function relatorioCsv(){
   const r = planoState().relatorio; if(!r) return;
-  const cab = ['Turma','Bimestre','Aulas dadas','Diagnóstica (%)','Prova do bimestre (%)','Ganho (pontos)','Alunos que melhoraram','Alunos com as duas','Entrega de exercícios (%)','Acerto nos exercícios (%)','Termômetro: entenderam (%)','Cadernos com visto (%)','Revisões concluídas','Alunos com apoio'];
-  const linhas = r.linhas.map(l => [l.turma, l.b, `${l.aulasDadas}/${l.totalAulas}`, l.diag.media, l.prova.media, l.ganho, l.melhoraram, l.ambos, l.entrega, l.acertoEx, l.termoOk, l.cadernos, l.revisoes, l.comApoio]);
+  const cab = ['Turma','Bimestre','Aulas dadas','Diagnóstica NP2 (%)','Avaliação NP1 (%)','Abaixo de 5 na diagnóstica','Nomes','Entrega de exercícios (%)','Acerto nos exercícios (%)','Termômetro: entenderam (%)','Cadernos com visto (%)','Revisões concluídas','Alunos com apoio'];
+  const linhas = r.linhas.map(l => [l.turma, l.b, `${l.aulasDadas}/${l.totalAulas}`, l.diag.media, l.prova.media, l.diag.abaixo.length, l.diag.abaixo.join(', '), l.entrega, l.acertoEx, l.termoOk, l.cadernos, l.revisoes, l.comApoio]);
   const habs = [...new Set(r.linhas.flatMap(l => [...Object.keys(l.diag.porHab), ...Object.keys(l.prova.porHab)]))].sort();
-  const extra = [[], ['Por habilidade (ENEM)'], ['Turma', ...habs.flatMap(h => [h + ' diagnóstica %', h + ' prova %'])]].concat(r.linhas.map(l => [l.turma, ...habs.flatMap(h => [l.diag.porHab[h] ? Math.round(l.diag.porHab[h][0]/l.diag.porHab[h][1]*100) : '', l.prova.porHab[h] ? Math.round(l.prova.porHab[h][0]/l.prova.porHab[h][1]*100) : ''])]));
+  const extra = [[], ['Por habilidade (ENEM)'], ['Turma', ...habs.flatMap(h => [h + ' diagnóstica %', h + ' avaliação %'])]].concat(r.linhas.map(l => [l.turma, ...habs.flatMap(h => [l.diag.porHab[h] ? Math.round(l.diag.porHab[h][0]/l.diag.porHab[h][1]*100) : '', l.prova.porHab[h] ? Math.round(l.prova.porHab[h][0]/l.prova.porHab[h][1]*100) : ''])]));
   const csv = [cab, ...linhas, ...extra].map(l => l.map(v => v==null ? '' : `"${String(v).replace(/"/g,'""')}"`).join(';')).join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob); const a = document.createElement('a');
@@ -24402,7 +24560,7 @@ function renderRelatorio(){
       <h3 style="margin:0;">📈 Resultados — ${r.b}º bimestre</h3>
       <div class="row" style="gap:6px;"><button class="btn btn-ghost btn-sm" data-action="relatorio-csv" ${r.carregando?'disabled':''}>⬇️ Planilha (CSV)</button><button class="btn btn-ghost btn-sm" data-action="relatorio-imprimir" ${r.carregando?'disabled':''}>🖨️ Imprimir</button><button class="btn btn-ghost btn-sm" data-action="relatorio-fechar">Fechar</button></div>
     </div>
-    <p class="muted" style="font-size:.84rem;">Compara a <strong>diagnóstica</strong> (antes) com a <strong>prova do bimestre</strong> (depois), nas mesmas habilidades do ENEM, e junta os sinais do dia a dia: entrega e acerto dos exercícios, termômetro, cadernos e revisões.</p>
+    <p class="muted" style="font-size:.84rem;">Mostra como cada turma está: a <strong>diagnóstica</strong> (NP2, aplicada no meio ou no fim do bimestre) e a <strong>avaliação</strong> (NP1), por habilidade do ENEM, junto com os sinais do dia a dia: entrega e acerto dos exercícios, termômetro, cadernos e revisões.</p>
     ${r.carregando && !r.linhas.length ? '<p>⏳ Calculando…</p>' : ''}
     ${r.linhas.map(l => {
       const habs = [...new Set([...Object.keys(l.diag.porHab), ...Object.keys(l.prova.porHab)])].sort((a,b) => parseInt(a.slice(1)) - parseInt(b.slice(1)));
@@ -24410,21 +24568,22 @@ function renderRelatorio(){
       return `<div data-relatorio-turma="${esc(l.turmaId)}" style="border:1px solid #eadfd0; border-radius:10px; padding:10px 12px; margin:10px 0;">
         <div class="row" style="justify-content:space-between; flex-wrap:wrap; gap:6px;"><strong style="font-size:1.05rem;">${esc(l.turma)}</strong><span class="muted" style="font-size:.82rem;">${l.aulasDadas}/${l.totalAulas} aulas dadas · ${l.alunos} alunos${l.comApoio ? ` · ${l.comApoio} com apoio` : ''}</span></div>
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; margin-top:8px; font-size:.86rem;">
-          <div>🩺 Diagnóstica<br>${pc(l.diag.media)} <span class="muted">(${l.diag.n} alunos)</span></div>
-          <div>📝 Prova do bimestre<br>${pc(l.prova.media)} <span class="muted">(${l.prova.n} alunos)</span></div>
-          <div>📈 Avanço<br>${l.ganho==null ? '<span class="muted">aguarda as duas</span>' : `<strong style="color:${l.ganho>=0?'#1d6b31':'#b3261e'};">${l.ganho>=0?'+':''}${l.ganho} pontos</strong>`}${l.ambos ? `<br><span class="muted">${l.melhoraram} de ${l.ambos} alunos melhoraram</span>` : ''}</div>
+          <div>🩺 Diagnóstica (NP2)<br>${pc(l.diag.media)} <span class="muted">(${l.diag.n} alunos)</span></div>
+          <div>📝 Avaliação (NP1)<br>${pc(l.prova.media)} <span class="muted">(${l.prova.n} alunos)</span></div>
+          <div>⚠️ Abaixo de 5 na diagnóstica<br>${l.diag.n ? `<strong style="color:${l.diag.abaixo.length?'#b3261e':'#1d6b31'};">${l.diag.abaixo.length} aluno(s)</strong>` : '<span class="muted">ainda não aplicada</span>'}</div>
           <div>📤 Entrega dos exercícios<br>${pc(l.entrega)}</div>
           <div>✅ Acerto nos exercícios<br>${pc(l.acertoEx)}</div>
           <div>🌡️ Entenderam a aula<br>${pc(l.termoOk)}</div>
           <div>📒 Cadernos com visto<br>${pc(l.cadernos)}</div>
           <div>🔁 Revisões concluídas<br><strong>${l.revisoes}</strong></div>
         </div>
-        ${habs.length ? `<details style="margin-top:8px;"><summary style="cursor:pointer; font-size:.86rem;">Por habilidade do ENEM (antes × depois)</summary>
+        ${l.diag.abaixo.length ? `<div data-relatorio-abaixo style="margin-top:8px; font-size:.84rem; background:#fdf1ef; border-radius:8px; padding:6px 10px;"><strong>Precisam de atenção (diagnóstica abaixo de 5):</strong> ${l.diag.abaixo.map(esc).join(', ')}. <span class="muted">Sugestão: retomar as aulas mais fracas e marcar a 🧩 versão de apoio nos próximos exercícios.</span></div>` : ''}
+        ${habs.length ? `<details style="margin-top:8px;"><summary style="cursor:pointer; font-size:.86rem;">Por habilidade do ENEM (diagnóstica × avaliação)</summary>
           ${habs.map(h => { const d = pct(l.diag.porHab[h]), p = pct(l.prova.porHab[h]);
             return `<div style="display:grid; grid-template-columns:3em 1fr 1fr; gap:6px; align-items:center; font-size:.8rem; margin:3px 0;" title="${esc((typeof HAB_TEXTO!=='undefined' && HAB_TEXTO[h])||'')}"><strong>${h}</strong>
               <div style="background:#eee; border-radius:4px; height:12px; position:relative;"><div style="width:${d||0}%; height:100%; background:#b9a9ad; border-radius:4px;"></div><span style="position:absolute; right:4px; top:-2px; font-size:.72rem;">${d==null?'—':d+'%'}</span></div>
               <div style="background:#eee; border-radius:4px; height:12px; position:relative;"><div style="width:${p||0}%; height:100%; background:#6B1F2E; border-radius:4px;"></div><span style="position:absolute; right:4px; top:-2px; font-size:.72rem; color:${p>60?'#fff':'#222'};">${p==null?'—':p+'%'}</span></div></div>`; }).join('')}
-          <div class="muted" style="font-size:.75rem;">Barra clara = diagnóstica · barra vinho = prova do bimestre</div></details>` : ''}
+          <div class="muted" style="font-size:.75rem;">Barra clara = diagnóstica (NP2) · barra vinho = avaliação (NP1)</div></details>` : ''}
       </div>`; }).join('')}
   </div>`;
 }
@@ -24751,6 +24910,7 @@ function renderPlanoLivro(){
   return `
     <h2>🗓️ Plano de Aulas do Livro</h2>
     ${avisos}
+    ${plano.aulas.some(a => a.exercicio) ? '' : `<div class="card" data-plano-sem-conteudo style="border-left:4px solid #C9A227;"><strong>⏳ As aulas da ${esc(plano.serie||'série')} ainda estão sendo preparadas.</strong><br><span style="font-size:.88rem;">Por enquanto o plano tem o roteiro de cada aula (tema, páginas do livro, objetivo e sugestões). Slides, exercícios, diagnóstica, níveis e trabalho em grupo aparecem aqui assim que o conteúdo desta série for importado.</span></div>`}
     ${podeImportar ? renderPlanoPainel() + renderPlanoFeedbackResumo(s.turmaPlano[turmaId]) : ''}
     <div class="card">
       <div class="row" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -24763,7 +24923,7 @@ function renderPlanoLivro(){
       <div class="row" style="margin-top:8px; gap:6px; flex-wrap:wrap; align-items:center;">
         ${s.registroAberto ? '' : renderPlanoRegistro(turmaId)}
         <span style="font-size:.85rem; margin-left:6px;">Bimestre:</span>
-        <select data-action="plano-bim-ferr" style="width:auto; padding:2px 6px;">${[1,2,3,4].filter(b => plano.aulas.some(a=>a.bimestre===b && a.exercicio)).map(b => `<option value="${b}" ${(s.bimFerramentas||(hoje?hoje.bimestre:1))===b?'selected':''}>${b}º</option>`).join('')}</select>
+        <select data-action="plano-bim-ferr" style="width:auto; padding:2px 6px;">${[1,2,3,4].filter(b => plano.aulas.some(a=>a.bimestre===b)).map(b => `<option value="${b}" ${(s.bimFerramentas||(hoje?hoje.bimestre:1))===b?'selected':''}>${b}º</option>`).join('')}</select>
         <button class="btn btn-ghost btn-sm" data-action="plano-montar-prova" data-b="${s.bimFerramentas||(hoje?hoje.bimestre:1)}">📝 Montar prova</button>
         <button class="btn btn-ghost btn-sm" data-action="plano-recup-abrir" data-b="${s.bimFerramentas||(hoje?hoje.bimestre:1)}">♻️ Recuperação personalizada</button>
         <button class="btn btn-ghost btn-sm" data-action="relatorio-abrir" data-escopo="turma" data-b="${s.bimFerramentas||(hoje?hoje.bimestre:1)}">📈 Resultados</button>
@@ -24771,17 +24931,17 @@ function renderPlanoLivro(){
     </div>
     ${s.registroAberto ? renderPlanoRegistro(turmaId) : ''}
     ${renderRelatorio()}
-    ${planoDiagnosticaHtml(turmaId, plano, prog)}
     ${s.montarProva && s.montarProva.turmaId===turmaId ? renderMontarProva() : ''}
     ${s.recup && s.recup.turmaId===turmaId ? renderRecuperacao() : ''}
     ${hoje ? planoAulaDetalheHtml(turmaId, plano, hoje, prog, true) : '<div class="card"><h3>🎉 Todas as aulas do plano foram dadas!</h3></div>'}
+    ${planoDiagnosticaHtml(turmaId, plano, prog, s.bimFerramentas||(hoje?hoje.bimestre:1))}
     ${renderPlanoErros(turmaId, !!(hoje && hoje.tipo==='Revisão'))}
     ${renderPlanoHabilidades(turmaId)}
-    <div class="card">
-      <h3 style="margin-top:0;">🖥️ Slides das aulas</h3>
-      <p class="muted" style="font-size:.86rem; margin-top:0;">Selecione <strong>vários PDFs de uma vez</strong>. O app liga cada arquivo à aula pelo número no nome: <code>aula-01.pdf</code> → Aula 1, <code>aula-02.pdf</code> → Aula 2…</p>
+    <details class="card">
+      <summary style="cursor:pointer; font-weight:700;">🖥️ Enviar PDFs dos slides <span class="muted" style="font-weight:400; font-size:.85rem;">(só se você tiver slides próprios)</span></summary>
+      <p class="muted" style="font-size:.86rem;">Selecione <strong>vários PDFs de uma vez</strong>. O app liga cada arquivo à aula pelo número no nome: <code>aula-01.pdf</code> → Aula 1, <code>aula-02.pdf</code> → Aula 2…</p>
       <label class="btn btn-primary btn-sm" style="cursor:pointer;">⬆️ Enviar PDFs dos slides<input type="file" id="plano-slides-input" accept="application/pdf" multiple style="display:none;"></label>
-    </div>
+    </details>
     <div class="card">
       <h3 style="margin-top:0;">📚 Todas as aulas</h3>
       ${lista}
@@ -25793,6 +25953,7 @@ document.addEventListener('click', (e) => {
   else if(act==='freq-calendario-mes'){ const c=state.coordenador; const [a,m]=c.freqConfig.mesCalendario.split('-').map(Number); const d=new Date(a, m-1+parseInt(btn.dataset.dir), 1); c.freqConfig.mesCalendario = d.toISOString().slice(0,7); render(); }
   else if(act==='aluno-sub-view'){
     al.subview = btn.dataset.sub;
+    if(al.matriculaStudentId) usoMarcar('aluno', al.subview, al.matriculaStudentId);
     state.ui.sidebarSearch = '';
     render();
   }
@@ -25950,6 +26111,9 @@ document.addEventListener('click', (e) => {
   else if(act==='revisao-resp'){ revisaoResponder(parseInt(btn.dataset.i)); }
   else if(act==='revisao-proxima'){ revisaoProxima(); }
   else if(act==='revisao-fechar'){ revisaoState().sessao = null; render(); }
+  else if(act==='recurso-toggle'){ recursoToggle(btn.dataset.id, btn.checked); }
+  else if(act==='recursos-uso'){ recursosResumoUso(); }
+  else if(act==='plano-diag-sel'){ const st = planoState(); const k = st.turmaSel + ':' + btn.dataset.b; st.diagSel = st.diagSel || {}; st.diagSel[k] = st.diagSel[k] || {}; st.diagSel[k][btn.dataset.n] = btn.checked; render(); }
   else if(act==='plano-diag-aplicar'){ planoAplicarDiagnostica(planoState().turmaSel, parseInt(btn.dataset.b)); }
   else if(act==='relatorio-abrir'){ const s = planoState(); const b = parseInt(btn.dataset.b)||1; const ids = btn.dataset.escopo==='todas' ? planoTurmasVisiveis().filter(t => s.turmaPlano[t.id]).map(t => t.id) : [s.turmaSel]; relatorioAbrir(ids, b); window.scrollTo(0,0); }
   else if(act==='relatorio-csv'){ relatorioCsv(); }
@@ -26011,6 +26175,8 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-clear-note'){ clearCoordNote(btn.dataset.id); }
   else if(act==='sub-view'){
     p.subview = btn.dataset.sub;
+    if(btn.dataset.lista) p.mode = 'list';
+    if(p.session) usoMarcar('professor', p.subview, p.session.id);
     p.profileEditorOpen = false;
     state.ui.sidebarSearch = '';
     stopLiberacoesPoll();
