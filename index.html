@@ -655,6 +655,8 @@
     .chart-label{ flex-basis:90px; font-size:.78rem; }
   }
   @media (max-width: 680px){ .stat-grid{ grid-template-columns:repeat(2,1fr); } }
+  [data-sed-preview] *{ animation:none !important; }
+  @media (max-width: 760px){ .sed-grade{ grid-template-columns:1fr !important; } .sed-grade > div:first-child{ max-height:30vh !important; } }
   @media (max-width: 420px){
     header h1{ font-size:1.9rem; }
     .tab-btn{ font-size:1rem; padding:4px 11px; }
@@ -673,7 +675,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-16-1100</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-16-1800</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -1140,7 +1142,7 @@ const SEG_EMAIL_COORD = 'coordenacao@sala-ceetip.app';
 // Chaves que só a equipe pode gravar (alunos, monitores e biblioteca continuam gravando o resto)
 const SEG_SO_EQUIPE_PREFIXOS = ['assessment', 'pesos-instrumentos', 'notas-manuais', 'bloco-lancamentos', 'disciplinas', 'question-bank',
   'plano-livro', 'plano-livro-parte', 'plano-livro-img', 'plano-livro-prog', 'plano-livro-slides', 'plano-livro-videos', 'plano-config', 'plano-visto',
-  'plano-termometro', 'slide-img', 'gemini-api-key-professor', 'avulso-respostas', 'aula-viva', 'seg-teste'];
+  'plano-termometro', 'plano-slides-ed', 'plano-slides-ed-t', 'plano-slides-ed-img', 'slide-img', 'gemini-api-key-professor', 'avulso-respostas', 'aula-viva', 'seg-teste'];
 const SEG_SO_EQUIPE_CHAVES = ['recursos-config', 'professores', 'coordenador-senha', 'coordenador-senha-salt', 'pin-liberacao', 'periodos-avaliacao', 'socio-config',
   'sessao-config', 'gabaritos-avulsos', 'gemini-api-key', 'temporada-atual', 'slides-decks', 'avisos', 'cronograma', 'dias-letivos',
   'turno-horarios', 'livros-didaticos', 'materiais-turma', 'tarefas', 'mapasmentais', 'lixeira', 'backup-ultimo', 'areas-disciplinas',
@@ -2399,7 +2401,12 @@ function detailsRestaurar(){
   });
   detailsEstado.telaAtual = tela;
 }
+// Digitando no editor de slides: redesenhos “de fundo” esperam o campo perder o foco (senão o cursor some).
+let renderPendenteDigitando = false;
+function digitandoNoEditor(){ const f = document.activeElement; return !!(f && f.dataset && f.dataset.sed && /^(INPUT|TEXTAREA)$/.test(f.tagName)); }
+document.addEventListener('focusout', () => setTimeout(() => { if(renderPendenteDigitando && !digitandoNoEditor()){ renderPendenteDigitando = false; render(); } }, 0));
 function render(){
+  if(digitandoNoEditor()){ renderPendenteDigitando = true; return; }
   if(Date.now() < selectAbertoAte){
     if(!renderAdiadoTimer) renderAdiadoTimer = setTimeout(() => { renderAdiadoTimer = null; selectAbertoAte = 0; render(); }, Math.max(50, selectAbertoAte - Date.now() + 50));
     return;
@@ -2426,6 +2433,7 @@ function renderInterno(){
   if(fotoLightboxEl) fotoLightboxEl.innerHTML = renderFotoLightbox();
   if(state.view==='landing'){
     root.innerHTML = renderLanding();
+    try{ const cv = document.getElementById('av-video-camada'); if(cv) cv.remove(); }catch(e){}
     const wrapEl = document.querySelector('.wrap');
     if(wrapEl){ wrapEl.classList.remove('wide'); wrapEl.classList.remove('full'); }
     return;
@@ -2457,6 +2465,7 @@ function renderInterno(){
   requestAnimationFrame(()=>{
     requestAnimationFrame(()=>{
       document.querySelectorAll('.quiz-bar-fill[data-target]').forEach(el => { el.style.width = el.dataset.target; });
+      try{ avVideoSync(); }catch(e){}
       initCampanhaCarousel();
     });
   });
@@ -22730,10 +22739,14 @@ function renderAlunoEstudarBlock(){
       </div>
       ${aberta ? `
         ${a.objetivo ? `<p style="font-size:.88rem; margin:8px 0 4px;"><strong>O que você precisa saber:</strong> ${esc(a.objetivo)}</p>` : ''}
-        ${(!slot && a.slides) ? (() => { const sv = e.av && e.av.n===a.n ? e.av : null; const lista = avMontarSlides(a.slides, { estudo:true });
+        ${(!slot && a.slides) ? (() => { const sv = e.av && e.av.n===a.n ? e.av : null;
+            e.edT = e.edT || {};
+            if(!(a.n in e.edT)){ e.edT[a.n] = null; const tid = state.aluno.turma && state.aluno.turma.id; if(tid) planoLerJson(`plano-slides-ed-t:${tid}:${a.n}`, null).then(v => { if(v){ e.edT[a.n] = v; render(); } }); }
+            const edT = e.edT[a.n]; const dE = avAplicarEdicao(a.slides, edT);
+            const lista = avSlidesFinal(dE, { estudo:true }, edT);
             if(!sv) return `<button class="btn btn-primary btn-sm" data-action="estudar-av" data-n="${a.n}" data-i="0">🖥️ Ver os slides da aula (${lista.length})</button>`;
-            avInjetarCss(); if(!AV_ICONES || (a.slides.figuras||[]).some(f => !(f.f in AV_IMG))){ avCarregarRecursos(a.slides).then(render); }
-            return `<div style="margin:8px 0;"><div class="av-slide" style="width:100%;">${avSlideHtml(a.slides, lista[sv.idx], { modo:'aluno', n:a.n, revelado:true, minha:null, estudo:true, mapaModelo: (e.cfg && e.cfg.mapaModelo) || 'estudar' })}</div>
+            avInjetarCss(); if(!AV_ICONES || (a.slides.figuras||[]).some(f => !(f.f in AV_IMG)) || (dE.extras||[]).some(x => x.img && !(('ed-' + x.img) in AV_IMG))){ avCarregarRecursos(dE).then(render); }
+            return `<div style="margin:8px 0;"><div class="av-slide" style="width:100%;">${avSlideHtml(dE, lista[Math.min(sv.idx, lista.length-1)], { modo:'aluno', n:a.n, revelado:true, minha:null, estudo:true, mapaModelo: (e.cfg && e.cfg.mapaModelo) || 'estudar' })}</div>
               <div class="row" style="justify-content:space-between; align-items:center; margin-top:6px;"><button class="btn btn-ghost btn-sm" data-action="estudar-av" data-n="${a.n}" data-i="${sv.idx-1}" ${sv.idx===0?'disabled':''}>← Anterior</button><span class="muted">${sv.idx+1} / ${lista.length}</span><button class="btn btn-ghost btn-sm" data-action="estudar-av" data-n="${a.n}" data-i="${Math.min(lista.length-1, sv.idx+1)}" ${sv.idx>=lista.length-1?'disabled':''}>Próximo →</button></div></div>`; })() : ''}
         ${slot ? (deck ? `<div style="margin:8px 0;">${deck.img ? `<img src="${deck.img}" alt="Slide" style="width:100%; border-radius:8px; border:1px solid #ddd;">` : '<div class="spinner"></div>'}
             <div class="row" style="justify-content:space-between; align-items:center; margin-top:6px;"><button class="btn btn-ghost btn-sm" data-action="estudar-slide" data-n="${a.n}" data-i="${deck.idx-1}" ${deck.idx===0?'disabled':''}>← Anterior</button><span class="muted">${deck.idx+1} / ${deck.total}</span><button class="btn btn-ghost btn-sm" data-action="estudar-slide" data-n="${a.n}" data-i="${deck.idx+1}" ${deck.idx>=deck.total-1?'disabled':''}>Próximo →</button></div></div>`
@@ -23024,6 +23037,8 @@ async function avCarregarRecursos(d){
   (d.figuras||[]).forEach(f => keys.add(f.f));
   if(d.esquema && d.esquema.fig) keys.add(d.esquema.fig);
   await Promise.all([...keys].filter(k => !(k in AV_IMG)).map(async k => { AV_IMG[k] = await planoLerJson(`plano-livro-img:${k}`, null); }));
+  // fotos/imagens dos slides criados pelo professor
+  await Promise.all((d.extras||[]).filter(x => x && x.img && !(('ed-' + x.img) in AV_IMG)).map(async x => { AV_IMG['ed-' + x.img] = await planoLerJson(`plano-slides-ed-img:${x.img}`, null); }));
 }
 function avIc(nome, cor, extra){ const svg = avSvgSeguro((AV_ICONES||{})[nome]); return svg ? `<span class="av-ic" style="color:${cor};${extra||''}">${svg}</span>` : ''; }
 function avCirc(nome, fundo, cor, tam){ return `<span class="av-circ" style="background:${fundo}; width:${tam}em; height:${tam}em;">${avIc(nome, cor, `font-size:${(tam*0.55).toFixed(2)}em;`)}</span>`; }
@@ -23099,7 +23114,10 @@ function avInjetarCss(){
   .av-alvo{position:absolute;aspect-ratio:1;border-radius:50%;border:.25em solid #1d6b31;background:rgba(29,107,49,.18);transform:translate(-50%,-50%);pointer-events:none;}
   .av-faixa{position:absolute;left:0;right:0;bottom:0;background:#C9A227;color:#3b1018;padding:.6em 1.2em;font-size:1.5cqw;z-index:4;animation:avFade .4s both;}
   .av-over{position:fixed;inset:0;background:rgba(15,15,15,.82);display:flex;align-items:center;justify-content:center;z-index:9600;padding:16px;}
-  .av-over-card{background:#fff;color:#222;border-radius:14px;padding:22px 24px;width:min(760px,100%);text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.4);}
+  .av-over-card{background:#fff;color:#222;border-radius:14px;padding:22px 24px;width:min(760px,100%);text-align:center;box-shadow:0 10px 40px rgba(0,0,0,.4);position:relative;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;-webkit-overflow-scrolling:touch;}
+  .av-over-card img{max-width:100%;max-height:60vh;height:auto;object-fit:contain;}
+  .av-over-x{position:sticky;top:-10px;float:right;margin:-10px -12px 0 8px;width:38px;height:38px;border-radius:50%;border:1px solid #ddd;background:#fff;font-size:18px;line-height:1;cursor:pointer;z-index:2;}
+  @media (max-height:560px){ .av-over-card{padding:12px 14px;} .av-over-card [data-desafio-turma]{margin:2px 0 !important;padding:2px 6px !important;} }
   .av-pisca{animation:avPulso 1.1s infinite;}
   .av-alvo-in{animation:avAlvo .55s cubic-bezier(.2,1.4,.4,1) both;}
   @keyframes avAlvo{from{opacity:0;transform:translate(-50%,-50%) scale(.4)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
@@ -23245,6 +23263,16 @@ function avSlideHtml(d, sl, ctx){
   case 'atividade': return `<div class="av-in"><div class="av-t">Mãos à obra</div><div class="av-g2">
       <div class="av-card av-pop" style="min-height:12em;"><div class="av-row">${avCirc('FaBookOpen', C.v, '#fff', 2.2)}<b style="color:${C.v};">No livro</b></div><div style="margin-top:.7em;font-size:1.1em;">${esc(d.atividade)}</div></div>
       <div class="av-card az av-pop" style="min-height:12em;animation-delay:.2s;"><div class="av-row">${avCirc('FaMobileScreen', C.a, '#fff', 2.2)}<b style="color:${C.a};">No app — exercício de fixação</b></div><div style="margin-top:.7em;font-size:1.1em;">5 questões objetivas + 1 questão do livro. Ao terminar, você vê a resposta certa e a explicação. Entregue no prazo e ganhe fichas 🎫</div></div></div></div>`;
+  case 'extra': {
+    const x = (d.extras||[]).find(e => e.id===sl.id) || {};
+    if(x.tipo==='video') return avVideoSlideHtml(x, ctx);
+    const linhas = String(x.texto||'').split('\n').map(t => t.trim()).filter(Boolean);
+    const foto = x.img && AV_IMG['ed-' + x.img] ? `<img src="${AV_IMG['ed-' + x.img]}" alt="" style="max-width:100%;max-height:36cqw;object-fit:contain;border-radius:.4em;">` : (x.img ? '<div class="av-fonte">(carregando imagem…)</div>' : '');
+    const texto = linhas.length > 1 ? `<ul style="margin:.2em 0 0 1em;padding:0;">${linhas.map((t,i) => `<li class="av-pop" style="margin:.4em 0;animation-delay:${.15+i*.15}s;">${esc(t)}</li>`).join('')}</ul>` : (linhas[0] ? `<div style="font-size:1.25em;">${esc(linhas[0])}</div>` : '');
+    return `<div class="av-in"><div class="av-t">${esc(x.titulo||'')}</div>
+      ${foto && texto ? `<div style="display:grid;grid-template-columns:1.25fr 1fr;gap:1.2em;height:74%;"><div style="display:flex;align-items:center;justify-content:center;">${foto}</div><div class="av-card" style="overflow:hidden;">${texto}</div></div>`
+        : foto ? `<div style="height:76%;display:flex;align-items:center;justify-content:center;">${foto}</div>` : `<div class="av-card" style="font-size:1.1em;">${texto}</div>`}</div>`;
+  }
   case 'volte': return `<div class="av-in av-azul"><div class="av-t">Volte à pergunta inicial</div><div style="font-size:1.6em;font-style:italic;margin:1.2em 0;">${esc(d.pergunta)}</div>
       <div class="av-card ou" style="color:${C.v};font-weight:700;">Escreva no caderno, em até 3 linhas, a sua resposta com o que aprendeu hoje.</div></div>`;
   case 'proxima': { const p = d.proxima||{}; return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Na próxima aula…</div>${avCirc('FaArrowRight', C.v, '#fff', 2.2)}</div>
@@ -23252,6 +23280,488 @@ function avSlideHtml(d, sl, ctx){
       <div class="av-card az"><b style="color:${C.a};">Até lá, no app:</b><ul style="margin:.5em 0 0 1em;padding:0;"><li>Minhas provas → exercício desta aula</li><li>Estudar → slides e questões que errou</li><li>Faltou? Tudo fica em Estudar.</li></ul></div></div></div>`; }
   }
   return '<div class="av-in"></div>';
+}
+/* ======================= EDITOR DE SLIDES (“Apresentar no app”) =======================
+   O professor corrige os textos dos slides e esconde os que não quer usar. Nada do plano original muda:
+   a versão dele fica em `plano-slides-ed:<planoId>:<aula>:<dono>` = { campos:{...}, ocultos:[...], em, por }.
+   `campos` substitui só os campos de texto do slide (título, pontos, pergunta-relâmpago, V ou F…).
+   Ao iniciar a aula ao vivo, a edição vai junto na sessão (os tablets montam os mesmos slides) e é copiada
+   para `plano-slides-ed-t:<turmaId>:<aula>`, que o “Estudar” do aluno usa depois da aula. */
+const SED_CAMPOS = ['titulo','pergunta','ideia','pontos','destaque','conceito','atividade','nuvem','debate','relampago','vf','figuras','esquema','mapa','anterior','abertura','extras'];
+function sedDono(){ const p = state.professor; return state.view==='coordenador' ? 'coord' : ((p.session && p.session.id) || 'coord'); }
+function sedChave(planoId, n){ return `plano-slides-ed:${planoId}:${n}:${sedDono()}`; }
+function avAplicarEdicao(d, ed){
+  if(!d || !ed || !ed.campos) return d;
+  const out = Object.assign({}, d);
+  SED_CAMPOS.forEach(k => { if(ed.campos[k]!==undefined) out[k] = ed.campos[k]; });
+  return out;
+}
+function avSlideChave(sl){ return sl.t + (sl.t==='figura' ? ':' + sl.i : sl.t==='caderno' ? ':' + sl.k : sl.t==='extra' ? ':' + sl.id : ''); }
+// Ordem escolhida pelo professor (lista de chaves) + slides próprios (extras). A capa fica sempre em 1º.
+// Chaves que não estão na ordem salva (ex.: plano atualizado depois) entram logo depois do slide que vinha antes delas.
+function avOrdenar(L, ed, d){
+  const extras = ((d && d.extras) || []).filter(x => x && x.id);
+  const ordem = (ed && Array.isArray(ed.ordem)) ? ed.ordem : null;
+  if(!ordem && !extras.length) return L;
+  const grupos = new Map(); const chavesOrig = [];
+  L.forEach(sl => { const k = avSlideChave(sl); if(!grupos.has(k)){ grupos.set(k, []); chavesOrig.push(k); } grupos.get(k).push(sl); });
+  extras.forEach(x => { const k = 'extra:' + x.id; if(!grupos.has(k)) grupos.set(k, [{ t:'extra', id: x.id }]); });
+  let seq = (ordem || []).filter(k => grupos.has(k) && k!=='capa');
+  seq = seq.filter((k, i) => seq.indexOf(k)===i);
+  chavesOrig.forEach((k, i) => {
+    if(k==='capa' || seq.includes(k)) return;
+    let pos = 0;
+    for(let j=i-1; j>=0; j--){ const q = seq.indexOf(chavesOrig[j]); if(q>=0){ pos = q+1; break; } }
+    seq.splice(pos, 0, k);
+  });
+  extras.forEach(x => { const k = 'extra:' + x.id; if(!seq.includes(k)) seq.push(k); });
+  const out = (grupos.get('capa') || []).slice();
+  seq.forEach(k => out.push(...grupos.get(k)));
+  return out;
+}
+function avSlidesFinal(d, opts, ed){ return avOrdenar(avFiltrarOcultos(avMontarSlides(d, opts), ed), ed, d); }
+function avFiltrarOcultos(L, ed){
+  const oc = new Set((ed && ed.ocultos) || []);
+  if(!oc.size) return L;
+  return L.filter(sl => sl.t==='capa' || !oc.has(avSlideChave(sl)));
+}
+async function sedCarregar(planoId, n){
+  const s = planoState(); s.sedCache = s.sedCache || {};
+  const k = sedChave(planoId, n);
+  if(!(k in s.sedCache)){ try{ s.sedCache[k] = JSON.parse((await window.storage.get(k, true)).value); }catch(e){ s.sedCache[k] = null; } }
+  return s.sedCache[k];
+}
+const SED_NOMES = { capa:'Capa', 'mapa-inicio':'Mapa da aula (início)', retomada:'Na aula passada', nuvem:'Nuvem de palavras', aprender:'O que vamos aprender', leitura:'Leitura', caderno:'Caderno (mapa)', destaque:'Destaque', figura:'Figura', esquema:'Esquema', relampago:'Pergunta-relâmpago', resposta:'Resposta da relâmpago', conceito:'Conceito (anote no caderno)', vf:'V ou F relâmpago', pratica:'Hora de praticar', grupo:'Atividade em grupo', 'mapa-final':'Mapa da aula (final)', volte:'Volte à pergunta inicial', termometro:'Termômetro', proxima:'Próxima aula' };
+function sedNomeSlide(sl, d){
+  if(sl.t==='figura') return 'Figura ' + (sl.i+1) + (d.figuras && d.figuras[sl.i] ? ': ' + (d.figuras[sl.i].titulo || d.figuras[sl.i].leg || '') : '');
+  if(sl.t==='esquema') return 'Esquema' + (sl.passos>1 ? ` (passo ${sl.k+1}/${sl.passos})` : '');
+  if(sl.t==='caderno') return 'Caderno: ramo ' + (sl.k+1);
+  if(sl.t==='extra'){ const x = (d.extras||[]).find(e => e.id===sl.id); return (x && x.tipo==='video' ? '🎬 ' : '⭐ ') + ((x && x.titulo) || 'Slide novo'); }
+  return SED_NOMES[sl.t] || sl.t;
+}
+async function sedAbrir(turmaId, n){
+  const s = planoState();
+  const plano = s.planos[s.turmaPlano[turmaId]];
+  const aula = plano && plano.aulas.find(a => a.n===n);
+  if(!aula || !aula.slides) return;
+  avInjetarCss();
+  s.sedAberto = { carregando:true, n, turmaId, planoId: plano.id }; render();
+  await avCarregarRecursos(aula.slides);
+  const ed = await sedCarregar(plano.id, n);
+  const cfg = await planoCfgCarregar(turmaId);
+  const base = JSON.parse(JSON.stringify(aula.slides));
+  const wd = JSON.parse(JSON.stringify(avAplicarEdicao(aula.slides, ed)));
+  await avCarregarRecursos(wd);
+  s.sedAberto = { n, turmaId, planoId: plano.id, base, wd, ocultos: ((ed && ed.ocultos) || []).slice(), ordem: (ed && Array.isArray(ed.ordem)) ? ed.ordem.slice() : null,
+    imgsNovas: {}, imgsOrig: ((wd.extras||[]).map(x => x.img).filter(Boolean)), sel: 0, tinhaEdicao: !!ed, sujo: false, msg: '',
+    opts: { leitura: (cfg.leitura||{})[n] || 0, grupo: (cfg.grupo||{})[n] || 0 } };
+  render();
+}
+function sedLista(se){ return avOrdenar(avMontarSlides(se.wd, se.opts), { ordem: se.ordem }, se.wd); }
+function sedChavesAtuais(se){ const ks = []; sedLista(se).forEach(sl => { const k = avSlideChave(sl); if(k!=='capa' && !ks.includes(k)) ks.push(k); }); return ks; }
+function sedMover(k, dir){
+  const se = planoState().sedAberto; if(!se) return;
+  const ks = sedChavesAtuais(se); const i = ks.indexOf(k); const j = i + dir;
+  if(i<0 || j<0 || j>=ks.length) return;
+  [ks[i], ks[j]] = [ks[j], ks[i]];
+  se.ordem = ks; se.sujo = true; se.msg = '';
+  const L = sedLista(se); const ni = L.findIndex(sl => avSlideChave(sl)===k); if(ni>=0) se.sel = ni;
+  render();
+}
+function sedNovoSlide(tipo){
+  const se = planoState().sedAberto; if(!se) return;
+  const L = sedLista(se); const atual = L[se.sel] ? avSlideChave(L[se.sel]) : 'capa';
+  const ks = sedChavesAtuais(se);
+  const id = cryptoId();
+  se.wd.extras = (se.wd.extras || []).concat([tipo==='video' ? { id, tipo:'video', titulo: 'Vídeo', url: '', ini: '', fim: '', pergunta: '' } : { id, titulo: 'Novo slide', texto: '', img: null }]);
+  const pos = atual==='capa' ? 0 : ks.indexOf(atual) + 1;
+  ks.splice(pos, 0, 'extra:' + id);
+  se.ordem = ks; se.sujo = true; se.msg = '';
+  const L2 = sedLista(se); se.sel = Math.max(0, L2.findIndex(sl => sl.t==='extra' && sl.id===id));
+  render();
+}
+function sedExcluirExtra(id){
+  const se = planoState().sedAberto; if(!se) return;
+  if(!confirm('Excluir este slide que você criou?')) return;
+  se.wd.extras = (se.wd.extras || []).filter(x => x.id!==id);
+  if(se.ordem) se.ordem = se.ordem.filter(k => k!=='extra:' + id);
+  se.ocultos = se.ocultos.filter(k => k!=='extra:' + id);
+  se.sujo = true; se.sel = Math.max(0, se.sel - 1); render();
+}
+// Reduz a foto (no máximo 1280 px, JPEG) para caber no banco e carregar rápido nos tablets.
+function sedComprimirImagem(file){
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onerror = () => rej(new Error('leitura'));
+    r.onload = () => { const im = new Image(); im.onerror = () => rej(new Error('imagem'));
+      im.onload = () => {
+        let q = 0.78, max = 1280, url = '';
+        for(let t=0; t<5; t++){
+          const esc0 = Math.min(1, max / Math.max(im.width, im.height));
+          const c = document.createElement('canvas'); c.width = Math.round(im.width*esc0); c.height = Math.round(im.height*esc0);
+          const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+          url = c.toDataURL('image/jpeg', q);
+          if(url.length < 450000) break;
+          q -= 0.12; max = Math.round(max * 0.8);
+        }
+        res(url);
+      };
+      im.src = r.result; };
+    r.readAsDataURL(file);
+  });
+}
+document.addEventListener('change', async e => {
+  const el = e.target; if(!el || !el.dataset || !el.dataset.sedImg) return;
+  const se = planoState().sedAberto; if(!se) return;
+  const f = el.files && el.files[0]; if(!f) return;
+  if(!/^image\//.test(f.type)){ alert('Escolha uma imagem (foto, print ou figura).'); return; }
+  try{
+    const url = await sedComprimirImagem(f);
+    const x = (se.wd.extras || []).find(y => y.id===el.dataset.sedImg); if(!x) return;
+    const imgId = cryptoId(); AV_IMG['ed-' + imgId] = url; se.imgsNovas[imgId] = url; x.img = imgId;
+    se.sujo = true; se.msg = ''; render();
+  }catch(err){ alert('Não consegui ler essa imagem. Tente outra (JPG ou PNG).'); }
+});
+const SED_PULAR = new Set(['tipo','icones','icone','fig','f','p','ar','n','cor','paginas','k','iconesCards']);
+const SED_ROTULOS = { titulo:'Título', itens:'Item', a:'Lado A', b:'Lado B', centro:'Centro do mapa', ramos:'Ramo', t:'Texto', dica:'Dica', ideia:'Ideia', pontos:'Ponto', conceito:'Conceito', formula:'Fórmula', cards:'Cartão' };
+function sedRotulo(path){
+  return path.split('.').slice(1).map(x => /^\d+$/.test(x) ? String(Number(x)+1) : (SED_ROTULOS[x] || x)).join(' › ') || 'Texto';
+}
+function sedFolhas(obj, path, out){
+  if(typeof obj==='string'){ out.push([path, obj]); return out; }
+  if(Array.isArray(obj)){ obj.forEach((v, i) => sedFolhas(v, path + '.' + i, out)); return out; }
+  if(obj && typeof obj==='object') Object.keys(obj).forEach(k => { if(!SED_PULAR.has(k)) sedFolhas(obj[k], path + '.' + k, out); });
+  return out;
+}
+function sedCamposGenericos(obj, path, aviso){
+  if(!obj) return '';
+  const fs = sedFolhas(obj, path, []);
+  return (aviso ? `<p class="muted" style="font-size:.8rem;margin:4px 0;">${aviso}</p>` : '') + fs.map(([pt, v]) => sedCampo(sedRotulo(pt), pt, v)).join('');
+}
+function sedPreviewHtml(se){
+  const L = sedLista(se); const sl = L[Math.min(se.sel, L.length-1)] || L[0];
+  return `<div class="av-slide" style="width:100%;">${avSlideHtml(se.wd, sl, { modo:'prof', n: se.n, revelado:true, minha:null, sess:{}, resp:{}, estudo:false, preview:true, mapaModelo:'estudar' })}</div>`;
+}
+function sedCampo(rotulo, path, valor, opts){
+  opts = opts || {};
+  const v = valor==null ? '' : String(valor);
+  if(opts.area || v.length > 90) return `<label style="display:block;margin:6px 0 2px;font-size:.82rem;font-weight:600;">${rotulo}</label><textarea data-sed="${path}" rows="${opts.rows||2}" style="width:100%;">${esc(v)}</textarea>`;
+  return `<label style="display:block;margin:6px 0 2px;font-size:.82rem;font-weight:600;">${rotulo}</label><input type="text" data-sed="${path}" value="${esc(v)}" style="width:100%;">`;
+}
+function sedCamposHtml(se, sl){
+  const d = se.wd; const L = ['A','B','C','D','E'];
+  switch(sl.t){
+    case 'capa': return sedCampo('Título da aula', 'titulo', d.titulo) + sedCampo('Para começar (pergunta inicial — também aparece no slide “Volte à pergunta”)', 'pergunta', d.pergunta, { area:true });
+    case 'volte': return sedCampo('Pergunta inicial (também aparece na capa)', 'pergunta', d.pergunta, { area:true });
+    case 'aprender': return sedCampo('Ideia principal (título do slide)', 'ideia', d.ideia) + (d.pontos||[]).map((p,i) => sedCampo('Ponto ' + (i+1), 'pontos.'+i, p, { area:true })).join('');
+    case 'destaque': return d.destaque ? sedCampo('Destaque (texto grande)', 'destaque.0', d.destaque[0]) + sedCampo('Complemento', 'destaque.1', d.destaque[1], { area:true }) : '';
+    case 'figura': { const f = (d.figuras||[])[sl.i]; if(!f) return '';
+      return sedCampo('Título do slide', `figuras.${sl.i}.titulo`, f.titulo || f.leg) + sedCampo('Legenda', `figuras.${sl.i}.leg`, f.leg, { area:true })
+        + sedCampo('Perguntas sobre a figura (uma por linha)', `figuras.${sl.i}.perguntas`, (f.perguntas||[]).join('\n'), { area:true, rows:4 }); }
+    case 'relampago': case 'resposta': { const r = d.relampago || {};
+      return sedCampo('Pergunta-relâmpago', 'relampago.texto', r.texto, { area:true })
+        + (r.opcoes||[]).map((o,i) => sedCampo('Alternativa ' + L[i], 'relampago.opcoes.'+i, o)).join('')
+        + `<label style="display:block;margin:6px 0 2px;font-size:.82rem;font-weight:600;">Alternativa certa</label><select data-sed="relampago.correta">${(r.opcoes||[]).map((o,i)=>`<option value="${i}" ${Number(r.correta)===i?'selected':''}>${L[i]}</option>`).join('')}</select>`
+        + sedCampo('Por quê? (explicação mostrada depois)', 'relampago.explicacao', r.explicacao, { area:true }); }
+    case 'conceito': return d.conceito ? sedCampo('Conceito', 'conceito.0', d.conceito[0]) + sedCampo('Definição para o caderno', 'conceito.1', d.conceito[1], { area:true }) : '';
+    case 'nuvem': return sedCampo('Pergunta da nuvem de palavras', 'nuvem', d.nuvem, { area:true });
+    case 'vf': return (d.vf||[]).map((it,i) => `<div style="border:1px solid #eee;border-radius:8px;padding:4px 8px;margin:6px 0;">${sedCampo('Afirmação ' + (i+1), `vf.${i}.t`, it.t, { area:true })}
+        <label style="display:block;margin:6px 0 2px;font-size:.82rem;font-weight:600;">Resposta</label><select data-sed="vf.${i}.v"><option value="1" ${it.v?'selected':''}>Verdadeiro</option><option value="0" ${!it.v?'selected':''}>Falso</option></select>
+        ${sedCampo('Explicação', `vf.${i}.e`, it.e)}</div>`).join('');
+    case 'pratica': case 'atividade': return sedCampo('Atividade do livro', 'atividade', d.atividade, { area:true });
+    case 'grupo': return sedCampo('Proposta para o grupo', 'debate', d.debate, { area:true });
+    case 'esquema': return sedCamposGenericos(d.esquema, 'esquema', 'Os textos do esquema (todos os passos). O desenho e os ícones continuam os mesmos.');
+    case 'caderno': return d.mapa ? sedCampo('Centro do mapa', 'mapa.centro', d.mapa.centro) + sedCamposGenericos((d.mapa.ramos||[])[sl.k], 'mapa.ramos.' + sl.k, 'Este ramo do mapa da aula (o aluno copia no caderno).') : '';
+    case 'mapa-inicio': case 'mapa-final': return sedCamposGenericos(d.mapa, 'mapa', 'Mapa da aula: os mesmos textos aparecem no início, nos slides de caderno e no final.');
+    case 'retomada': return d.anterior ? sedCamposGenericos(d.anterior, 'anterior', 'Resumo da aula passada.') : (d.abertura ? sedCamposGenericos(d.abertura, 'abertura') : '<p class="muted" style="font-size:.85rem;">Este slide é montado automaticamente pelo app. Você pode escondê-lo.</p>');
+    case 'extra': { const x = (d.extras||[]).find(e => e.id===sl.id); if(!x) return ''; const i = d.extras.indexOf(x);
+      if(x.tipo==='video'){
+        const salvos = (((planoState().videos||{})[se.planoId]||{})[se.n]) || [];
+        const ok = ytIdDe(x.url);
+        return sedCampo('Título do slide', `extras.${i}.titulo`, x.titulo)
+          + sedCampo('Link do vídeo no YouTube', `extras.${i}.url`, x.url)
+          + `<p style="font-size:.8rem;margin:2px 0;" data-sed-video-status>${x.url ? (ok ? '✅ Vídeo reconhecido.' : '⚠️ Não reconheci esse link. Use um link do YouTube (youtube.com/watch?v=… ou youtu.be/…).') : ''}</p>`
+          + (salvos.length ? `<div style="margin:4px 0;font-size:.82rem;"><b>Ou escolha um vídeo salvo nesta aula:</b> ${salvos.map(v => `<button class="btn btn-ghost btn-sm" data-action="sed-video-escolher" data-id="${esc(x.id)}" data-url="${esc(v.url)}" data-t="${esc(v.t||'')}" style="width:auto;margin:2px;">🎬 ${esc(v.t||v.url)}</button>`).join('')}</div>` : '')
+          + `<div class="row" style="gap:10px;"><div style="flex:1;">${sedCampo('Começar em (min:seg, opcional)', `extras.${i}.ini`, x.ini)}</div><div style="flex:1;">${sedCampo('Parar em (min:seg, opcional)', `extras.${i}.fim`, x.fim)}</div></div>`
+          + sedCampo('Pergunta para pensar enquanto assiste (opcional)', `extras.${i}.pergunta`, x.pergunta, { area:true })
+          + `<p class="muted" style="font-size:.8rem;margin:6px 0;">Na aula, o vídeo toca no telão (precisa de internet). Nos tablets aparece “Assista no telão”, para não sobrecarregar o Wi-Fi. No “Estudar”, o aluno pode assistir depois.</p>`
+          + `<p style="margin:10px 0 0;"><button class="btn btn-ghost btn-sm" data-action="sed-extra-excluir" data-id="${esc(x.id)}" style="width:auto;color:#a33131;border-color:#e3a1a1;">🗑️ Excluir este slide</button></p>`;
+      }
+      return sedCampo('Título do slide', `extras.${i}.titulo`, x.titulo)
+        + sedCampo('Texto (cada linha vira um tópico)', `extras.${i}.texto`, x.texto, { area:true, rows:5 })
+        + `<label style="display:block;margin:8px 0 2px;font-size:.82rem;font-weight:600;">Imagem ou foto (opcional)</label>
+           <div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;"><label class="btn btn-ghost btn-sm" style="cursor:pointer;width:auto;">📷 ${x.img?'Trocar imagem':'Escolher imagem ou tirar foto'}<input type="file" accept="image/*" data-sed-img="${esc(x.id)}" style="display:none;"></label>
+           ${x.img ? `<button class="btn btn-ghost btn-sm" data-action="sed-img-tirar" data-id="${esc(x.id)}" style="width:auto;">Tirar imagem</button>` : ''}</div>
+           <p style="margin:12px 0 0;"><button class="btn btn-ghost btn-sm" data-action="sed-extra-excluir" data-id="${esc(x.id)}" style="width:auto;color:#a33131;border-color:#e3a1a1;">🗑️ Excluir este slide</button></p>`; }
+  }
+  return `<p class="muted" style="font-size:.85rem;">Este slide é montado automaticamente pelo app${sl.t==='leitura'||sl.t==='grupo' ? ' (o tempo é escolhido no quadro da aula)' : ''}. Você pode escondê-lo, se não quiser usar.</p>`;
+}
+function sedHtml(){
+  const s = planoState(); const se = s.sedAberto;
+  if(!se) return '';
+  if(se.carregando) return `<div class="av-over" style="z-index:9500;"><div class="av-over-card"><div class="spinner"></div><p class="muted">Abrindo o editor de slides…</p></div></div>`;
+  const L = sedLista(se); if(se.sel >= L.length) se.sel = L.length - 1;
+  const sl = L[se.sel]; const oc = new Set(se.ocultos);
+  const visiveis = L.filter(x => x.t==='capa' || !oc.has(avSlideChave(x))).length;
+  const lista = L.map((x, i) => { const k = avSlideChave(x); const esc0 = oc.has(k) && x.t!=='capa';
+    return `<div class="row" data-sed-item="${i}" style="align-items:center;gap:4px;padding:3px 4px;border-radius:6px;${i===se.sel?'background:#F3E7C0;':''}${esc0?'opacity:.45;':''}">
+      <button class="btn btn-ghost btn-sm" data-action="sed-sel" data-i="${i}" style="flex:1;min-width:0;width:auto;text-align:left;border:none;background:transparent;padding:4px;font-size:.8rem;${esc0?'text-decoration:line-through;':''}">${i+1}. ${esc(sedNomeSlide(x, se.wd))}</button>
+      ${x.t==='capa' || (i>0 && avSlideChave(L[i-1])===k) ? '' : `<button class="btn btn-ghost btn-sm" data-action="sed-mover" data-k="${esc(k)}" data-dir="-1" title="Subir" style="padding:2px 5px;width:auto;flex:0 0 auto;min-width:0;">↑</button><button class="btn btn-ghost btn-sm" data-action="sed-mover" data-k="${esc(k)}" data-dir="1" title="Descer" style="padding:2px 5px;width:auto;flex:0 0 auto;min-width:0;">↓</button>`}
+      ${x.t==='capa' ? '' : `<button class="btn btn-ghost btn-sm" data-action="sed-ocultar" data-k="${esc(k)}" title="${esc0?'Mostrar este slide':'Esconder este slide'}" style="padding:2px 6px;width:auto;flex:0 0 auto;min-width:0;">${esc0?'🚫':'👁️'}</button>`}</div>`; }).join('');
+  const escondido = oc.has(avSlideChave(sl)) && sl.t!=='capa';
+  return `<div class="av-over" data-sed-editor style="z-index:9500;align-items:flex-start;overflow:auto;">
+    <div class="av-over-card" style="width:min(1180px,100%);text-align:left;max-height:none;">
+      <div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div><h3 style="margin:0;">✏️ Editar slides — Aula ${se.n}</h3><div class="muted" style="font-size:.8rem;">${visiveis} de ${L.length} slides aparecem. ${(() => { const ts = sedTurmasDoPlano(se.planoId); return ts.length ? `As mudanças valem para todas as suas turmas com este plano: <b>${esc(ts.join(', '))}</b>.` : 'As mudanças valem para as suas turmas com este plano.'; })()} O plano original não muda.</div></div>
+        <div class="row" style="gap:6px;flex-wrap:wrap;">
+          ${se.tinhaEdicao || se.sujo ? `<button class="btn btn-ghost btn-sm" data-action="sed-original">↩️ Voltar ao original</button>` : ''}
+          ${se.tinhaEdicao ? `<button class="btn btn-ghost btn-sm" data-action="sed-copiar" title="Copiar esta edição para outra aula, para a outra versão do plano ou para outro professor">📋 Copiar…</button>` : ''}
+          <button class="btn btn-ghost btn-sm" data-action="sed-fechar">Fechar</button>
+          <button class="btn btn-primary btn-sm" data-action="sed-salvar" ${se.salvando?'disabled':''}>${se.salvando?'Salvando…':'💾 Salvar'}</button>
+        </div>
+      </div>
+      ${se.msg ? `<div style="margin:8px 0;padding:6px 10px;border-radius:8px;background:#e9f6ec;font-size:.85rem;" data-sed-msg>${esc(se.msg)}</div>` : ''}
+      ${sedCopiarHtml(se)}
+      <div style="display:grid;grid-template-columns:minmax(180px,250px) 1fr;gap:14px;margin-top:10px;" class="sed-grade">
+        <div style="max-height:70vh;overflow:auto;border:1px solid #eee;border-radius:8px;padding:4px;">${lista}</div>
+        <div>
+          <div data-sed-preview style="${escondido?'opacity:.4;':''}">${sedPreviewHtml(se)}</div>
+          ${escondido ? '<p class="muted" style="font-size:.85rem;margin:6px 0;">🚫 Este slide está escondido e não aparece na aula.</p>' : ''}
+          <div class="row" style="gap:6px;margin:8px 0;"><button class="btn btn-ghost btn-sm" data-action="sed-sel" data-i="${Math.max(0, se.sel-1)}" ${se.sel===0?'disabled':''}>← Anterior</button><span class="muted" style="align-self:center;">${se.sel+1} / ${L.length}</span><button class="btn btn-ghost btn-sm" data-action="sed-sel" data-i="${Math.min(L.length-1, se.sel+1)}" ${se.sel>=L.length-1?'disabled':''}>Próximo →</button><button class="btn btn-ghost btn-sm" data-action="sed-novo" style="width:auto;margin-left:auto;" title="Cria um slide com título, texto e imagem logo depois deste">➕ Novo slide depois deste</button><button class="btn btn-ghost btn-sm" data-action="sed-novo" data-tipo="video" style="width:auto;" title="Cria um slide com um vídeo do YouTube logo depois deste">🎬 Slide de vídeo</button></div>
+          <div data-sed-campos>${sedCamposHtml(se, sl)}</div>
+        </div>
+      </div>
+    </div></div>`;
+}
+function sedSetPath(obj, path, valor){
+  const ps = path.split('.'); let o = obj;
+  for(let i=0;i<ps.length-1;i++){ const k = /^\d+$/.test(ps[i]) ? Number(ps[i]) : ps[i]; if(o[k]==null) o[k] = /^\d+$/.test(ps[i+1]) ? [] : {}; o = o[k]; }
+  const ult = /^\d+$/.test(ps[ps.length-1]) ? Number(ps[ps.length-1]) : ps[ps.length-1];
+  o[ult] = valor;
+}
+function sedValor(el){
+  const path = el.dataset.sed;
+  if(path==='relampago.correta') return Number(el.value);
+  if(/^vf\.\d+\.v$/.test(path)) return el.value==='1';
+  if(/\.perguntas$/.test(path)) return el.value.split('\n').map(x => x.trim()).filter(Boolean);
+  return el.value;
+}
+document.addEventListener('input', e => {
+  const el = e.target; if(!el || !el.dataset || !el.dataset.sed) return;
+  const se = planoState().sedAberto; if(!se || !se.wd) return;
+  sedSetPath(se.wd, el.dataset.sed, sedValor(el)); se.sujo = true; se.msg = '';
+  const pv = document.querySelector('[data-sed-preview]'); if(pv) pv.innerHTML = sedPreviewHtml(se);
+  if(/\.url$/.test(el.dataset.sed)){ const st = document.querySelector('[data-sed-video-status]'); if(st) st.textContent = el.value ? (ytIdDe(el.value) ? '✅ Vídeo reconhecido.' : '⚠️ Não reconheci esse link. Use um link do YouTube (youtube.com/watch?v=… ou youtu.be/…).') : ''; }
+});
+document.addEventListener('change', e => {
+  const el = e.target; if(!el || !el.dataset || !el.dataset.sed || el.tagName!=='SELECT') return;
+  const se = planoState().sedAberto; if(!se || !se.wd) return;
+  sedSetPath(se.wd, el.dataset.sed, sedValor(el)); se.sujo = true; se.msg = '';
+  const pv = document.querySelector('[data-sed-preview]'); if(pv) pv.innerHTML = sedPreviewHtml(se);
+});
+function sedDiferencas(se){
+  const campos = {};
+  SED_CAMPOS.forEach(k => { if(se.wd[k]!==undefined && JSON.stringify(se.wd[k])!==JSON.stringify(se.base[k])) campos[k] = se.wd[k]; });
+  if(campos.extras && !campos.extras.length && !se.base.extras) delete campos.extras;
+  return campos;
+}
+// A ordem só é guardada se for diferente da ordem que o app montaria sozinho.
+function sedOrdemParaSalvar(se){
+  if(!se.ordem) return null;
+  const atual = sedChavesAtuais(se);
+  const padrao = []; avOrdenar(avMontarSlides(se.wd, se.opts), null, se.wd).forEach(sl => { const k = avSlideChave(sl); if(k!=='capa' && !padrao.includes(k)) padrao.push(k); });
+  return JSON.stringify(atual)===JSON.stringify(padrao) ? null : atual;
+}
+async function sedSalvar(){
+  const s = planoState(); const se = s.sedAberto; if(!se || se.salvando) return;
+  const campos = sedDiferencas(se);
+  const ordem = sedOrdemParaSalvar(se);
+  const k = sedChave(se.planoId, se.n);
+  se.salvando = true; render();
+  try{
+    const usadas = new Set((se.wd.extras||[]).map(x => x.img).filter(Boolean));
+    for(const [id, url] of Object.entries(se.imgsNovas||{})){ if(usadas.has(id)) await window.storage.set(`plano-slides-ed-img:${id}`, JSON.stringify(url), true); }
+    se.imgsNovas = {};
+    for(const id of (se.imgsOrig||[])){ if(!usadas.has(id)){ try{ await window.storage.delete(`plano-slides-ed-img:${id}`, true); }catch(e){} } }
+    se.imgsOrig = [...usadas];
+    if(!Object.keys(campos).length && !se.ocultos.length && !ordem){ try{ await window.storage.delete(k, true); }catch(e){} s.sedCache[k] = null; se.tinhaEdicao = false; se.msg = '✅ Nada mudou em relação ao original: a aula usa os slides originais.'; }
+    else{
+      const ed = { campos, ocultos: se.ocultos.slice(), ordem, em: Date.now(), por: (state.professor.session && state.professor.session.displayName) || 'Coordenação' };
+      await window.storage.set(k, JSON.stringify(ed), true);
+      s.sedCache[k] = ed; se.tinhaEdicao = true;
+      se.msg = '✅ Salvo! Na próxima vez que você clicar em “📡 Apresentar no app”, a aula usa a sua versão (os tablets também).';
+    }
+    se.sujo = false;
+  }catch(e){ se.msg = '⚠️ Não foi possível salvar agora. Verifique a internet e tente de novo.'; }
+  se.salvando = false; render();
+}
+async function sedOriginal(){
+  const s = planoState(); const se = s.sedAberto; if(!se) return;
+  if(!confirm('Voltar aos slides originais desta aula? As suas mudanças serão apagadas.')) return;
+  const k = sedChave(se.planoId, se.n);
+  try{ await window.storage.delete(k, true); }catch(e){}
+  s.sedCache[k] = null;
+  for(const id of (se.imgsOrig||[])){ try{ await window.storage.delete(`plano-slides-ed-img:${id}`, true); }catch(e){} }
+  se.imgsOrig = []; se.imgsNovas = {}; se.ordem = null;
+  se.wd = JSON.parse(JSON.stringify(se.base)); se.ocultos = []; se.tinhaEdicao = false; se.sujo = false; se.msg = '↩️ Slides originais restaurados.';
+  render();
+}
+function sedFechar(){
+  const s = planoState(); const se = s.sedAberto;
+  if(se && se.sujo && !confirm('Você tem mudanças não salvas. Fechar mesmo assim?')) return;
+  s.sedAberto = null; render();
+}
+/* ---- Slide de vídeo (YouTube) ----
+   O vídeo fica numa camada fora da tela do app (#av-video-camada), posicionada por cima do espaço reservado no slide.
+   Assim os redesenhos da aula ao vivo (respostas chegando etc.) não recarregam nem param o vídeo.
+   Nos tablets, durante a aula ao vivo, o vídeo NÃO toca (Wi-Fi e som): aparece “Assista no telão”. No Estudar, toca. */
+function ytIdDe(url){
+  if(!url) return null;
+  const m = String(url).trim().match(/(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  return m ? m[1] : (/^[a-zA-Z0-9_-]{11}$/.test(String(url).trim()) ? String(url).trim() : null);
+}
+function tempoSeg(t){
+  if(t==null || t==='') return 0;
+  const p = String(t).trim().split(':').map(x => parseInt(x, 10));
+  if(p.some(isNaN)) return 0;
+  return p.reduce((a, x) => a*60 + x, 0);
+}
+function avVideoSrc(x){
+  const id = ytIdDe(x.url); if(!id) return '';
+  const ini = tempoSeg(x.ini), fim = tempoSeg(x.fim);
+  return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1&playsinline=1${ini?'&start='+ini:''}${fim>ini?'&end='+fim:''}`;
+}
+function avVideoSlideHtml(x, ctx){
+  const id = ytIdDe(x.url);
+  const trecho = (x.ini || x.fim) ? `<span class="av-fonte">Trecho: ${esc(x.ini||'0:00')}${x.fim?' a '+esc(x.fim):''}</span>` : '';
+  const pergunta = x.pergunta ? `<div class="av-card ou" style="margin-top:.6em;"><b>Enquanto assiste:</b> ${esc(x.pergunta)}</div>` : '';
+  let corpo;
+  if(!id) corpo = `<div class="av-card" style="height:60%;display:flex;align-items:center;justify-content:center;text-align:center;">🎬 Cole o link de um vídeo do YouTube no campo ao lado.</div>`;
+  else if(ctx.modo==='aluno' && !ctx.estudo) corpo = `<div class="av-card az" style="height:62%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;"><div style="font-size:4em;">🎬</div><div style="font-size:1.6em;font-weight:700;color:#1F4E79;">Assista no telão</div><div>O vídeo passa na frente da sala.</div></div>`;
+  else if(ctx.preview) corpo = `<div style="height:64%;display:flex;align-items:center;justify-content:center;"><div style="position:relative;height:100%;aspect-ratio:16/9;max-width:100%;background:#000 url(https://i.ytimg.com/vi/${id}/hqdefault.jpg) center/cover;border-radius:.4em;display:flex;align-items:center;justify-content:center;"><span style="background:rgba(200,0,0,.9);color:#fff;border-radius:.4em;padding:.2em .7em;font-size:2em;">▶</span></div></div>`;
+  else corpo = `<div style="height:64%;display:flex;align-items:center;justify-content:center;"><div data-av-video-slot="${esc(avVideoSrc(x))}" style="height:100%;aspect-ratio:16/9;max-width:100%;background:#000;border-radius:.4em;color:#fff;display:flex;align-items:center;justify-content:center;font-size:.9em;">carregando o vídeo… (precisa de internet)</div></div>`;
+  return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t" style="margin-bottom:.4em;">🎬 ${esc(x.titulo||'Vídeo')}</div>${trecho}</div>${corpo}${pergunta}</div>`;
+}
+let avVideoRaf = null;
+function avVideoSync(){
+  const slot = document.querySelector('[data-av-video-slot]');
+  let cam = document.getElementById('av-video-camada');
+  if(!slot){ if(cam) cam.remove(); return; }
+  const src = slot.dataset.avVideoSlot;
+  if(!cam){ cam = document.createElement('div'); cam.id = 'av-video-camada'; cam.style.cssText = 'position:fixed;z-index:9100;background:#000;border-radius:6px;overflow:hidden;'; document.body.appendChild(cam); }
+  if(cam.dataset.src !== src){
+    cam.dataset.src = src;
+    cam.innerHTML = `<iframe src="${esc(src)}" title="Vídeo" style="width:100%;height:100%;border:0;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen></iframe>`;
+  }
+  const r = slot.getBoundingClientRect();
+  const painel = document.querySelector('.av-over');   // painel aberto (roleta, desafio…) fica por cima: esconde o vídeo
+  const vis = r.width > 20 && r.height > 20 && r.bottom > 0 && r.top < innerHeight && !painel;
+  cam.style.display = vis ? 'block' : 'none';
+  Object.assign(cam.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+}
+function avVideoAgendar(){ if(avVideoRaf) return; avVideoRaf = requestAnimationFrame(() => { avVideoRaf = null; avVideoSync(); }); }
+window.addEventListener('resize', avVideoAgendar);
+window.addEventListener('scroll', avVideoAgendar, true);
+// garante que o vídeo some/acompanha quando parte da tela muda sem um redesenho completo
+setInterval(() => { if(document.getElementById('av-video-camada')) avVideoSync(); }, 700);
+/* ---- Copiar a edição para outra aula / outra versão / outro professor ---- */
+function sedChaveDe(planoId, n, dono){ return `plano-slides-ed:${planoId}:${n}:${dono}`; }
+function sedTurmasDoPlano(planoId){
+  const s = planoState();
+  return (planoTurmasVisiveis()||[]).filter(t => s.turmaPlano[t.id]===planoId).map(t => t.name);
+}
+function sedNormTxt(t){ return String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); }
+// aula do outro plano que mais se parece com esta (mesmo título ou mesmas páginas do livro)
+function sedAulaCorrespondente(aulaOrig, plano){
+  if(!plano || !aulaOrig) return null;
+  const tit = sedNormTxt(aulaOrig.tituloCurto || aulaOrig.tema);
+  const pags = String(aulaOrig.paginas||'').match(/\d+/g) || [];
+  let melhor = null, nota = 0;
+  plano.aulas.filter(a => a.slides).forEach(a => {
+    let p = 0;
+    if(tit && sedNormTxt(a.tituloCurto || a.tema)===tit) p += 10;
+    const pa = String(a.paginas||'').match(/\d+/g) || [];
+    p += pags.filter(x => pa.includes(x)).length;
+    if(p > nota){ nota = p; melhor = a; }
+  });
+  return melhor;
+}
+async function sedCopiarAbrir(){
+  const s = planoState(); const se = s.sedAberto; if(!se) return;
+  if(se.sujo){ await sedSalvar(); if(se.sujo) return; }
+  const k = sedChave(se.planoId, se.n);
+  if(!s.sedCache[k]){ alert('Esta aula ainda não tem edição salva para copiar. Faça as mudanças e clique em Salvar primeiro.'); return; }
+  let profs = []; try{ profs = (await fetchProfessoresList()) || []; }catch(e){}
+  const planoAtual = s.planos[se.planoId];
+  const disc = sedNormTxt(planoAtual && planoAtual.disciplina);
+  se.copiar = { dono: sedDono(), planoId: se.planoId, n: null, profs: profs.filter(p => p && p.id).map(p => ({ id: p.id, nome: p.displayName || p.name || p.email || p.id })),
+    planos: (s.index||[]).filter(pl => !disc || sedNormTxt(pl.disciplina)===disc), msg:'' };
+  await sedCopiarPlano(se.planoId);
+}
+async function sedCopiarPlano(planoId){
+  const s = planoState(); const se = s.sedAberto; if(!se || !se.copiar) return;
+  se.copiar.planoId = planoId; se.copiar.msg = '';
+  const pl = await planoObter(planoId);
+  const orig = (s.planos[se.planoId]||{aulas:[]}).aulas.find(a => a.n===se.n);
+  if(planoId===se.planoId){ const prox = pl.aulas.find(a => a.slides && a.n!==se.n); se.copiar.n = se.copiar.dono!==sedDono() ? se.n : (prox ? prox.n : se.n); }
+  else { const c = sedAulaCorrespondente(orig, pl); se.copiar.n = c ? c.n : ((pl.aulas.find(a => a.slides)||{}).n || 1); }
+  render();
+}
+function sedCopiarHtml(se){
+  const c = se.copiar; if(!c) return '';
+  const s = planoState(); const pl = s.planos[c.planoId];
+  const orig = (s.planos[se.planoId]||{aulas:[]}).aulas.find(a => a.n===se.n) || {};
+  const dest = pl && pl.aulas.find(a => a.n===c.n);
+  const parece = dest && (sedNormTxt(dest.tituloCurto||dest.tema)===sedNormTxt(orig.tituloCurto||orig.tema));
+  const mesmo = c.planoId===se.planoId && c.n===se.n && c.dono===sedDono();
+  const turmasDest = c.dono===sedDono() ? sedTurmasDoPlano(c.planoId) : [];
+  return `<div data-sed-copiar style="margin:10px 0;padding:10px 12px;border:1px solid #e6dcc8;border-radius:10px;background:#fffaf0;">
+    <strong>📋 Copiar esta edição</strong> <span class="muted" style="font-size:.8rem;">(textos, slides escondidos, ordem, slides novos e vídeos)</span>
+    <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:8px;align-items:flex-end;">
+      <div><label style="font-size:.8rem;font-weight:600;display:block;">Para quem</label><select data-sed-copiar-campo="dono">
+        <option value="${esc(sedDono())}" ${c.dono===sedDono()?'selected':''}>Para mim (outra aula ou versão)</option>
+        ${c.profs.filter(p => p.id!==sedDono()).map(p => `<option value="${esc(p.id)}" ${c.dono===p.id?'selected':''}>Prof. ${esc(p.nome)}</option>`).join('')}</select></div>
+      <div><label style="font-size:.8rem;font-weight:600;display:block;">Plano / versão</label><select data-sed-copiar-campo="plano">${c.planos.map(p => `<option value="${esc(p.id)}" ${c.planoId===p.id?'selected':''}>${esc(p.titulo)}</option>`).join('')}</select></div>
+      <div><label style="font-size:.8rem;font-weight:600;display:block;">Aula</label><select data-sed-copiar-campo="aula">${pl ? pl.aulas.filter(a => a.slides).map(a => `<option value="${a.n}" ${c.n===a.n?'selected':''}>Aula ${a.n} — ${esc(a.tituloCurto||a.tema||'')}</option>`).join('') : ''}</select></div>
+      <button class="btn btn-primary btn-sm" data-action="sed-copiar-ok" style="width:auto;" ${mesmo?'disabled':''}>Copiar</button>
+      <button class="btn btn-ghost btn-sm" data-action="sed-copiar-fechar" style="width:auto;">Cancelar</button>
+    </div>
+    ${mesmo ? '<p class="muted" style="font-size:.82rem;margin:6px 0 0;">Esta é a própria aula que você está editando.</p>' : dest && !parece ? `<p style="font-size:.82rem;margin:6px 0 0;color:#a4521b;">⚠️ A aula de destino tem outro título (“${esc(dest.tituloCurto||dest.tema||'')}”). A cópia troca os textos dela pelos desta aula — confira se é o mesmo conteúdo.</p>` : ''}
+    ${turmasDest.length ? `<p class="muted" style="font-size:.8rem;margin:6px 0 0;">Vai valer para: ${esc(turmasDest.join(', '))}.</p>` : ''}
+    ${c.msg ? `<p style="font-size:.85rem;margin:6px 0 0;" data-sed-copiar-msg>${esc(c.msg)}</p>` : ''}
+  </div>`;
+}
+document.addEventListener('change', e => {
+  const el = e.target; if(!el || !el.dataset || !el.dataset.sedCopiarCampo) return;
+  const se = planoState().sedAberto; if(!se || !se.copiar) return;
+  const campo = el.dataset.sedCopiarCampo;
+  if(campo==='dono'){ se.copiar.dono = el.value; se.copiar.msg = ''; if(se.copiar.planoId===se.planoId && el.value!==sedDono()) se.copiar.n = se.n; render(); }
+  else if(campo==='plano'){ sedCopiarPlano(el.value); }
+  else if(campo==='aula'){ se.copiar.n = parseInt(el.value, 10); se.copiar.msg = ''; render(); }
+});
+async function sedCopiarExecutar(){
+  const s = planoState(); const se = s.sedAberto; const c = se && se.copiar; if(!c) return;
+  const origem = s.sedCache[sedChave(se.planoId, se.n)]; if(!origem) return;
+  const destK = sedChaveDe(c.planoId, c.n, c.dono);
+  let existe = false; try{ await window.storage.get(destK, true); existe = true; }catch(e){}
+  const quem = c.dono===sedDono() ? '' : ' de ' + ((c.profs.find(p => p.id===c.dono)||{}).nome || 'outro professor');
+  if(existe && !confirm(`A aula ${c.n}${quem} já tem uma edição. Substituir pela desta aula?`)) return;
+  try{
+    const ed = JSON.parse(JSON.stringify(origem));
+    // as fotos dos slides novos são duplicadas: apagar a edição de uma aula não apaga a foto da outra
+    for(const x of ((ed.campos && ed.campos.extras) || [])){
+      if(!x.img) continue;
+      let url = AV_IMG['ed-' + x.img]; if(!url) url = await planoLerJson(`plano-slides-ed-img:${x.img}`, null);
+      if(!url){ x.img = null; continue; }
+      const novo = cryptoId(); await window.storage.set(`plano-slides-ed-img:${novo}`, JSON.stringify(url), true); AV_IMG['ed-' + novo] = url; x.img = novo;
+    }
+    ed.em = Date.now(); ed.copiadoDe = { planoId: se.planoId, n: se.n, por: (state.professor.session && state.professor.session.displayName) || 'Coordenação' };
+    await window.storage.set(destK, JSON.stringify(ed), true);
+    if(c.dono===sedDono()) s.sedCache[destK] = ed;
+    const pl = s.planos[c.planoId];
+    c.msg = `✅ Copiado para a aula ${c.n}${pl ? ' de “' + pl.titulo + '”' : ''}${quem}.`;
+  }catch(err){ c.msg = '⚠️ Não foi possível copiar agora. Verifique a internet e tente de novo.'; }
+  render();
 }
 // ---- Professor ----
 function aulaVivaState(){ const p = state.professor; if(!p.aulaViva) p.aulaViva = { presenting:false, sess:null, d:null, slides:[], resp:{}, n:null }; return p.aulaViva; }
@@ -23270,7 +23780,13 @@ async function iniciarAulaViva(turmaId, n){
   const cfg = await planoCfgCarregar(turmaId);
   if(!s.prog[turmaId]) await planoCarregarTurma(turmaId);
   const sessCfg = { datashow: !!cfg.datashow, mapaModelo: cfg.mapaModelo, leitura: (cfg.leitura||{})[n] || 0, grupo: (cfg.grupo||{})[n] || 0 };
-  av.d = aula.slides; av.n = n; av.slides = avMontarSlides(aula.slides, { leitura: sessCfg.leitura, grupo: sessCfg.grupo }); av.resp = {}; av.int = {}; av.duvidas = {}; av.painel = null; av.marcando = false; av.ultimaChave = null;
+  // versão editada pelo professor (textos e slides escondidos): vai junto na sessão para os tablets
+  const ed = await sedCarregar(plano.id, n);
+  if(ed) sessCfg.ed = { campos: ed.campos || {}, ocultos: ed.ocultos || [], ordem: ed.ordem || null };
+  try{ await window.storage.set(`plano-slides-ed-t:${turmaId}:${n}`, JSON.stringify(sessCfg.ed || null), true); }catch(e){}
+  const dEd = avAplicarEdicao(aula.slides, sessCfg.ed);
+  await avCarregarRecursos(dEd);
+  av.d = dEd; av.n = n; av.slides = avSlidesFinal(dEd, { leitura: sessCfg.leitura, grupo: sessCfg.grupo }, sessCfg.ed); av.resp = {}; av.int = {}; av.duvidas = {}; av.painel = null; av.marcando = false; av.ultimaChave = null;
   av.sess = { id: cryptoId(), turmaId, planoId: plano.id, n, idx: 0, total: av.slides.length, revelado: false, fichasDadas: false,
     professorName: p.session ? p.session.displayName : 'Coordenação', startedAt: Date.now(), cfg: sessCfg };
   av.presenting = true;
@@ -23419,7 +23935,7 @@ async function pollAulaVivaForAluno(){
       avInjetarCss();
       await avCarregarRecursos(aula.slides);
       if(!al.aulaViva || al.aulaViva.id!==ativa.id){ al.avMinha = null; }
-      al.aulaViva = ativa; al.avD = aula.slides; al.avSlides = avMontarSlides(aula.slides, { leitura: (ativa.cfg && ativa.cfg.leitura) || 0, grupo: (ativa.cfg && ativa.cfg.grupo) || 0 });
+      const edV = ativa.cfg && ativa.cfg.ed; al.aulaViva = ativa; al.avD = avAplicarEdicao(aula.slides, edV); if(edV) await avCarregarRecursos(al.avD); al.avSlides = avSlidesFinal(al.avD, { leitura: (ativa.cfg && ativa.cfg.leitura) || 0, grupo: (ativa.cfg && ativa.cfg.grupo) || 0 }, edV);
       if(ativa.modo==='quiz' && al.stage==='aulaviva'){ al.stage = 'dashboard'; al.avAutoVoltar = true; al.subview = 'inicio'; }
       else if(!ativa.modo && al.avAutoVoltar && al.stage==='dashboard'){ al.avAutoVoltar = false; al.stage = 'aulaviva'; }
     }
@@ -23806,6 +24322,9 @@ function avDesafioHtml(linhas, turmaId, grande){
       <span style="text-align:right;">${String(l.media).replace('.',',')} 🎫/aluno</span></div>`).join('')}
     <div class="muted" style="font-size:.78em;margin-top:6px;">Semana que começou em ${ini.toLocaleDateString('pt-BR')}. Conta a média de fichas por aluno, para ser justo com turmas grandes e pequenas. Toda segunda-feira começa um novo desafio.</div></div>`;
 }
+// Fecha o painel da aula ao vivo tocando fora dele ou com Esc (o botão “Fechar” pode ficar fora da tela em telas baixas).
+document.addEventListener('click', e => { const o = e.target; if(o && o.dataset && o.dataset.avFundoFecha && !aulaVivaState().girando) avPainelFechar(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape'){ try{ const av = aulaVivaState(); if(av && av.painel && !av.girando) avPainelFechar(); }catch(x){} } });
 async function avDesafioAbrir(){
   const av = aulaVivaState();
   try{ const r = await window.storage.get('turmas', true); state.professor.turmas = JSON.parse(r.value); }catch(e){}
@@ -23840,7 +24359,7 @@ function avPainelHtml(av){
         : '<p class="muted">Nenhuma dúvida nova. Os alunos mandam pelo botão “❓ Dúvida” no tablet.</p>'}</div>
       <button class="btn btn-ghost" data-action="av-painel-fechar" style="margin-top:10px;">Fechar</button>`;
   }
-  return `<div class="av-over" data-av-painel="${av.painel}"><div class="av-over-card">${corpo}</div></div>`;
+  return `<div class="av-over" data-av-painel="${av.painel}" data-av-fundo-fecha="1"><div class="av-over-card">${av.girando ? '' : '<button class="av-over-x" data-action="av-painel-fechar" title="Fechar" aria-label="Fechar">✕</button>'}${corpo}</div></div>`;
 }
 function avFaixaDuvidaHtml(sess, prof){
   if(!sess || !sess.duvidaTela) return '';
@@ -24914,7 +25433,7 @@ function planoAulaDetalheHtml(turmaId, plano, aula, prog, destaque){
     ${aula.tipo==='Revisão' ? `<p style="margin:8px 0; font-size:.88rem; background:#fdf0e6; border-radius:8px; padding:8px 10px;">📉 Veja no quadro <strong>“O que a turma mais errou”</strong> (logo abaixo) os conteúdos para revisar e aplique a lista de revisão com as questões mais erradas.</p>` : ''}
     ${aula.tipo==='Avaliação' ? `<p style="margin:8px 0; display:flex; gap:8px; flex-wrap:wrap;"><button class="btn btn-primary btn-sm" data-action="plano-montar-prova" data-b="${aula.bimestre}">📝 Montar a prova do ${aula.bimestre}º bimestre com as questões das aulas</button><button class="btn btn-ghost btn-sm" data-action="plano-recup-abrir" data-b="${aula.bimestre}">♻️ Depois da prova: recuperação personalizada</button></p>` : ''}
     <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center;">
-      ${aula.slides ? `<button class="btn btn-primary btn-sm" data-action="plano-aula-viva" data-n="${aula.n}" title="Slides montados pelo app, com animações e a pergunta-relâmpago nos tablets">📡 Apresentar no app</button>` : ''}
+      ${aula.slides ? `<button class="btn btn-primary btn-sm" data-action="plano-aula-viva" data-n="${aula.n}" title="Slides montados pelo app, com animações e a pergunta-relâmpago nos tablets">📡 Apresentar no app</button><button class="btn btn-ghost btn-sm" data-action="sed-abrir" data-n="${aula.n}" title="Corrigir textos e esconder slides desta aula (o plano original não muda)">✏️ Editar slides${(planoState().sedCache||{})[sedChave(plano.id, aula.n)] ? ' <span style="font-size:.75rem;background:#F3E7C0;border-radius:6px;padding:1px 5px;">editados</span>' : ''}</button>` : ''}
       ${aula.exercicio ? `<button class="btn btn-ghost btn-sm" data-action="plano-quiz" data-n="${aula.n}" title="Quiz por Equipes com as perguntas do exercício desta aula">🎮 Quiz da aula</button>` : ''}
       ${slot
         ? `<button class="btn btn-primary btn-sm" data-action="plano-apresentar" data-n="${aula.n}">▶️ Apresentar slides (${slot.totalSlides})</button>`
@@ -24951,7 +25470,9 @@ function renderPlanoLivro(){
   const podeImportar = planoPodeImportar();
   const avisos = `${s.msg?`<div class="card" data-plano-msg style="background:#e9f6ec; border:1px solid #9fd3ab;">${esc(s.msg)}</div>`:''}${s.erro?`<div class="card" style="background:#fdecec; border:1px solid #e3a1a1;">${esc(s.erro)}</div>`:''}${s.enviando?`<div class="card" data-plano-enviando>⏳ ${esc(s.enviando.texto)} (${s.enviando.atual}/${s.enviando.total})… não feche esta tela.</div>`:''}`;
   const opcoesPlano = sel => `<option value="">— sem plano —</option>` + s.index.map(pl => `<option value="${esc(pl.id)}" ${sel===pl.id?'selected':''}>${esc(pl.titulo)}</option>`).join('');
-  const blocoCoord = podeImportar ? `
+  // O quadro de importação e vínculo das turmas aparece só no painel da coordenação (não no painel do professor,
+  // nem quando a coordenação entra “como professor”).
+  const blocoCoord = state.view==='coordenador' ? `
     <div class="card">
       <h3 style="margin-top:0;">⚙️ Coordenação: planos e turmas</h3>
       <p class="muted" style="font-size:.88rem; margin-top:0;">1) Importe o arquivo <strong>.json</strong> do plano (faz uma vez só). 2) Escolha qual versão cada turma segue. O professor passa a ver a “Aula de hoje”.</p>
@@ -24981,7 +25502,7 @@ function renderPlanoLivro(){
   });
   if(!turmasComPlano.length){
     return `<h2>🗓️ Plano de Aulas do Livro</h2>${avisos}${blocoCoord}
-      <div class="card"><p>Nenhuma das suas turmas tem plano de aulas ainda.</p><p class="muted">${podeImportar ? 'Importe o plano e escolha a versão de cada turma no quadro acima.' : 'Peça à coordenação para importar o plano e escolher a versão da sua turma.'}</p></div>`;
+      <div class="card"><p>Nenhuma das suas turmas tem plano de aulas ainda.</p><p class="muted">${state.view==='coordenador' ? 'Importe o plano e escolha a versão de cada turma no quadro acima.' : podeImportar ? 'Importe o plano e escolha a versão de cada turma no painel da coordenação (🗓️ Plano de Aulas do Livro).' : 'Peça à coordenação para importar o plano e escolher a versão da sua turma.'}</p></div>`;
   }
   const turmaId = turmasComPlano.some(t=>t.id===s.turmaSel) ? s.turmaSel : turmasComPlano[0].id;
   if(turmaId !== s.turmaSel){ s.turmaSel = turmaId; setTimeout(async()=>{ await planoCarregarTurma(turmaId); render(); },0); }
@@ -25012,6 +25533,7 @@ function renderPlanoLivro(){
       }).join('')}</div>
     </details>`).join('');
   return `
+    ${sedHtml()}
     <h2>🗓️ Plano de Aulas do Livro</h2>
     ${avisos}
     ${plano.aulas.some(a => a.exercicio) ? '' : `<div class="card" data-plano-sem-conteudo style="border-left:4px solid #C9A227;"><strong>⏳ As aulas da ${esc(plano.serie||'série')} ainda estão sendo preparadas.</strong><br><span style="font-size:.88rem;">Por enquanto o plano tem o roteiro de cada aula (tema, páginas do livro, objetivo e sugestões). Slides, exercícios, diagnóstica, níveis e trabalho em grupo aparecem aqui assim que o conteúdo desta série for importado.</span></div>`}
@@ -26190,6 +26712,21 @@ document.addEventListener('click', (e) => {
   else if(act==='inicio-abrir-plano'){ const s = planoState(); s.turmaSel = btn.dataset.tid; s.aulaAberta = null; s.msg=''; p.subview = 'planolivro'; planoCarregarTurma(btn.dataset.tid).then(() => { render(); window.scrollTo(0,0); }); }
   else if(act==='inicio-apresentar'){ const s = planoState(); s.turmaSel = btn.dataset.tid; iniciarAulaViva(btn.dataset.tid, parseInt(btn.dataset.n)); }
   else if(act==='inicio-marcar-dada'){ const n = parseInt(btn.dataset.n); if(confirm(`Marcar a aula ${n} como dada hoje nesta turma?`)){ const s = planoState(); planoMarcarDada(btn.dataset.tid, n, true).then(() => { s.resumoInicio = null; planoCarregarResumoInicio(); }); } }
+  else if(act.startsWith('sed-') && digitandoNoEditor() && (document.activeElement.blur(), false)){}
+  else if(act==='sed-abrir'){ sedAbrir(planoState().turmaSel, parseInt(btn.dataset.n)); }
+  else if(act==='sed-sel'){ const se = planoState().sedAberto; if(se){ se.sel = parseInt(btn.dataset.i)||0; render(); } }
+  else if(act==='sed-ocultar'){ const se = planoState().sedAberto; if(se){ const k = btn.dataset.k; se.ocultos = se.ocultos.includes(k) ? se.ocultos.filter(x => x!==k) : se.ocultos.concat([k]); se.sujo = true; se.msg = ''; render(); } }
+  else if(act==='sed-salvar'){ sedSalvar(); }
+  else if(act==='sed-mover'){ sedMover(btn.dataset.k, parseInt(btn.dataset.dir)); }
+  else if(act==='sed-novo'){ sedNovoSlide(btn.dataset.tipo); }
+  else if(act==='sed-video-escolher'){ const se = planoState().sedAberto; const x = se && (se.wd.extras||[]).find(y => y.id===btn.dataset.id); if(x){ x.url = btn.dataset.url; if(!x.titulo || x.titulo==='Vídeo') x.titulo = btn.dataset.t || x.titulo; se.sujo = true; render(); } }
+  else if(act==='sed-copiar'){ sedCopiarAbrir(); }
+  else if(act==='sed-copiar-ok'){ sedCopiarExecutar(); }
+  else if(act==='sed-copiar-fechar'){ const se = planoState().sedAberto; if(se){ se.copiar = null; render(); } }
+  else if(act==='sed-extra-excluir'){ sedExcluirExtra(btn.dataset.id); }
+  else if(act==='sed-img-tirar'){ const se = planoState().sedAberto; const x = se && (se.wd.extras||[]).find(y => y.id===btn.dataset.id); if(x){ x.img = null; se.sujo = true; render(); } }
+  else if(act==='sed-original'){ sedOriginal(); }
+  else if(act==='sed-fechar'){ sedFechar(); }
   else if(act==='plano-aula-viva'){ iniciarAulaViva(planoState().turmaSel, parseInt(btn.dataset.n)); }
   else if(act==='av-ir'){ aulaVivaIr(parseInt(btn.dataset.d)); }
   else if(act==='av-revelar'){ aulaVivaRevelar(); }
