@@ -656,6 +656,63 @@
   }
   @media (max-width: 680px){ .stat-grid{ grid-template-columns:repeat(2,1fr); } }
   [data-sed-preview] *{ animation:none !important; }
+  /* ---- Página do Plano de Aulas ---- */
+  .pl-cab{ padding:12px 16px; }
+  .pl-turmas{ display:flex; gap:6px; overflow-x:auto; flex:1; min-width:0; padding-bottom:2px; scrollbar-width:thin; }
+  .pl-turma{ flex:0 0 auto; border:1px solid var(--paper-line,#e4d9c8); background:var(--paper,#fff); color:var(--ink,#222); border-radius:999px; padding:7px 16px; font-weight:600; font-size:.92rem; cursor:pointer; font-family:inherit; }
+  .pl-turma.ativa{ background:var(--wine,#6B1F2E); border-color:var(--wine,#6B1F2E); color:#fff; }
+  .pl-engrenagem{ flex:0 0 auto; font-size:1.1rem; padding:4px 10px; }
+  .pl-engrenagem.ativa{ background:#f3e7c0; }
+  .pl-progresso{ margin-top:10px; background:var(--paper-line,#eee); border-radius:8px; height:8px; overflow:hidden; }
+  .pl-progresso > div{ height:100%; background:var(--wine,#6B1F2E); border-radius:8px; }
+  .pl-hero{ border:2px solid var(--wine,#6B1F2E); }
+  .pl-aula{ margin-bottom:12px; }
+  .pl-titulo{ margin:4px 0 6px; font-size:1.3rem; line-height:1.25; }
+  .pl-nota{ margin:8px 0; font-size:.88rem; background:#fdf0e6; border-radius:8px; padding:8px 10px; }
+  .pl-acoes{ display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin-top:12px; }
+  .pl-acao{ display:flex; align-items:center; gap:10px; text-align:left; border-radius:12px; padding:12px 14px; min-height:62px; font-family:inherit; font-size:1rem; font-weight:700; cursor:pointer; border:1px solid transparent; line-height:1.2; }
+  label.pl-acao, .pl-acao{ text-transform:none; letter-spacing:normal; margin:0; }
+  .pl-acao small{ display:block; font-size:.76rem; font-weight:400; opacity:.85; margin-top:2px; }
+  .pl-acao-ic{ font-size:1.6rem; line-height:1; }
+  .pl-acao-1{ background:var(--wine,#6B1F2E); color:#fff; }
+  .pl-acao-2{ background:#1F4E79; color:#fff; }
+  .pl-acao-3{ background:#fff; color:#1d6b31; border-color:#1d6b31; }
+  .pl-acao-ok{ background:#eef4fb; color:#1F4E79; border-color:#c9d8ea; cursor:default; }
+  .pl-acao-feita{ background:#e3f3e6; color:#1d6b31; border-color:#9fd3ab; }
+  .pl-acao:hover:not(.pl-acao-ok){ filter:brightness(1.06); box-shadow:0 2px 10px rgba(0,0,0,.12); }
+  .pl-linha{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; font-size:.86rem; }
+  .pl-linha .btn{ width:auto; }
+  .pl-opc{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .pl-opc label{ text-transform:none; font-weight:400; font-size:.86rem; margin:0; }
+  .pl-secund{ padding-top:10px; border-top:1px dashed var(--paper-line,#e4d9c8); }
+  .pl-abas{ display:flex; gap:4px; flex-wrap:wrap; margin-top:14px; border-bottom:1px solid var(--paper-line,#e4d9c8); }
+  .pl-aba{ border:none; background:transparent; padding:8px 12px; font-size:.88rem; cursor:pointer; color:var(--ink-soft,#666); border-bottom:3px solid transparent; margin-bottom:-1px; font-family:inherit; }
+  .pl-aba.ativa{ color:var(--wine,#6B1F2E); border-bottom-color:var(--wine,#6B1F2E); font-weight:700; }
+  .pl-aba-corpo{ padding:10px 2px 2px; }
+  .pl-nav{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:14px; padding-top:10px; border-top:1px solid var(--paper-line,#e4d9c8); }
+  .pl-grupo{ padding:0; overflow:hidden; margin-bottom:10px; }
+  .pl-grupo-cab{ display:flex; align-items:center; gap:12px; width:100%; background:transparent; border:none; padding:14px 18px; cursor:pointer; text-align:left; font-family:inherit; color:var(--ink,#222); }
+  .pl-grupo-cab:hover{ background:rgba(107,31,46,.04); }
+  .pl-grupo-tit{ font-weight:700; font-size:1rem; white-space:nowrap; }
+  .pl-grupo-res{ flex:1; min-width:0; font-size:.82rem; color:var(--ink-soft,#777); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pl-grupo-seta{ font-size:1rem; color:var(--wine,#6B1F2E); }
+  .pl-grupo-corpo{ padding:0 18px 16px; }
+  .pl-grupo-corpo > .card{ box-shadow:none; border:1px solid var(--paper-line,#eee); }
+  .pl-bim{ margin-bottom:6px; } .pl-bim > summary{ cursor:pointer; font-weight:700; padding:8px 0; }
+  .pl-item{ display:flex; gap:10px; align-items:center; padding:9px 8px; border-bottom:1px solid var(--paper-line,#eee); font-size:.88rem; cursor:pointer; border-radius:8px; }
+  .pl-item:hover{ background:rgba(107,31,46,.05); }
+  .pl-item-hoje{ background:#fbf3df; } .pl-item.aberta{ background:#f3ece0; }
+  .pl-item-n{ flex:0 0 30px; height:30px; border-radius:50%; background:var(--paper-line,#eee); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.8rem; color:#555; }
+  .pl-item-t{ flex:1; min-width:0; }
+  .pl-selo{ flex:0 0 auto; font-size:.72rem; border-radius:999px; padding:2px 8px; font-weight:700; }
+  .pl-selo-ok{ background:#e3f3e6; color:#1d6b31; } .pl-selo-hoje{ background:var(--wine,#6B1F2E); color:#fff; } .pl-selo-prox{ background:#eef4fb; color:#1F4E79; }
+  .pl-item-seta{ color:#999; }
+  @media (max-width: 640px){
+    .pl-acoes{ grid-template-columns:1fr; }
+    .pl-grupo-cab{ flex-wrap:wrap; } .pl-grupo-res{ flex-basis:100%; order:3; white-space:normal; }
+    .pl-item{ flex-wrap:wrap; } .pl-titulo{ font-size:1.15rem; }
+  }
+  :root[data-theme="dark"] .pl-acao-3{ background:transparent; } :root[data-theme="dark"] .pl-item-hoje, :root[data-theme="dark"] .pl-item.aberta, :root[data-theme="dark"] .pl-nota{ background:rgba(201,162,39,.15); } :root[data-theme="dark"] .pl-acao-ok{ background:rgba(31,78,121,.25); color:#cfe0f3; } :root[data-theme="dark"] .pl-acao-feita{ background:rgba(29,107,49,.25); color:#bfe6c8; }
   .av-dest{ color:#6B1F2E; font-weight:700; } .av-escuro .av-dest, .av-azul .av-dest{ color:#F3D27A; }
   @media (max-width: 760px){ .sed-grade{ grid-template-columns:1fr !important; } .sed-grade > div:first-child{ max-height:30vh !important; } }
   @media (max-width: 420px){
@@ -676,7 +733,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-16-2000</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-16-2100</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -25549,7 +25606,7 @@ function renderInicioAulasCard(){
 function planoLinksHtml(lista, icone){
   return (lista||[]).map(l => `<a href="${esc(l.url)}" target="_blank" rel="noopener" style="display:block; font-size:.85rem; margin:2px 0;">${icone} ${esc(l.t)}${l.busca?' <span class="muted">(busca)</span>':''}</a>`).join('');
 }
-function planoAulaDetalheHtml(turmaId, plano, aula, prog, destaque){
+function planoAulaDetalheHtml(turmaId, plano, aula, prog, destaque, ctxHero){
   const s = planoState();
   const slot = s.slides[plano.id] && s.slides[plano.id][aula.n];
   const codigo = prog.exercicios && prog.exercicios[aula.n];
@@ -25557,54 +25614,79 @@ function planoAulaDetalheHtml(turmaId, plano, aula, prog, destaque){
   const dada = !!(prog.dadas && prog.dadas[aula.n]);
   const vale = s.valeNota[aula.n] !== false;
   const recursos = planoLinksHtml(aula.video,'🎬') + planoLinksHtml(aula.podcast,'🎧') + planoLinksHtml(aula.filmes,'🎞️') + planoLinksHtml(aula.sites,'🌐') + planoLinksHtml(aula.questoes,'❓');
+  const editados = (planoState().sedCache||{})[sedChave(plano.id, aula.n)];
+  // ---- ações principais (3 botões grandes) ----
+  const apresentar = aula.slides
+    ? `<button class="pl-acao pl-acao-1" data-action="plano-aula-viva" data-n="${aula.n}" title="Slides montados pelo app, com animações e perguntas nos tablets"><span class="pl-acao-ic">📡</span><span>Apresentar<small>slides no telão e nos tablets</small></span></button>`
+    : slot ? `<button class="pl-acao pl-acao-1" data-action="plano-apresentar" data-n="${aula.n}"><span class="pl-acao-ic">▶️</span><span>Apresentar<small>PDF com ${slot.totalSlides} slides</small></span></button>`
+    : `<label class="pl-acao pl-acao-1" style="cursor:pointer;"><span class="pl-acao-ic">⬆️</span><span>Enviar slides<small>PDF desta aula</small></span><input type="file" accept="application/pdf" data-action="plano-slide-unico" data-n="${aula.n}" style="display:none;"></label>`;
+  const exercicio = !aula.exercicio ? ''
+    : codigo ? `<div class="pl-acao pl-acao-ok" data-pl-ex-aplicado><span class="pl-acao-ic">📝</span><span>Exercício aplicado<small>código <b>${esc(codigo)}</b></small></span></div>`
+    : `<button class="pl-acao pl-acao-2" data-action="plano-aplicar-exercicio" data-n="${aula.n}"><span class="pl-acao-ic">📝</span><span>Aplicar exercício<small>${aula.exercicio.questoes.length} questões${planoMapaDoExercicio(turmaId, aula) ? ' + mapa do caderno' : ''} · ${vale ? 'vale nota' : 'treino'}</small></span></button>`;
+  const marcar = dada
+    ? `<button class="pl-acao pl-acao-feita" data-action="plano-desmarcar-dada" data-n="${aula.n}" title="Desmarcar"><span class="pl-acao-ic">✅</span><span>Aula dada<small>toque para desmarcar</small></span></button>`
+    : `<button class="pl-acao pl-acao-3" data-action="plano-marcar-dada" data-n="${aula.n}"><span class="pl-acao-ic">✅</span><span>Marcar como dada<small>registra no plano</small></span></button>`;
+  // opções do exercício (antes e depois de aplicar)
+  const exOpcoes = !aula.exercicio ? '<span class="muted" style="font-size:.8rem;">Exercício de fixação desta aula ainda não foi preparado.</span>'
+    : codigo ? `<span class="pl-opc">${prog.apoio && prog.apoio[aula.n] ? `🧩 apoio <b>${esc(prog.apoio[aula.n].code)}</b> (${prog.apoio[aula.n].alunos.length}) · ` : ''}${prog.desafios && prog.desafios[aula.n] ? `⭐ desafio <b>${esc(prog.desafios[aula.n])}</b> · ` : ''}
+         <label style="cursor:pointer;"><input type="checkbox" data-action="plano-vale-nota-aplicado" data-code="${esc(codigo)}" ${(!aval || aval.valeNota!==false)?'checked':''} style="width:auto;"> vale nota</label>
+         <span data-prazo-aplicado style="margin-left:6px;">${aval && aval.endAt ? (new Date(aval.endAt).getTime() < Date.now() ? '⏰ prazo encerrado em ' : '⏰ até ') + planoDataCurta(aval.endAt) : '⏰ sem prazo'}</span>
+         <select data-action="plano-estender-prazo" data-code="${esc(codigo)}" style="width:auto; margin-left:6px; padding:2px 4px;"><option value="">mudar prazo…</option><option value="2">+2 dias</option><option value="7">+7 dias</option><option value="0">tirar o prazo</option></select></span>`
+    : `<span class="pl-opc"><b>Exercício:</b> <label style="cursor:pointer;"><input type="checkbox" data-action="plano-vale-nota" data-n="${aula.n}" ${vale?'checked':''} style="width:auto;"> vale nota</label>
+         <label>prazo <select data-action="plano-prazo" data-n="${aula.n}" style="width:auto; padding:2px 4px;">${[['2','2 dias'],['7','7 dias'],['14','14 dias'],['','sem prazo']].map(([v,t]) => `<option value="${v}" ${(s.prazo[aula.n]!=null ? s.prazo[aula.n] : '7')===v?'selected':''}>${t}</option>`).join('')}</select></label>
+         <button class="btn btn-ghost btn-sm" data-action="plano-editar-exercicio" data-n="${aula.n}" style="width:auto;">✏️ Editar antes de aplicar</button>
+         ${planoApoioHtml(turmaId, aula)}</span>`;
+  // ---- ações secundárias ----
+  const secund = [
+    aula.exercicio ? `<button class="btn btn-ghost btn-sm" data-action="plano-quiz" data-n="${aula.n}" title="Quiz por Equipes com as perguntas do exercício desta aula">🎮 Quiz da aula</button>` : '',
+    aula.slides ? `<button class="btn btn-ghost btn-sm" data-action="sed-abrir" data-n="${aula.n}" title="Corrigir textos, criar slides, vídeos e perguntas (o plano original não muda)">✏️ Editar slides${editados ? ' <span style="font-size:.75rem;background:#F3E7C0;border-radius:6px;padding:1px 5px;">editados</span>' : ''}</button>` : '',
+    aula.slides && slot ? `<button class="btn btn-ghost btn-sm" data-action="plano-apresentar" data-n="${aula.n}">▶️ PDF (${slot.totalSlides})</button>` : '',
+    aula.slides && !slot ? `<label class="btn btn-ghost btn-sm" style="cursor:pointer;">⬆️ PDF próprio<input type="file" accept="application/pdf" data-action="plano-slide-unico" data-n="${aula.n}" style="display:none;"></label>` : '',
+    aula.slides ? planoLeituraHtml(turmaId, aula) + planoGrupoHtml(turmaId, aula) : '',
+    aula.slides && aula.slides.mapa ? (() => { const vs = planoVistoDe(turmaId, aula.n); const nv = Object.keys(vs).length; const tot = (((state.professor.turmas||[]).find(t=>t.id===turmaId)||{}).students||[]).length;
+      return `<button class="btn btn-ghost btn-sm" data-action="plano-visto-abrir" data-tid="${esc(turmaId)}" data-n="${aula.n}" style="${dada && !nv ? 'border-color:#a4521b; color:#a4521b;' : ''}">📒 Visto no caderno (${nv}/${tot})</button>`; })() : '',
+  ].filter(Boolean).join('');
+  // ---- abas de apoio ----
+  const abas = [];
+  if((aula.roteiro||[]).length) abas.push(['roteiro', '🧭 Roteiro', `<ol style="margin:0 0 0 18px; font-size:.9rem; line-height:1.5;">${aula.roteiro.map(r=>`<li>${esc(r)}</li>`).join('')}</ol>`]);
+  const livro = `${aula.pergunta?`<p style="margin:0 0 6px;"><strong>Pergunta para começar:</strong> <em>${esc(aula.pergunta)}</em></p>`:''}${(aula.exercicios_livro||[]).length?`<p style="margin:0 0 6px;">📖 <strong>No livro:</strong> ${(aula.exercicios_livro||[]).map(e=>esc(typeof e==='string'?e:(e.t||''))).join(' · ')}</p>`:''}${aula.tarefa?`<p style="margin:0;">🏠 <strong>Tarefa:</strong> ${esc(aula.tarefa)}</p>`:''}`;
+  if(livro) abas.push(['livro', '📖 Livro e tarefa', `<div style="font-size:.9rem;">${livro}</div>`]);
+  abas.push(['videos', '⭐ Vídeos', planoVideosHtml(plano.id, aula.n, true)]);
+  if(recursos) abas.push(['buscas', '🔎 Buscas prontas', `<div>${recursos}</div>`]);
+  const abaSel = ((s.abaAula||{})[aula.n]) || (abas[0] && abas[0][0]);
+  const abaAtual = abas.find(a => a[0]===abaSel) || abas[0];
+  const abasHtml = abas.length ? `<div class="pl-abas" data-pl-abas>${abas.map(([id, rot]) => `<button class="pl-aba ${abaAtual && abaAtual[0]===id ? 'ativa' : ''}" data-action="pl-aba" data-n="${aula.n}" data-aba="${id}">${rot}</button>`).join('')}</div><div class="pl-aba-corpo" data-pl-aba-corpo="${abaAtual ? abaAtual[0] : ''}">${abaAtual ? abaAtual[2] : ''}</div>` : '';
+  // ---- navegação (só no cartão principal) ----
+  const idx = plano.aulas.findIndex(a => a.n===aula.n);
+  const ant = plano.aulas[idx-1], prox = plano.aulas[idx+1];
+  const nav = ctxHero ? `<div class="pl-nav">
+      ${ant ? `<button class="btn btn-ghost btn-sm" data-action="pl-ver-aula" data-n="${ant.n}" style="width:auto;">← Aula ${ant.n}</button>` : '<span></span>'}
+      ${ctxHero.vendoOutra ? `<button class="btn btn-ghost btn-sm" data-action="pl-ver-aula" data-n="" style="width:auto;">📌 Voltar para a aula de hoje</button>` : '<span></span>'}
+      ${prox ? `<button class="btn btn-ghost btn-sm" data-action="pl-ver-aula" data-n="${prox.n}" style="width:auto;">Aula ${prox.n} →</button>` : '<span></span>'}</div>` : '';
+  const kicker = ctxHero ? (ctxHero.vendoOutra ? `<strong style="color:#1F4E79;">👀 VENDO OUTRA AULA</strong> · ` : `<strong style="color:var(--wine,#6B1F2E);">📌 AULA DE HOJE</strong> · `) : '';
   return `
-  <div class="card" data-plano-aula="${aula.n}" style="${destaque?'border:2px solid var(--wine,#6B1F2E);':''} margin-bottom:12px;">
+  <div class="card pl-aula ${ctxHero ? 'pl-hero' : ''}" data-plano-aula="${aula.n}">
     <div class="row" style="justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
       <div style="flex:1 1 300px; min-width:0;">
-        <div class="muted" style="font-size:.8rem;">${destaque?'<strong style="color:var(--wine,#6B1F2E);">📌 AULA DE HOJE</strong> · ':''}Aula ${aula.n} de ${plano.aulas.length} · ${aula.bimestre}º bimestre · semana ${aula.semana} · ${esc(aula.tipo||'')}${aula.paginas?' · livro '+esc(aula.paginas):''}</div>
-        <h3 style="margin:4px 0 6px;">${esc(aula.tituloCurto||aula.tema)}</h3>${aula.tituloCurto?`<div class="muted" style="font-size:.8rem; margin:-4px 0 6px;">${esc(aula.tema)}</div>`:''}
+        <div class="muted" style="font-size:.8rem;">${kicker}Aula ${aula.n} de ${plano.aulas.length} · ${aula.bimestre}º bimestre · semana ${aula.semana} · ${esc(aula.tipo||'')}${aula.paginas?' · livro '+esc(aula.paginas):''}</div>
+        <h3 class="pl-titulo">${esc(aula.tituloCurto||aula.tema)}</h3>${aula.tituloCurto?`<div class="muted" style="font-size:.8rem; margin:-4px 0 6px;">${esc(aula.tema)}</div>`:''}
         ${aula.objetivo?`<p style="margin:0 0 6px; font-size:.9rem;"><strong>Objetivo:</strong> ${esc(aula.objetivo)}</p>`:''}
         ${planoCursosHtml(turmaId, aula)}
-        ${aula.pergunta?`<p style="margin:0 0 6px; font-size:.9rem;"><strong>Pergunta para começar:</strong> <em>${esc(aula.pergunta)}</em></p>`:''}
       </div>
-      ${dada?'<span class="badge" style="background:#e3f3e6; color:#1d6b31; padding:4px 10px; border-radius:12px; font-size:.8rem;">✅ Aula dada</span>':''}
     </div>
-    ${(aula.roteiro||[]).length?`<details ${destaque?'open':''} style="margin:6px 0;"><summary style="cursor:pointer; font-weight:600;">🧭 Roteiro da aula (50 min)</summary><ol style="margin:6px 0 0 18px; font-size:.88rem;">${aula.roteiro.map(r=>`<li>${esc(r)}</li>`).join('')}</ol></details>`:''}
-    ${(aula.exercicios_livro||[]).length?`<p style="margin:6px 0; font-size:.88rem;">📖 <strong>No livro:</strong> ${(aula.exercicios_livro||[]).map(e=>esc(typeof e==='string'?e:(e.t||''))).join(' · ')}</p>`:''}
-    ${aula.tarefa?`<p style="margin:6px 0; font-size:.88rem;">🏠 <strong>Tarefa:</strong> ${esc(aula.tarefa)}</p>`:''}
-    ${planoVideosHtml(plano.id, aula.n, true)}
-    ${recursos?`<details style="margin:6px 0;"><summary style="cursor:pointer; font-weight:600;">🔎 Buscas prontas: vídeos, podcasts e questões</summary><div style="margin-top:6px;">${recursos}</div></details>`:''}
-    ${aula.tipo==='Revisão' ? `<p style="margin:8px 0; font-size:.88rem; background:#fdf0e6; border-radius:8px; padding:8px 10px;">📉 Veja no quadro <strong>“O que a turma mais errou”</strong> (logo abaixo) os conteúdos para revisar e aplique a lista de revisão com as questões mais erradas.</p>` : ''}
-    ${aula.tipo==='Avaliação' ? `<p style="margin:8px 0; display:flex; gap:8px; flex-wrap:wrap;"><button class="btn btn-primary btn-sm" data-action="plano-montar-prova" data-b="${aula.bimestre}">📝 Montar a prova do ${aula.bimestre}º bimestre com as questões das aulas</button><button class="btn btn-ghost btn-sm" data-action="plano-recup-abrir" data-b="${aula.bimestre}">♻️ Depois da prova: recuperação personalizada</button></p>` : ''}
-    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center;">
-      ${aula.slides ? `<button class="btn btn-primary btn-sm" data-action="plano-aula-viva" data-n="${aula.n}" title="Slides montados pelo app, com animações e a pergunta-relâmpago nos tablets">📡 Apresentar no app</button><button class="btn btn-ghost btn-sm" data-action="sed-abrir" data-n="${aula.n}" title="Corrigir textos e esconder slides desta aula (o plano original não muda)">✏️ Editar slides${(planoState().sedCache||{})[sedChave(plano.id, aula.n)] ? ' <span style="font-size:.75rem;background:#F3E7C0;border-radius:6px;padding:1px 5px;">editados</span>' : ''}</button>` : ''}
-      ${aula.exercicio ? `<button class="btn btn-ghost btn-sm" data-action="plano-quiz" data-n="${aula.n}" title="Quiz por Equipes com as perguntas do exercício desta aula">🎮 Quiz da aula</button>` : ''}
-      ${slot
-        ? `<button class="btn btn-primary btn-sm" data-action="plano-apresentar" data-n="${aula.n}">▶️ Apresentar slides (${slot.totalSlides})</button>`
-        : `<label class="btn btn-ghost btn-sm" style="cursor:pointer;">⬆️ Enviar PDF dos slides<input type="file" accept="application/pdf" data-action="plano-slide-unico" data-n="${aula.n}" style="display:none;"></label>`}
-      ${aula.exercicio ? (codigo
-        ? `<span style="font-size:.85rem; background:#eef4fb; border-radius:8px; padding:6px 10px;">📝 Exercício aplicado · código <strong>${esc(codigo)}</strong>${prog.apoio && prog.apoio[aula.n] ? ` · 🧩 apoio <strong>${esc(prog.apoio[aula.n].code)}</strong> (${prog.apoio[aula.n].alunos.length})` : ''}${prog.desafios && prog.desafios[aula.n] ? ` · ⭐ desafio <strong>${esc(prog.desafios[aula.n])}</strong>` : ''}
-             <label style="margin-left:8px; cursor:pointer;"><input type="checkbox" data-action="plano-vale-nota-aplicado" data-code="${esc(codigo)}" ${(!aval || aval.valeNota!==false)?'checked':''} style="width:auto;"> vale nota</label>
-             <span data-prazo-aplicado style="margin-left:8px;">${aval && aval.endAt ? (new Date(aval.endAt).getTime() < Date.now() ? '⏰ prazo encerrado em ' : '⏰ até ') + planoDataCurta(aval.endAt) : '⏰ sem prazo'}</span>
-             <select data-action="plano-estender-prazo" data-code="${esc(codigo)}" style="width:auto; margin-left:6px; padding:2px 4px;"><option value="">mudar prazo…</option><option value="2">+2 dias</option><option value="7">+7 dias</option><option value="0">tirar o prazo</option></select></span>`
-        : `<label style="font-size:.85rem; cursor:pointer;"><input type="checkbox" data-action="plano-vale-nota" data-n="${aula.n}" ${vale?'checked':''} style="width:auto;"> Vale nota</label>
-           <label style="font-size:.85rem;">Prazo: <select data-action="plano-prazo" data-n="${aula.n}" style="width:auto; padding:2px 4px;">${[['2','2 dias'],['7','7 dias (até a próxima semana)'],['14','14 dias'],['','sem prazo']].map(([v,t]) => `<option value="${v}" ${(s.prazo[aula.n]!=null ? s.prazo[aula.n] : '7')===v?'selected':''}>${t}</option>`).join('')}</select></label>
-           <button class="btn btn-sm" style="background:var(--blue,#1F4E79); color:#fff;" data-action="plano-aplicar-exercicio" data-n="${aula.n}">📝 Aplicar exercício à turma (${aula.exercicio.questoes.length} questões${planoMapaDoExercicio(turmaId, aula) ? ' + mapa do caderno' : ''})</button>
-           <button class="btn btn-ghost btn-sm" data-action="plano-editar-exercicio" data-n="${aula.n}">✏️ Editar antes de aplicar</button>
-           ${planoApoioHtml(turmaId, aula)}`)
-        : '<span class="muted" style="font-size:.8rem;">Exercício de fixação desta aula ainda não foi preparado.</span>'}
-      ${dada
-        ? `<button class="btn btn-ghost btn-sm" data-action="plano-desmarcar-dada" data-n="${aula.n}">↩ Desmarcar</button>`
-        : `<button class="btn btn-ghost btn-sm" data-action="plano-marcar-dada" data-n="${aula.n}" style="border-color:#1d6b31; color:#1d6b31;">✅ Marcar aula como dada</button>`}
-    </div>
-    ${aula.slides ? `<div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:8px;">${planoLeituraHtml(turmaId, aula)}${planoGrupoHtml(turmaId, aula)}
-      ${aula.slides.mapa ? (() => { const vs = planoVistoDe(turmaId, aula.n); const nv = Object.keys(vs).length; const tot = (((state.professor.turmas||[]).find(t=>t.id===turmaId)||{}).students||[]).length;
-        return `<button class="btn btn-ghost btn-sm" data-action="plano-visto-abrir" data-tid="${esc(turmaId)}" data-n="${aula.n}" style="${dada && !nv ? 'border-color:#a4521b; color:#a4521b;' : ''}">📒 Visto no caderno (${nv}/${tot})</button>`; })() : ''}</div>` : ''}
+    ${aula.tipo==='Revisão' ? `<p class="pl-nota">📉 Dia de revisão: abra <strong>“📝 Avaliação do bimestre”</strong>, logo abaixo, para ver o que a turma mais errou e aplicar a lista de revisão.</p>` : ''}
+    ${aula.tipo==='Avaliação' ? `<p style="margin:8px 0; display:flex; gap:8px; flex-wrap:wrap;"><button class="btn btn-primary btn-sm" data-action="plano-montar-prova" data-b="${aula.bimestre}" style="width:auto;">📝 Montar a prova do ${aula.bimestre}º bimestre com as questões das aulas</button><button class="btn btn-ghost btn-sm" data-action="plano-recup-abrir" data-b="${aula.bimestre}" style="width:auto;">♻️ Depois da prova: recuperação personalizada</button></p>` : ''}
+    <div class="pl-acoes">${apresentar}${exercicio}${marcar}</div>
+    <div class="pl-linha">${exOpcoes}</div>
+    ${secund ? `<div class="pl-linha pl-secund">${secund}</div>` : ''}
     ${planoState().vistoAberto===aula.n && aula.slides && aula.slides.mapa ? `<div style="margin-top:8px; border:1px solid #eadfd0; border-radius:10px; padding:10px;">${renderVistoPainel(turmaId, aula.n, false)}</div>` : ''}
     ${avTermoChipHtml(turmaId, aula.n)}
+    ${abasHtml}
     ${dada ? planoFeedbackProfHtml(plano.id, turmaId, aula.n) : ''}
+    ${nav}
   </div>`;
 }
+
 function renderPlanoLivro(){
   const s = planoState();
   if(!s.carregado){ setTimeout(()=>carregarPlanoLivro(), 0); return '<div class="card"><p class="muted">Carregando planos de aula…</p></div>'; }
@@ -25657,67 +25739,90 @@ function renderPlanoLivro(){
   const dadas = plano.aulas.filter(a => prog.dadas && prog.dadas[a.n]).length;
   const pct = Math.round(dadas / plano.aulas.length * 100);
   const hoje = planoAulaDeHoje(plano, prog);
+  const vista = s.aulaVista && plano.aulas.find(a => a.n===s.aulaVista);
+  const heroAula = vista || hoje;
   const nSlides = Object.keys(s.slides[plano.id]||{}).length;
+  const bimAtual = hoje ? hoje.bimestre : (plano.aulas[plano.aulas.length-1]||{}).bimestre || 1;
+  const bimF = s.bimFerramentas || bimAtual;
   const porBim = [1,2,3,4].map(b => ({ b, aulas: plano.aulas.filter(a=>a.bimestre===b) })).filter(x=>x.aulas.length);
   const lista = porBim.map(({b, aulas}) => `
-    <details ${hoje && hoje.bimestre===b ? 'open' : ''} style="margin-bottom:8px;">
-      <summary style="cursor:pointer; font-weight:700; padding:6px 0;">${b}º bimestre · ${aulas.filter(a=>prog.dadas&&prog.dadas[a.n]).length}/${aulas.length} aulas dadas</summary>
+    <details ${hoje && hoje.bimestre===b ? 'open' : ''} class="pl-bim">
+      <summary>${b}º bimestre <span class="muted" style="font-weight:400;">· ${aulas.filter(a=>prog.dadas&&prog.dadas[a.n]).length} de ${aulas.length} aulas dadas</span></summary>
       <div>${aulas.map(a => {
         const dada = prog.dadas && prog.dadas[a.n];
-        const temSlide = s.slides[plano.id] && s.slides[plano.id][a.n];
+        const temSlide = (s.slides[plano.id] && s.slides[plano.id][a.n]) || a.slides;
         const ex = prog.exercicios && prog.exercicios[a.n];
-        return `<div style="display:flex; gap:8px; align-items:center; padding:5px 4px; border-bottom:1px solid var(--border,#eee); font-size:.86rem; ${hoje&&hoje.n===a.n?'background:#fbf3df;':''}">
-          <span style="width:22px;">${dada?'✅':'⬜'}</span>
-          <span style="width:46px; color:#777;">Aula ${a.n}</span>
-          <span style="flex:1; min-width:0;">${esc(a.tituloCurto||a.tema)} <span class="muted">${a.paginas?'· '+esc(a.paginas):''}</span></span>
-          <span title="slides" style="opacity:${temSlide?1:.25};">🖥️</span>
-          <span title="exercício" style="opacity:${a.exercicio?(ex?1:.6):.2};">${ex?'📝✔':'📝'}</span>
-          <button class="btn btn-ghost btn-sm" data-action="plano-abrir-aula" data-n="${a.n}">${s.aulaAberta===a.n?'Fechar':'Abrir'}</button>
-        </div>${s.aulaAberta===a.n ? `<div style="padding:8px 0;">${planoAulaDetalheHtml(turmaId, plano, a, prog, false)}</div>` : ''}`;
+        const selo = dada ? '<span class="pl-selo pl-selo-ok">✓ dada</span>' : (hoje && hoje.n===a.n ? '<span class="pl-selo pl-selo-hoje">● hoje</span>' : (hoje && a.n===hoje.n+1 ? '<span class="pl-selo pl-selo-prox">próxima</span>' : ''));
+        const aberta = s.aulaAberta===a.n;
+        return `<div class="pl-item ${hoje&&hoje.n===a.n?'pl-item-hoje':''} ${aberta?'aberta':''}" data-action="plano-abrir-aula" data-n="${a.n}" role="button" tabindex="0">
+          <span class="pl-item-n">${a.n}</span>
+          <span class="pl-item-t">${esc(a.tituloCurto||a.tema)} <span class="muted">${a.paginas?'· '+esc(a.paginas):''}</span></span>
+          ${selo}
+          <span title="slides" style="opacity:${temSlide?1:.2};">🖥️</span>
+          <span title="${ex?'exercício aplicado':'exercício'}" style="opacity:${a.exercicio?(ex?1:.55):.15};">${ex?'📝✔':'📝'}</span>
+          <span class="pl-item-seta">${aberta?'▴':'▾'}</span>
+        </div>${aberta ? `<div style="padding:8px 0;">${planoAulaDetalheHtml(turmaId, plano, a, prog, false)}</div>` : ''}`;
       }).join('')}</div>
     </details>`).join('');
+  const turmaBtns = turmasComPlano.length > 1
+    ? `<div class="pl-turmas" data-pl-turmas>${turmasComPlano.map(t => `<button class="pl-turma ${t.id===turmaId?'ativa':''}" data-action="plano-turma-chip" data-tid="${esc(t.id)}">${esc(t.name)}</button>`).join('')}</div>`
+    : `<div class="pl-turmas"><span class="pl-turma ativa" style="cursor:default;">${esc((turmasComPlano[0]||{}).name||'')}</span></div>`;
+  const avisosProf = state.view==='coordenador' ? avisos : avisos.replace(/<div class="card" data-plano-msg[^]*?plano\(s\) importado\(s\)[^]*?<\/div>/, '');
+  const revisaoHoje = !!(hoje && hoje.tipo==='Revisão'), provaHoje = !!(hoje && hoje.tipo==='Avaliação');
   return `
     ${sedHtml()}
-    <h2>🗓️ Plano de Aulas do Livro</h2>
-    ${avisos}
+    ${avisosProf}
     ${plano.aulas.some(a => a.exercicio) ? '' : `<div class="card" data-plano-sem-conteudo style="border-left:4px solid #C9A227;"><strong>⏳ As aulas da ${esc(plano.serie||'série')} ainda estão sendo preparadas.</strong><br><span style="font-size:.88rem;">Por enquanto o plano tem o roteiro de cada aula (tema, páginas do livro, objetivo e sugestões). Slides, exercícios, diagnóstica, níveis e trabalho em grupo aparecem aqui assim que o conteúdo desta série for importado.</span></div>`}
     ${podeImportar ? renderPlanoPainel() + renderPlanoFeedbackResumo(s.turmaPlano[turmaId]) : ''}
-    <div class="card">
-      <div class="row" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-        ${seletor}
-        <span style="font-size:.88rem;"><strong>${esc(plano.titulo)}</strong></span>
+    <div class="card pl-cab" data-plano-cab>
+      <div class="row" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:nowrap;">
+        ${turmaBtns}
+        <button class="btn btn-ghost btn-sm pl-engrenagem ${s.ajustesAbertos?'ativa':''}" data-action="pl-ajustes" title="Ajustes desta turma (data show, mapa do caderno)" style="width:auto;">⚙️</button>
       </div>
-      <div style="margin-top:10px; background:#eee; border-radius:8px; height:12px; overflow:hidden;"><div data-plano-progresso="${pct}" style="width:${pct}%; height:100%; background:var(--wine,#6B1F2E);"></div></div>
-      <div class="muted" style="font-size:.82rem; margin-top:4px;">${dadas} de ${plano.aulas.length} aulas dadas (${pct}%) · ${nSlides} aula(s) com slides</div>
-      ${planoCfgHtml(turmaId)}
-      <div class="row" style="margin-top:8px; gap:6px; flex-wrap:wrap; align-items:center;">
-        ${s.registroAberto ? '' : renderPlanoRegistro(turmaId)}
-        <span style="font-size:.85rem; margin-left:6px;">Bimestre:</span>
-        <select data-action="plano-bim-ferr" style="width:auto; padding:2px 6px;">${[1,2,3,4].filter(b => plano.aulas.some(a=>a.bimestre===b)).map(b => `<option value="${b}" ${(s.bimFerramentas||(hoje?hoje.bimestre:1))===b?'selected':''}>${b}º</option>`).join('')}</select>
-        <button class="btn btn-ghost btn-sm" data-action="plano-montar-prova" data-b="${s.bimFerramentas||(hoje?hoje.bimestre:1)}">📝 Montar prova</button>
-        <button class="btn btn-ghost btn-sm" data-action="plano-recup-abrir" data-b="${s.bimFerramentas||(hoje?hoje.bimestre:1)}">♻️ Recuperação personalizada</button>
-        <button class="btn btn-ghost btn-sm" data-action="relatorio-abrir" data-escopo="turma" data-b="${s.bimFerramentas||(hoje?hoje.bimestre:1)}">📈 Resultados</button>
-      </div>
+      <div class="pl-progresso"><div data-plano-progresso="${pct}" style="width:${pct}%;"></div></div>
+      <div class="muted" style="font-size:.8rem; margin-top:4px;"><strong style="color:var(--ink,#333);">${esc(plano.titulo)}</strong> · ${dadas} de ${plano.aulas.length} aulas dadas (${pct}%)</div>
+      ${s.ajustesAbertos ? planoCfgHtml(turmaId) : ''}
     </div>
     ${s.registroAberto ? renderPlanoRegistro(turmaId) : ''}
     ${renderRelatorio()}
     ${s.montarProva && s.montarProva.turmaId===turmaId ? renderMontarProva() : ''}
     ${s.recup && s.recup.turmaId===turmaId ? renderRecuperacao() : ''}
-    ${hoje ? planoAulaDetalheHtml(turmaId, plano, hoje, prog, true) : '<div class="card"><h3>🎉 Todas as aulas do plano foram dadas!</h3></div>'}
-    ${planoDiagnosticaHtml(turmaId, plano, prog, s.bimFerramentas||(hoje?hoje.bimestre:1))}
-    ${renderPlanoErros(turmaId, !!(hoje && hoje.tipo==='Revisão'))}
-    ${renderPlanoHabilidades(turmaId)}
-    <details class="card">
-      <summary style="cursor:pointer; font-weight:700;">🖥️ Enviar PDFs dos slides <span class="muted" style="font-weight:400; font-size:.85rem;">(só se você tiver slides próprios)</span></summary>
-      <p class="muted" style="font-size:.86rem;">Selecione <strong>vários PDFs de uma vez</strong>. O app liga cada arquivo à aula pelo número no nome: <code>aula-01.pdf</code> → Aula 1, <code>aula-02.pdf</code> → Aula 2…</p>
-      <label class="btn btn-primary btn-sm" style="cursor:pointer;">⬆️ Enviar PDFs dos slides<input type="file" id="plano-slides-input" accept="application/pdf" multiple style="display:none;"></label>
-    </details>
-    <div class="card">
-      <h3 style="margin-top:0;">📚 Todas as aulas</h3>
-      ${lista}
-    </div>
+    ${heroAula ? planoAulaDetalheHtml(turmaId, plano, heroAula, prog, true, { vendoOutra: !!vista && (!hoje || vista.n!==hoje.n) }) : '<div class="card"><h3>🎉 Todas as aulas do plano foram dadas!</h3></div>'}
+    ${planoDiagnosticaHtml(turmaId, plano, prog, bimF)}
+    ${plGrupoHtml('aulas', '📚 Todas as aulas', `${bimAtual}º bimestre · ${plano.aulas.filter(a=>a.bimestre===bimAtual && prog.dadas && prog.dadas[a.n]).length} de ${plano.aulas.filter(a=>a.bimestre===bimAtual).length} aulas dadas`, () => lista, false)}
+    ${plGrupoHtml('aval', '📝 Avaliação do bimestre', `${bimF}º bimestre · prova, recuperação, resultados e o que a turma mais errou`, () => `
+      <div class="row" style="gap:6px; flex-wrap:wrap; align-items:center; margin-bottom:8px;">
+        <span style="font-size:.85rem;">Bimestre:</span>
+        <select data-action="plano-bim-ferr" style="width:auto; padding:2px 6px;">${[1,2,3,4].filter(b => plano.aulas.some(a=>a.bimestre===b)).map(b => `<option value="${b}" ${bimF===b?'selected':''}>${b}º</option>`).join('')}</select>
+        <button class="btn btn-ghost btn-sm" data-action="plano-montar-prova" data-b="${bimF}" style="width:auto;">📝 Montar prova</button>
+        <button class="btn btn-ghost btn-sm" data-action="plano-recup-abrir" data-b="${bimF}" style="width:auto;">♻️ Recuperação personalizada</button>
+        <button class="btn btn-ghost btn-sm" data-action="relatorio-abrir" data-escopo="turma" data-b="${bimF}" style="width:auto;">📈 Resultados</button>
+        ${s.registroAberto ? '' : renderPlanoRegistro(turmaId)}
+      </div>
+      ${renderPlanoErros(turmaId, revisaoHoje)}`, revisaoHoje || provaHoje)}
+    ${plGrupoHtml('habil', '📈 Habilidades e entregas', 'como a turma vai em cada habilidade do ENEM e nas entregas', () => renderPlanoHabilidades(turmaId), false)}
+    ${plGrupoHtml('pdf', '🖥️ Slides próprios (PDF)', nSlides ? `${nSlides} aula(s) com PDF enviado` : 'só se você tiver slides próprios', () => `
+      <p class="muted" style="font-size:.86rem; margin-top:0;">Selecione <strong>vários PDFs de uma vez</strong>. O app liga cada arquivo à aula pelo número no nome: <code>aula-01.pdf</code> → Aula 1, <code>aula-02.pdf</code> → Aula 2…</p>
+      <label class="btn btn-primary btn-sm" style="cursor:pointer; width:auto;">⬆️ Enviar PDFs dos slides<input type="file" id="plano-slides-input" accept="application/pdf" multiple style="display:none;"></label>`, false)}
     ${blocoCoord}`;
 }
+// Grupo recolhível da página do plano. O professor abre/fecha; o app lembra (neste aparelho).
+function plGruposAbertos(){
+  const s = planoState();
+  if(!s.gruposAbertos){ try{ s.gruposAbertos = JSON.parse(localStorage.getItem('plano-grupos-abertos') || '{}') || {}; }catch(e){ s.gruposAbertos = {}; } }
+  return s.gruposAbertos;
+}
+function plGrupoHtml(id, titulo, resumo, corpoFn, padraoAberto){
+  const g = plGruposAbertos();
+  const aberto = g[id]!=null ? !!g[id] : !!padraoAberto;
+  return `<div class="card pl-grupo ${aberto?'aberto':''}" data-pl-grupo="${id}">
+    <button class="pl-grupo-cab" data-action="pl-grupo" data-g="${id}" aria-expanded="${aberto}">
+      <span class="pl-grupo-tit">${titulo}</span><span class="pl-grupo-res">${resumo}</span><span class="pl-grupo-seta">${aberto?'▴':'▾'}</span>
+    </button>
+    ${aberto ? `<div class="pl-grupo-corpo">${corpoFn()}</div>` : ''}
+  </div>`;
+}
+
 
 async function computeGradesForAssessments(assessments, pesos, turma, unidade, overrides){
   // Exercício aplicado pelo Plano do Livro com "Vale nota" desligado é só treino: fica fora da nota.
@@ -26846,6 +26951,11 @@ document.addEventListener('click', (e) => {
   else if(act==='coord-open-results'){ openCoordResults(btn.dataset.code); }
   else if(act==='coord-back-to-list'){ state.coordenador.mode='list'; state.coordenador.transferRespIdx=null; state.coordenador.transferError=''; render(); }
   else if(act==='coord-calc-notas'){ calcCoordNotas(); }
+  else if(act==='pl-aba'){ const s=planoState(); s.abaAula = Object.assign({}, s.abaAula||{}, { [btn.dataset.n]: btn.dataset.aba }); render(); }
+  else if(act==='pl-ver-aula'){ const s=planoState(); const n=parseInt(btn.dataset.n); s.aulaVista = isNaN(n) ? null : n; s.vistoAberto = null; render(); const h=document.querySelector('.pl-hero'); if(h && h.getBoundingClientRect().top < 0) h.scrollIntoView({ behavior:'smooth', block:'start' }); }
+  else if(act==='plano-turma-chip'){ const s=planoState(); s.turmaSel=btn.dataset.tid; s.aulaAberta=null; s.aulaVista=null; s.msg=''; s.montarProva=null; planoCarregarTurma(btn.dataset.tid).then(render); render(); }
+  else if(act==='pl-ajustes'){ const s=planoState(); s.ajustesAbertos = !s.ajustesAbertos; render(); }
+  else if(act==='pl-grupo'){ const g = plGruposAbertos(); const id = btn.dataset.g; const el = document.querySelector(`[data-pl-grupo="${id}"]`); g[id] = !(el && el.classList.contains('aberto')); try{ localStorage.setItem('plano-grupos-abertos', JSON.stringify(g)); }catch(e){} render(); }
   else if(act==='plano-abrir-aula'){ const s=planoState(); const n=parseInt(btn.dataset.n); s.aulaAberta = s.aulaAberta===n ? null : n; render(); }
   else if(act==='plano-marcar-dada'){ planoState().msg=''; planoMarcarDada(planoState().turmaSel, parseInt(btn.dataset.n), true); }
   else if(act==='plano-desmarcar-dada'){ planoState().msg=''; planoMarcarDada(planoState().turmaSel, parseInt(btn.dataset.n), false); }
