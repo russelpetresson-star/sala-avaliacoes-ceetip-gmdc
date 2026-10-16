@@ -673,7 +673,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-15-2100</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-16-0300</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -704,6 +704,23 @@
 
 <!-- model-viewer (Realidade Aumentada no navegador, sem instalar app) -->
 <script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+<script>
+/* Se os arquivos do Firebase não chegaram (internet fraca, rede bloqueando gstatic.com, cache antigo),
+   mostra um aviso claro em vez de uma tela vazia. */
+(function(){
+  if(typeof firebase!=='undefined' && firebase.firestore && firebase.auth) return;
+  window.__semFirebase = true;
+  function aviso(){
+    var alvo = document.getElementById('root') || document.body;
+    alvo.innerHTML = '<div style="max-width:520px;margin:40px auto;padding:22px;border:1px solid #e4d9c8;border-radius:14px;background:#fffaf2;font-family:sans-serif;color:#222;">'
+      + '<h2 style="margin-top:0;color:#6B1F2E;">⚠️ Não foi possível carregar o app</h2>'
+      + '<p>O aparelho não conseguiu baixar a parte de conexão com o banco de dados (Firebase). Normalmente é a internet fraca ou a rede bloqueando o endereço <b>gstatic.com</b>.</p>'
+      + '<p>Tente: verificar a internet, trocar de rede (ex.: dados móveis) ou recarregar a página.</p>'
+      + '<button onclick="location.reload()" style="background:#6B1F2E;color:#fff;border:0;border-radius:10px;padding:10px 18px;font-size:1rem;cursor:pointer;">🔄 Tentar de novo</button></div>';
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(aviso, 0); }); else setTimeout(aviso, 0);
+})();
+</script>
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyCAYrKnwCfQfm84m47vSjRALV0DSHrPnms",
@@ -21657,10 +21674,12 @@ function normalizarTextoPlano(t){ return String(t||'').normalize('NFD').replace(
 function planoQuestoesParaAvaliacao(ex, mapa){
   const qs = ex.questoes || [];
   const nMc = qs.filter(q=>q.tipo==='mc').length;
-  const temDiss = qs.some(q=>q.tipo==='dissertativa');
-  const ptsDiss = temDiss ? 2 : 0;
+  // Questões do livro (dissertativas): 1 questão vale 2 pontos; 2 ou mais dividem 3 pontos entre si.
+  const nDiss = qs.filter(q=>q.tipo==='dissertativa').length;
+  const ptsDissTotal = nDiss===0 ? 0 : nDiss===1 ? 2 : 3;
+  const ptsDiss = nDiss ? Math.round(ptsDissTotal / nDiss * 100) / 100 : 0;
   const ptsMapa = mapa ? MAPA_PONTOS : 0;
-  const ptsMc = nMc ? Math.round(((10 - ptsDiss - ptsMapa) / nMc) * 100) / 100 : 0;
+  const ptsMc = nMc ? Math.round(((10 - ptsDissTotal - ptsMapa) / nMc) * 100) / 100 : 0;
   const extra = mapa ? [{ id: cryptoId(), type:'dissertativa', mapaCaderno:true, text: `📒 Mapa mental da aula, feito no caderno: centro “${mapa.centro}” e ${mapa.ramos.length} ramos (${mapa.ramos.map(r => r.t).join(' · ')}), com palavras-chave e pelo menos um desenho. Esta questão é o visto do professor no seu caderno.`, points: ptsMapa, image:null, annulled:false, descritorSaeb:'', conteudo:'', modelAnswer: `Centro: ${mapa.centro}. Ramos: ` + mapa.ramos.map(r => `${r.t} (${r.itens.join(', ')})`).join('; ') }] : [];
   return qs.map(q => {
     if(q.tipo==='mc'){
@@ -21671,6 +21690,16 @@ function planoQuestoesParaAvaliacao(ex, mapa){
   }).concat(extra);
 }
 function planoMapaDoExercicio(turmaId, aula){ return (planoCfg(turmaId).mapaNoExercicio!==false && aula.slides && aula.slides.mapa) ? aula.slides.mapa : null; }
+// Conexão da aula com o curso técnico da turma (PG = Petróleo e Gás, ST = Segurança do Trabalho), pelo nome da turma
+const CURSOS_NOMES = { PG:'Petróleo e Gás', ST:'Segurança do Trabalho', EM:'Eletromecânica' };
+function planoCursosHtml(turmaId, aula){
+  const c = aula && aula.cursos; if(!c) return '';
+  const t = (state.professor.turmas||[]).find(x => x.id===turmaId);
+  const nome = ((t && t.name) || '').toUpperCase().replace(/\s+/g, '');
+  const meu = Object.keys(c).find(k => nome.includes(k));
+  const lista = meu ? [meu] : Object.keys(c);
+  return `<div data-plano-cursos style="margin:0 0 8px; font-size:.86rem; background:#f3f7fb; border-left:3px solid #1F4E79; border-radius:6px; padding:6px 10px;">🔧 <strong>Conexão com o curso</strong>${lista.map(k => `<div style="margin-top:2px;"><b>${esc(CURSOS_NOMES[k]||k)}:</b> ${esc(c[k])}</div>`).join('')}</div>`;
+}
 async function aplicarExercicioPlano(turmaId, n){
   const s = planoState();
   const plano = s.planos[s.turmaPlano[turmaId]];
@@ -23036,8 +23065,9 @@ function avSlideHtml(d, sl, ctx){
       <div style="color:#F3E7C0;">${esc(d.capitulo||'')}</div>
       <div class="av-card ou av-pop" style="position:absolute;left:4.4cqw;right:4.4cqw;bottom:4cqw;color:${C.v};font-size:1.15em;animation-delay:.3s;"><b>Para começar:</b> <i>${esc(d.pergunta)}</i></div></div>`;
   case 'retomada': {
-    if(!d.anterior) return `<div class="av-in"><div class="av-t">Começando a Geografia do Ensino Médio</div><div class="av-g3" style="align-items:stretch;">
-      ${[['Introdução','O espaço geográfico e seus conceitos'],['Capítulo 1','Representações cartográficas e escalas'],['Revisão e prova','Aulas 19 e 20 do bimestre']].map(([t,x],i)=>`<div class="av-card ${i===0?'ou':''} av-pop" style="animation-delay:${i*.15}s;min-height:9em;"><div class="av-t" style="font-size:1.3em;">${t}</div>${x}</div>`).join('')}</div></div>`;
+    if(!d.anterior){ const ab = (d.abertura && Array.isArray(d.abertura.cards) && d.abertura.cards.length) ? d.abertura : { titulo:'Começando a Geografia do Ensino Médio', cards:[['Introdução','O espaço geográfico e seus conceitos'],['Capítulo 1','Representações cartográficas e escalas'],['Revisão e prova','Aulas 19 e 20 do bimestre']] };
+      return `<div class="av-in"><div class="av-t">${esc(ab.titulo||'')}</div><div class="av-g3" style="align-items:stretch;">
+      ${ab.cards.slice(0,3).map(([t,x],i)=>`<div class="av-card ${i===0?'ou':''} av-pop" style="animation-delay:${i*.15}s;min-height:9em;"><div class="av-t" style="font-size:1.3em;">${esc(t)}</div>${esc(x)}</div>`).join('')}</div></div>`; }
     const a = d.anterior;
     return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Na aula passada…</div>${avCirc('FaClockRotateLeft', C.a, '#fff', 2.2)}</div>
       <div class="av-card" style="font-size:1.15em;"><b style="color:${C.v}">Aula ${a.n}:</b> ${esc(a.ideia)}</div>
@@ -23070,7 +23100,7 @@ function avSlideHtml(d, sl, ctx){
     const novo = i => i===k ? 'av-pop' : '';
     let corpo = '';
     if(e.tipo==='comparar'){
-      const lado = (dados, cls, cor, nomeIc, i) => i>k ? `<div class="av-card cz" style="min-height:12em;display:flex;align-items:center;justify-content:center;font-size:3em;">?</div>`
+      const lado = (dados, cls, cor, nomeIc, i) => i>k ? `<div class="av-card cz" style="min-height:12em;display:flex;align-items:center;justify-content:center;"><span style="font-size:3em;color:#bbb;">?</span></div>`
         : `<div class="av-card ${cls} ${novo(i)}" style="min-height:12em;"><div class="av-row" style="margin-bottom:.5em;">${nomeIc?avCirc(nomeIc, cor, '#fff', 2):''}<b style="font-family:Cambria,Georgia,serif;font-size:1.3em;color:${cor};">${esc(dados[0])}</b></div><ul style="margin:0 0 0 1em;padding:0;">${dados[1].map(x=>`<li style="margin:.3em 0;">${esc(x)}</li>`).join('')}</ul></div>`;
       corpo = `<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:.8em;align-items:center;">${lado(e.a,'',C.v,ic[0],0)}<div class="av-circ" style="background:${C.o};width:2.4em;height:2.4em;font-size:1.4em;font-weight:700;color:${C.v};">×</div>${lado(e.b,'az',C.a,ic[1],1)}</div>`;
     } else if(e.tipo==='quatro'){
@@ -23078,7 +23108,7 @@ function avSlideHtml(d, sl, ctx){
     } else if(e.tipo==='tres'){
       corpo = `<div class="av-g3" style="height:68%;">${e.itens.map((it,i)=>{ const h = 55 + i*20; return i>k ? `<div class="av-card cz" style="height:${h}%;"></div>` : `<div class="av-card ${['','ou','az'][i]} ${novo(i)}" style="height:${h}%;"><div class="av-row" style="justify-content:space-between;"><b style="font-family:Cambria,Georgia,serif;font-size:1.4em;color:${C.v};">${esc(it[0])}</b>${ic[i]?avCirc(ic[i], C.a, '#fff', 1.8):''}</div><div style="color:${C.a};font-weight:700;">${esc(it[1])}</div><div style="margin-top:.3em;">${esc(it[2])}</div></div>`; }).join('')}</div><div class="av-fonte" style="text-align:right;">mais detalhe →</div>`;
     } else if(e.tipo==='linha' || e.tipo==='passos'){
-      corpo = `${e.tipo==='passos' ? `<div class="av-card ou" style="text-align:center;font-size:1.6em;font-weight:700;color:${C.v};width:50%;margin:0 auto .8em;">D = d × N</div>` : ''}
+      corpo = `${e.tipo==='passos' && e.formula ? `<div class="av-card ou" style="text-align:center;font-size:1.6em;font-weight:700;color:${C.v};width:50%;margin:0 auto .8em;">${esc(e.formula)}</div>` : ''}
         <div style="display:flex;gap:.5em;align-items:stretch;">${e.itens.map((it,i)=> `${i>0?`<div style="align-self:center;color:${i<=k?C.o:'#ddd'};font-size:1.6em;">➜</div>`:''}` + (i>k ? `<div class="av-card cz" style="flex:1;min-height:10em;"></div>` : `<div class="av-card ${i===k?'ou':''} ${novo(i)}" style="flex:1;min-height:10em;text-align:center;">${ic[i]?avCirc(ic[i], i===k?C.v:'#8C3A4B', '#fff', 2.2):''}<div style="font-weight:700;color:${C.v};margin:.4em 0;">${esc(it[0])}</div><div style="${e.tipo==='passos'?`font-weight:700;color:${C.a};`:''}">${esc(it[1])}</div>${it[2]&&e.tipo!=='passos'?`<div style="font-weight:700;color:${C.a};margin-top:.4em;">${esc(it[2])}</div>`:''}</div>`)).join('')}</div>`;
     } else if(e.tipo==='encolher'){
       const it = e.itens[k]; const tams = [10, 7.5, 5, 2.8];
@@ -24798,6 +24828,7 @@ function planoAulaDetalheHtml(turmaId, plano, aula, prog, destaque){
         <div class="muted" style="font-size:.8rem;">${destaque?'<strong style="color:var(--wine,#6B1F2E);">📌 AULA DE HOJE</strong> · ':''}Aula ${aula.n} de ${plano.aulas.length} · ${aula.bimestre}º bimestre · semana ${aula.semana} · ${esc(aula.tipo||'')}${aula.paginas?' · livro '+esc(aula.paginas):''}</div>
         <h3 style="margin:4px 0 6px;">${esc(aula.tituloCurto||aula.tema)}</h3>${aula.tituloCurto?`<div class="muted" style="font-size:.8rem; margin:-4px 0 6px;">${esc(aula.tema)}</div>`:''}
         ${aula.objetivo?`<p style="margin:0 0 6px; font-size:.9rem;"><strong>Objetivo:</strong> ${esc(aula.objetivo)}</p>`:''}
+        ${planoCursosHtml(turmaId, aula)}
         ${aula.pergunta?`<p style="margin:0 0 6px; font-size:.9rem;"><strong>Pergunta para começar:</strong> <em>${esc(aula.pergunta)}</em></p>`:''}
       </div>
       ${dada?'<span class="badge" style="background:#e3f3e6; color:#1d6b31; padding:4px 10px; border-radius:12px; font-size:.8rem;">✅ Aula dada</span>':''}
