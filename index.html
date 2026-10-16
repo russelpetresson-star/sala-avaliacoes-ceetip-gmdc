@@ -673,7 +673,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-16-0300</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-16-1100</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -2353,7 +2353,63 @@ function renderPrivacyNotice(){
   `;
 }
 
+/* -------- Redesenho sem "pisca" --------
+   render() troca a tela inteira. Sem cuidado, isso fecha as seções que o usuário abriu (<details>),
+   fecha a lista de uma caixa de seleção que está aberta e faz o menu lateral encolher/abrir de novo.
+   1) Caixa de seleção aberta: o redesenho espera ela fechar (no máximo 8 s).
+   2) Seções abertas/fechadas pelo usuário continuam como estavam, enquanto a tela for a mesma.
+   3) Menu lateral idêntico ao anterior é reaproveitado (mantém o estado de "aberto" e a rolagem). */
+let selectAbertoAte = 0, renderAdiadoTimer = null;
+function renderLiberarSelect(){
+  if(!selectAbertoAte) return;
+  selectAbertoAte = 0;
+  if(renderAdiadoTimer){ clearTimeout(renderAdiadoTimer); renderAdiadoTimer = null; setTimeout(render, 0); }
+}
+document.addEventListener('mousedown', e => { if(e.target && e.target.tagName==='SELECT') selectAbertoAte = Date.now() + 8000; else renderLiberarSelect(); }, true);
+document.addEventListener('touchstart', e => { if(e.target && e.target.tagName==='SELECT') selectAbertoAte = Date.now() + 8000; }, { capture:true, passive:true });
+document.addEventListener('change', e => { if(e.target && e.target.tagName==='SELECT'){ selectAbertoAte = 0; if(renderAdiadoTimer){ clearTimeout(renderAdiadoTimer); renderAdiadoTimer = null; } } }, true);
+document.addEventListener('focusout', e => { if(e.target && e.target.tagName==='SELECT') renderLiberarSelect(); }, true);
+document.addEventListener('keydown', e => { if(e.target && e.target.tagName==='SELECT' && (e.key==='Escape' || e.key==='Enter' || e.key==='Tab')) setTimeout(renderLiberarSelect, 0); }, true);
+function telaAssinatura(){
+  try{ return [state.view, state.professor.subview, state.coordenador.subview, state.aluno.subview, state.aluno.stage].join('|'); }catch(e){ return state.view; }
+}
+function detailsChave(d, vistos){
+  const s = d.querySelector(':scope > summary');
+  const base = (s ? s.textContent : '').replace(/\(\d+[^)]*\)/g, '').replace(/\s+/g, ' ').trim().slice(0, 80);
+  vistos[base] = (vistos[base]||0) + 1;
+  return base + '#' + vistos[base];
+}
+let detailsEstado = { tela: null, mapa: {} };
+function detailsGuardar(){
+  const mapa = {}, vistos = {};
+  root.querySelectorAll('details').forEach(d => { mapa[detailsChave(d, vistos)] = { tpl: d.dataset.tplOpen==='1', aberto: d.open }; });
+  detailsEstado = { tela: detailsEstado.telaAtual, mapa };
+}
+function detailsRestaurar(){
+  const tela = telaAssinatura();
+  const mesmaTela = detailsEstado.tela === tela;
+  const vistos = {};
+  root.querySelectorAll('details').forEach(d => {
+    const tpl = d.hasAttribute('open');
+    d.dataset.tplOpen = tpl ? '1' : '0';
+    if(!mesmaTela) return;
+    const ant = detailsEstado.mapa[detailsChave(d, vistos)];
+    // Só mantém a escolha do usuário se o próprio app não mudou de ideia sobre essa seção.
+    if(ant && ant.tpl === tpl && ant.aberto !== tpl) d.open = ant.aberto;
+  });
+  detailsEstado.telaAtual = tela;
+}
 function render(){
+  if(Date.now() < selectAbertoAte){
+    if(!renderAdiadoTimer) renderAdiadoTimer = setTimeout(() => { renderAdiadoTimer = null; selectAbertoAte = 0; render(); }, Math.max(50, selectAbertoAte - Date.now() + 50));
+    return;
+  }
+  if(renderAdiadoTimer){ clearTimeout(renderAdiadoTimer); renderAdiadoTimer = null; }
+  try{ detailsGuardar(); }catch(e){}
+  try{ renderInterno(); }
+  finally{ try{ detailsRestaurar(); }catch(e){} }
+}
+function renderInterno(){
   setTimeout(atualizarTelaAcesa, 0);
   try{ document.body.classList.toggle('apoio-fonte', state.view==='aluno' && !!alunoApoio().fonteGrande); }catch(e){}
   tabsEl.innerHTML = '';
@@ -2375,7 +2431,17 @@ function render(){
     return;
   }
   const carrosselAntigo = root.querySelector('.campanha-carousel');
+  const menuAntigo = root.querySelector('.app-sidebar');
+  const menuAntigoHtml = menuAntigo ? menuAntigo.outerHTML : null;
+  const menuFoco = menuAntigo && menuAntigo.contains(document.activeElement) ? document.activeElement : null;
   root.innerHTML = state.view==='professor' ? renderProfessor() : state.view==='coordenador' ? renderCoordenador() : state.view==='freqmonitor' ? renderFreqMonitor() : state.view==='biblioteca' ? renderBiblioteca() : renderAluno();
+  if(menuAntigo){
+    const menuNovo = root.querySelector('.app-sidebar');
+    if(menuNovo && menuNovo.outerHTML === menuAntigoHtml){
+      menuNovo.replaceWith(menuAntigo);
+      if(menuFoco && document.activeElement !== menuFoco){ try{ menuFoco.focus({ preventScroll:true }); }catch(e){} }
+    }
+  }
   // Reaproveita o carrossel já carregado (imagens decodificadas, slide atual) quando o conteúdo
   // não mudou, em vez de recriar tudo a cada render — evita o "pisca" do banner.
   if(carrosselAntigo){
@@ -16768,7 +16834,7 @@ function renderResponderTimed(){
       ${al.error ? `<p class="err">${esc(al.error)}</p>` : ''}
       <div class="row" style="margin-top:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
         <button class="btn btn-ghost" data-action="responder-anterior" ${idx===0?'disabled':''}>← Questão anterior</button>
-        ${!canAdvance ? `<span class="pill" style="background:var(--yellow-dark); color:#fff;">⏳ Aguarde ${mm}:${ss} para ${isLast?'enviar':'avançar'}</span>` : ''}
+        ${!canAdvance ? `<span class="pill" data-resp-aguarde data-fim="${startedAt + minMsPerQuestion(a)}" data-acao="${isLast?'enviar':'avançar'}" style="background:var(--yellow-dark); color:#fff;">⏳ Aguarde ${mm}:${ss} para ${isLast?'enviar':'avançar'}</span>` : ''}
         ${isLast
           ? `<button class="btn btn-primary" data-action="submit-answers" ${!canAdvance?'disabled':''}>Enviar respostas</button>`
           : `<button class="btn btn-primary" data-action="responder-proxima" ${!canAdvance?'disabled':''}>Próxima questão →</button>`
@@ -18502,9 +18568,16 @@ function isTimedResponder(a){
 }
 function startResponderTick(){
   stopResponderTick();
+  // Atualiza só o relógio "Aguarde mm:ss" (sem redesenhar a tela inteira a cada segundo, o que
+  // fechava listas de seleção abertas e tirava o foco). Redesenha uma vez quando o tempo acaba.
   responderTickInterval = setInterval(() => {
-    if(state.aluno.stage==='responder' && !state.aluno.examLocked) render();
-    else stopResponderTick();
+    if(state.aluno.stage!=='responder' || state.aluno.examLocked){ stopResponderTick(); return; }
+    const el = document.querySelector('[data-resp-aguarde]');
+    if(!el) return;
+    const resta = Number(el.dataset.fim) - Date.now();
+    if(!(resta > 0)){ render(); return; }
+    const seg = Math.ceil(resta/1000);
+    el.textContent = `⏳ Aguarde ${String(Math.floor(seg/60)).padStart(2,'0')}:${String(seg%60).padStart(2,'0')} para ${el.dataset.acao}`;
   }, 1000);
 }
 function stopResponderTick(){
