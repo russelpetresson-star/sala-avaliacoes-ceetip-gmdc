@@ -656,6 +656,7 @@
   }
   @media (max-width: 680px){ .stat-grid{ grid-template-columns:repeat(2,1fr); } }
   [data-sed-preview] *{ animation:none !important; }
+  .av-dest{ color:#6B1F2E; font-weight:700; } .av-escuro .av-dest, .av-azul .av-dest{ color:#F3D27A; }
   @media (max-width: 760px){ .sed-grade{ grid-template-columns:1fr !important; } .sed-grade > div:first-child{ max-height:30vh !important; } }
   @media (max-width: 420px){
     header h1{ font-size:1.9rem; }
@@ -675,7 +676,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-16-1800</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-16-2000</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -2596,6 +2597,16 @@ const ALUNO_SECOES = [
   { id:'escola', icon:'💬', label:'Escola', abas:[['duvidas','❓ Dúvidas'], ['revisao','🔎 Revisão de colegas'], ['monitoria','🧑‍🏫 Monitoria'], ['buscaativa','🚌 Transporte'], ['campanha','📢 Jovens Protagonistas']] },
   { id:'eu', icon:'🏅', label:'Eu', abas:[['conquistas','🏅 Conquistas'], ['portfolio','🗂️ Portfólio'], ['diario','📷 Diário de bordo'], ['biblioteca','📚 Biblioteca']] },
 ];
+const COORD_SECOES = [
+  { id:'painel', icon:'🏠', label:'Painel', abas:[['dashboard','🏠 Painel']] },
+  { id:'aval', icon:'📝', label:'Avaliações e notas', abas:[['avaliacoes','📝 Todas as avaliações'], ['liberacoes','🔓 Liberações'], ['notas','🧮 Notas finais e risco'], ['importarnotas','📥 Importar notas (CSV)'], ['periodos','📅 Períodos'], ['bloco','🖨️ Prova em papel'], ['avulso','🗒️ Gabarito avulso']] },
+  { id:'turmas', icon:'👥', label:'Turmas e frequência', abas:[['turmas','👥 Turmas'], ['chamada','🪪 Chamada'], ['freqpainel','📊 Painel de frequência']] },
+  { id:'profs', icon:'🧑‍🏫', label:'Professores', abas:[['professores','🧑‍🏫 Professores'], ['frequencia','📈 Frequência dos professores'], ['pesosprof','⚖️ Pesos dos professores']] },
+  { id:'alunos', icon:'💛', label:'Alunos', abas:[['monitoria','🎯 Monitoria de desempenho'], ['buscaativa','🚌 Busca ativa e transporte'], ['socio','💛 Socioemocional'], ['portfolio','🗂️ Portfólio'], ['campanha','📢 Jovens Protagonistas'], ['conquistas','🏅 Hall de conquistas'], ['temporada','🏆 Temporada de desafios']] },
+  { id:'aulas', icon:'📚', label:'Aulas e comunicação', abas:[['planolivro','🗓️ Plano de aulas do livro'], ['livros','📘 Livros didáticos'], ['mural','📌 Mural de avisos'], ['diario','📷 Diário de bordo'], ['enquete','📣 Enquete'], ['quiz','🎮 Quiz'], ['roleta','🎡 Roleta'], ['duelo','⚔️ Duelo'], ['slides','🖥️ Slides']] },
+  { id:'config', icon:'⚙️', label:'Configurações', abas:[['sessao','🔐 Sessão e prova'], ['freqconfig','⏰ Frequência'], ['ia','🤖 IA'], ['lixeira','🗑️ Lixeira']] },
+];
+function navAcao(role){ return role==='aluno' ? 'aluno-sub-view' : role==='coordenador' ? 'coord-sub-view' : 'sub-view'; }
 function navSecaoDe(secoes, sub){ return secoes.find(s => s.abas.some(a => a[0]===sub)) || secoes[0]; }
 function navUltima(role, secId){ const u = state.ui; u.navUltima = u.navUltima || {}; return (u.navUltima[role]||{})[secId]; }
 function navLembrar(role, secId, sub){ const u = state.ui; u.navUltima = u.navUltima || {}; (u.navUltima[role] = u.navUltima[role] || {})[secId] = sub; }
@@ -2603,7 +2614,7 @@ function navLembrar(role, secId, sub){ const u = state.ui; u.navUltima = u.navUl
 function navSidebarItens(role, secoes, sub, badges){
   const atual = navSecaoDe(secoes, sub);
   navLembrar(role, atual.id, sub);
-  const acao = role==='aluno' ? 'aluno-sub-view' : 'sub-view';
+  const acao = navAcao(role);
   const itens = secoes.map(sec => {
     let alvo;
     if(sec.id==='ferr') alvo = 'ferramentas';                 // Ferramentas sempre abre a grade
@@ -2615,7 +2626,7 @@ function navSidebarItens(role, secoes, sub, badges){
 }
 function navAbasHtml(role, secoes, sub, extra){
   const sec = navSecaoDe(secoes, sub);
-  const acao = role==='aluno' ? 'aluno-sub-view' : 'sub-view';
+  const acao = navAcao(role);
   if(sec.id==='ferr'){
     if(sub==='ferramentas') return '';
     const r = recursoPorSub('prof', sub);
@@ -11473,43 +11484,13 @@ function renderCoordenador(){
       </div>
     </div>
   `;
-  // Menu da coordenação organizado em grupos (mesmo recurso do menu do professor).
-  const sidebarItems = [
-    { action:'coord-sub-view', sub:'dashboard', icon:'🏠', label:'Painel', group:'📊 Painel' },
-    { action:'coord-sub-view', sub:'avaliacoes', icon:'📝', label:'Todas as avaliações', group:'📝 Avaliações & Notas' },
-    { action:'coord-sub-view', sub:'liberacoes', icon:'🔓', label:'Liberações', badge: liberacoesVisiveis().filter(r=>!r.released).length || 0, group:'📝 Avaliações & Notas' },
-    { action:'coord-sub-view', sub:'notas', icon:'🧮', label:'Notas finais e risco', group:'📝 Avaliações & Notas' },
-    { action:'coord-sub-view', sub:'importarnotas', icon:'📥', label:'Importar Notas (CSV)', group:'📝 Avaliações & Notas' },
-    { action:'coord-sub-view', sub:'periodos', icon:'📅', label:'Períodos', group:'📝 Avaliações & Notas' },
-    { action:'coord-sub-view', sub:'turmas', icon:'👥', label:'Turmas', group:'👥 Turmas & Frequência' },
-    { action:'coord-sub-view', sub:'chamada', icon:'🪪', label:'Chamada', group:'👥 Turmas & Frequência' },
-    { action:'coord-sub-view', sub:'freqpainel', icon:'📊', label:'Painel de Frequência', group:'👥 Turmas & Frequência' },
-    { action:'coord-sub-view', sub:'professores', icon:'🧑‍🏫', label:'Professores', group:'🧑‍🏫 Professores' },
-    { action:'coord-sub-view', sub:'frequencia', icon:'📈', label:'Frequência dos Professores', group:'🧑‍🏫 Professores' },
-    { action:'coord-sub-view', sub:'pesosprof', icon:'⚖️', label:'Pesos dos professores', group:'🧑‍🏫 Professores' },
-    { action:'coord-sub-view', sub:'monitoria', icon:'🎯', label:'Monitoria de Desempenho', badge: monitoriaIntervencaoNaoVistosCount(), group:'💛 Acompanhamento do Aluno' },
-    { action:'coord-sub-view', sub:'buscaativa', icon:'🚌', label:'Busca Ativa e Transporte', badge: buscaAtivaAcionamentosNaoVistosCount(), group:'💛 Acompanhamento do Aluno' },
-    { action:'coord-sub-view', sub:'socio', icon:'💛', label:'Avaliação Socioemocional', group:'💛 Acompanhamento do Aluno' },
-    { action:'coord-sub-view', sub:'portfolio', icon:'🗂️', label:'Portfólio do Aluno', group:'💛 Acompanhamento do Aluno' },
-    { action:'coord-sub-view', sub:'campanha', icon:'📢', label:'Jovens Protagonistas', badge: campanhaPendentesCount(), group:'🏅 Protagonismo' },
-    { action:'coord-sub-view', sub:'conquistas', icon:'🏅', label:'Hall de Conquistas', group:'🏅 Protagonismo' },
-    { action:'coord-sub-view', sub:'temporada', icon:'🏆', label:'Temporada de Desafios', group:'🏅 Protagonismo' },
-    { action:'coord-sub-view', sub:'mural', icon:'📌', label:'Mural de Avisos', group:'📢 Comunicação' },
-    { action:'coord-sub-view', sub:'diario', icon:'📷', label:'Diário de Bordo', group:'📢 Comunicação' },
-    { action:'coord-sub-view', sub:'enquete', icon:'📣', label:'Enquete Relâmpago', group:'📢 Comunicação' },
-    { action:'coord-sub-view', sub:'bloco', icon:'🖨️', label:'Bloco de Provas', group:'🖨️ Provas em Papel' },
-    { action:'coord-sub-view', sub:'avulso', icon:'🗒️', label:'Gabarito Avulso', group:'🖨️ Provas em Papel' },
-    { action:'coord-sub-view', sub:'planolivro', icon:'🗓️', label:'Plano de Aulas do Livro', group:'🎮 Recursos de Aula' },
-    { action:'coord-sub-view', sub:'livros', icon:'📘', label:'Livros Didáticos', group:'🎮 Recursos de Aula' },
-    { action:'coord-sub-view', sub:'quiz', icon:'🎮', label:'Quiz por Equipes', group:'🎮 Recursos de Aula' },
-    { action:'coord-sub-view', sub:'roleta', icon:'🎡', label:'Roleta de Sorteio', group:'🎮 Recursos de Aula' },
-    { action:'coord-sub-view', sub:'duelo', icon:'⚔️', label:'Modo Duelo', group:'🎮 Recursos de Aula' },
-    { action:'coord-sub-view', sub:'slides', icon:'🖥️', label:'Apresentação de Slides', group:'🎮 Recursos de Aula' },
-    { action:'coord-sub-view', sub:'sessao', icon:'🔐', label:'Sessão e prova', group:'⚙️ Configurações' },
-    { action:'coord-sub-view', sub:'freqconfig', icon:'⏰', label:'Config. de Frequência', group:'⚙️ Configurações' },
-    { action:'coord-sub-view', sub:'ia', icon:'🤖', label:'Configurações de IA', group:'⚙️ Configurações' },
-    { action:'coord-sub-view', sub:'lixeira', icon:'🗑️', label:'Lixeira', group:'⚙️ Configurações' },
-  ];
+  // Menu da coordenação enxuto: 7 seções no menu lateral, abas no topo com as telas de cada seção
+  // (mesmo modelo do professor e do aluno). As telas continuam as mesmas (c.subview).
+  const navCoord = navSidebarItens('coordenador', COORD_SECOES, c.subview, {
+    aval: liberacoesVisiveis().filter(r=>!r.released).length || 0,
+    alunos: (monitoriaIntervencaoNaoVistosCount() || 0) + (buscaAtivaAcionamentosNaoVistosCount() || 0) + (campanhaPendentesCount() || 0),
+  });
+  const sidebarItems = navCoord.itens;
   let content;
   if(c.subview==='dashboard') content = renderCoordDashboard();
   else if(c.subview==='professores') content = renderCoordProfessores();
@@ -11545,7 +11526,8 @@ function renderCoordenador(){
   else if(c.subview==='ia') content = renderCoordIA();
   else if(c.subview==='temporada') content = renderCoordTemporada();
   else content = c.mode==='results' ? renderCoordResults() : renderCoordAssessments();
-  return `<div class="app-topbar">${topBar}</div><div class="app-shell">${renderSidebar(sidebarItems, c.subview, 'coordenador')}<div class="app-main">${content}</div></div>`;
+  content = navAbasHtml('coordenador', COORD_SECOES, c.subview) + content;
+  return `<div class="app-topbar">${topBar}</div><div class="app-shell">${renderSidebar(sidebarItems, navCoord.atualSub, null)}<div class="app-main">${content}</div></div>`;
 }
 
 function renderCoordSessao(){
@@ -23129,20 +23111,7 @@ function avInjetarCss(){
   `;
   document.head.appendChild(st);
 }
-function avOpcoesHtml(d, ctx){
-  const r = d.relampago; const L = ['A','B','C','D','E'];
-  const total = Object.keys(ctx.resp||{}).length;
-  const cont = r.opcoes.map((_, i) => Object.values(ctx.resp||{}).filter(x => x.op===i).length);
-  return r.opcoes.map((o, i) => {
-    let cls = '';
-    if(ctx.revelado) cls = i===r.correta ? 'ok' : (ctx.minha===i ? 'no' : '');
-    else if(ctx.minha===i) cls = 'sel';
-    const barra = (ctx.modo==='prof' && ctx.revelado) ? `<div class="av-bar"><div style="width:${total ? Math.round(cont[i]/total*100) : 0}%"></div></div>` : '';
-    const contTxt = (ctx.modo==='prof' && ctx.revelado) ? ` <span style="float:right;">${cont[i]}</span>` : '';
-    const attrs = ctx.modo==='aluno' && !ctx.revelado ? `data-action="av-responder" data-i="${i}"` : 'disabled';
-    return `<button class="av-op ${cls}" ${attrs}><b>${L[i]})</b> ${esc(o)}${contTxt}${barra}</button>`;
-  }).join('');
-}
+function avOpcoesHtml(d, ctx){ return avOpcoesGen(d.relampago, ctx, i => `data-action="av-responder" data-i="${i}"`); }
 function avSlideHtml(d, sl, ctx){
   const C = { v:'#6B1F2E', o:'#C9A227', a:'#1F4E79' };
   const img = (k, alt) => AV_IMG[k] ? `<img src="${AV_IMG[k]}" alt="" style="max-width:100%;max-height:${alt||38}cqw;object-fit:contain;border-radius:.3em;">` : '<div class="av-fonte">(imagem não importada)</div>';
@@ -23151,26 +23120,26 @@ function avSlideHtml(d, sl, ctx){
   switch(sl.t){
   case 'capa': return `<div class="av-in av-escuro">
       <div style="position:absolute;right:4cqw;top:3cqw;opacity:.35;font-size:9em;">${avIc(d.iconeAula, '#C98A9A')}</div>
-      <div style="color:${C.o};font-weight:700;letter-spacing:.15em;font-size:.8em;margin-top:1.5em;">AULA ${String(ctx.n).padStart(2,'0')} · LIVRO ${esc(d.paginas||'')}</div>
-      <div class="av-t" style="font-size:2.4em;margin-top:1.6em;">${esc(d.titulo)}</div>
-      <div style="color:#F3E7C0;">${esc(d.capitulo||'')}</div>
-      <div class="av-card ou av-pop" style="position:absolute;left:4.4cqw;right:4.4cqw;bottom:4cqw;color:${C.v};font-size:1.15em;animation-delay:.3s;"><b>Para começar:</b> <i>${esc(d.pergunta)}</i></div></div>`;
+      <div style="color:${C.o};font-weight:700;letter-spacing:.15em;font-size:.8em;margin-top:1.5em;">AULA ${String(ctx.n).padStart(2,'0')} · LIVRO ${escR(d.paginas||'')}</div>
+      <div class="av-t" style="font-size:2.4em;margin-top:1.6em;">${escR(d.titulo)}</div>
+      <div style="color:#F3E7C0;">${escR(d.capitulo||'')}</div>
+      <div class="av-card ou av-pop" style="position:absolute;left:4.4cqw;right:4.4cqw;bottom:4cqw;color:${C.v};font-size:1.15em;animation-delay:.3s;"><b>Para começar:</b> <i>${escR(d.pergunta)}</i></div></div>`;
   case 'retomada': {
     if(!d.anterior){ const ab = (d.abertura && Array.isArray(d.abertura.cards) && d.abertura.cards.length) ? d.abertura : { titulo:'Começando a Geografia do Ensino Médio', cards:[['Introdução','O espaço geográfico e seus conceitos'],['Capítulo 1','Representações cartográficas e escalas'],['Revisão e prova','Aulas 19 e 20 do bimestre']] };
-      return `<div class="av-in"><div class="av-t">${esc(ab.titulo||'')}</div><div class="av-g3" style="align-items:stretch;">
-      ${ab.cards.slice(0,3).map(([t,x],i)=>`<div class="av-card ${i===0?'ou':''} av-pop" style="animation-delay:${i*.15}s;min-height:9em;"><div class="av-t" style="font-size:1.3em;">${esc(t)}</div>${esc(x)}</div>`).join('')}</div></div>`; }
+      return `<div class="av-in"><div class="av-t">${escR(ab.titulo||'')}</div><div class="av-g3" style="align-items:stretch;">
+      ${ab.cards.slice(0,3).map(([t,x],i)=>`<div class="av-card ${i===0?'ou':''} av-pop" style="animation-delay:${i*.15}s;min-height:9em;"><div class="av-t" style="font-size:1.3em;">${escR(t)}</div>${escR(x)}</div>`).join('')}</div></div>`; }
     const a = d.anterior;
     return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Na aula passada…</div>${avCirc('FaClockRotateLeft', C.a, '#fff', 2.2)}</div>
-      <div class="av-card" style="font-size:1.15em;"><b style="color:${C.v}">Aula ${a.n}:</b> ${esc(a.ideia)}</div>
-      <div class="av-g2" style="margin-top:.9em;">${a.pontos.map((p,i)=>`<div class="av-card az av-pop" style="animation-delay:${.2+i*.15}s;">${esc(p)}</div>`).join('')}</div>
-      <div style="margin-top:.9em;color:${C.a};"><b>Conceito que já sabemos:</b> ${esc(a.conceito)}</div></div>`;
+      <div class="av-card" style="font-size:1.15em;"><b style="color:${C.v}">Aula ${a.n}:</b> ${escR(a.ideia)}</div>
+      <div class="av-g2" style="margin-top:.9em;">${a.pontos.map((p,i)=>`<div class="av-card az av-pop" style="animation-delay:${.2+i*.15}s;">${escR(p)}</div>`).join('')}</div>
+      <div style="margin-top:.9em;color:${C.a};"><b>Conceito que já sabemos:</b> ${escR(a.conceito)}</div></div>`;
   }
-  case 'aprender': return `<div class="av-in"><div class="av-t">${esc(d.ideia)}</div><div class="av-g2">
-      ${d.pontos.map((p,i)=>`<div class="av-card av-pop av-row" style="animation-delay:${i*.18}s;align-items:flex-start;min-height:5.2em;">${avCirc((d.iconesCards||[])[i]||d.iconeAula, C.o, C.v, 2.3)}<div>${esc(p)}</div></div>`).join('')}</div></div>`;
+  case 'aprender': return `<div class="av-in"><div class="av-t">${escR(d.ideia)}</div><div class="av-g2" ${(d.pontos||[]).length > 4 ? 'style="grid-template-columns:repeat(3,1fr);"' : ''}>
+      ${d.pontos.map((p,i)=>`<div class="av-card av-pop av-row" style="animation-delay:${i*.18}s;align-items:flex-start;min-height:5.2em;">${avCirc((d.iconesCards||[])[i]||d.iconeAula, C.o, C.v, 2.3)}<div>${escR(p)}</div></div>`).join('')}</div></div>`;
   case 'destaque': return `<div class="av-in av-escuro" style="text-align:center;">
       <div class="av-pop" style="margin-top:1em;">${avCirc(d.iconeAula, C.o, C.v, 3.2)}</div>
-      <div class="av-big av-pop" style="margin-top:.4em;animation-delay:.25s;">${esc(d.destaque[0])}</div>
-      <div style="color:#F3E7C0;font-size:1.3em;margin-top:.6em;">${esc(d.destaque[1])}</div></div>`;
+      <div class="av-big av-pop" style="margin-top:.4em;animation-delay:.25s;">${escR(d.destaque[0])}</div>
+      <div style="color:#F3E7C0;font-size:1.3em;margin-top:.6em;">${escR(d.destaque[1])}</div></div>`;
   case 'nuvem': return avNuvemHtml(d, ctx);
   case 'mapa-inicio': case 'caderno': case 'leitura': case 'mapa-final': return avCadernoHtml(d, sl, ctx);
   case 'grupo': return avGrupoHtml(d, sl, ctx);
@@ -23179,11 +23148,11 @@ function avSlideHtml(d, sl, ctx){
   case 'figura': {
     if(!ctx.estudo && ctx.sess && ctx.sess.toque && ctx.sess.toque.fig===sl.i) return avFiguraToqueHtml(d, sl, ctx);
     const f = d.figuras[sl.i];
-    return `<div class="av-in"><div class="av-t">${esc(f.titulo||f.leg)}</div>
+    return `<div class="av-in"><div class="av-t">${escR(f.titulo||f.leg)}</div>
       <div style="display:grid;grid-template-columns:1.35fr 1fr;gap:1em;height:72%;">
         <div style="display:flex;align-items:center;justify-content:center;height:100%;">${img(f.f)}</div>
-        <div class="av-card" style="overflow:hidden;"><b style="color:${C.v}">${esc(f.leg)}</b>
-          <ul style="margin:.6em 0 0 1em;padding:0;">${(f.perguntas||[]).map((q,i)=>`<li class="av-pop" style="margin:.35em 0;animation-delay:${.3+i*.25}s;">${esc(q)}</li>`).join('')}</ul>
+        <div class="av-card" style="overflow:hidden;"><b style="color:${C.v}">${escR(f.leg)}</b>
+          <ul style="margin:.6em 0 0 1em;padding:0;">${(f.perguntas||[]).map((q,i)=>`<li class="av-pop" style="margin:.35em 0;animation-delay:${.3+i*.25}s;">${escR(q)}</li>`).join('')}</ul>
           <div class="av-fonte" style="margin-top:.6em;">Fonte: livro didático de Geografia (volume único), p. ${f.p}. Uso pedagógico interno.</div></div></div></div>`;
   }
   case 'esquema': {
@@ -23192,22 +23161,22 @@ function avSlideHtml(d, sl, ctx){
     let corpo = '';
     if(e.tipo==='comparar'){
       const lado = (dados, cls, cor, nomeIc, i) => i>k ? `<div class="av-card cz" style="min-height:12em;display:flex;align-items:center;justify-content:center;"><span style="font-size:3em;color:#bbb;">?</span></div>`
-        : `<div class="av-card ${cls} ${novo(i)}" style="min-height:12em;"><div class="av-row" style="margin-bottom:.5em;">${nomeIc?avCirc(nomeIc, cor, '#fff', 2):''}<b style="font-family:Cambria,Georgia,serif;font-size:1.3em;color:${cor};">${esc(dados[0])}</b></div><ul style="margin:0 0 0 1em;padding:0;">${dados[1].map(x=>`<li style="margin:.3em 0;">${esc(x)}</li>`).join('')}</ul></div>`;
+        : `<div class="av-card ${cls} ${novo(i)}" style="min-height:12em;"><div class="av-row" style="margin-bottom:.5em;">${nomeIc?avCirc(nomeIc, cor, '#fff', 2):''}<b style="font-family:Cambria,Georgia,serif;font-size:1.3em;color:${cor};">${escR(dados[0])}</b></div><ul style="margin:0 0 0 1em;padding:0;">${dados[1].map(x=>`<li style="margin:.3em 0;">${escR(x)}</li>`).join('')}</ul></div>`;
       corpo = `<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:.8em;align-items:center;">${lado(e.a,'',C.v,ic[0],0)}<div class="av-circ" style="background:${C.o};width:2.4em;height:2.4em;font-size:1.4em;font-weight:700;color:${C.v};">×</div>${lado(e.b,'az',C.a,ic[1],1)}</div>`;
     } else if(e.tipo==='quatro'){
-      corpo = `<div class="av-g2">${e.itens.map((it,i)=> i>k ? `<div class="av-card cz" style="min-height:5.5em;"></div>` : `<div class="av-card ${i%3===0?'ou':''} ${novo(i)}" style="min-height:5.5em;"><div class="av-row">${ic[i]?avCirc(ic[i], C.v, '#fff', 2):''}<b style="font-family:Cambria,Georgia,serif;font-size:1.25em;color:${C.v};">${esc(it[0])}</b></div><div style="margin-top:.4em;">${esc(it[1])}</div></div>`).join('')}</div>`;
+      corpo = `<div class="av-g2">${e.itens.map((it,i)=> i>k ? `<div class="av-card cz" style="min-height:5.5em;"></div>` : `<div class="av-card ${i%3===0?'ou':''} ${novo(i)}" style="min-height:5.5em;"><div class="av-row">${ic[i]?avCirc(ic[i], C.v, '#fff', 2):''}<b style="font-family:Cambria,Georgia,serif;font-size:1.25em;color:${C.v};">${escR(it[0])}</b></div><div style="margin-top:.4em;">${escR(it[1])}</div></div>`).join('')}</div>`;
     } else if(e.tipo==='tres'){
-      corpo = `<div class="av-g3" style="height:68%;">${e.itens.map((it,i)=>{ const h = 55 + i*20; return i>k ? `<div class="av-card cz" style="height:${h}%;"></div>` : `<div class="av-card ${['','ou','az'][i]} ${novo(i)}" style="height:${h}%;"><div class="av-row" style="justify-content:space-between;"><b style="font-family:Cambria,Georgia,serif;font-size:1.4em;color:${C.v};">${esc(it[0])}</b>${ic[i]?avCirc(ic[i], C.a, '#fff', 1.8):''}</div><div style="color:${C.a};font-weight:700;">${esc(it[1])}</div><div style="margin-top:.3em;">${esc(it[2])}</div></div>`; }).join('')}</div><div class="av-fonte" style="text-align:right;">mais detalhe →</div>`;
+      corpo = `<div class="av-g3" style="height:68%;">${e.itens.map((it,i)=>{ const h = 55 + i*20; return i>k ? `<div class="av-card cz" style="height:${h}%;"></div>` : `<div class="av-card ${['','ou','az'][i]} ${novo(i)}" style="height:${h}%;"><div class="av-row" style="justify-content:space-between;"><b style="font-family:Cambria,Georgia,serif;font-size:1.4em;color:${C.v};">${escR(it[0])}</b>${ic[i]?avCirc(ic[i], C.a, '#fff', 1.8):''}</div><div style="color:${C.a};font-weight:700;">${escR(it[1])}</div><div style="margin-top:.3em;">${escR(it[2])}</div></div>`; }).join('')}</div><div class="av-fonte" style="text-align:right;">mais detalhe →</div>`;
     } else if(e.tipo==='linha' || e.tipo==='passos'){
-      corpo = `${e.tipo==='passos' && e.formula ? `<div class="av-card ou" style="text-align:center;font-size:1.6em;font-weight:700;color:${C.v};width:50%;margin:0 auto .8em;">${esc(e.formula)}</div>` : ''}
-        <div style="display:flex;gap:.5em;align-items:stretch;">${e.itens.map((it,i)=> `${i>0?`<div style="align-self:center;color:${i<=k?C.o:'#ddd'};font-size:1.6em;">➜</div>`:''}` + (i>k ? `<div class="av-card cz" style="flex:1;min-height:10em;"></div>` : `<div class="av-card ${i===k?'ou':''} ${novo(i)}" style="flex:1;min-height:10em;text-align:center;">${ic[i]?avCirc(ic[i], i===k?C.v:'#8C3A4B', '#fff', 2.2):''}<div style="font-weight:700;color:${C.v};margin:.4em 0;">${esc(it[0])}</div><div style="${e.tipo==='passos'?`font-weight:700;color:${C.a};`:''}">${esc(it[1])}</div>${it[2]&&e.tipo!=='passos'?`<div style="font-weight:700;color:${C.a};margin-top:.4em;">${esc(it[2])}</div>`:''}</div>`)).join('')}</div>`;
+      corpo = `${e.tipo==='passos' && e.formula ? `<div class="av-card ou" style="text-align:center;font-size:1.6em;font-weight:700;color:${C.v};width:50%;margin:0 auto .8em;">${escR(e.formula)}</div>` : ''}
+        <div style="display:flex;gap:.5em;align-items:stretch;">${e.itens.map((it,i)=> `${i>0?`<div style="align-self:center;color:${i<=k?C.o:'#ddd'};font-size:1.6em;">➜</div>`:''}` + (i>k ? `<div class="av-card cz" style="flex:1;min-height:10em;"></div>` : `<div class="av-card ${i===k?'ou':''} ${novo(i)}" style="flex:1;min-height:10em;text-align:center;">${ic[i]?avCirc(ic[i], i===k?C.v:'#8C3A4B', '#fff', 2.2):''}<div style="font-weight:700;color:${C.v};margin:.4em 0;">${escR(it[0])}</div><div style="${e.tipo==='passos'?`font-weight:700;color:${C.a};`:''}">${escR(it[1])}</div>${it[2]&&e.tipo!=='passos'?`<div style="font-weight:700;color:${C.a};margin-top:.4em;">${escR(it[2])}</div>`:''}</div>`)).join('')}</div>`;
     } else if(e.tipo==='encolher'){
       const it = e.itens[k]; const tams = [10, 7.5, 5, 2.8];
       corpo = `<div style="display:grid;grid-template-columns:1.1fr 1fr;gap:1em;height:74%;">
         <div class="av-card az" style="display:flex;align-items:center;justify-content:center;"><div style="font-size:${tams[k]}em;color:${C.a};animation:avEncolhe 1s ease both;--de:${k>0 ? (tams[k-1]/tams[k]).toFixed(2) : 1.2};">${avIc('FaEarthAmericas', C.a)}</div></div>
-        <div class="av-card"><div class="av-row">${avCirc(it[3], C.v, '#fff', 2.6)}<b style="font-size:1.5em;color:${C.v};">${esc(it[0])}</b></div>
-          <div style="margin-top:.6em;font-size:1.15em;">${esc(it[1])}</div>
-          <div class="av-pop" style="font-size:2.2em;font-weight:700;color:${C.a};margin-top:.3em;animation-delay:.4s;">${esc(it[2])}</div>
+        <div class="av-card"><div class="av-row">${avCirc(it[3], C.v, '#fff', 2.6)}<b style="font-size:1.5em;color:${C.v};">${escR(it[0])}</b></div>
+          <div style="margin-top:.6em;font-size:1.15em;">${escR(it[1])}</div>
+          <div class="av-pop" style="font-size:2.2em;font-weight:700;color:${C.a};margin-top:.3em;animation-delay:.4s;">${escR(it[2])}</div>
           <div style="font-style:italic;color:#666;margin-top:.5em;">Quanto mais rápido o transporte, menor o mundo parece.</div></div></div>`;
     } else if(e.tipo==='limite'){
       corpo = `<div class="av-fonte" style="text-align:center;font-style:italic;">Ex.: Santana do Livramento (Brasil) e Rivera (Uruguai)</div>
@@ -23220,20 +23189,20 @@ function avSlideHtml(d, sl, ctx){
     } else if(e.tipo==='figura'){
       corpo = `<div style="height:75%;display:flex;align-items:center;justify-content:center;">${img(e.fig, 40)}</div><div class="av-fonte" style="text-align:center;">Fonte: livro didático, p. ${e.p}.</div>`;
     }
-    return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">${esc(e.titulo)}</div>${sl.passos>1?`<span class="av-fonte">${k+1} / ${sl.passos}</span>`:''}</div>${corpo}</div>`;
+    return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">${escR(e.titulo)}</div>${sl.passos>1?`<span class="av-fonte">${k+1} / ${sl.passos}</span>`:''}</div>${corpo}</div>`;
   }
   case 'relampago': {
     const total = Object.keys(ctx.resp||{}).length;
     return `<div class="av-in av-azul"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Pergunta-relâmpago</div><span style="font-size:2.6em;animation:avPulso 1.2s infinite;">${avIc('FaBolt', C.o)}</span></div>
-      <div style="font-weight:700;font-size:1.2em;margin-bottom:.4em;">${esc(r.texto)}</div>
+      <div style="font-weight:700;font-size:1.2em;margin-bottom:.4em;">${escR(r.texto)}</div>
       ${avOpcoesHtml(d, ctx)}
       <div style="margin-top:.5em;color:#F3E7C0;font-size:.9em;">${ctx.modo==='prof' ? (ctx.revelado ? `Resposta: <b>${L[r.correta]}</b> · ${total} resposta(s)` : `📱 Respondam no tablet · <b>${total}</b> resposta(s) até agora`) : (ctx.revelado ? (ctx.minha===r.correta ? '✅ Você acertou!' : (ctx.minha==null ? 'Resposta: ' + L[r.correta] : '❌ A certa é a ' + L[r.correta])) : (ctx.minha!=null ? '✔ Resposta enviada! Aguarde o professor revelar.' : 'Toque na sua resposta.'))}</div></div>`;
   }
   case 'resposta': return `<div class="av-in"><div class="av-t">Resposta: ${L[r.correta]}</div>
-      ${r.opcoes.map((o,i)=>`<div style="margin:.2em 0;${i===r.correta?'color:#1d6b31;font-weight:700;':'color:#999;'}">${L[i]}) ${esc(o)}</div>`).join('')}
-      <div class="av-card av-pop av-row" style="background:#E9F6EC;margin-top:.9em;animation-delay:.3s;">${avIc('FaLightbulb','#1d6b31','font-size:2em;')}<div><b style="color:#1d6b31;">Por quê?</b> ${esc(r.explicacao)}</div></div></div>`;
+      ${r.opcoes.map((o,i)=>`<div style="margin:.2em 0;${i===r.correta?'color:#1d6b31;font-weight:700;':'color:#999;'}">${L[i]}) ${escR(o)}</div>`).join('')}
+      <div class="av-card av-pop av-row" style="background:#E9F6EC;margin-top:.9em;animation-delay:.3s;">${avIc('FaLightbulb','#1d6b31','font-size:2em;')}<div><b style="color:#1d6b31;">Por quê?</b> ${escR(r.explicacao)}</div></div></div>`;
   case 'conceito': return `<div class="av-in av-escuro"><div class="av-row">${avCirc('FaPenToSquare', C.o, C.v, 2.4)}<b style="color:${C.o};letter-spacing:.12em;">ANOTE NO CADERNO</b></div>
-      <div class="av-t av-pop" style="font-size:2.3em;margin-top:1em;">${esc(d.conceito[0])}</div><div style="font-size:1.35em;color:#F3E7C0;">${esc(d.conceito[1])}</div></div>`;
+      <div class="av-t av-pop" style="font-size:2.3em;margin-top:1em;">${escR(d.conceito[0])}</div><div style="font-size:1.35em;color:#F3E7C0;">${escR(d.conceito[1])}</div></div>`;
   case 'pratica': {
     if(ctx.modo==='prof'){
       const sess = ctx.sess || {};
@@ -23244,39 +23213,42 @@ function avSlideHtml(d, sl, ctx){
             <div style="margin:.6em 0;flex:1;">As ${ctx.nQuiz||5} perguntas aparecem aqui na tela, com tempo e placar ao vivo. Os alunos respondem pelo tablet, em equipes sorteadas na hora. Quem acerta ganha fichas.</div>
             <button class="btn btn-primary" data-action="av-pratica-quiz" style="font-size:1em;">🎮 Começar o quiz agora</button></div>
           <div class="av-card az av-pop" style="min-height:14em;display:flex;flex-direction:column;animation-delay:.15s;"><div class="av-row">${avCirc('FaMobileScreen', C.a, '#fff', 2.4)}<b style="font-size:1.3em;color:${C.a};">Atividade no tablet</b></div>
-            ${env ? `<div style="margin:.6em 0;flex:1;" data-av-atividade-enviada><b style="color:#1d6b31;">✔ Atividade enviada</b> (código ${esc(env)}).<br><span style="font-size:1.4em;font-weight:700;color:${C.a};">${ctx.entregas!=null ? ctx.entregas : '…'}</span> aluno(s) já entregaram.<br><span class="av-fonte">Quem não terminar agora faz depois, em Minhas provas, até o prazo.</span></div>`
+            ${env ? `<div style="margin:.6em 0;flex:1;" data-av-atividade-enviada><b style="color:#1d6b31;">✔ Atividade enviada</b> (código ${escR(env)}).<br><span style="font-size:1.4em;font-weight:700;color:${C.a};">${ctx.entregas!=null ? ctx.entregas : '…'}</span> aluno(s) já entregaram.<br><span class="av-fonte">Quem não terminar agora faz depois, em Minhas provas, até o prazo.</span></div>`
               : `<div style="margin:.6em 0;flex:1;">O exercício da aula (5 objetivas + 1 do livro) vai para os tablets. Os alunos fazem agora, na aula, ou depois até o prazo. ${ctx.valeNota===false?'<b>Não vale nota.</b>':'<b>Vale nota.</b>'} Prazo: ${ctx.prazoTxt||'7 dias'}.</div>`}
             ${env ? '' : `<button class="btn btn-primary" data-action="av-pratica-atividade" style="font-size:1em;background:${C.a};">📝 Enviar para os tablets</button>`}</div>
         </div>
-        <div class="av-fonte" style="margin-top:.6em;">No livro: ${esc(d.atividade)}</div></div>`;
+        <div class="av-fonte" style="margin-top:.6em;">No livro: ${escR(d.atividade)}</div></div>`;
     }
     if(ctx.modo==='aluno' && !ctx.estudo){
       const sess = ctx.sess || {};
       return `<div class="av-in"><div class="av-t">Hora de praticar!</div>
         ${sess.atividadeCode ? `<div class="av-card az av-pop" style="text-align:center;padding:1.4em;"><div style="font-size:3em;">${avIc('FaMobileScreen', C.a)}</div><div style="font-size:1.3em;font-weight:700;color:${C.a};margin:.4em 0;">A atividade chegou!</div><div>Faça agora ou depois, em Minhas provas, até o prazo. Entregue no prazo e ganhe fichas 🎫</div>
-          <button class="btn btn-primary" data-action="av-fazer-atividade" data-code="${esc(sess.atividadeApoio && (sess.atividadeApoio.alunos||[]).includes(state.aluno.matriculaStudentId) ? sess.atividadeApoio.code : sess.atividadeCode)}" style="margin-top:.8em;font-size:1em;">📝 Fazer agora</button></div>`
+          <button class="btn btn-primary" data-action="av-fazer-atividade" data-code="${escR(sess.atividadeApoio && (sess.atividadeApoio.alunos||[]).includes(state.aluno.matriculaStudentId) ? sess.atividadeApoio.code : sess.atividadeCode)}" style="margin-top:.8em;font-size:1em;">📝 Fazer agora</button></div>`
           : `<div class="av-card" style="text-align:center;padding:1.6em;"><div style="font-size:3em;animation:avPulso 1.4s infinite;">${avIc('FaStar', C.o)}</div><div style="font-size:1.2em;margin-top:.4em;">Aguarde: o professor vai escolher entre o <b>quiz por equipes</b> e a <b>atividade no tablet</b>.</div></div>`}
-        <div class="av-fonte" style="margin-top:.6em;">No livro: ${esc(d.atividade)}</div></div>`;
+        <div class="av-fonte" style="margin-top:.6em;">No livro: ${escR(d.atividade)}</div></div>`;
     }
   }
   // falls through: em "Estudar", mostra a atividade do livro
   case 'atividade': return `<div class="av-in"><div class="av-t">Mãos à obra</div><div class="av-g2">
-      <div class="av-card av-pop" style="min-height:12em;"><div class="av-row">${avCirc('FaBookOpen', C.v, '#fff', 2.2)}<b style="color:${C.v};">No livro</b></div><div style="margin-top:.7em;font-size:1.1em;">${esc(d.atividade)}</div></div>
+      <div class="av-card av-pop" style="min-height:12em;"><div class="av-row">${avCirc('FaBookOpen', C.v, '#fff', 2.2)}<b style="color:${C.v};">No livro</b></div><div style="margin-top:.7em;font-size:1.1em;">${escR(d.atividade)}</div></div>
       <div class="av-card az av-pop" style="min-height:12em;animation-delay:.2s;"><div class="av-row">${avCirc('FaMobileScreen', C.a, '#fff', 2.2)}<b style="color:${C.a};">No app — exercício de fixação</b></div><div style="margin-top:.7em;font-size:1.1em;">5 questões objetivas + 1 questão do livro. Ao terminar, você vê a resposta certa e a explicação. Entregue no prazo e ganhe fichas 🎫</div></div></div></div>`;
   case 'extra': {
     const x = (d.extras||[]).find(e => e.id===sl.id) || {};
     if(x.tipo==='video') return avVideoSlideHtml(x, ctx);
+    if(x.tipo==='pergunta') return avPerguntaSlideHtml(x, ctx);
+    if(x.tipo==='livro') return avLivroSlideHtml(d, x, (d.extras||[]).indexOf(x), ctx);
+    if(x.tipo==='comparar') return avSlideHtml(Object.assign({}, d, { esquema: { tipo:'comparar', titulo: x.titulo||'', a: [(x.a||[])[0]||'', ((x.a||[])[1]||[]).filter(t => String(t).trim())], b: [(x.b||[])[0]||'', ((x.b||[])[1]||[]).filter(t => String(t).trim())], icones: [] } }), { t:'esquema', k:1, passos:1 }, ctx);
     const linhas = String(x.texto||'').split('\n').map(t => t.trim()).filter(Boolean);
     const foto = x.img && AV_IMG['ed-' + x.img] ? `<img src="${AV_IMG['ed-' + x.img]}" alt="" style="max-width:100%;max-height:36cqw;object-fit:contain;border-radius:.4em;">` : (x.img ? '<div class="av-fonte">(carregando imagem…)</div>' : '');
-    const texto = linhas.length > 1 ? `<ul style="margin:.2em 0 0 1em;padding:0;">${linhas.map((t,i) => `<li class="av-pop" style="margin:.4em 0;animation-delay:${.15+i*.15}s;">${esc(t)}</li>`).join('')}</ul>` : (linhas[0] ? `<div style="font-size:1.25em;">${esc(linhas[0])}</div>` : '');
-    return `<div class="av-in"><div class="av-t">${esc(x.titulo||'')}</div>
+    const texto = linhas.length > 1 ? `<ul style="margin:.2em 0 0 1em;padding:0;">${linhas.map((t,i) => `<li class="av-pop" style="margin:.4em 0;animation-delay:${.15+i*.15}s;">${escR(t)}</li>`).join('')}</ul>` : (linhas[0] ? `<div style="font-size:1.25em;">${escR(linhas[0])}</div>` : '');
+    return `<div class="av-in"><div class="av-t">${escR(x.titulo||'')}</div>
       ${foto && texto ? `<div style="display:grid;grid-template-columns:1.25fr 1fr;gap:1.2em;height:74%;"><div style="display:flex;align-items:center;justify-content:center;">${foto}</div><div class="av-card" style="overflow:hidden;">${texto}</div></div>`
         : foto ? `<div style="height:76%;display:flex;align-items:center;justify-content:center;">${foto}</div>` : `<div class="av-card" style="font-size:1.1em;">${texto}</div>`}</div>`;
   }
-  case 'volte': return `<div class="av-in av-azul"><div class="av-t">Volte à pergunta inicial</div><div style="font-size:1.6em;font-style:italic;margin:1.2em 0;">${esc(d.pergunta)}</div>
+  case 'volte': return `<div class="av-in av-azul"><div class="av-t">Volte à pergunta inicial</div><div style="font-size:1.6em;font-style:italic;margin:1.2em 0;">${escR(d.pergunta)}</div>
       <div class="av-card ou" style="color:${C.v};font-weight:700;">Escreva no caderno, em até 3 linhas, a sua resposta com o que aprendeu hoje.</div></div>`;
   case 'proxima': { const p = d.proxima||{}; return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Na próxima aula…</div>${avCirc('FaArrowRight', C.v, '#fff', 2.2)}</div>
-      <div class="av-g2" style="grid-template-columns:1.6fr 1fr;"><div class="av-card" style="min-height:11em;"><div style="color:${C.o};font-weight:700;letter-spacing:.12em;font-size:.8em;">AULA ${String(p.n||'').padStart(2,'0')}${p.paginas?' · LIVRO '+esc(p.paginas):''}</div><div class="av-t" style="font-size:1.6em;margin-top:.5em;">${esc(p.titulo||'')}</div><div>${p.tipo==='Avaliação'?'Traga o livro e revise o caderno: é dia de prova.':'Traga o livro. Se puder, leia as páginas antes.'}</div></div>
+      <div class="av-g2" style="grid-template-columns:1.6fr 1fr;"><div class="av-card" style="min-height:11em;"><div style="color:${C.o};font-weight:700;letter-spacing:.12em;font-size:.8em;">AULA ${String(p.n||'').padStart(2,'0')}${p.paginas?' · LIVRO '+escR(p.paginas):''}</div><div class="av-t" style="font-size:1.6em;margin-top:.5em;">${escR(p.titulo||'')}</div><div>${p.tipo==='Avaliação'?'Traga o livro e revise o caderno: é dia de prova.':'Traga o livro. Se puder, leia as páginas antes.'}</div></div>
       <div class="av-card az"><b style="color:${C.a};">Até lá, no app:</b><ul style="margin:.5em 0 0 1em;padding:0;"><li>Minhas provas → exercício desta aula</li><li>Estudar → slides e questões que errou</li><li>Faltou? Tudo fica em Estudar.</li></ul></div></div></div>`; }
   }
   return '<div class="av-in"></div>';
@@ -23336,7 +23308,7 @@ function sedNomeSlide(sl, d){
   if(sl.t==='figura') return 'Figura ' + (sl.i+1) + (d.figuras && d.figuras[sl.i] ? ': ' + (d.figuras[sl.i].titulo || d.figuras[sl.i].leg || '') : '');
   if(sl.t==='esquema') return 'Esquema' + (sl.passos>1 ? ` (passo ${sl.k+1}/${sl.passos})` : '');
   if(sl.t==='caderno') return 'Caderno: ramo ' + (sl.k+1);
-  if(sl.t==='extra'){ const x = (d.extras||[]).find(e => e.id===sl.id); return (x && x.tipo==='video' ? '🎬 ' : '⭐ ') + ((x && x.titulo) || 'Slide novo'); }
+  if(sl.t==='extra'){ const x = (d.extras||[]).find(e => e.id===sl.id); const ic = { video:'🎬 ', pergunta:'❓ ', comparar:'⚖️ ', livro:'📖 ' }[x && x.tipo] || '⭐ '; return ic + ((x && x.titulo) || 'Slide novo'); }
   return SED_NOMES[sl.t] || sl.t;
 }
 async function sedAbrir(turmaId, n){
@@ -23373,7 +23345,13 @@ function sedNovoSlide(tipo){
   const L = sedLista(se); const atual = L[se.sel] ? avSlideChave(L[se.sel]) : 'capa';
   const ks = sedChavesAtuais(se);
   const id = cryptoId();
-  se.wd.extras = (se.wd.extras || []).concat([tipo==='video' ? { id, tipo:'video', titulo: 'Vídeo', url: '', ini: '', fim: '', pergunta: '' } : { id, titulo: 'Novo slide', texto: '', img: null }]);
+  const modelos = {
+    video: { id, tipo:'video', titulo: 'Vídeo', url: '', ini: '', fim: '', pergunta: '' },
+    pergunta: { id, tipo:'pergunta', titulo: 'Pergunta', texto: '', opcoes: ['', '', '', ''], correta: 0, explicacao: '' },
+    comparar: { id, tipo:'comparar', titulo: 'Comparação', a: ['Lado A', ['', '']], b: ['Lado B', ['', '']] },
+    livro: { id, tipo:'livro', titulo: 'Pausa para o livro', paginas: se.wd.paginas || '', atividade: '', min: 10 },
+  };
+  se.wd.extras = (se.wd.extras || []).concat([modelos[tipo] || { id, titulo: 'Novo slide', texto: '', img: null }]);
   const pos = atual==='capa' ? 0 : ks.indexOf(atual) + 1;
   ks.splice(pos, 0, 'extra:' + id);
   se.ordem = ks; se.sujo = true; se.msg = '';
@@ -23453,7 +23431,7 @@ function sedCamposHtml(se, sl){
   switch(sl.t){
     case 'capa': return sedCampo('Título da aula', 'titulo', d.titulo) + sedCampo('Para começar (pergunta inicial — também aparece no slide “Volte à pergunta”)', 'pergunta', d.pergunta, { area:true });
     case 'volte': return sedCampo('Pergunta inicial (também aparece na capa)', 'pergunta', d.pergunta, { area:true });
-    case 'aprender': return sedCampo('Ideia principal (título do slide)', 'ideia', d.ideia) + (d.pontos||[]).map((p,i) => sedCampo('Ponto ' + (i+1), 'pontos.'+i, p, { area:true })).join('');
+    case 'aprender': return sedCampo('Ideia principal (título do slide)', 'ideia', d.ideia) + sedListaTextos('Ponto', 'pontos', d.pontos, 'Adicionar ponto (até 6)');
     case 'destaque': return d.destaque ? sedCampo('Destaque (texto grande)', 'destaque.0', d.destaque[0]) + sedCampo('Complemento', 'destaque.1', d.destaque[1], { area:true }) : '';
     case 'figura': { const f = (d.figuras||[])[sl.i]; if(!f) return '';
       return sedCampo('Título do slide', `figuras.${sl.i}.titulo`, f.titulo || f.leg) + sedCampo('Legenda', `figuras.${sl.i}.leg`, f.leg, { area:true })
@@ -23465,16 +23443,45 @@ function sedCamposHtml(se, sl){
         + sedCampo('Por quê? (explicação mostrada depois)', 'relampago.explicacao', r.explicacao, { area:true }); }
     case 'conceito': return d.conceito ? sedCampo('Conceito', 'conceito.0', d.conceito[0]) + sedCampo('Definição para o caderno', 'conceito.1', d.conceito[1], { area:true }) : '';
     case 'nuvem': return sedCampo('Pergunta da nuvem de palavras', 'nuvem', d.nuvem, { area:true });
-    case 'vf': return (d.vf||[]).map((it,i) => `<div style="border:1px solid #eee;border-radius:8px;padding:4px 8px;margin:6px 0;">${sedCampo('Afirmação ' + (i+1), `vf.${i}.t`, it.t, { area:true })}
+    case 'vf': return (d.vf||[]).map((it,i) => `<div style="border:1px solid #eee;border-radius:8px;padding:4px 8px;margin:6px 0;"><div style="text-align:right;margin-bottom:-24px;">${sedListaDelBtn('vf', i, d.vf.length)}</div>${sedCampo('Afirmação ' + (i+1), `vf.${i}.t`, it.t, { area:true })}
         <label style="display:block;margin:6px 0 2px;font-size:.82rem;font-weight:600;">Resposta</label><select data-sed="vf.${i}.v"><option value="1" ${it.v?'selected':''}>Verdadeiro</option><option value="0" ${!it.v?'selected':''}>Falso</option></select>
-        ${sedCampo('Explicação', `vf.${i}.e`, it.e)}</div>`).join('');
+        ${sedCampo('Explicação', `vf.${i}.e`, it.e)}</div>`).join('') + sedListaAddBtn('vf', (d.vf||[]).length, 'Adicionar afirmação (até 8)');
     case 'pratica': case 'atividade': return sedCampo('Atividade do livro', 'atividade', d.atividade, { area:true });
     case 'grupo': return sedCampo('Proposta para o grupo', 'debate', d.debate, { area:true });
-    case 'esquema': return sedCamposGenericos(d.esquema, 'esquema', 'Os textos do esquema (todos os passos). O desenho e os ícones continuam os mesmos.');
-    case 'caderno': return d.mapa ? sedCampo('Centro do mapa', 'mapa.centro', d.mapa.centro) + sedCamposGenericos((d.mapa.ramos||[])[sl.k], 'mapa.ramos.' + sl.k, 'Este ramo do mapa da aula (o aluno copia no caderno).') : '';
+    case 'esquema': { const e = d.esquema; if(!e) return '';
+      const aviso = '<p class="muted" style="font-size:.8rem;margin:4px 0;">Os textos do esquema (todos os passos). O desenho e os ícones continuam os mesmos.</p>';
+      if(e.tipo==='linha' || e.tipo==='passos'){
+        const nomes = e.tipo==='passos' ? ['Etapa', 'Resultado'] : ['Título', 'Texto', 'Destaque'];
+        return aviso + sedCampo('Título do esquema', 'esquema.titulo', e.titulo) + (e.tipo==='passos' && e.formula!=null ? sedCampo('Fórmula', 'esquema.formula', e.formula) : '')
+          + (e.itens||[]).map((it, i) => `<div style="border:1px solid #eee;border-radius:8px;padding:4px 8px;margin:6px 0;"><div class="row" style="justify-content:space-between;align-items:center;"><b style="font-size:.82rem;">Etapa ${i+1}</b>${sedListaDelBtn('esquema.itens', i, e.itens.length)}</div>${(Array.isArray(it) ? it : [it]).map((v, j) => sedCampo(nomes[j] || ('Texto ' + (j+1)), Array.isArray(it) ? `esquema.itens.${i}.${j}` : `esquema.itens.${i}`, v)).join('')}</div>`).join('')
+          + sedListaAddBtn('esquema.itens', (e.itens||[]).length, 'Adicionar etapa (até 6)');
+      }
+      if(e.tipo==='comparar'){
+        const lado = (k, nome) => `<div style="border:1px solid #eee;border-radius:8px;padding:4px 8px;margin:6px 0;">${sedCampo(nome + ' — título', `esquema.${k}.0`, (e[k]||[])[0])}${sedListaTextos('Item', `esquema.${k}.1`, (e[k]||[])[1], 'Adicionar item')}</div>`;
+        return aviso + sedCampo('Título do esquema', 'esquema.titulo', e.titulo) + lado('a', 'Lado A') + lado('b', 'Lado B');
+      }
+      return sedCamposGenericos(e, 'esquema', 'Os textos do esquema (todos os passos). O desenho e os ícones continuam os mesmos.'); }
+    case 'caderno': { if(!d.mapa) return ''; const rm = (d.mapa.ramos||[])[sl.k] || {}; const pre = 'mapa.ramos.' + sl.k;
+      return sedCampo('Centro do mapa', 'mapa.centro', d.mapa.centro) + '<p class="muted" style="font-size:.8rem;margin:4px 0;">Este ramo do mapa da aula (o aluno copia no caderno).</p>'
+        + sedCampo('Nome do ramo', pre + '.t', rm.t) + sedListaTextos('Palavra de ajuda', pre + '.itens', rm.itens, 'Adicionar palavra') + (rm.dica!=null ? sedCampo('Sugestão de desenho', pre + '.dica', rm.dica) : ''); }
     case 'mapa-inicio': case 'mapa-final': return sedCamposGenericos(d.mapa, 'mapa', 'Mapa da aula: os mesmos textos aparecem no início, nos slides de caderno e no final.');
     case 'retomada': return d.anterior ? sedCamposGenericos(d.anterior, 'anterior', 'Resumo da aula passada.') : (d.abertura ? sedCamposGenericos(d.abertura, 'abertura') : '<p class="muted" style="font-size:.85rem;">Este slide é montado automaticamente pelo app. Você pode escondê-lo.</p>');
     case 'extra': { const x = (d.extras||[]).find(e => e.id===sl.id); if(!x) return ''; const i = d.extras.indexOf(x);
+      const excluir = `<p style="margin:10px 0 0;"><button class="btn btn-ghost btn-sm" data-action="sed-extra-excluir" data-id="${esc(x.id)}" style="width:auto;color:#a33131;border-color:#e3a1a1;">🗑️ Excluir este slide</button></p>`;
+      const LT = ['A','B','C','D','E'];
+      if(x.tipo==='pergunta') return sedCampo('Título do slide', `extras.${i}.titulo`, x.titulo) + sedCampo('Pergunta', `extras.${i}.texto`, x.texto, { area:true })
+        + sedListaTextos('Alternativa', `extras.${i}.opcoes`, x.opcoes, 'Adicionar alternativa (até 5)')
+        + `<label style="display:block;margin:6px 0 2px;font-size:.82rem;font-weight:600;">Alternativa certa</label><select data-sed="extras.${i}.correta">${(x.opcoes||[]).map((o,j)=>`<option value="${j}" ${Number(x.correta)===j?'selected':''}>${LT[j]}${o?' — '+esc(String(o).slice(0,40)):''}</option>`).join('')}</select>`
+        + sedCampo('Por quê? (explicação mostrada depois)', `extras.${i}.explicacao`, x.explicacao, { area:true })
+        + '<p class="muted" style="font-size:.8rem;margin:6px 0;">Na aula, os alunos respondem no tablet. Você clica em “Revelar resposta” no slide: aparece o gráfico das respostas, e quem respondeu ganha 1 ficha (2 se acertou).</p>' + excluir;
+      if(x.tipo==='comparar'){
+        const lado = (k, nome) => `<div style="border:1px solid #eee;border-radius:8px;padding:4px 8px;margin:6px 0;">${sedCampo(nome + ' — título', `extras.${i}.${k}.0`, (x[k]||[])[0])}${sedListaTextos('Item', `extras.${i}.${k}.1`, (x[k]||[])[1], 'Adicionar item')}</div>`;
+        return sedCampo('Título do slide', `extras.${i}.titulo`, x.titulo) + lado('a', 'Coluna da esquerda') + lado('b', 'Coluna da direita') + excluir;
+      }
+      if(x.tipo==='livro') return sedCampo('Título do slide', `extras.${i}.titulo`, x.titulo) + sedCampo('Páginas do livro', `extras.${i}.paginas`, x.paginas)
+        + sedCampo('O que fazer (atividade, leitura, exercício)', `extras.${i}.atividade`, x.atividade, { area:true, rows:3 })
+        + `<label style="display:block;margin:6px 0 2px;font-size:.82rem;font-weight:600;">Tempo</label><select data-sed="extras.${i}.min">${[3,5,8,10,12,15,20,25,30].map(m=>`<option value="${m}" ${Number(x.min)===m?'selected':''}>${m} minutos</option>`).join('')}</select>`
+        + '<p class="muted" style="font-size:.8rem;margin:6px 0;">Na aula, você clica em “Iniciar” e o cronômetro aparece no telão e nos tablets.</p>' + excluir;
       if(x.tipo==='video'){
         const salvos = (((planoState().videos||{})[se.planoId]||{})[se.n]) || [];
         const ok = ytIdDe(x.url);
@@ -23527,8 +23534,15 @@ function sedHtml(){
         <div>
           <div data-sed-preview style="${escondido?'opacity:.4;':''}">${sedPreviewHtml(se)}</div>
           ${escondido ? '<p class="muted" style="font-size:.85rem;margin:6px 0;">🚫 Este slide está escondido e não aparece na aula.</p>' : ''}
-          <div class="row" style="gap:6px;margin:8px 0;"><button class="btn btn-ghost btn-sm" data-action="sed-sel" data-i="${Math.max(0, se.sel-1)}" ${se.sel===0?'disabled':''}>← Anterior</button><span class="muted" style="align-self:center;">${se.sel+1} / ${L.length}</span><button class="btn btn-ghost btn-sm" data-action="sed-sel" data-i="${Math.min(L.length-1, se.sel+1)}" ${se.sel>=L.length-1?'disabled':''}>Próximo →</button><button class="btn btn-ghost btn-sm" data-action="sed-novo" style="width:auto;margin-left:auto;" title="Cria um slide com título, texto e imagem logo depois deste">➕ Novo slide depois deste</button><button class="btn btn-ghost btn-sm" data-action="sed-novo" data-tipo="video" style="width:auto;" title="Cria um slide com um vídeo do YouTube logo depois deste">🎬 Slide de vídeo</button></div>
+          <div class="row" style="gap:6px;margin:8px 0;"><button class="btn btn-ghost btn-sm" data-action="sed-sel" data-i="${Math.max(0, se.sel-1)}" ${se.sel===0?'disabled':''}>← Anterior</button><span class="muted" style="align-self:center;">${se.sel+1} / ${L.length}</span><button class="btn btn-ghost btn-sm" data-action="sed-sel" data-i="${Math.min(L.length-1, se.sel+1)}" ${se.sel>=L.length-1?'disabled':''}>Próximo →</button></div>
+          <div class="row" data-sed-novos style="gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 10px;padding:8px;border:1px dashed #d9cbb3;border-radius:10px;"><span style="font-size:.82rem;font-weight:600;">➕ Novo slide depois deste:</span>
+            <button class="btn btn-ghost btn-sm" data-action="sed-novo" style="width:auto;" title="Título, tópicos e foto">📝 Texto e foto</button>
+            <button class="btn btn-ghost btn-sm" data-action="sed-novo" data-tipo="video" style="width:auto;" title="Vídeo do YouTube no telão">🎬 Vídeo</button>
+            <button class="btn btn-ghost btn-sm" data-action="sed-novo" data-tipo="pergunta" style="width:auto;" title="Múltipla escolha respondida nos tablets, com fichas">❓ Pergunta nos tablets</button>
+            <button class="btn btn-ghost btn-sm" data-action="sed-novo" data-tipo="comparar" style="width:auto;" title="Duas colunas lado a lado">⚖️ Comparação</button>
+            <button class="btn btn-ghost btn-sm" data-action="sed-novo" data-tipo="livro" style="width:auto;" title="Página e atividade do livro, com cronômetro">📖 Pausa para o livro</button></div>
           <div data-sed-campos>${sedCamposHtml(se, sl)}</div>
+          <p class="muted" style="font-size:.78rem;margin:10px 0 0;">💡 Dica: escreva <code>*assim*</code> (entre asteriscos) para destacar uma palavra no slide.</p>
         </div>
       </div>
     </div></div>`;
@@ -23541,7 +23555,7 @@ function sedSetPath(obj, path, valor){
 }
 function sedValor(el){
   const path = el.dataset.sed;
-  if(path==='relampago.correta') return Number(el.value);
+  if(path==='relampago.correta' || /^extras\.\d+\.(correta|min)$/.test(path)) return Number(el.value);
   if(/^vf\.\d+\.v$/.test(path)) return el.value==='1';
   if(/\.perguntas$/.test(path)) return el.value.split('\n').map(x => x.trim()).filter(Boolean);
   return el.value;
@@ -23763,6 +23777,134 @@ async function sedCopiarExecutar(){
   }catch(err){ c.msg = '⚠️ Não foi possível copiar agora. Verifique a internet e tente de novo.'; }
   render();
 }
+/* ---- Etapa 3 do editor: tópicos, destaque, pergunta nos tablets, comparação, pausa para o livro ---- */
+// *palavra* vira destaque (negrito vinho; dourado nos slides escuros)
+function escR(t){ return esc(t).replace(/\*([^*\n]{1,80})\*/g, '<b class="av-dest">$1</b>'); }
+function sedGetPath(obj, path){ return path.split('.').reduce((o, k) => o==null ? undefined : o[/^\d+$/.test(k) ? Number(k) : k], obj); }
+// Listas que o professor pode aumentar/diminuir: [regex do caminho, mínimo, máximo, item novo]
+const SED_LISTAS = [
+  [/^pontos$/, 2, 6, () => ''],
+  [/^vf$/, 3, 8, () => ({ t:'', v:true, e:'' })],
+  [/^esquema\.itens$/, 2, 6, arr => (Array.isArray(arr[0]) ? arr[0].map(() => '') : '')],
+  [/^esquema\.[ab]\.1$/, 1, 6, () => ''],
+  [/^mapa\.ramos\.\d+\.itens$/, 1, 5, () => ''],
+  [/^extras\.\d+\.opcoes$/, 2, 5, () => ''],
+  [/^extras\.\d+\.[ab]\.1$/, 1, 6, () => ''],
+  [/^figuras\.\d+\.perguntas$/, 0, 6, () => ''],
+];
+function sedListaRegra(path){ return SED_LISTAS.find(r => r[0].test(path)); }
+function sedListaDelBtn(path, i, len){
+  const r = sedListaRegra(path); if(!r || len <= r[1]) return '';
+  return `<button class="btn btn-ghost btn-sm" data-action="sed-lista-del" data-path="${esc(path)}" data-i="${i}" title="Remover" style="width:auto;padding:2px 8px;margin-left:6px;color:#a33131;">🗑️</button>`;
+}
+function sedListaAddBtn(path, len, rotulo){
+  const r = sedListaRegra(path); if(!r || len >= r[2]) return '';
+  return `<button class="btn btn-ghost btn-sm" data-action="sed-lista-add" data-path="${esc(path)}" style="width:auto;margin:6px 0;">➕ ${esc(rotulo)}</button>`;
+}
+// lista de textos simples com 🗑️ em cada um e ➕ no fim
+function sedListaTextos(rotulo, path, arr, addRotulo){
+  arr = arr || [];
+  return arr.map((v, i) => `<div style="display:flex;align-items:flex-end;gap:4px;"><div style="flex:1;">${sedCampo(rotulo + ' ' + (i+1), path + '.' + i, v, { area: String(v||'').length > 60 })}</div>${sedListaDelBtn(path, i, arr.length)}</div>`).join('') + sedListaAddBtn(path, arr.length, addRotulo);
+}
+function sedListaMudar(path, op, i){
+  const se = planoState().sedAberto; if(!se) return;
+  const arr = sedGetPath(se.wd, path); const r = sedListaRegra(path);
+  if(!Array.isArray(arr) || !r) return;
+  if(op==='add' && arr.length < r[2]) arr.push(r[3](arr));
+  if(op==='del' && arr.length > r[1]){
+    arr.splice(i, 1);
+    // pergunta própria: mantém a alternativa certa apontando para a mesma opção
+    const mq = path.match(/^extras\.(\d+)\.opcoes$/);
+    if(mq){ const x = se.wd.extras[Number(mq[1])]; if(x.correta===i) x.correta = 0; else if(x.correta > i) x.correta--; }
+  }
+  se.sujo = true; se.msg = ''; render();
+}
+// opções de múltipla escolha (relâmpago e perguntas do professor)
+function avOpcoesGen(r, ctx, attrsAluno){
+  const L = ['A','B','C','D','E'];
+  const total = Object.keys(ctx.resp||{}).length;
+  const cont = r.opcoes.map((_, i) => Object.values(ctx.resp||{}).filter(x => x.op===i).length);
+  return r.opcoes.map((o, i) => {
+    let cls = '';
+    if(ctx.revelado) cls = i===Number(r.correta) ? 'ok' : (ctx.minha===i ? 'no' : '');
+    else if(ctx.minha===i) cls = 'sel';
+    const barra = (ctx.modo==='prof' && ctx.revelado) ? `<div class="av-bar"><div style="width:${total ? Math.round(cont[i]/total*100) : 0}%"></div></div>` : '';
+    const contTxt = (ctx.modo==='prof' && ctx.revelado) ? ` <span style="float:right;">${cont[i]}</span>` : '';
+    const attrs = ctx.modo==='aluno' && !ctx.revelado && !ctx.estudo ? attrsAluno(i) : 'disabled';
+    return `<button class="av-op ${cls}" ${attrs}><b>${L[i]})</b> ${escR(o)}${contTxt}${barra}</button>`;
+  }).join('');
+}
+function avPergEstado(ctx, qid){ return ((ctx.sess && ctx.sess.perg) || {})[qid] || {}; }
+function avPerguntaSlideHtml(x, ctx){
+  const L = ['A','B','C','D','E'];
+  const st = avPergEstado(ctx, x.id);
+  const revelado = ctx.preview || ctx.estudo || !!st.revelado;
+  const resp = ctx.modo==='prof' && !ctx.preview ? ((aulaVivaState().pergResp||{})[x.id] || {}) : {};
+  const minha = ctx.modo==='aluno' && !ctx.estudo ? (((state.aluno.avPergMinha||{})[x.id]) ?? null) : null;
+  const c2 = Object.assign({}, ctx, { revelado, resp, minha });
+  const total = Object.keys(resp).length;
+  const certa = Number(x.correta)||0;
+  let rodape;
+  if(ctx.modo==='prof') rodape = ctx.preview ? `Resposta: <b>${L[certa]}</b> · na aula os alunos respondem no tablet`
+    : revelado ? `Resposta: <b>${L[certa]}</b> · ${total} resposta(s)` : `📱 Respondam no tablet · <b>${total}</b> resposta(s) até agora <button class="btn" data-action="av-perg-revelar" data-q="${esc(x.id)}" style="margin-left:.8em;background:#C9A227;color:#3b1018;font-weight:700;">Revelar resposta</button>`;
+  else if(ctx.estudo) rodape = `Resposta: <b>${L[certa]}</b>`;
+  else rodape = revelado ? (minha===certa ? '✅ Você acertou!' : (minha==null ? 'Resposta: ' + L[certa] : '❌ A certa é a ' + L[certa])) : (minha!=null ? '✔ Resposta enviada! Aguarde o professor revelar.' : 'Toque na sua resposta.');
+  return `<div class="av-in av-azul"><div class="av-row" style="justify-content:space-between;"><div class="av-t">${escR(x.titulo||'Pergunta')}</div><span style="font-size:2.4em;">❓</span></div>
+    <div style="font-weight:700;font-size:1.2em;margin-bottom:.4em;">${escR(x.texto||'')}</div>
+    ${avOpcoesGen({ opcoes: x.opcoes||[], correta: certa }, c2, i => `data-action="av-perg-responder" data-q="${esc(x.id)}" data-i="${i}"`)}
+    <div style="margin-top:.5em;color:#F3E7C0;font-size:.9em;">${rodape}</div>
+    ${revelado && x.explicacao ? `<div class="av-card" style="margin-top:.5em;color:#222;font-size:.95em;"><b style="color:#1d6b31;">Por quê?</b> ${escR(x.explicacao)}</div>` : ''}</div>`;
+}
+function avLivroSlideHtml(d, x, idx, ctx){
+  const C = { v:'#6B1F2E', o:'#C9A227' };
+  const sess = ctx.sess || {}; const pos = 5000 + idx; const min = Number(x.min) || 10;
+  const ini = !ctx.preview && sess.leituraIni && sess.leituraIdx===pos ? sess.leituraIni : null;
+  const resta = ini ? Math.max(0, min*60 - (Date.now()-ini)/1000) : min*60;
+  const mmss = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+  const tablet = ctx.modo==='aluno' && !ctx.estudo;
+  return `<div class="av-in av-azul"><div class="av-t">📖 ${escR(x.titulo||'Pausa para o livro')}</div>
+    <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:1em;align-items:center;height:68%;">
+      <div style="font-size:1.2em;line-height:1.5;">
+        ${x.paginas ? `<div>Abra o <b>livro</b> em <b>${escR(x.paginas)}</b>.</div>` : ''}
+        <div style="margin-top:.4em;">${escR(x.atividade||'')}</div>
+        ${tablet ? '<div style="color:#F3E7C0;margin-top:.5em;">📵 Tablet para baixo durante a atividade.</div>' : ''}</div>
+      <div style="text-align:center;">${ctx.estudo ? `<div style="font-size:1.4em;">⏱ ${min} min</div>` : `<div data-av-leitura-relogio data-ini="${ini||''}" data-min="${min}" style="font-size:3.6em;font-weight:800;font-family:Cambria,Georgia,serif;">${ini && resta<=0 ? '⏰' : mmss(resta)}</div>
+        ${ini ? (resta<=0 ? '<div style="color:#F3E7C0;">Tempo esgotado</div>' : `<div class="av-barra"><div style="animation:avBarra ${min*60}s linear both;animation-delay:-${((Date.now()-ini)/1000).toFixed(1)}s;"></div></div>`)
+          : (ctx.modo==='prof' && !ctx.preview ? `<button class="btn" data-action="av-leitura-iniciar" data-i="${pos}" style="background:${C.o};color:${C.v};font-weight:700;margin-top:.4em;">▶ Iniciar ${min} min</button>` : `<div style="color:#F3E7C0;">${min} minutos</div>`)}`}</div>
+    </div></div>`;
+}
+async function avPergCarregar(qid){
+  const av = aulaVivaState(); if(!av.sess) return false;
+  const lista = await liveListar(`aula-viva-resp:${av.sess.id}~${qid}:`);
+  const out = {}; Object.entries(lista).forEach(([sid, v]) => { try{ out[sid] = JSON.parse(v); }catch(e){} });
+  av.pergResp = av.pergResp || {};
+  const mudou = JSON.stringify(av.pergResp[qid]||{}) !== JSON.stringify(out);
+  av.pergResp[qid] = out; return mudou;
+}
+function avExtraAtual(av){
+  const sl = av.slides[av.sess.idx];
+  return sl && sl.t==='extra' ? (av.d.extras||[]).find(e => e.id===sl.id) : null;
+}
+async function avPergRevelar(qid){
+  const av = aulaVivaState(); if(!av.sess) return;
+  const x = (av.d.extras||[]).find(e => e.id===qid); if(!x) return;
+  await avPergCarregar(qid);
+  av.sess.perg = Object.assign({}, av.sess.perg||{});
+  const st = av.sess.perg[qid] = Object.assign({}, av.sess.perg[qid]||{}, { revelado: true });
+  render(); await aulaVivaSalvarSessao();
+  if(!st.fichas){
+    st.fichas = true; await aulaVivaSalvarSessao();
+    const certa = Number(x.correta)||0;
+    try{ await awardFichasLote(av.sess.turmaId, Object.entries(av.pergResp[qid]||{}).map(([sid, r]) => ({ studentId: sid, amount: r.op===certa ? 2 : 1, motivo: r.op===certa ? 'Acertou a pergunta da aula' : 'Respondeu a pergunta da aula' }))); }catch(e){}
+  }
+}
+async function avPergResponder(qid, i){
+  const al = state.aluno; const s = al.aulaViva;
+  if(!s || !al.matriculaStudentId) return;
+  if(((s.perg||{})[qid]||{}).revelado) return;
+  al.avPergMinha = Object.assign({}, al.avPergMinha||{}, { [qid]: i }); render();
+  try{ await window.storage.set(`aula-viva-resp:${s.id}~${qid}:${al.matriculaStudentId}`, JSON.stringify({ op:i, nome: al.name, at: Date.now() }), true); }catch(e){}
+}
 // ---- Professor ----
 function aulaVivaState(){ const p = state.professor; if(!p.aulaViva) p.aulaViva = { presenting:false, sess:null, d:null, slides:[], resp:{}, n:null }; return p.aulaViva; }
 async function aulaVivaSalvarSessao(){
@@ -23822,6 +23964,8 @@ async function aulaVivaPollProf(){
   const t = av.slides[av.sess.idx] && av.slides[av.sess.idx].t;
   if(t==='pratica' && av.sess.atividadeCode){ await aulaVivaContarEntregas(); }
   await avPollInterativo();
+  const xp = avExtraAtual(av);
+  if(xp && xp.tipo==='pergunta'){ if(await avPergCarregar(xp.id)) avRenderSeguro(); }
   if(t==='relampago' || t==='resposta'){
     const antes = JSON.stringify(av.resp);
     await aulaVivaCarregarRespostas();
@@ -24375,7 +24519,7 @@ function avCtrlExtrasHtml(av){
     ${av.d && av.d.mapa ? `<button class="btn btn-ghost btn-sm" data-action="av-visto-abrir" style="background:#fff;" title="Visto no mapa mental do caderno">📒 Visto</button>` : ''}
     <button class="btn btn-sm ${novas?'av-pisca':''}" data-action="av-duvidas" style="background:${novas?'#C9A227':'#fff'};color:#3b1018;" data-av-duvidas-n="${novas}">❓ Dúvidas${novas?` (${novas})`:''}</button>`;
 }
-function avChave(sess, extra){ return [sess.idx, sess.revelado, sess.vf ? sess.vf.id+sess.vf.i+sess.vf.fase : '', sess.toque ? sess.toque.id+sess.toque.fase : '', sess.grupos ? sess.grupos.id : '', extra||''].join('|'); }
+function avChave(sess, extra){ return [sess.idx, sess.revelado, JSON.stringify(sess.perg||{}), sess.vf ? sess.vf.id+sess.vf.i+sess.vf.fase : '', sess.toque ? sess.toque.id+sess.toque.fase : '', sess.grupos ? sess.grupos.id : '', extra||''].join('|'); }
 
 // ---------- Aluno ----------
 async function avAlunoSalvarInt(tipo, valor){
@@ -26719,6 +26863,8 @@ document.addEventListener('click', (e) => {
   else if(act==='sed-salvar'){ sedSalvar(); }
   else if(act==='sed-mover'){ sedMover(btn.dataset.k, parseInt(btn.dataset.dir)); }
   else if(act==='sed-novo'){ sedNovoSlide(btn.dataset.tipo); }
+  else if(act==='sed-lista-add'){ sedListaMudar(btn.dataset.path, 'add'); }
+  else if(act==='sed-lista-del'){ sedListaMudar(btn.dataset.path, 'del', parseInt(btn.dataset.i)); }
   else if(act==='sed-video-escolher'){ const se = planoState().sedAberto; const x = se && (se.wd.extras||[]).find(y => y.id===btn.dataset.id); if(x){ x.url = btn.dataset.url; if(!x.titulo || x.titulo==='Vídeo') x.titulo = btn.dataset.t || x.titulo; se.sujo = true; render(); } }
   else if(act==='sed-copiar'){ sedCopiarAbrir(); }
   else if(act==='sed-copiar-ok'){ sedCopiarExecutar(); }
@@ -26738,6 +26884,8 @@ document.addEventListener('click', (e) => {
   else if(act==='av-entrar'){ avInjetarCss(); requestFullscreenSafe(); state.aluno.stage = 'aulaviva'; render(); }
   else if(act==='av-sair'){ exitFullscreenSafe(); state.aluno.stage = 'dashboard'; render(); }
   else if(act==='av-responder'){ aulaVivaResponder(parseInt(btn.dataset.i)); }
+  else if(act==='av-perg-responder'){ avPergResponder(btn.dataset.q, parseInt(btn.dataset.i)); }
+  else if(act==='av-perg-revelar'){ avPergRevelar(btn.dataset.q); }
   else if(act==='av-nuvem-ocultar'){ avNuvemOcultar(btn.dataset.w); }
   else if(act==='av-grupo-formar'){ avGrupoFormar(); }
   else if(act==='av-grupo-fichas'){ avGrupoFichas(parseInt(btn.dataset.g)); }
