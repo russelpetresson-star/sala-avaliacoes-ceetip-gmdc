@@ -697,6 +697,7 @@
   .pl-grupo-res{ flex:1; min-width:0; font-size:.82rem; color:var(--ink-soft,#777); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .pl-grupo-seta{ font-size:1rem; color:var(--wine,#6B1F2E); }
   .pl-grupo-corpo{ padding:0 18px 16px; }
+  .pl-grupo-corpo .btn{ width:auto; }
   .pl-grupo-corpo > .card{ box-shadow:none; border:1px solid var(--paper-line,#eee); }
   .pl-bim{ margin-bottom:6px; } .pl-bim > summary{ cursor:pointer; font-weight:700; padding:8px 0; }
   .pl-item{ display:flex; gap:10px; align-items:center; padding:9px 8px; border-bottom:1px solid var(--paper-line,#eee); font-size:.88rem; cursor:pointer; border-radius:8px; }
@@ -733,7 +734,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-16-2100</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-19-1400</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -1204,7 +1205,7 @@ const SEG_SO_EQUIPE_PREFIXOS = ['assessment', 'pesos-instrumentos', 'notas-manua
 const SEG_SO_EQUIPE_CHAVES = ['recursos-config', 'professores', 'coordenador-senha', 'coordenador-senha-salt', 'pin-liberacao', 'periodos-avaliacao', 'socio-config',
   'sessao-config', 'gabaritos-avulsos', 'gemini-api-key', 'temporada-atual', 'slides-decks', 'avisos', 'cronograma', 'dias-letivos',
   'turno-horarios', 'livros-didaticos', 'materiais-turma', 'tarefas', 'mapasmentais', 'lixeira', 'backup-ultimo', 'areas-disciplinas',
-  'busca-ativa-vinculos', 'plano-livro-index', 'plano-livro-regras', 'plano-livro-turmas', 'plano-livro-icones', 'blocos-provas',
+  'busca-ativa-vinculos', 'plano-livro-index', 'plano-livro-regras', 'plano-livro-turmas', 'plano-livro-donos', 'plano-livro-icones', 'blocos-provas',
   'ra-items', 'rede-escola', 'monitoria-desempenho', 'monitoria-indicados', 'jovens-protagonistas-indicados', 'slides-historico',
   'turmas-antigo-backup', 'seg-teste'];
 const SEG = { auth:null, pronto:false, anonimoErro:null, papel:'anonimo', avisoProf:'', coordErro:'' };
@@ -2660,7 +2661,7 @@ const COORD_SECOES = [
   { id:'turmas', icon:'👥', label:'Turmas e frequência', abas:[['turmas','👥 Turmas'], ['chamada','🪪 Chamada'], ['freqpainel','📊 Painel de frequência']] },
   { id:'profs', icon:'🧑‍🏫', label:'Professores', abas:[['professores','🧑‍🏫 Professores'], ['frequencia','📈 Frequência dos professores'], ['pesosprof','⚖️ Pesos dos professores']] },
   { id:'alunos', icon:'💛', label:'Alunos', abas:[['monitoria','🎯 Monitoria de desempenho'], ['buscaativa','🚌 Busca ativa e transporte'], ['socio','💛 Socioemocional'], ['portfolio','🗂️ Portfólio'], ['campanha','📢 Jovens Protagonistas'], ['conquistas','🏅 Hall de conquistas'], ['temporada','🏆 Temporada de desafios']] },
-  { id:'aulas', icon:'📚', label:'Aulas e comunicação', abas:[['planolivro','🗓️ Plano de aulas do livro'], ['livros','📘 Livros didáticos'], ['mural','📌 Mural de avisos'], ['diario','📷 Diário de bordo'], ['enquete','📣 Enquete'], ['quiz','🎮 Quiz'], ['roleta','🎡 Roleta'], ['duelo','⚔️ Duelo'], ['slides','🖥️ Slides']] },
+  { id:'aulas', icon:'📚', label:'Aulas e comunicação', abas:[['planolivro','🗓️ Plano de aulas do livro'], ['areabim','🧭 Visão da área'], ['livros','📘 Livros didáticos'], ['mural','📌 Mural de avisos'], ['diario','📷 Diário de bordo'], ['enquete','📣 Enquete'], ['quiz','🎮 Quiz'], ['roleta','🎡 Roleta'], ['duelo','⚔️ Duelo'], ['slides','🖥️ Slides']] },
   { id:'config', icon:'⚙️', label:'Configurações', abas:[['sessao','🔐 Sessão e prova'], ['freqconfig','⏰ Frequência'], ['ia','🤖 IA'], ['lixeira','🗑️ Lixeira']] },
 ];
 function navAcao(role){ return role==='aluno' ? 'aluno-sub-view' : role==='coordenador' ? 'coord-sub-view' : 'sub-view'; }
@@ -8049,6 +8050,152 @@ function sairApresentacaoSlides(){
   render();
 }
 
+
+/* ======================= VISÃO DA ÁREA POR BIMESTRE (coordenação) =======================
+   Junta os planos das disciplinas de uma mesma área (Ciências Humanas) numa série: o que cada uma trabalha
+   em cada bimestre, os temas em comum (conexões gravadas nos planos), a classificação dos capítulos
+   (base = outros dependem dele; independente = pode mudar de bimestre) e sugestões opcionais de ajuste. */
+function areaState(){ const s = planoState(); if(!s.area) s.area = { serie:'1', bim:1, dados:null, carregando:false }; return s.area; }
+function areaPlanoDaSerie(disc, serie){
+  const s = planoState();
+  const regra = (s.regras||{})[`${disc}|${serie}`];
+  const cand = (s.index||[]).filter(pl => planoDiscKey(pl.disciplina)===disc && planoSerieNum(pl.serie)===serie);
+  if(regra && cand.some(pl => pl.id===regra)) return regra;
+  const b = cand.find(pl => String(pl.versao||'').toUpperCase()==='B');
+  return (b || cand[0] || {}).id || null;
+}
+async function areaCarregar(){
+  const s = planoState(); const A = areaState();
+  if(A.carregando) return;
+  A.carregando = true; render();
+  if(!s.carregado) await carregarPlanoLivro();
+  const discs = planoDiscsDisponiveis(); const dados = {};
+  for(const ser of ['1','2','3']){
+    dados[ser] = [];
+    for(const d of discs){
+      const pid = areaPlanoDaSerie(d.k, ser); if(!pid) continue;
+      const pl = await planoObter(pid); if(pl) dados[ser].push({ disc: d.k, label: d.label, plano: pl });
+    }
+  }
+  A.dados = dados; A.carregando = false; render();
+}
+function areaCapsDoPlano(pl){
+  // capítulos do plano: usa a classificação gravada (plano.area.capitulos) ou agrupa pelas aulas
+  const caps = []; const info = ((pl.area||{}).capitulos)||[];
+  (pl.aulas||[]).forEach(a => {
+    if(a.tipo==='Revisão' || a.tipo==='Avaliação') return;
+    const c = (a.slides && a.slides.capitulo) || a.capitulo || '';
+    if(!c) return;
+    let k = caps.find(x => x.cap===c);
+    if(!k){ const i = info.find(x => x.cap===c) || {}; k = { cap:c, chave: i.chave || c.split(' — ')[0], tipo: i.tipo || '', requer: i.requer || [], motivo: i.motivo || '', aulas: [] }; caps.push(k); }
+    k.aulas.push(a);
+  });
+  caps.forEach(k => { k.bims = [...new Set(k.aulas.map(a => a.bimestre))].sort(); k.de = Math.min(...k.aulas.map(a => a.n)); k.ate = Math.max(...k.aulas.map(a => a.n)); });
+  return caps;
+}
+function areaTipoChip(tipo){
+  if(tipo==='base') return '<span title="Capítulo base: outros capítulos dependem dele — não mude de lugar" style="font-size:.7rem; background:#eee; color:#555; border-radius:5px; padding:0 5px;">🔒 base</span>';
+  if(tipo==='independente') return '<span title="Capítulo independente: pode ser antecipado ou adiado, desde que o que ele requer já tenha sido visto" style="font-size:.7rem; background:#e6f4ea; color:#1d6b31; border-radius:5px; padding:0 5px;">🔀 independente</span>';
+  return '';
+}
+function areaPares(lista){
+  // pares de conexão entre as disciplinas da mesma série (sem repetir A↔B e B↔A)
+  const por = {}; lista.forEach(x => por[x.plano.id] = x);
+  const vistos = new Set(), out = [];
+  lista.forEach(x => (x.plano.aulas||[]).forEach(a => (a.conexoes || (a.slides && a.slides.conexoes) || []).forEach(c => {
+    const y = por[c.planoId]; if(!y) return;
+    const b = (y.plano.aulas||[]).find(z => z.n===c.n); if(!b) return;
+    const k = [x.plano.id + ':' + a.n, y.plano.id + ':' + b.n].sort().join('|');
+    if(vistos.has(k)) return; vistos.add(k);
+    out.push({ x, a, y, b, tema: c.tema || '' });
+  })));
+  return out;
+}
+function areaSugestoes(lista){
+  const todos = areaPares(lista);
+  const capsPor = {}; lista.forEach(x => capsPor[x.plano.id] = areaCapsDoPlano(x.plano));
+  const capDe = (x, a) => (capsPor[x.plano.id]||[]).find(k => k.aulas.some(z => z.n===a.n));
+  const grupos = {};
+  todos.forEach(p => {
+    [[p.x, p.a, p.y, p.b], [p.y, p.b, p.x, p.a]].forEach(([x, a, y, b]) => {
+      const k1 = capDe(x, a); if(!k1 || k1.tipo!=='independente') return;
+      const g = (grupos[x.plano.id + '|' + k1.cap] = grupos[x.plano.id + '|' + k1.cap] || { x, k1, temas: new Set(), alvos: [], parceiros: new Set(), juntos: 0 });
+      if(a.bimestre===b.bimestre){ g.juntos++; return; }   // já coincide hoje
+      g.temas.add(p.tema); g.alvos.push(b.bimestre); g.y = y; const k2 = capDe(y, b); if(k2) g.parceiros.add(k2.cap);
+    });
+  });
+  const out = [];
+  Object.values(grupos).forEach(g => {
+    if(g.temas.size < 2) return;
+    const atual = g.k1.bims[0];
+    // bimestre-alvo: o mais frequente entre os temas da outra disciplina
+    const cont = {}; g.alvos.forEach(b => cont[b] = (cont[b]||0) + 1);
+    const alvo = Number(Object.entries(cont).sort((a, b) => b[1] - a[1] || Math.abs(a[0]-atual) - Math.abs(b[0]-atual))[0][0]);
+    if(alvo === atual) return;
+    const req = (capsPor[g.x.plano.id]||[]).filter(k => (g.k1.requer||[]).includes(k.chave));
+    const minimo = req.length ? Math.max(...req.map(k => k.bims[k.bims.length-1])) : 1;
+    const possivel = alvo < atual ? Math.max(alvo, minimo) : alvo;
+    if(possivel === atual) return;
+    const ganha = g.alvos.filter(b => b===possivel).length;
+    if(!ganha || g.juntos >= ganha) return;   // não troca temas que já coincidem por outros
+    out.push({ ...g, alvo, atual, possivel, minimo, req, n: g.temas.size, ganha });
+  });
+  return out.sort((a, b) => b.ganha - a.ganha || b.n - a.n).slice(0, 6);
+}
+function renderAreaBimestre(){
+  const s = planoState(); const A = areaState();
+  if(!s.carregado || !A.dados){ if(!A.carregando) setTimeout(() => areaCarregar(), 0); return '<h2>🧭 Visão da área por bimestre</h2><div class="card"><p class="muted">Carregando os planos das disciplinas…</p></div>'; }
+  const discs = planoDiscsDisponiveis();
+  if(discs.length < 2) return `<h2>🧭 Visão da área por bimestre</h2><div class="card"><p>Esta visão compara as disciplinas da área. Até agora só há plano de <strong>${esc((discs[0]||{}).label||'nenhuma disciplina')}</strong>.</p><p class="muted">Importe o plano de outra disciplina de Ciências Humanas (em 🗓️ Plano de aulas do livro) para ver os temas em comum.</p></div>`;
+  const lista = A.dados[A.serie] || [];
+  const serieBtns = ['1','2','3'].map(x => `<button class="pl-turma ${x===A.serie?'ativa':''}" data-action="area-serie" data-s="${x}">${x}ª série</button>`).join('');
+  const pares = areaPares(lista);
+  const junto = b => pares.filter(p => p.a.bimestre===b && p.b.bimestre===b);
+  const caps = {}; lista.forEach(x => caps[x.disc] = areaCapsDoPlano(x.plano));
+  const cor = i => ['#6B1F2E', '#1F4E79', '#7a5b00', '#1d6b31'][i % 4];
+  // mapa do ano
+  const mapa = `<div style="overflow-x:auto;"><table class="area-mapa" data-area-mapa style="width:100%; border-collapse:collapse; font-size:.85rem;">
+    <thead><tr><th style="text-align:left; padding:6px; width:110px;">Bimestre</th>${lista.map((x, i) => `<th style="text-align:left; padding:6px; color:${cor(i)};">${conexIcone(x.label)} ${esc(x.label)} <span class="muted" style="font-weight:400; font-size:.75rem;">${esc(x.plano.titulo||'')}</span></th>`).join('')}</tr></thead>
+    <tbody>${[1,2,3,4].map(b => { const j = junto(b).length; return `<tr data-area-bim="${b}" data-action="area-bim" data-b="${b}" style="cursor:pointer; border-top:1px solid #e6dcc8; ${b===A.bim ? 'background:#fbf3df;' : ''}">
+      <td style="padding:6px; vertical-align:top;"><strong>${b}º</strong>${j ? `<br><span style="font-size:.72rem; color:#1d6b31; font-weight:700;">🔗 ${j} tema${j>1?'s':''} em comum</span>` : ''}</td>
+      ${lista.map(x => { const cs = (caps[x.disc]||[]).filter(k => k.aulas.some(a => a.bimestre===b));
+        const extra = (x.plano.aulas||[]).filter(a => a.bimestre===b && !(a.slides && a.slides.capitulo) && !a.capitulo && a.tipo!=='Revisão' && a.tipo!=='Avaliação').length;
+        const enem = !cs.length && (x.plano.aulas||[]).some(a => a.bimestre===b && a.tipo==='ENEM');
+        return `<td style="padding:6px; vertical-align:top;">${cs.map(k => `<div style="margin:2px 0;">${esc(k.cap.replace(/^Capítulo (\d+) — /, 'Cap. $1 — '))} ${areaTipoChip(k.tipo)}</div>`).join('') || (enem ? '<span class="muted">Revisão para o ENEM</span>' : extra ? '<span class="muted">aulas de revisão e projeto</span>' : '<span class="muted">—</span>')}</td>`; }).join('')}
+    </tr>`; }).join('')}</tbody></table></div>`;
+  // detalhe do bimestre
+  const b = A.bim; const jb = junto(b);
+  const marcadas = new Set(jb.flatMap(p => [p.x.plano.id + ':' + p.a.n, p.y.plano.id + ':' + p.b.n]));
+  const detalhe = `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px;">${lista.map((x, i) => {
+      const cs = (caps[x.disc]||[]).filter(k => k.aulas.some(a => a.bimestre===b));
+      const aulasB = (x.plano.aulas||[]).filter(a => a.bimestre===b);
+      return `<div data-area-disc="${esc(x.disc)}" style="border:1px solid #e6dcc8; border-radius:10px; padding:10px;">
+        <strong style="color:${cor(i)};">${conexIcone(x.label)} ${esc(x.label)}</strong> <span class="muted" style="font-size:.78rem;">· aulas ${aulasB.length ? aulasB[0].n + ' a ' + aulasB[aulasB.length-1].n : '—'}</span>
+        ${cs.map(k => `<div style="margin-top:8px;"><div style="font-weight:600; font-size:.88rem;">${esc(k.cap)} ${areaTipoChip(k.tipo)}</div>
+          ${k.motivo ? `<div class="muted" style="font-size:.76rem;">${esc(k.motivo)}</div>` : ''}
+          <ul style="margin:4px 0 0; padding-left:18px; font-size:.82rem;">${k.aulas.filter(a => a.bimestre===b).map(a => `<li style="${marcadas.has(x.plano.id + ':' + a.n) ? 'font-weight:700; color:#1d6b31;' : ''}">${a.n}. ${esc(a.tituloCurto||a.tema)}${marcadas.has(x.plano.id + ':' + a.n) ? ' 🔗' : ''}</li>`).join('')}</ul></div>`).join('') || `<p class="muted" style="font-size:.85rem;">${aulasB.some(a => a.tipo==='ENEM') ? 'Revisão para o ENEM, simulados e projeto final.' : 'Sem capítulos do livro neste bimestre.'}</p>`}
+      </div>`; }).join('')}</div>`;
+  const comuns = jb.length ? `<ul data-area-comuns style="margin:6px 0 0; padding-left:18px; font-size:.88rem;">${jb.map(p => `<li style="margin:4px 0;"><strong>${esc(p.tema)}</strong><br><span class="muted">${conexIcone(p.x.label)} ${esc(p.x.label)}, aula ${p.a.n}: ${esc(p.a.tituloCurto||p.a.tema)} &nbsp;↔&nbsp; ${conexIcone(p.y.label)} ${esc(p.y.label)}, aula ${p.b.n}: ${esc(p.b.tituloCurto||p.b.tema)}</span></li>`).join('')}</ul>`
+    : '<p class="muted" style="font-size:.88rem;">Nenhum tema em comum cai neste bimestre nas duas disciplinas ao mesmo tempo. Veja abaixo as conexões com outros bimestres.</p>';
+  const outros = pares.filter(p => (p.a.bimestre===b) !== (p.b.bimestre===b) && (p.a.bimestre===b || p.b.bimestre===b));
+  const outrosHtml = outros.length ? `<details style="margin-top:8px;"><summary style="cursor:pointer; font-size:.88rem;">🔁 ${outros.length} tema${outros.length>1?'s':''} deste bimestre que a outra disciplina trabalha em outro bimestre</summary><ul style="margin:6px 0 0; padding-left:18px; font-size:.84rem;">${outros.map(p => { const [u, ua, v, va] = p.a.bimestre===b ? [p.x, p.a, p.y, p.b] : [p.y, p.b, p.x, p.a]; return `<li style="margin:3px 0;"><strong>${esc(p.tema)}</strong> — ${esc(u.label)} aula ${ua.n} (${b}º bim) · ${esc(v.label)} aula ${va.n} (${va.bimestre}º bim)</li>`; }).join('')}</ul></details>` : '';
+  // sugestões
+  const sug = areaSugestoes(lista);
+  const sugHtml = sug.length ? `<ol data-area-sugestoes style="margin:6px 0 0; padding-left:20px; font-size:.88rem; line-height:1.45;">${sug.map(g => `<li style="margin:6px 0;"><strong>${esc(g.x.label)} — ${esc(g.k1.cap)}</strong> ${areaTipoChip('independente')} está no ${g.atual}º bimestre e tem <strong>${g.n} tema${g.n>1?'s':''} em comum</strong> com ${esc(g.y.label)} (${[...g.parceiros].map(c => esc(c.split(' — ')[0])).join(', ')}) trabalhados em outro bimestre.
+      ${g.possivel===g.alvo ? `Passar o capítulo para o <strong>${g.possivel}º bimestre</strong> faria ${g.ganha} desses temas coincidirem.` : `O mais perto possível é o <strong>${g.possivel}º bimestre</strong> (ele requer antes ${g.req.map(k => esc(k.chave)).join(', ')}, que vai até o ${g.minimo}º bimestre): ${g.ganha} tema${g.ganha>1?'s':''} passaria${g.ganha>1?'m':''} a coincidir.`}${g.juntos ? ` Hoje ele já coincide em ${g.juntos} tema${g.juntos>1?'s':''} no ${g.atual}º bimestre, que deixaria${g.juntos>1?'m':''} de coincidir.` : ''}
+      <br><span class="muted" style="font-size:.8rem;">Temas: ${[...g.temas].slice(0, 4).map(esc).join('; ')}${g.temas.size>4?'…':''}. Mover um capítulo desloca outros — confira com os professores como fica a distribuição das aulas.</span></li>`).join('')}</ol>`
+    : '<p class="muted" style="font-size:.88rem;">Nenhuma sugestão: nesta série os temas em comum já caem em bimestres próximos ou dependem de capítulos-base.</p>';
+  return `<h2>🧭 Visão da área por bimestre</h2>
+    <p class="muted" style="margin-top:-6px;">Ciências Humanas: o que cada disciplina trabalha em cada bimestre e os temas que se cruzam. A ordem dos livros continua valendo — esta tela ajuda a combinar atividades entre professores e a decidir, com os dados na mão, se vale a pena mover algum capítulo independente.</p>
+    <div class="card"><div class="pl-turmas" data-area-series>${serieBtns}</div>
+      <p class="muted" style="font-size:.8rem; margin:6px 0 4px;">Planos usados: ${lista.map(x => `${esc(x.plano.titulo)}`).join(' · ')} (a versão padrão de cada série). <span>🔒 base = outros capítulos dependem dele · 🔀 independente = pode mudar de bimestre.</span> Toque num bimestre para ver os detalhes.</p>
+      ${mapa}</div>
+    <div class="card" data-area-detalhe><h3 style="margin-top:0;">${A.serie}ª série · ${b}º bimestre</h3>
+      <h4 style="margin:6px 0 2px;">🔗 Temas em comum neste bimestre (${jb.length})</h4>${comuns}${outrosHtml}
+      <h4 style="margin:14px 0 6px;">O que cada disciplina trabalha</h4>${detalhe}</div>
+    <div class="card" data-area-sug><h3 style="margin-top:0;">💡 Sugestões de ajuste (opcionais) — ${A.serie}ª série</h3>
+      <p class="muted" style="font-size:.84rem; margin-top:0;">Só capítulos independentes aparecem aqui, respeitando o que cada um precisa ter visto antes. Nada muda sozinho: a decisão é da coordenação com os professores.</p>${sugHtml}</div>`;
+}
 function renderLivrosDidaticos(canUpload){
   const p = state.professor;
   if(p.livrosLoading){
@@ -11573,6 +11720,7 @@ function renderCoordenador(){
   else if(c.subview==='avulso') content = renderGabaritoAvulso();
   else if(c.subview==='livros') content = renderLivrosDidaticos(true);
   else if(c.subview==='planolivro') content = renderPlanoLivro();
+  else if(c.subview==='areabim') content = renderAreaBimestre();
   else if(c.subview==='mural') content = renderMuralAvisos(true);
   else if(c.subview==='enquete') content = renderEnqueteRelampago();
   else if(c.subview==='quiz') content = renderQuizEquipes();
@@ -21671,6 +21819,9 @@ async function carregarPlanoLivro(forcar){
   if(s.carregando || (s.carregado && !forcar)) return;
   s.carregando = true; render();
   s.index = await planoLerJson('plano-livro-index', []);
+  PLANO_IDX_CACHE = s.index;
+  if(!s.disc){ try{ s.disc = localStorage.getItem('plano-disc') || ''; }catch(e){} }
+  await planoDonosGarantir(state.professor.turmas || []);
   await planoAtualizarEfetivo();
   s.carregando = false; s.carregado = true;
   const turmas = planoTurmasVisiveis();
@@ -21695,10 +21846,11 @@ async function planoObter(planoId){
 async function planoCarregarTurma(turmaId){
   const s = planoState();
   if(!turmaId) return;
-  s.prog[turmaId] = await planoLerJson(`plano-livro-prog:${turmaId}`, { dadas:{}, exercicios:{} });
+  s.conex = {};
+  s.prog[turmaId] = await planoLerJson(`plano-livro-prog:${planoTK(turmaId)}`, { dadas:{}, exercicios:{} });
   if(!s.prog[turmaId].dadas) s.prog[turmaId].dadas = {};
   if(!s.prog[turmaId].exercicios) s.prog[turmaId].exercicios = {};
-  s.termo = s.termo || {}; s.termo[turmaId] = await planoLerJson(`plano-termometro:${turmaId}`, {});
+  s.termo = s.termo || {}; s.termo[turmaId] = await planoLerJson(`plano-termometro:${planoTK(turmaId)}`, {});
   await planoCfgCarregar(turmaId);
   await planoVistoCarregar(turmaId);
   await planoObter(s.turmaPlano[turmaId]);
@@ -21727,7 +21879,8 @@ async function importarPlanoLivro(file){
   }
   await window.storage.set('plano-livro-index', JSON.stringify(index), true);
   s.index = index;
-  if(pac && pac.icones){ try{ await window.storage.set('plano-livro-icones', JSON.stringify(pac.icones), true); AV_ICONES = null; }catch(e){} }
+  // ícones: soma aos que já existem (cada disciplina traz os seus; importar Sociologia não apaga os da Geografia)
+  if(pac && pac.icones){ try{ const atuais = await planoLerJson('plano-livro-icones', {}); await window.storage.set('plano-livro-icones', JSON.stringify(Object.assign({}, atuais || {}, pac.icones)), true); AV_ICONES = null; }catch(e){} }
   // imagens das questões de prova (mapas e fotos do livro): cada uma num documento próprio
   const imgs = Object.entries((pac && pac.imagens) || {});
   for(let i=0; i<imgs.length; i++){
@@ -21735,6 +21888,7 @@ async function importarPlanoLivro(file){
     try{ await window.storage.set(`plano-livro-img:${imgs[i][0]}`, JSON.stringify(imgs[i][1]), true); }catch(e){}
   }
   await planoCriarRegrasPadrao(planos.filter(pl => pl.id && Array.isArray(pl.aulas)));
+  PLANO_IDX_CACHE = index; s.area = null;
   await planoAtualizarEfetivo(); s.painel = null;
   s.enviando = null;
   s.msg = `✅ ${planos.length} plano(s) importado(s). As turmas já foram vinculadas automaticamente pela disciplina e pela série (Versão A). Confira abaixo e troque a versão se quiser.`;
@@ -21759,7 +21913,9 @@ async function excluirPlanoLivro(planoId){
 async function definirPlanoTurma(turmaId, planoId){
   const s = planoState();
   const tp = await planoLerJson('plano-livro-turmas', {});
-  if(planoId) tp[turmaId] = planoId; else delete tp[turmaId];   // '' = volta para o automático; '__nenhum' = desliga
+  const k = `${turmaId}|${planoDiscAtual()}`;   // vínculo por turma E disciplina
+  if(planoId) tp[k] = planoId; else delete tp[k];   // '' = volta para o automático; '__nenhum' = desliga
+  if(tp[turmaId] && (tp[turmaId]==='__nenhum' ? ((PLANO_DONOS||{})[turmaId]||planoDiscAtual())===planoDiscAtual() : planoDiscDoPlanoId(tp[turmaId])===planoDiscAtual())) delete tp[turmaId];
   await window.storage.set('plano-livro-turmas', JSON.stringify(tp), true);
   await planoAtualizarEfetivo(); s.painel = null;
   if(!s.turmaSel && s.turmaPlano[turmaId]) s.turmaSel = turmaId;
@@ -21768,13 +21924,13 @@ async function definirPlanoTurma(turmaId, planoId){
 }
 async function planoSalvarProg(turmaId){
   const s = planoState();
-  await window.storage.set(`plano-livro-prog:${turmaId}`, JSON.stringify(s.prog[turmaId]), true);
+  await window.storage.set(`plano-livro-prog:${planoTK(turmaId)}`, JSON.stringify(s.prog[turmaId]), true);
 }
 async function planoMarcarDada(turmaId, n, dada){
   const s = planoState();
   const prog = s.prog[turmaId] || { dadas:{}, exercicios:{} };
   // relê do banco antes de gravar (outro aparelho pode ter marcado outra aula)
-  const fresh = await planoLerJson(`plano-livro-prog:${turmaId}`, prog);
+  const fresh = await planoLerJson(`plano-livro-prog:${planoTK(turmaId)}`, prog);
   fresh.dadas = fresh.dadas || {}; fresh.exercicios = fresh.exercicios || {};
   if(dada) fresh.dadas[n] = Date.now(); else delete fresh.dadas[n];
   s.prog[turmaId] = fresh;
@@ -21792,6 +21948,140 @@ function planoDisciplinaDoProfessor(nome){
   return (state.professor.disciplinas||[]).find(d => normalizarTextoPlano(d.name).includes(alvo) || alvo.includes(normalizarTextoPlano(d.name))) || null;
 }
 function normalizarTextoPlano(t){ return String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim(); }
+/* ======================= VÁRIAS DISCIPLINAS NA MESMA TURMA =======================
+   Cada turma segue um plano por disciplina (Geografia, Sociologia...). Progresso, configuração, visto do caderno,
+   termômetro e slides editados ficam guardados por turma E disciplina:
+     `<chave>:<turmaId>`              → a disciplina “dona” dos dados antigos daquela turma (compatibilidade)
+     `<chave>:<turmaId>@<disciplina>` → as demais disciplinas
+   Dono de cada turma: `plano-livro-donos` = { turmaId: 'geografia' | 'sociologia' | '-' (ninguém) }. */
+let PLANO_DONOS = null, PLANO_IDX_CACHE = null;
+function planoDiscKey(nome){ return normalizarTextoPlano(nome||''); }
+function planoDiscDoPlanoId(pid){
+  if(!pid) return '';
+  const idx = (state.planoLivro && state.planoLivro.index && state.planoLivro.index.length) ? state.planoLivro.index : (PLANO_IDX_CACHE || []);
+  const pl = idx.find(x => x.id===pid);
+  if(pl && pl.disciplina) return planoDiscKey(pl.disciplina);
+  const m = String(pid).match(/^([a-zà-ú]+)-/i); return m ? planoDiscKey(m[1]) : '';
+}
+function planoTK(turmaId, disc){
+  if(!turmaId) return turmaId;
+  if(disc===undefined) disc = (state.planoLivro && state.planoLivro.disc) || '';
+  const dono = (PLANO_DONOS || {})[turmaId];
+  if(!disc || dono===undefined || dono===disc) return turmaId;
+  return `${turmaId}@${disc}`;
+}
+function planoTKP(turmaId, planoId){ return planoTK(turmaId, planoId ? planoDiscDoPlanoId(planoId) : undefined); }
+async function planoDonosCarregar(forcar){
+  if(PLANO_DONOS && !forcar) return PLANO_DONOS;
+  PLANO_DONOS = (await planoLerJson('plano-livro-donos', {})) || {};
+  if(!PLANO_IDX_CACHE || forcar) PLANO_IDX_CACHE = await planoLerJson('plano-livro-index', []);
+  return PLANO_DONOS;
+}
+// Na primeira vez (depois da atualização), descobre a disciplina dona dos dados antigos de cada turma:
+// pelo exercício já aplicado (origem do plano) ou, sem exercício, pelo plano que a turma seguia.
+async function planoDonosGarantir(turmas){
+  await planoDonosCarregar(true);
+  const faltam = (turmas || []).filter(t => t && t.id && !(t.id in PLANO_DONOS));
+  if(!faltam.length) return PLANO_DONOS;
+  let legado = null; const novos = {};
+  for(const t of faltam){
+    let dono = '';
+    const prog = await planoLerJson('plano-livro-prog:' + t.id, null);   // chave antiga (sem disciplina)
+    const codes = Object.values((prog && prog.exercicios) || {});
+    for(const code of codes.slice(0, 4)){
+      const a = await planoLerJson('assessment:' + code, null);
+      if(a && a.origemPlano && a.origemPlano.planoId){ dono = planoDiscDoPlanoId(a.origemPlano.planoId); break; }
+    }
+    if(!dono && prog && Object.keys(prog.dadas || {}).length){
+      if(!legado) legado = (await planoCalcularEfetivo(turmas)).efetivo;
+      if(legado[t.id]) dono = planoDiscDoPlanoId(legado[t.id]);
+    }
+    novos[t.id] = dono || '-';
+  }
+  try{
+    await window.storage.update('plano-livro-donos', raw => {
+      let o; try{ o = raw ? JSON.parse(raw) : {}; }catch(e){ o = {}; }
+      o = o || {}; Object.entries(novos).forEach(([k, v]) => { if(!(k in o)) o[k] = v; });
+      PLANO_DONOS = o; return JSON.stringify(o);
+    });
+  }catch(e){ Object.assign(PLANO_DONOS, novos); }
+  return PLANO_DONOS;
+}
+// Disciplinas com plano importado (todas) e as do usuário (professor: as que ele leciona)
+function planoDiscsDisponiveis(){
+  const s = planoState(); const m = new Map();
+  (s.index || []).forEach(pl => { const k = planoDiscKey(pl.disciplina); if(k && !m.has(k)) m.set(k, pl.disciplina); });
+  return [...m].map(([k, label]) => ({ k, label })).sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+}
+function planoDiscsDoUsuario(){
+  const todas = planoDiscsDisponiveis(); const p = state.professor;
+  if(state.view==='coordenador' || !p.session) return todas;
+  // professor vê só as disciplinas que leciona (sem plano da disciplina dele → nenhuma)
+  return todas.filter(d => (p.disciplinas || []).some(x => planoDiscCasa(x.name, d.label)));
+}
+function planoDiscAtual(){
+  const s = planoState(); const ds = planoDiscsDoUsuario();
+  if(!ds.length){ s.disc = (state.view==='coordenador' || !state.professor.session) ? (s.disc || '') : '__nenhuma'; return s.disc; }
+  if(!ds.some(d => d.k===s.disc)) s.disc = ds[0].k;
+  return s.disc;
+}
+async function planoTrocarDisciplina(k){
+  const s = planoState();
+  if(s.disc===k) return;
+  s.disc = k; try{ localStorage.setItem('plano-disc', k); }catch(e){}
+  s.prog = {}; s.cfg = {}; s.visto = {}; s.termo = {}; s.painel = null; s.resumoInicio = null; s.aulaAberta = null; s.aulaVista = null; s.msg = ''; s.montarProva = null; s.area = null;
+  await planoAtualizarEfetivo();
+  const turmas = planoTurmasVisiveis();
+  if(!turmas.some(t => t.id===s.turmaSel && s.turmaPlano[t.id])){ const c = turmas.find(t => s.turmaPlano[t.id]); s.turmaSel = c ? c.id : ''; }
+  if(s.turmaSel) await planoCarregarTurma(s.turmaSel);
+  render();
+}
+// ---- Conexões na área: aulas de outras disciplinas com o mesmo tema (gravadas no plano pelo mapa de conexões) ----
+const CONEX_IC = { geografia:'🌎', sociologia:'👥', historia:'🏛️', filosofia:'💭' };
+function conexIcone(disc){ return CONEX_IC[planoDiscKey(disc)] || '📘'; }
+function conexQuandoChip(c){
+  const m = ({ junto:['#1d6b31','#e6f4ea','neste bimestre'], antes:['#1F4E79','#e6f0fa','já visto'], depois:['#7a5b00','#fbf3df','vem depois'] })[c.quando];
+  return m ? `<span style="font-size:.72rem; font-weight:700; color:${m[0]}; background:${m[1]}; border-radius:6px; padding:1px 6px; white-space:nowrap;">${m[2]}</span>` : '';
+}
+async function conexCarregarStatus(turmaId, disc){
+  const s = planoState(); s.conex = s.conex || {}; const k = turmaId + '|' + disc;
+  if(k in s.conex) return; s.conex[k] = null;
+  try{
+    if(!s.conexProfs) s.conexProfs = await planoLerVinculosProfessores();
+    const t = (state.professor.turmas||[]).find(x => x.id===turmaId);
+    const r = t ? await planoCalcularEfetivo([t], { index: s.index, disc, profs: s.conexProfs }) : { efetivo:{} };
+    const pid = r.efetivo[turmaId] || null;
+    const prog = pid ? await planoLerJson(`plano-livro-prog:${planoTK(turmaId, disc)}`, { dadas:{} }) : null;
+    s.conex[k] = { planoId: pid, dadas: (prog && prog.dadas) || {} };
+  }catch(e){ s.conex[k] = { planoId:null, dadas:{} }; }
+  render();
+}
+function conexoesProfHtml(turmaId, plano, aula){
+  const cx = aula.conexoes || (aula.slides && aula.slides.conexoes) || [];
+  if(!cx.length) return '';
+  const s = planoState(); s.conex = s.conex || {};
+  const linhas = cx.map(c => {
+    const dk = planoDiscKey(c.disc); const st = s.conex[turmaId + '|' + dk];
+    if(st===undefined) setTimeout(() => conexCarregarStatus(turmaId, dk), 0);
+    let status = '';
+    if(st && st.planoId && st.planoId===c.planoId){ const ts = st.dadas[c.n]; status = ts ? `<span style="color:#1d6b31;">✓ já dada nesta turma em ${new Date(ts).toLocaleDateString('pt-BR')}</span>` : '<span class="muted">ainda não dada nesta turma</span>'; }
+    else if(st && st.planoId && c.serie===plano.serie) status = `<span class="muted">esta turma segue outra versão do plano de ${esc(c.disc)}</span>`;
+    return `<li data-conexao="${esc(dk)}-${c.n}" style="margin:5px 0;">${conexIcone(c.disc)} <b>${esc(c.disc)}</b> · ${esc(c.serie||'')} · ${c.bim}º bim · aula ${c.n} — ${esc(c.titulo)} ${conexQuandoChip(c)}<br><span style="font-size:.8rem;"><span class="muted">Tema em comum:</span> ${esc(c.tema||'')}${status ? ' · ' + status : ''}</span></li>`;
+  }).join('');
+  return `<div class="pl-conexoes" data-pl-conexoes style="margin:6px 0; padding:8px 10px; border-radius:8px; background:#f3f7fb; border:1px solid #d6e3f0; font-size:.86rem;"><strong style="color:#1F4E79;">🔗 Conexões na área</strong> <span class="muted" style="font-size:.78rem;">— dá para combinar uma atividade com o(a) professor(a) da outra disciplina</span><ul style="margin:4px 0 0; padding-left:2px; list-style:none;">${linhas}</ul></div>`;
+}
+function conexoesEstudarHtml(e, a){
+  const cx = a.conexoes || (a.slides && a.slides.conexoes) || [];
+  if(!cx.length) return '';
+  return `<div data-estudar-conexoes style="margin:8px 0; padding:8px 10px; border-radius:8px; background:#f3f7fb; border:1px solid #d6e3f0; font-size:.86rem;"><strong style="color:#1F4E79;">🔗 Você também estuda isso em…</strong>${cx.map(c => {
+    const d = (e.discs||[]).find(x => x.k===planoDiscKey(c.disc)); const pode = d && d.planoId===c.planoId;
+    return `<div style="margin-top:6px;">${conexIcone(c.disc)} <b>${esc(c.disc)}</b> · ${esc(c.rel||'')}: ${esc(c.titulo)}<br><span class="muted" style="font-size:.8rem;">Tema em comum: ${esc(c.tema||'')}</span>${pode ? ` <button class="btn btn-ghost btn-sm" data-action="estudar-conexao" data-k="${esc(d.k)}" data-n="${c.n}" style="width:auto; padding:2px 8px;">Abrir esta aula</button>` : ''}</div>`; }).join('')}</div>`;
+}
+function planoDiscSeletorHtml(){
+  const ds = planoDiscsDoUsuario(); if(ds.length < 2) return '';
+  const atual = planoDiscAtual();
+  return `<div class="pl-turmas" data-pl-discs style="margin-bottom:8px;">${ds.map(d => `<button class="pl-turma ${d.k===atual?'ativa':''}" data-action="plano-disc" data-k="${esc(d.k)}">📘 ${esc(d.label)}</button>`).join('')}</div>`;
+}
 function planoQuestoesParaAvaliacao(ex, mapa){
   const qs = ex.questoes || [];
   const nMc = qs.filter(q=>q.tipo==='mc').length;
@@ -21878,7 +22168,7 @@ async function aplicarExercicioPlano(turmaId, n){
   (state.professor.assessments = state.professor.assessments||[]).unshift(assessment);
   for(const x of extras){ const limpo = JSON.parse(JSON.stringify(x.a)); await window.storage.set(`assessment:${limpo.code}`, JSON.stringify(limpo), true); state.professor.assessments.unshift(limpo); }
   if(state.coordenador && Array.isArray(state.coordenador.assessments)) state.coordenador.assessments.unshift(assessment);
-  const fresh = await planoLerJson(`plano-livro-prog:${turmaId}`, prog);
+  const fresh = await planoLerJson(`plano-livro-prog:${planoTK(turmaId)}`, prog);
   fresh.dadas = fresh.dadas || {}; fresh.exercicios = fresh.exercicios || {};
   fresh.exercicios[n] = code;
   extras.forEach(x => { if(x.tipo==='apoio') fresh.apoio = Object.assign({}, fresh.apoio||{}, { [n]: { code: x.a.code, alunos: x.a.somenteAlunos } }); if(x.tipo==='desafio') fresh.desafios = Object.assign({}, fresh.desafios||{}, { [n]: x.a.code }); });
@@ -22014,7 +22304,7 @@ async function planoCarregarPainel(){
   const turmas = planoTurmasVisiveis().filter(t => s.turmaPlano[t.id]);
   const linhas = await Promise.all(turmas.map(async t => {
     const plano = await planoObter(s.turmaPlano[t.id]);
-    const prog = await planoLerJson(`plano-livro-prog:${t.id}`, { dadas:{}, exercicios:{} });
+    const prog = await planoLerJson(`plano-livro-prog:${planoTK(t.id)}`, { dadas:{}, exercicios:{} });
     const dadasTs = Object.values(prog.dadas||{});
     const ultima = dadasTs.length ? Math.max(...dadasTs) : null;
     const hoje = planoAulaDeHoje(plano, prog);
@@ -22029,8 +22319,8 @@ async function planoCarregarPainel(){
       if(nomes.size){ somaPct += fizeram.size / nomes.size; contados++; }
     }));
     const semEntregar = codes.length ? Object.values(feitosPorAluno).filter(f => f/codes.length < 0.5).length : 0;
-    const termo = Object.values(await planoLerJson(`plano-termometro:${t.id}`, {})).filter(x => x && x.total);
-    const vistoDoc = await planoLerJson(`plano-visto:${t.id}`, {});
+    const termo = Object.values(await planoLerJson(`plano-termometro:${planoTK(t.id)}`, {})).filter(x => x && x.total);
+    const vistoDoc = await planoLerJson(`plano-visto:${planoTK(t.id)}`, {});
     const vistoVals = Object.values(vistoDoc||{}).flatMap(o => Object.values(o||{}));
     const cadernos = vistoVals.length ? Math.round(vistoVals.reduce((a,x) => a + (VISTO_FATOR[x.v]||0), 0) / vistoVals.length * 100) : null;
     const aulasComMapa = plano ? plano.aulas.filter(a => a.slides && a.slides.mapa && prog.dadas && prog.dadas[a.n]) : [];
@@ -22045,21 +22335,31 @@ async function planoCarregarPainel(){
   s.painelCarregando = false;
   render();
 }
+// Andamento das turmas: grupo recolhível (fechado por padrão). A tabela só é carregada quando o grupo é aberto.
 function renderPlanoPainel(){
   const s = planoState();
   if(!Object.keys(s.turmaPlano||{}).length) return '';
+  let resumo = 'aulas dadas, entregas e alertas de cada turma';
+  if(s.painel){
+    const ls = s.painel.linhas, dia = 24*3600*1000;
+    const sem = ls.filter(l => !l.ultima).length, parad = ls.filter(l => l.ultima && (Date.now()-l.ultima) > 10*dia).length;
+    resumo = `${ls.length} turma(s)` + (sem ? ` · ${sem} ainda não começou` : '') + (parad ? ` · ${parad} parada(s)` : '') + (!sem && !parad ? ' · todas andando' : '');
+  }
+  return plGrupoHtml('andamento', '📊 Andamento das turmas', resumo, renderPlanoPainelCorpo, false);
+}
+function renderPlanoPainelCorpo(){
+  const s = planoState();
   if(!s.painel && !s.painelCarregando){ setTimeout(()=>planoCarregarPainel(), 0); }
-  if(!s.painel) return '<div class="card"><h3 style="margin-top:0;">📊 Andamento das turmas</h3><p class="muted">Carregando…</p></div>';
+  if(!s.painel) return '<p class="muted">Carregando…</p>';
   const dia = 24*3600*1000;
   const linhas = s.painel.linhas.slice().sort((a,b)=>(a.turma||'').localeCompare(b.turma||'', 'pt-BR', {numeric:true}));
   const porPlano = {};
   linhas.forEach(l => { (porPlano[l.plano] = porPlano[l.plano] || []).push(l.dadas); });
   const mediana = arr => { const v = arr.slice().sort((a,b)=>a-b); return v.length ? v[Math.floor((v.length-1)/2)] : 0; };
   return `
-    <div class="card" data-plano-painel>
-      <div class="row" style="justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-        <h3 style="margin:0;">📊 Andamento das turmas</h3>
-        <span class="row" style="gap:6px;"><button class="btn btn-ghost btn-sm" data-action="relatorio-abrir" data-escopo="todas" data-b="1">📈 Resultados de todas as turmas</button>
+    <div data-plano-painel>
+      <div class="row" style="justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap;">
+        <span class="row" style="gap:6px; flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" data-action="relatorio-abrir" data-escopo="todas" data-b="1">📈 Resultados de todas as turmas</button>
         <button class="btn btn-ghost btn-sm" data-action="plano-painel-atualizar">${s.painelCarregando?'⏳ Atualizando…':'↻ Atualizar'}</button></span>
       </div>
       <p class="muted" style="font-size:.84rem;">“Atrás das outras” compara com as turmas do mesmo plano. Quando o calendário de 2027 for ligado, a comparação passa a ser com a data prevista.</p>
@@ -22716,15 +23016,26 @@ async function carregarEstudarAluno(forcar){
   const al = state.aluno; const e = estudarState();
   if(!al.turma || e.carregando || (e.carregado && !forcar)) return;
   e.carregando = true; render();
-  const ef = await planoCalcularEfetivo([al.turma]);
-  const planoId = ef.efetivo[al.turma.id];
+  await planoDonosCarregar(true);
+  // uma aba por disciplina com plano (Geografia, Sociologia...)
+  const discs = [...new Map((PLANO_IDX_CACHE||[]).map(pl => [planoDiscKey(pl.disciplina), pl.disciplina])).entries()].filter(([k]) => k);
+  e.discs = [];
+  for(const [k, label] of discs){ const r = await planoCalcularEfetivo([al.turma], { index: PLANO_IDX_CACHE, disc: k }); if(r.efetivo[al.turma.id]) e.discs.push({ k, label, planoId: r.efetivo[al.turma.id] }); }
+  e.discs.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+  if(!e.disc || !e.discs.some(d => d.k===e.disc)){ let lemb = ''; try{ lemb = localStorage.getItem('estudar-disc') || ''; }catch(_){} e.disc = (e.discs.find(d => d.k===lemb) || e.discs[0] || {}).k || ''; }
+  const dSel = e.discs.find(d => d.k===e.disc);
+  const planoId = dSel ? dSel.planoId : null;
+  const tk = planoTK(al.turma.id, e.disc);
   e.plano = planoId ? await planoLerDoc(planoId) : null;
-  e.prog = await planoLerJson(`plano-livro-prog:${al.turma.id}`, { dadas:{}, exercicios:{} });
+  e.prog = await planoLerJson(`plano-livro-prog:${tk}`, { dadas:{}, exercicios:{} });
   e.slides = planoId ? await planoLerJson(`plano-livro-slides:${planoId}`, {}) : {};
-  e.cfg = Object.assign(planoCfgPadrao(), await planoLerJson(`plano-config:${al.turma.id}`, {}));
-  e.visto = await planoLerJson(`plano-visto:${al.turma.id}`, {});
+  e.cfg = Object.assign(planoCfgPadrao(), await planoLerJson(`plano-config:${tk}`, {}));
+  e.visto = await planoLerJson(`plano-visto:${tk}`, {});
+  e.edT = {};
   e.planoId = planoId || null;
   if(planoId){ const ps = planoState(); ps.videos[planoId] = await planoLerJson(`plano-livro-videos:${planoId}`, {}); e.feedback = (await planoLerJson(`plano-feedback:${planoId}`, [])).filter(f => f.quem==='aluno' && f.autorId===al.matriculaStudentId); }
+  e.aviso = '';
+  if(e.abrirApos){ if((e.prog.dadas||{})[e.abrirApos]) e.aberta = e.abrirApos; else e.aviso = `A aula ${e.abrirApos} de ${((e.discs||[]).find(d => d.k===e.disc)||{}).label||'outra disciplina'} ainda não foi dada na sua turma. Ela aparece aqui assim que o(a) professor(a) marcar.`; e.abrirApos = null; }
   e.carregando = false; e.carregado = true;
   render();
 }
@@ -22745,9 +23056,10 @@ async function estudarAbrirSlides(n, idx){
 function renderAlunoEstudarBlock(){
   const al = state.aluno; const e = estudarState();
   if(!e.carregado){ setTimeout(()=>carregarEstudarAluno(), 0); return '<div class="card"><p class="muted">Carregando…</p></div>'; }
-  if(!e.plano) return '<div class="card"><h2>📖 Estudar</h2><p class="muted">Sua turma ainda não segue um plano de aulas do livro.</p></div>';
+  const abas = (e.discs||[]).length > 1 ? `<div class="pl-turmas" data-estudar-discs style="margin:0 0 10px;">${e.discs.map(d => `<button class="pl-turma ${d.k===e.disc?'ativa':''}" data-action="estudar-disc" data-k="${esc(d.k)}">📘 ${esc(d.label)}</button>`).join('')}</div>` : '';
+  if(!e.plano) return `<div class="card"><h2>📖 Estudar</h2>${abas}<p class="muted">Sua turma ainda não segue um plano de aulas do livro.</p></div>`;
   const dadas = e.plano.aulas.filter(a => e.prog.dadas && e.prog.dadas[a.n]).sort((a,b) => e.prog.dadas[b.n] - e.prog.dadas[a.n]);
-  if(!dadas.length) return '<div class="card"><h2>📖 Estudar</h2><p class="muted">Assim que o professor marcar as aulas como dadas, elas aparecem aqui com os slides e as questões para revisar.</p></div>';
+  if(!dadas.length) return `<div class="card"><h2>📖 Estudar</h2>${abas}${e.aviso ? `<p data-estudar-aviso style="color:#a4521b;">${esc(e.aviso)}</p>` : ''}<p class="muted">Assim que o professor marcar as aulas${abas ? ' desta disciplina' : ''} como dadas, elas aparecem aqui com os slides e as questões para revisar.</p></div>`;
   const item = a => {
     const code = planoCodigoDoAluno(e.prog, a.n, al.matriculaStudentId);
     const feito = code ? estudarMinhaResposta(code) : null;
@@ -22780,7 +23092,7 @@ function renderAlunoEstudarBlock(){
         ${a.objetivo ? `<p style="font-size:.88rem; margin:8px 0 4px;"><strong>O que você precisa saber:</strong> ${esc(a.objetivo)}</p>` : ''}
         ${(!slot && a.slides) ? (() => { const sv = e.av && e.av.n===a.n ? e.av : null;
             e.edT = e.edT || {};
-            if(!(a.n in e.edT)){ e.edT[a.n] = null; const tid = state.aluno.turma && state.aluno.turma.id; if(tid) planoLerJson(`plano-slides-ed-t:${tid}:${a.n}`, null).then(v => { if(v){ e.edT[a.n] = v; render(); } }); }
+            if(!(a.n in e.edT)){ e.edT[a.n] = null; const tid = state.aluno.turma && state.aluno.turma.id; if(tid) planoLerJson(`plano-slides-ed-t:${planoTK(tid, e.disc)}:${a.n}`, null).then(v => { if(v){ e.edT[a.n] = v; render(); } }); }
             const edT = e.edT[a.n]; const dE = avAplicarEdicao(a.slides, edT);
             const lista = avSlidesFinal(dE, { estudo:true }, edT);
             if(!sv) return `<button class="btn btn-primary btn-sm" data-action="estudar-av" data-n="${a.n}" data-i="0">🖥️ Ver os slides da aula (${lista.length})</button>`;
@@ -22792,6 +23104,7 @@ function renderAlunoEstudarBlock(){
           : `<button class="btn btn-primary btn-sm" data-action="estudar-slide" data-n="${a.n}" data-i="0">🖥️ Ver os slides da aula (${slot.totalSlides})</button>`) : ''}
         ${(((planoState().videos[e.planoId]||{})[a.n])||[]).length ? planoVideosHtml(e.planoId, a.n, false) : ''}
         ${estudarMapaHtml(e, a)}
+        ${conexoesEstudarHtml(e, a)}
         ${exHtml}
         ${desafioPend ? `<p style="margin:6px 0;"><button class="btn btn-primary btn-sm" data-action="dashboard-start-exam" data-code="${esc(desafioCode)}">⭐ Desafio extra liberado — fazer agora</button> <span class="muted" style="font-size:.8rem;">(não vale nota, vale +3 fichas)</span></p>` : ''}
         ${(() => { const f = (e.feedback||[]).find(x => x.n===a.n); return `<div style="margin-top:10px; font-size:.88rem;">Esta aula ajudou você a entender o conteúdo?
@@ -22801,6 +23114,8 @@ function renderAlunoEstudarBlock(){
     </div>`;
   };
   return `<h2>📖 Estudar</h2>
+    ${abas}
+    ${e.aviso ? `<div class="card" data-estudar-aviso style="background:#fff4e5; border:1px solid #f0b46b; font-size:.9rem;">${esc(e.aviso)}</div>` : ''}
     <p class="muted" style="margin-top:-6px;">As aulas que já aconteceram: reveja os slides (bom para quem faltou) e treine as questões que você errou.</p>
     ${dadas.map(item).join('')}`;
 }
@@ -22826,11 +23141,11 @@ function renderAlunoPrazoBlock(){
 // ---- Editar o exercício antes de aplicar (abre o formulário normal já preenchido) ----
 async function planoRegistrarExercicio(turmaId, n, code){
   const s = planoState();
-  const fresh = await planoLerJson(`plano-livro-prog:${turmaId}`, { dadas:{}, exercicios:{} });
+  const fresh = await planoLerJson(`plano-livro-prog:${planoTK(turmaId)}`, { dadas:{}, exercicios:{} });
   fresh.dadas = fresh.dadas || {}; fresh.exercicios = fresh.exercicios || {};
   fresh.exercicios[n] = code;
   s.prog[turmaId] = fresh; s.painel = null;
-  await window.storage.set(`plano-livro-prog:${turmaId}`, JSON.stringify(fresh), true);
+  await window.storage.set(`plano-livro-prog:${planoTK(turmaId)}`, JSON.stringify(fresh), true);
 }
 function planoEditarExercicio(turmaId, n){
   const s = planoState(); const p = state.professor;
@@ -22978,8 +23293,11 @@ async function planoCalcularEfetivo(turmas, opts){
   const profs = (opts && opts.profs) || await planoLerVinculosProfessores();
   const porId = {}; index.forEach(pl => porId[pl.id] = pl);
   const efetivo = {}, origem = {};
+  const dK = opts && opts.disc ? opts.disc : '';   // com disciplina: só planos/regras dessa disciplina
+  const doDisc = pid => !dK || (porId[pid] && planoDiscKey(porId[pid].disciplina)===dK);
   (turmas||[]).forEach(t => {
-    const m = manual[t.id];
+    let m = dK ? manual[`${t.id}|${dK}`] : undefined;
+    if(m===undefined){ const m0 = manual[t.id]; if(m0==='__nenhum' ? (!dK || ((PLANO_DONOS||{})[t.id]||dK)===dK) : (m0 && doDisc(m0))) m = m0; }
     if(m && m!=='__nenhum' && porId[m]){ efetivo[t.id] = m; origem[t.id] = { tipo:'manual' }; return; }
     if(m==='__nenhum'){ origem[t.id] = { tipo:'desligado' }; return; }
     const serie = planoSerieNum(t.name);
@@ -22989,7 +23307,7 @@ async function planoCalcularEfetivo(turmas, opts){
         if(!(d.turmaIds||[]).includes(t.id)) continue;
         const regra = Object.entries(regras).find(([k, planoId]) => {
           const [disc, s] = k.split('|');
-          return s===serie && planoId && porId[planoId] && planoDiscCasa(d.name, disc);
+          return s===serie && planoId && porId[planoId] && doDisc(planoId) && planoDiscCasa(d.name, disc);
         });
         if(regra){ efetivo[t.id] = regra[1]; origem[t.id] = { tipo:'auto', professor: pr.nome, disciplina: d.name }; return; }
       }
@@ -23000,7 +23318,7 @@ async function planoCalcularEfetivo(turmas, opts){
 async function planoAtualizarEfetivo(){
   const s = planoState();
   const turmas = state.professor.turmas || [];
-  const r = await planoCalcularEfetivo(turmas, { index: s.index });
+  const r = await planoCalcularEfetivo(turmas, { index: s.index, disc: planoDiscAtual() });
   s.turmaPlanoManual = r.manual; s.regras = r.regras; s.origem = r.origem;
   s.turmaPlano = r.efetivo;
   s.efetivoEm = Date.now();
@@ -23103,6 +23421,7 @@ function avMontarSlides(d, opts){
   L.push({ t:'relampago' }, { t:'resposta' }, { t:'conceito' });
   while(m && r < m.ramos.length) ramo();
   if((d.vf||[]).length) L.push({ t:'vf' });
+  if((d.conexoes||[]).length) L.push({ t:'conexoes' });
   L.push({ t:'pratica' });
   if((!estudo && opts && opts.grupo) || (estudo && d.debate)) L.push({ t:'grupo' });
   if(m) L.push({ t:'mapa-final' });
@@ -23210,7 +23529,7 @@ function avSlideHtml(d, sl, ctx){
         <div style="display:flex;align-items:center;justify-content:center;height:100%;">${img(f.f)}</div>
         <div class="av-card" style="overflow:hidden;"><b style="color:${C.v}">${escR(f.leg)}</b>
           <ul style="margin:.6em 0 0 1em;padding:0;">${(f.perguntas||[]).map((q,i)=>`<li class="av-pop" style="margin:.35em 0;animation-delay:${.3+i*.25}s;">${escR(q)}</li>`).join('')}</ul>
-          <div class="av-fonte" style="margin-top:.6em;">Fonte: livro didático de Geografia (volume único), p. ${f.p}. Uso pedagógico interno.</div></div></div></div>`;
+          <div class="av-fonte" style="margin-top:.6em;">Fonte: livro didático de ${escR(d.livroNome||'Geografia')} (volume único), p. ${f.p}. Uso pedagógico interno.</div></div></div></div>`;
   }
   case 'esquema': {
     const e = d.esquema, k = sl.k, ic = e.icones||[];
@@ -23304,6 +23623,14 @@ function avSlideHtml(d, sl, ctx){
   }
   case 'volte': return `<div class="av-in av-azul"><div class="av-t">Volte à pergunta inicial</div><div style="font-size:1.6em;font-style:italic;margin:1.2em 0;">${escR(d.pergunta)}</div>
       <div class="av-card ou" style="color:${C.v};font-weight:700;">Escreva no caderno, em até 3 linhas, a sua resposta com o que aprendeu hoje.</div></div>`;
+  case 'conexoes': { const cx = (d.conexoes||[]).slice(0, 3); const icD = disc => ({ geografia:'FaEarthAmericas', sociologia:'FaPeopleGroup', historia:'FaLandmark' })[planoDiscKey(disc)] || 'FaBookOpen';
+    return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Conexões na área</div>${avCirc('FaDiagramProject', C.a, '#fff', 2.2)}</div>
+      <div style="margin-bottom:.7em;color:${C.a};">Este assunto também aparece em outra disciplina de Ciências Humanas:</div>
+      <div class="${cx.length >= 3 ? 'av-g3' : 'av-g2'}" style="align-items:stretch;">${cx.map((c, i) => `<div class="av-card ${c.quando==='junto' ? 'ou' : 'az'} av-pop" style="animation-delay:${i*.15}s;">
+        <div class="av-row" style="gap:.5em;align-items:center;">${avCirc(icD(c.disc), C.v, '#fff', 1.9)}<b style="color:${C.v};">${escR(c.disc)} · ${escR(c.serie||'')}</b></div>
+        <div class="av-t" style="font-size:1.12em;margin:.45em 0 .3em;">${escR(c.titulo)}</div>
+        <div><b>Tema em comum:</b> ${escR(c.tema||c.conceito||'')}</div>
+        <div style="margin-top:.45em;font-size:.88em;color:${C.a};">${escR(c.rel||'')} · aula ${c.n}</div></div>`).join('')}</div></div>`; }
   case 'proxima': { const p = d.proxima||{}; return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Na próxima aula…</div>${avCirc('FaArrowRight', C.v, '#fff', 2.2)}</div>
       <div class="av-g2" style="grid-template-columns:1.6fr 1fr;"><div class="av-card" style="min-height:11em;"><div style="color:${C.o};font-weight:700;letter-spacing:.12em;font-size:.8em;">AULA ${String(p.n||'').padStart(2,'0')}${p.paginas?' · LIVRO '+escR(p.paginas):''}</div><div class="av-t" style="font-size:1.6em;margin-top:.5em;">${escR(p.titulo||'')}</div><div>${p.tipo==='Avaliação'?'Traga o livro e revise o caderno: é dia de prova.':'Traga o livro. Se puder, leia as páginas antes.'}</div></div>
       <div class="av-card az"><b style="color:${C.a};">Até lá, no app:</b><ul style="margin:.5em 0 0 1em;padding:0;"><li>Minhas provas → exercício desta aula</li><li>Estudar → slides e questões que errou</li><li>Faltou? Tudo fica em Estudar.</li></ul></div></div></div>`; }
@@ -23360,7 +23687,7 @@ async function sedCarregar(planoId, n){
   if(!(k in s.sedCache)){ try{ s.sedCache[k] = JSON.parse((await window.storage.get(k, true)).value); }catch(e){ s.sedCache[k] = null; } }
   return s.sedCache[k];
 }
-const SED_NOMES = { capa:'Capa', 'mapa-inicio':'Mapa da aula (início)', retomada:'Na aula passada', nuvem:'Nuvem de palavras', aprender:'O que vamos aprender', leitura:'Leitura', caderno:'Caderno (mapa)', destaque:'Destaque', figura:'Figura', esquema:'Esquema', relampago:'Pergunta-relâmpago', resposta:'Resposta da relâmpago', conceito:'Conceito (anote no caderno)', vf:'V ou F relâmpago', pratica:'Hora de praticar', grupo:'Atividade em grupo', 'mapa-final':'Mapa da aula (final)', volte:'Volte à pergunta inicial', termometro:'Termômetro', proxima:'Próxima aula' };
+const SED_NOMES = { capa:'Capa', 'mapa-inicio':'Mapa da aula (início)', retomada:'Na aula passada', nuvem:'Nuvem de palavras', aprender:'O que vamos aprender', leitura:'Leitura', caderno:'Caderno (mapa)', destaque:'Destaque', figura:'Figura', esquema:'Esquema', relampago:'Pergunta-relâmpago', resposta:'Resposta da relâmpago', conceito:'Conceito (anote no caderno)', vf:'V ou F relâmpago', pratica:'Hora de praticar', grupo:'Atividade em grupo', 'mapa-final':'Mapa da aula (final)', volte:'Volte à pergunta inicial', termometro:'Termômetro', conexoes:'Conexões na área', proxima:'Próxima aula' };
 function sedNomeSlide(sl, d){
   if(sl.t==='figura') return 'Figura ' + (sl.i+1) + (d.figuras && d.figuras[sl.i] ? ': ' + (d.figuras[sl.i].titulo || d.figuras[sl.i].leg || '') : '');
   if(sl.t==='esquema') return 'Esquema' + (sl.passos>1 ? ` (passo ${sl.k+1}/${sl.passos})` : '');
@@ -23982,7 +24309,7 @@ async function iniciarAulaViva(turmaId, n){
   // versão editada pelo professor (textos e slides escondidos): vai junto na sessão para os tablets
   const ed = await sedCarregar(plano.id, n);
   if(ed) sessCfg.ed = { campos: ed.campos || {}, ocultos: ed.ocultos || [], ordem: ed.ordem || null };
-  try{ await window.storage.set(`plano-slides-ed-t:${turmaId}:${n}`, JSON.stringify(sessCfg.ed || null), true); }catch(e){}
+  try{ await window.storage.set(`plano-slides-ed-t:${planoTKP(turmaId, plano.id)}:${n}`, JSON.stringify(sessCfg.ed || null), true); }catch(e){}
   const dEd = avAplicarEdicao(aula.slides, sessCfg.ed);
   await avCarregarRecursos(dEd);
   av.d = dEd; av.n = n; av.slides = avSlidesFinal(dEd, { leitura: sessCfg.leitura, grupo: sessCfg.grupo }, sessCfg.ed); av.resp = {}; av.int = {}; av.duvidas = {}; av.painel = null; av.marcando = false; av.ultimaChave = null;
@@ -24355,7 +24682,7 @@ async function avAoSair(t){
     const cont = [0,0,0]; Object.values(av.int.termo||{}).forEach(r => { if(r.v>=0 && r.v<3) cont[r.v]++; });
     const tot = cont[0]+cont[1]+cont[2];
     if(tot){
-      const k = `plano-termometro:${av.sess.turmaId}`;
+      const k = `plano-termometro:${planoTKP(av.sess.turmaId, av.sess.planoId)}`;
       const atual = await planoLerJson(k, {});
       atual[av.n] = { ok:cont[0], medio:cont[1], nao:cont[2], total:tot, at:Date.now() };
       try{ await window.storage.set(k, JSON.stringify(atual), true); }catch(e){}
@@ -24696,14 +25023,14 @@ function planoCfgPadrao(){ return { datashow:false, mapaModelo:'estudar', mapaNo
 function planoCfg(turmaId){ const s = planoState(); return (s.cfg||{})[turmaId] || planoCfgPadrao(); }
 async function planoCfgCarregar(turmaId){
   const s = planoState(); s.cfg = s.cfg || {};
-  s.cfg[turmaId] = Object.assign(planoCfgPadrao(), await planoLerJson(`plano-config:${turmaId}`, {}));
+  s.cfg[turmaId] = Object.assign(planoCfgPadrao(), await planoLerJson(`plano-config:${planoTK(turmaId)}`, {}));
   return s.cfg[turmaId];
 }
 async function planoCfgMudar(turmaId, mexer){
   const s = planoState(); s.cfg = s.cfg || {};
   const c = Object.assign(planoCfgPadrao(), s.cfg[turmaId]||{}); c.leitura = Object.assign({}, c.leitura||{}); c.grupo = Object.assign({}, c.grupo||{});
   mexer(c); s.cfg[turmaId] = c; render();
-  try{ await window.storage.set(`plano-config:${turmaId}`, JSON.stringify(c), true); }catch(e){}
+  try{ await window.storage.set(`plano-config:${planoTK(turmaId)}`, JSON.stringify(c), true); }catch(e){}
 }
 function planoCfgHtml(turmaId){
   const c = planoCfg(turmaId);
@@ -24848,7 +25175,7 @@ setInterval(() => {
 // ---------- Visto no caderno ----------
 async function planoVistoCarregar(turmaId){
   const s = planoState(); s.visto = s.visto || {};
-  s.visto[turmaId] = await planoLerJson(`plano-visto:${turmaId}`, {});
+  s.visto[turmaId] = await planoLerJson(`plano-visto:${planoTK(turmaId)}`, {});
   return s.visto[turmaId];
 }
 function planoVistoDe(turmaId, n){ const s = planoState(); return (((s.visto||{})[turmaId]||{})[n]) || {}; }
@@ -24858,7 +25185,7 @@ async function planoDarVisto(turmaId, n, marcas){
   const turma = (state.professor.turmas||[]).find(t => t.id===turmaId);
   const fichas = [];
   let novoDoc = null;
-  await window.storage.update(`plano-visto:${turmaId}`, raw => {
+  await window.storage.update(`plano-visto:${planoTK(turmaId)}`, raw => {
     let doc; try{ doc = raw ? JSON.parse(raw) : {}; }catch(e){ doc = {}; }
     doc = doc || {}; doc[n] = doc[n] || {};
     fichas.length = 0;
@@ -24938,13 +25265,15 @@ async function vistoTodos(turmaId, n, v){
 // Aluno: nota do mapa na hora de entregar o exercício (se o visto já foi dado)
 async function vistoDoAluno(a, al){
   if(!a || !a.origemPlano || !al.turma) return null;
-  const doc = await planoLerJson(`plano-visto:${a.origemPlano.turmaId || al.turma.id}`, {});
+  await planoDonosCarregar();
+  const doc = await planoLerJson(`plano-visto:${planoTKP(a.origemPlano.turmaId || al.turma.id, a.origemPlano.planoId)}`, {});
   const reg = ((doc||{})[a.origemPlano.aula]||{})[al.matriculaStudentId];
   return reg ? reg.v : null;
 }
 // Notas: quem não entregou o exercício pelo app, mas tem visto no caderno, fica com os pontos do mapa
 async function vistosParaNotas(assessments){
-  const tids = [...new Set((assessments||[]).filter(a => a.origemPlano && (a.questions||[]).some(q => q.mapaCaderno)).map(a => a.origemPlano.turmaId).filter(Boolean))];
+  await planoDonosCarregar();
+  const tids = [...new Set((assessments||[]).filter(a => a.origemPlano && a.origemPlano.turmaId && (a.questions||[]).some(q => q.mapaCaderno)).map(a => planoTKP(a.origemPlano.turmaId, a.origemPlano.planoId)))];
   const out = {};
   await Promise.all(tids.map(async t => { out[t] = await planoLerJson(`plano-visto:${t}`, {}); }));
   return out;
@@ -24953,7 +25282,7 @@ function vistoPontosParaNota(a, vistos, turma, nome){
   const qm = (a.questions||[]).find(q => q.mapaCaderno);
   if(!qm || !a.origemPlano || !turma) return 0;
   const st = (turma.students||[]).find(s => s.name===nome);
-  const reg = st && (((vistos[a.origemPlano.turmaId]||{})[a.origemPlano.aula])||{})[st.id];
+  const reg = st && (((vistos[planoTKP(a.origemPlano.turmaId, a.origemPlano.planoId)]||{})[a.origemPlano.aula])||{})[st.id];
   return reg ? qm.points * (VISTO_FATOR[reg.v]||0) : 0;
 }
 // Estudar (aluno): mapa da aula + situação do visto
@@ -25275,7 +25604,7 @@ async function planoAplicarDiagnostica(turmaId, b){
     origemPlano: { planoId: plano.id, turmaId, diagnostica: b, aulas: nums }, professorId: sess ? sess.id : null, professorName: sess ? sess.displayName : 'Coordenação', createdAt: Date.now(), updatedAt: null };
   await window.storage.set(`assessment:${code}`, JSON.stringify(a), true);
   (state.professor.assessments = state.professor.assessments||[]).unshift(a);
-  const fresh = await planoLerJson(`plano-livro-prog:${turmaId}`, prog);
+  const fresh = await planoLerJson(`plano-livro-prog:${planoTK(turmaId)}`, prog);
   fresh.diagnosticas = Object.assign({}, fresh.diagnosticas||{}, { [b]: code });
   fresh.diagUsadas = Object.assign({}, fresh.diagUsadas||{}, { [b]: itens.map(x => x.k) });
   s.prog[turmaId] = Object.assign({}, prog, fresh); await planoSalvarProg(turmaId);
@@ -25310,7 +25639,7 @@ async function relatorioCalcular(turmaId, b){
   const alunos = (turma && turma.students) || [];
   const nomes = {}; alunos.forEach(st => nomes[nomeChave(st.name)] = st);
   const unidade = UNIDADES[Math.max(0, Math.min(3, b-1))];
-  const prog = s.prog[turmaId] || await planoLerJson(`plano-livro-prog:${turmaId}`, { dadas:{}, exercicios:{} });
+  const prog = s.prog[turmaId] || await planoLerJson(`plano-livro-prog:${planoTK(turmaId)}`, { dadas:{}, exercicios:{} });
   const plano = s.planos[s.turmaPlano[turmaId]] || null;
   const todas = await Promise.all(((await window.storage.list('assessment:', true)).keys||[]).map(k => planoLerJson(k, null)));
   const daTurma = todas.filter(a => a && assessmentTurmaIds(a).includes(turmaId));
@@ -25344,8 +25673,8 @@ async function relatorioCalcular(turmaId, b){
     if(alunos.length){ somaEntrega += fizeram.size / alunos.length; nEx++; }
     resp.forEach(r => { somaAcerto += Math.min(1, (r.total||0) / 10); nAcerto++; });
   }
-  const termo = Object.entries(await planoLerJson(`plano-termometro:${turmaId}`, {})).filter(([n, x]) => aulasB.includes(Number(n)) && x && x.total).map(([, x]) => x);
-  const visto = await planoLerJson(`plano-visto:${turmaId}`, {});
+  const termo = Object.entries(await planoLerJson(`plano-termometro:${planoTK(turmaId)}`, {})).filter(([n, x]) => aulasB.includes(Number(n)) && x && x.total).map(([, x]) => x);
+  const visto = await planoLerJson(`plano-visto:${planoTK(turmaId)}`, {});
   const vv = Object.entries(visto||{}).filter(([n]) => aulasB.includes(Number(n))).flatMap(([, o]) => Object.values(o||{}));
   const filas = await Promise.all(alunos.map(st => planoLerJson(revisaoChave(turmaId, st.id), null)));
   const revisoes = filas.reduce((x, f) => x + ((f && f.feitos) || 0), 0);
@@ -25527,10 +25856,10 @@ async function planoCarregarResumoInicio(){
   for(const t of planoTurmasDoProfessor()){
     const plano = await planoObter(s.turmaPlano[t.id]);
     if(!plano) continue;
-    const prog = await planoLerJson(`plano-livro-prog:${t.id}`, { dadas:{}, exercicios:{} });
+    const prog = await planoLerJson(`plano-livro-prog:${planoTK(t.id)}`, { dadas:{}, exercicios:{} });
     s.prog[t.id] = Object.assign({}, prog, { dadas: prog.dadas||{}, exercicios: prog.exercicios||{} });
-    s.termo = s.termo || {}; s.termo[t.id] = await planoLerJson(`plano-termometro:${t.id}`, {});
-    s.visto = s.visto || {}; s.visto[t.id] = await planoLerJson(`plano-visto:${t.id}`, {});
+    s.termo = s.termo || {}; s.termo[t.id] = await planoLerJson(`plano-termometro:${planoTK(t.id)}`, {});
+    s.visto = s.visto || {}; s.visto[t.id] = await planoLerJson(`plano-visto:${planoTK(t.id)}`, {});
     linhas.push({ turmaId: t.id });
   }
   s.resumoInicio = { linhas, em: Date.now() };
@@ -25588,6 +25917,7 @@ function renderInicioAulasCard(){
       <strong style="font-size:1.05rem;">🗓️ Minhas aulas do livro</strong>
       <button class="btn btn-ghost btn-sm" data-action="sub-view" data-sub="planolivro">Ver plano completo</button>
     </div>
+    ${planoDiscSeletorHtml()}
     <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; margin-top:10px;">${cards}</div>
     <details style="margin-top:12px;" ${s.resumoInicio.linhas.every(({turmaId}) => !Object.keys((s.prog[turmaId]||{}).dadas||{}).length) ? 'open' : ''}>
       <summary style="cursor:pointer; font-weight:600;">❓ Como saber qual é a aula de hoje e conferir as aulas</summary>
@@ -25669,9 +25999,10 @@ function planoAulaDetalheHtml(turmaId, plano, aula, prog, destaque, ctxHero){
     <div class="row" style="justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap;">
       <div style="flex:1 1 300px; min-width:0;">
         <div class="muted" style="font-size:.8rem;">${kicker}Aula ${aula.n} de ${plano.aulas.length} · ${aula.bimestre}º bimestre · semana ${aula.semana} · ${esc(aula.tipo||'')}${aula.paginas?' · livro '+esc(aula.paginas):''}</div>
-        <h3 class="pl-titulo">${esc(aula.tituloCurto||aula.tema)}</h3>${aula.tituloCurto?`<div class="muted" style="font-size:.8rem; margin:-4px 0 6px;">${esc(aula.tema)}</div>`:''}
+        <h3 class="pl-titulo">${esc(aula.tituloCurto||aula.tema)}</h3>${aula.tituloCurto && aula.tema && aula.tema!==aula.tituloCurto?`<div class="muted" style="font-size:.8rem; margin:-4px 0 6px;">${esc(aula.tema)}</div>`:''}
         ${aula.objetivo?`<p style="margin:0 0 6px; font-size:.9rem;"><strong>Objetivo:</strong> ${esc(aula.objetivo)}</p>`:''}
         ${planoCursosHtml(turmaId, aula)}
+        ${conexoesProfHtml(turmaId, plano, aula)}
       </div>
     </div>
     ${aula.tipo==='Revisão' ? `<p class="pl-nota">📉 Dia de revisão: abra <strong>“📝 Avaliação do bimestre”</strong>, logo abaixo, para ver o que a turma mais errou e aplicar a lista de revisão.</p>` : ''}
@@ -25706,15 +26037,16 @@ function renderPlanoLivro(){
       ${s.index.length ? `<div style="margin-top:10px;">${s.index.map(pl => `<div class="row" style="justify-content:space-between; align-items:center; border-bottom:1px solid var(--border,#eee); padding:6px 0; gap:6px; flex-wrap:wrap;"><span style="font-size:.88rem;"><strong>${esc(pl.titulo)}</strong> · ${pl.totalAulas} aulas${pl.comExercicios?` · ${pl.comExercicios} com exercício pronto`:''}<br><span class="muted">${esc(pl.descricao||'')}</span></span><button class="btn btn-ghost btn-sm" data-action="plano-excluir" data-id="${esc(pl.id)}">Remover</button></div>`).join('')}</div>` : '<p class="muted" style="font-size:.85rem;">Nenhum plano importado ainda.</p>'}
       ${s.index.length && turmas.length ? `
       ${renderPlanoRegras()}
-      <h4 style="margin:14px 0 6px;">Turmas</h4>
+      <h4 style="margin:14px 0 6px;">Turmas${planoDiscsDisponiveis().length > 1 ? ` — ${esc((planoDiscsDisponiveis().find(d => d.k===planoDiscAtual())||{}).label||'')}` : ''}</h4>
+      ${planoDiscsDisponiveis().length > 1 ? `<p class="muted" style="font-size:.82rem; margin:0 0 6px;">Cada turma segue um plano por disciplina. Troque a disciplina nos botões 📘 do topo para ver e ajustar os vínculos das outras.</p>` : ''}
       <p class="muted" style="font-size:.82rem; margin:0 0 6px;">“Automático” segue a regra acima. Escolha uma versão só se esta turma precisar ser diferente.</p>
       <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:8px;">
-        ${turmas.map(t => { const man = (s.turmaPlanoManual||{})[t.id] || ''; const o = (s.origem||{})[t.id]; const ef = s.turmaPlano[t.id]; const pl = ef && s.index.find(x=>x.id===ef);
+        ${turmas.map(t => { const _mm = s.turmaPlanoManual||{}; const _dk = planoDiscAtual(); const _m0 = _mm[t.id]; const man = _mm[`${t.id}|${_dk}`] || ((_m0 && (_m0==='__nenhum' ? ((PLANO_DONOS||{})[t.id]||_dk)===_dk : planoDiscDoPlanoId(_m0)===_dk)) ? _m0 : '') || ''; const o = (s.origem||{})[t.id]; const ef = s.turmaPlano[t.id]; const pl = ef && s.index.find(x=>x.id===ef);
           return `<label style="font-size:.85rem;" data-turma-vinculo="${esc(t.id)}">${esc(t.name)}
           <select data-action="plano-turma-versao" data-tid="${esc(t.id)}" style="width:100%;">
             <option value="" ${!man?'selected':''}>Automático</option>
             <option value="__nenhum" ${man==='__nenhum'?'selected':''}>Nenhum plano</option>
-            ${s.index.map(x => `<option value="${esc(x.id)}" ${man===x.id?'selected':''}>${esc(x.titulo)}</option>`).join('')}
+            ${s.index.filter(x => planoDiscKey(x.disciplina)===planoDiscAtual()).map(x => `<option value="${esc(x.id)}" ${man===x.id?'selected':''}>${esc(x.titulo)}</option>`).join('')}
           </select>
           <span style="display:block; font-size:.76rem; text-transform:none; font-weight:400; color:${pl?'#1d6b31':'#888'};">${pl ? (o && o.tipo==='auto' ? `✔ ${esc(pl.titulo)} — automático (${esc(o.professor)}, ${esc(o.disciplina)})` : `✔ ${esc(pl.titulo)} — escolhido pela coordenação`) : (o && o.tipo==='desligado' ? 'sem plano (desligado)' : 'sem plano — nenhum professor da disciplina do plano nesta turma')}</span></label>`; }).join('')}
       </div>` : ''}
@@ -25727,15 +26059,15 @@ function renderPlanoLivro(){
     return (p.disciplinas||[]).some(d => (d.turmaIds||[]).includes(t.id) && (!pl || !pl.disciplina || planoDiscCasa(d.name, pl.disciplina)));
   });
   if(!turmasComPlano.length){
-    return `<h2>🗓️ Plano de Aulas do Livro</h2>${avisos}${blocoCoord}
-      <div class="card"><p>Nenhuma das suas turmas tem plano de aulas ainda.</p><p class="muted">${state.view==='coordenador' ? 'Importe o plano e escolha a versão de cada turma no quadro acima.' : podeImportar ? 'Importe o plano e escolha a versão de cada turma no painel da coordenação (🗓️ Plano de Aulas do Livro).' : 'Peça à coordenação para importar o plano e escolher a versão da sua turma.'}</p></div>`;
+    return `<h2>🗓️ Plano de Aulas do Livro</h2>${planoDiscSeletorHtml()}${avisos}${blocoCoord}
+      <div class="card"><p>Nenhuma das suas turmas tem plano de aulas${planoDiscsDoUsuario().length > 1 ? ' nesta disciplina' : ''} ainda.</p><p class="muted">${state.view==='coordenador' ? 'Importe o plano e escolha a versão de cada turma no quadro acima.' : podeImportar ? 'Importe o plano e escolha a versão de cada turma no painel da coordenação (🗓️ Plano de Aulas do Livro).' : 'Peça à coordenação para importar o plano e escolher a versão da sua turma.'}</p></div>`;
   }
   const turmaId = turmasComPlano.some(t=>t.id===s.turmaSel) ? s.turmaSel : turmasComPlano[0].id;
   if(turmaId !== s.turmaSel){ s.turmaSel = turmaId; setTimeout(async()=>{ await planoCarregarTurma(turmaId); render(); },0); }
   const plano = s.planos[s.turmaPlano[turmaId]];
   const prog = s.prog[turmaId] || { dadas:{}, exercicios:{} };
   const seletor = `<label style="font-size:.9rem;">Turma: <select data-action="plano-turma-sel" style="min-width:200px;">${turmasComPlano.map(t=>`<option value="${esc(t.id)}" ${t.id===turmaId?'selected':''}>${esc(t.name)}</option>`).join('')}</select></label>`;
-  if(!plano) return `<h2>🗓️ Plano de Aulas do Livro</h2>${avisos}${blocoCoord}<div class="card">${seletor}<p class="muted">Carregando o plano da turma…</p></div>`;
+  if(!plano) return `<h2>🗓️ Plano de Aulas do Livro</h2>${planoDiscSeletorHtml()}${avisos}${blocoCoord}<div class="card">${seletor}<p class="muted">Carregando o plano da turma…</p></div>`;
   const dadas = plano.aulas.filter(a => prog.dadas && prog.dadas[a.n]).length;
   const pct = Math.round(dadas / plano.aulas.length * 100);
   const hoje = planoAulaDeHoje(plano, prog);
@@ -25771,6 +26103,7 @@ function renderPlanoLivro(){
   const revisaoHoje = !!(hoje && hoje.tipo==='Revisão'), provaHoje = !!(hoje && hoje.tipo==='Avaliação');
   return `
     ${sedHtml()}
+    ${planoDiscSeletorHtml()}
     ${avisosProf}
     ${plano.aulas.some(a => a.exercicio) ? '' : `<div class="card" data-plano-sem-conteudo style="border-left:4px solid #C9A227;"><strong>⏳ As aulas da ${esc(plano.serie||'série')} ainda estão sendo preparadas.</strong><br><span style="font-size:.88rem;">Por enquanto o plano tem o roteiro de cada aula (tema, páginas do livro, objetivo e sugestões). Slides, exercícios, diagnóstica, níveis e trabalho em grupo aparecem aqui assim que o conteúdo desta série for importado.</span></div>`}
     ${podeImportar ? renderPlanoPainel() + renderPlanoFeedbackResumo(s.turmaPlano[turmaId]) : ''}
@@ -27493,6 +27826,11 @@ document.addEventListener('click', (e) => {
   else if(act==='student-logout'){ sairAluno(); }
   else if(act==='goto-aluno-livros'){ stopAlunoEnquetePoll(); al.stage='aluno-livros'; if(state.professor.livrosLoading){ loadLivros(); } render(); }
   else if(act==='back-to-student-dashboard'){ loadStudentDashboard(); }
+  else if(act==='estudar-disc'){ const e = estudarState(); e.disc = btn.dataset.k; try{ localStorage.setItem('estudar-disc', e.disc); }catch(_){} e.aberta = null; e.deck = null; e.av = null; carregarEstudarAluno(true); }
+  else if(act==='estudar-conexao'){ const e = estudarState(); const k = btn.dataset.k, n = parseInt(btn.dataset.n); if(k===e.disc){ e.aberta = n; render(); setTimeout(() => { const el = document.querySelector(`[data-estudar-aula="${n}"]`); if(el) el.scrollIntoView({ block:'start' }); }, 50); } else { e.disc = k; try{ localStorage.setItem('estudar-disc', k); }catch(_){} e.abrirApos = n; e.deck = null; e.av = null; carregarEstudarAluno(true); } }
+  else if(act==='plano-disc'){ planoTrocarDisciplina(btn.dataset.k); }
+  else if(act==='area-serie'){ const A = areaState(); A.serie = btn.dataset.s; render(); }
+  else if(act==='area-bim'){ const A = areaState(); A.bim = parseInt(btn.dataset.b)||1; render(); }
   else if(act==='estudar-abrir'){ const e = estudarState(); const n = parseInt(btn.dataset.n); e.aberta = e.aberta===n ? null : n; if(e.deck && e.deck.n!==n) e.deck = null; render(); }
   else if(act==='estudar-feedback'){ const e = estudarState(); const al2 = state.aluno; if(e.planoId){ planoRegistrarFeedback(e.planoId, { n: parseInt(btn.dataset.n), turmaId: al2.turma.id, quem:'aluno', autorId: al2.matriculaStudentId, util: btn.dataset.v==='1' }).then(lista => { e.feedback = lista.filter(f => f.quem==='aluno' && f.autorId===al2.matriculaStudentId); render(); }); } }
   else if(act==='estudar-slide'){ estudarAbrirSlides(parseInt(btn.dataset.n), parseInt(btn.dataset.i)); }
