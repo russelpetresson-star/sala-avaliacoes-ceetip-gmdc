@@ -80,6 +80,8 @@
      (cabeçalho, timbre da escola e o selo animado) — o resto do app mantém
      o vinho claro (--board) já usado nos demais elementos. */
   :root[data-theme="dark"] header h1{ color:#ffffff; }
+  .kit-cod{display:inline-block;font-weight:700;font-size:.72rem;color:#fff;padding:2px 6px;border-radius:5px;white-space:nowrap;vertical-align:middle}.kit-cod.lp{background:#00695C}.kit-cod.mt{background:#1F4E79}
+  .av-saesecod{color:#fff;font-weight:700;font-size:.78em;padding:.12em .45em;border-radius:.35em;white-space:nowrap;}
   :root[data-theme="dark"] .school-name-sm{ color:#ffffff; }
   :root[data-theme="dark"] .logo-badge{ border-color:#ffffff; }
   :root[data-theme="dark"] .landing-intro h2{ color:#ffffff; }
@@ -734,7 +736,7 @@
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-19-1400</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-10-20-1945</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -2644,7 +2646,7 @@ function subAtivo(role, sub){ const r = recursoPorSub(role, sub); return !r || r
 const PROF_SECOES = [
   { id:'hoje', icon:'🏠', label:'Hoje', abas:[['inicio','Hoje']] },
   { id:'turmas', icon:'👥', label:'Minhas turmas', abas:[['planolivro','🗓️ Aulas do plano'], ['painel','📊 Notas e desempenho'], ['turmas','👥 Alunos'], ['chamada','🪪 Chamada'], ['freqpainel','📈 Frequência']] },
-  { id:'aval', icon:'📝', label:'Avaliações', abas:[['avaliacoes','📝 Minhas avaliações'], ['banco','📚 Banco de questões'], ['bloco','🖨️ Prova em papel'], ['leitura','🔍 Ler gabaritos'], ['avulso','🗒️ Gabarito avulso'], ['liberacoes','🔓 Liberações']] },
+  { id:'aval', icon:'📝', label:'Avaliações', abas:[['avaliacoes','📝 Minhas avaliações'], ['banco','📚 Banco de questões'], ['kitsaese','🎯 Kit SAESE'], ['bloco','🖨️ Prova em papel'], ['leitura','🔍 Ler gabaritos'], ['avulso','🗒️ Gabarito avulso'], ['liberacoes','🔓 Liberações']] },
   { id:'ferr', icon:'🧰', label:'Ferramentas', abas:[['ferramentas','🧰 Ferramentas']].concat(RECURSOS.filter(r => r.prof).map(r => [r.prof, r.icon + ' ' + r.label])) },
   { id:'ajustes', icon:'⚙️', label:'Ajustes', abas:[['disciplinas','📖 Disciplinas'], ['pesos','⚖️ Pesos das notas'], ['lixeira','🗑️ Lixeira']] },
 ];
@@ -2653,15 +2655,15 @@ const ALUNO_SECOES = [
   { id:'provas', icon:'📝', label:'Provas e notas', abas:[['provas','📝 Minhas provas'], ['boletim','🧮 Boletim'], ['socio','💛 Socioemocional']] },
   { id:'estudar', icon:'📖', label:'Estudar', abas:[['estudar','📖 Aulas dadas'], ['tarefas','🗂️ Tarefas'], ['mapas','🧠 Mapas mentais'], ['materiais','📎 Materiais'], ['cronograma','📅 Cronograma'], ['ra','🕶️ Realidade aumentada'], ['@livros','📘 Livro didático']] },
   { id:'escola', icon:'💬', label:'Escola', abas:[['duvidas','❓ Dúvidas'], ['revisao','🔎 Revisão de colegas'], ['monitoria','🧑‍🏫 Monitoria'], ['buscaativa','🚌 Transporte'], ['campanha','📢 Jovens Protagonistas']] },
-  { id:'eu', icon:'🏅', label:'Eu', abas:[['conquistas','🏅 Conquistas'], ['portfolio','🗂️ Portfólio'], ['diario','📷 Diário de bordo'], ['biblioteca','📚 Biblioteca']] },
+  { id:'eu', icon:'🏅', label:'Eu', abas:[['conquistas','🏅 Conquistas'], ['caderneta','🎯 Caderneta SAESE'], ['portfolio','🗂️ Portfólio'], ['diario','📷 Diário de bordo'], ['biblioteca','📚 Biblioteca']] },
 ];
 const COORD_SECOES = [
   { id:'painel', icon:'🏠', label:'Painel', abas:[['dashboard','🏠 Painel']] },
-  { id:'aval', icon:'📝', label:'Avaliações e notas', abas:[['avaliacoes','📝 Todas as avaliações'], ['liberacoes','🔓 Liberações'], ['notas','🧮 Notas finais e risco'], ['importarnotas','📥 Importar notas (CSV)'], ['periodos','📅 Períodos'], ['bloco','🖨️ Prova em papel'], ['avulso','🗒️ Gabarito avulso']] },
+  { id:'aval', icon:'📝', label:'Avaliações e notas', abas:[['avaliacoes','📝 Todas as avaliações'], ['liberacoes','🔓 Liberações'], ['notas','🧮 Notas finais e risco'], ['saeseescola','📘 SAESE da escola'], ['importarnotas','📥 Importar notas (CSV)'], ['periodos','📅 Períodos'], ['bloco','🖨️ Prova em papel'], ['avulso','🗒️ Gabarito avulso']] },
   { id:'turmas', icon:'👥', label:'Turmas e frequência', abas:[['turmas','👥 Turmas'], ['chamada','🪪 Chamada'], ['freqpainel','📊 Painel de frequência']] },
   { id:'profs', icon:'🧑‍🏫', label:'Professores', abas:[['professores','🧑‍🏫 Professores'], ['frequencia','📈 Frequência dos professores'], ['pesosprof','⚖️ Pesos dos professores']] },
   { id:'alunos', icon:'💛', label:'Alunos', abas:[['monitoria','🎯 Monitoria de desempenho'], ['buscaativa','🚌 Busca ativa e transporte'], ['socio','💛 Socioemocional'], ['portfolio','🗂️ Portfólio'], ['campanha','📢 Jovens Protagonistas'], ['conquistas','🏅 Hall de conquistas'], ['temporada','🏆 Temporada de desafios']] },
-  { id:'aulas', icon:'📚', label:'Aulas e comunicação', abas:[['planolivro','🗓️ Plano de aulas do livro'], ['areabim','🧭 Visão da área'], ['livros','📘 Livros didáticos'], ['mural','📌 Mural de avisos'], ['diario','📷 Diário de bordo'], ['enquete','📣 Enquete'], ['quiz','🎮 Quiz'], ['roleta','🎡 Roleta'], ['duelo','⚔️ Duelo'], ['slides','🖥️ Slides']] },
+  { id:'aulas', icon:'📚', label:'Aulas e comunicação', abas:[['planolivro','🗓️ Plano de aulas do livro'], ['areabim','🧭 Visão da área'], ['kitsaese','🎯 Kit SAESE'], ['livros','📘 Livros didáticos'], ['mural','📌 Mural de avisos'], ['diario','📷 Diário de bordo'], ['enquete','📣 Enquete'], ['quiz','🎮 Quiz'], ['roleta','🎡 Roleta'], ['duelo','⚔️ Duelo'], ['slides','🖥️ Slides']] },
   { id:'config', icon:'⚙️', label:'Configurações', abas:[['sessao','🔐 Sessão e prova'], ['freqconfig','⏰ Frequência'], ['ia','🤖 IA'], ['lixeira','🗑️ Lixeira']] },
 ];
 function navAcao(role){ return role==='aluno' ? 'aluno-sub-view' : role==='coordenador' ? 'coord-sub-view' : 'sub-view'; }
@@ -2843,6 +2845,7 @@ function renderProfessor(){
   if(p.profileEditorOpen) content = renderProfessorProfileEditor();
   else if(p.subview==='inicio') content = renderProfessorInicio();
   else if(p.subview==='banco') content = renderBanco();
+  else if(p.subview==='kitsaese') content = renderKitSaese();
   else if(p.subview==='turmas') content = renderTurmas();
   else if(p.subview==='chamada') content = renderChamada(null, true);
   else if(p.subview==='freqpainel') content = renderFreqPainel(p.freqPainel, professorTurmas());
@@ -8309,6 +8312,7 @@ function renderProfessorInicio(){
     ${renderGreetingHeader(p.session.displayName, 'Aqui está um resumo rápido do que precisa da sua atenção hoje.')}
     ${segAvisoProfHtml()}
     ${renderInicioAulasCard()}
+    ${kitEhLpMt() ? `<div class="card inicio-card" data-kit-hoje style="border-left:4px solid #00695C;"><div class="row" style="align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;"><div><strong>🎯 Kit SAESE</strong><div class="muted" style="font-size:.86rem;">Textos, charges, gráficos e questões que suas turmas viram nesta semana em Geografia, Sociologia e História, com o descritor de LP ou MT de cada um.</div></div><button class="btn btn-primary btn-sm" style="width:auto;" data-action="sub-view" data-sub="kitsaese">Abrir o kit</button></div></div>` : ''}
     ${renderDiarioCard()}
     ${renderUnidadeAtualCard()}
     ${renderFreqHojeCard()}
@@ -10734,6 +10738,7 @@ async function calcProfessorPainel(){
           if(!descritorStats[key]) descritorStats[key] = {sum:0,count:0};
           descritorStats[key].sum += pct; descritorStats[key].count++;
         }
+        (q.saese||[]).forEach(c => { const key = 'SAESE ' + c; if(!descritorStats[key]) descritorStats[key] = {sum:0,count:0}; descritorStats[key].sum += pct; descritorStats[key].count++; });
       });
     });
 
@@ -11706,6 +11711,7 @@ function renderCoordenador(){
   else if(c.subview==='liberacoes') content = renderLiberacoes();
   else if(c.subview==='sessao') content = renderCoordSessao();
   else if(c.subview==='notas') content = renderCoordNotas();
+  else if(c.subview==='saeseescola') content = renderSaeseEscola();
   else if(c.subview==='socio') content = renderCoordSocio();
   else if(c.subview==='monitoria') content = renderCoordMonitoria();
   else if(c.subview==='buscaativa') content = renderCoordBuscaAtiva();
@@ -11721,6 +11727,7 @@ function renderCoordenador(){
   else if(c.subview==='livros') content = renderLivrosDidaticos(true);
   else if(c.subview==='planolivro') content = renderPlanoLivro();
   else if(c.subview==='areabim') content = renderAreaBimestre();
+  else if(c.subview==='kitsaese') content = renderKitSaese();
   else if(c.subview==='mural') content = renderMuralAvisos(true);
   else if(c.subview==='enquete') content = renderEnqueteRelampago();
   else if(c.subview==='quiz') content = renderQuizEquipes();
@@ -16811,6 +16818,7 @@ function renderStudentDashboard(){
   else if(al.subview==='campanha') content = renderAlunoCampanhaBlock();
   else if(al.subview==='portfolio') content = renderAlunoPortfolioBlock();
   else if(al.subview==='conquistas') content = renderAlunoConquistasBlock();
+  else if(al.subview==='caderneta') content = renderAlunoCadernetaBlock();
   else content = renderAlunoInicioBlock();
   if(al.subview && !subAtivo('aluno', al.subview)) content = renderAlunoInicioBlock();
   content = navAbasHtml('aluno', ALUNO_SECOES, (al.subview && subAtivo('aluno', al.subview)) ? al.subview : 'inicio') + content;
@@ -21819,7 +21827,7 @@ async function carregarPlanoLivro(forcar){
   if(s.carregando || (s.carregado && !forcar)) return;
   s.carregando = true; render();
   s.index = await planoLerJson('plano-livro-index', []);
-  PLANO_IDX_CACHE = s.index;
+  PLANO_IDX_CACHE = s.index; await saeseCorrCarregar(true);
   if(!s.disc){ try{ s.disc = localStorage.getItem('plano-disc') || ''; }catch(e){} }
   await planoDonosGarantir(state.professor.turmas || []);
   await planoAtualizarEfetivo();
@@ -22082,6 +22090,7 @@ function planoDiscSeletorHtml(){
   const atual = planoDiscAtual();
   return `<div class="pl-turmas" data-pl-discs style="margin-bottom:8px;">${ds.map(d => `<button class="pl-turma ${d.k===atual?'ativa':''}" data-action="plano-disc" data-k="${esc(d.k)}">📘 ${esc(d.label)}</button>`).join('')}</div>`;
 }
+async function planoResolverImagens(qs){ for(const q of qs||[]){ if(!q._imagemPlano) continue; const img = await planoLerJson(`plano-livro-img:${q._imagemPlano}`, null); if(img) q.image = img; delete q._imagemPlano; } }
 function planoQuestoesParaAvaliacao(ex, mapa){
   const qs = ex.questoes || [];
   const nMc = qs.filter(q=>q.tipo==='mc').length;
@@ -22095,9 +22104,9 @@ function planoQuestoesParaAvaliacao(ex, mapa){
   return qs.map(q => {
     if(q.tipo==='mc'){
       const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
-      return { id: cryptoId(), type:'mc', text: q.texto, points: ptsMc, image:null, annulled:false, descritorSaeb:'', conteudo:'', options, correctOptionId: options[q.correta] ? options[q.correta].id : null, explicacao: q.explicacao||'' };
+      return { id: cryptoId(), type:'mc', text: q.texto, points: ptsMc, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo:'', options, correctOptionId: options[q.correta] ? options[q.correta].id : null, explicacao: saeseExplicacao(q), saese: saeseDeQuestaoPlano(q), ...(q.imagem ? { _imagemPlano: q.imagem } : {}) };
     }
-    return { id: cryptoId(), type:'dissertativa', text: q.texto, points: ptsDiss, image:null, annulled:false, descritorSaeb:'', conteudo:'', modelAnswer: q.modelo||'' };
+    return { id: cryptoId(), type:'dissertativa', text: q.texto, points: ptsDiss, image:null, annulled:false, descritorSaeb:'', conteudo:'', modelAnswer: q.modelo||'', saese: saeseDeQuestaoPlano(q) };
   }).concat(extra);
 }
 function planoMapaDoExercicio(turmaId, aula){ return (planoCfg(turmaId).mapaNoExercicio!==false && aula.slides && aula.slides.mapa) ? aula.slides.mapa : null; }
@@ -22145,6 +22154,7 @@ async function aplicarExercicioPlano(turmaId, n){
     professorName: sess ? sess.displayName : 'Coordenação',
     createdAt: Date.now(), updatedAt: null,
   };
+  await planoResolverImagens(assessment.questions);
   // Níveis: versão de apoio (3 alternativas) para os alunos escolhidos e desafio extra para quem fizer 80%+
   const apoioIds = planoApoioSel(turmaId).filter(id => ((turma && turma.students)||[]).some(st => st.id===id));
   const extras = [];
@@ -22157,7 +22167,7 @@ async function aplicarExercicioPlano(turmaId, n){
   }
   if(aula.exercicio.desafio){
     const q = aula.exercicio.desafio; const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
-    const qd = { id: cryptoId(), type:'mc', text: q.texto, points: 10, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo:'Desafio', options, correctOptionId: options[q.correta].id, explicacao: q.explicacao||'' };
+    const qd = { id: cryptoId(), type:'mc', text: q.texto, points: 10, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo:'Desafio', options, correctOptionId: options[q.correta].id, explicacao: saeseExplicacao(q), saese: saeseDeQuestaoPlano(q) };
     if(q.comando) qd.comando = q.comando;
     const codeD = genCode();
     assessment.desafioCode = codeD;
@@ -22607,7 +22617,7 @@ async function planoCriarProva(){
   plano.aulas.filter(a => a.bimestre===m.bimestre && a.exercicio).forEach(a => {
     const add = (q, inedita) => {
       const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
-      const nova = { id: cryptoId(), type:'mc', text: q.texto, points: 1, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo: `Aula ${a.n} — ${a.tituloCurto||a.tema}`, options, correctOptionId: options[q.correta].id, explicacao: q.explicacao||'', inedita: !!inedita };
+      const nova = { id: cryptoId(), type:'mc', text: q.texto, points: 1, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo: `Aula ${a.n} — ${a.tituloCurto||a.tema}`, options, correctOptionId: options[q.correta].id, explicacao: saeseExplicacao(q), saese: saeseDeQuestaoPlano(q), inedita: !!inedita };
       if(q.comando) nova.comando = q.comando;
       if(q.imagem) nova._imagemPlano = q.imagem;
       questoes.push(nova);
@@ -22889,7 +22899,7 @@ async function planoRecupCriar(){
     const x = planoQuestaoPorChave(plano, k); if(!x) return null;
     const q = x.q;
     const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
-    const nova = { id: cryptoId(), type:'mc', text: q.texto, points: 1, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo: `Aula ${x.aula.n} — ${x.aula.tituloCurto||x.aula.tema}`, options, correctOptionId: options[q.correta].id, explicacao: q.explicacao||'', inedita: true };
+    const nova = { id: cryptoId(), type:'mc', text: q.texto, points: 1, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo: `Aula ${x.aula.n} — ${x.aula.tituloCurto||x.aula.tema}`, options, correctOptionId: options[q.correta].id, explicacao: saeseExplicacao(q), saese: saeseDeQuestaoPlano(q), inedita: true };
     if(q.comando) nova.comando = q.comando;
     if(q.imagem){ if(!(q.imagem in imgCache)) imgCache[q.imagem] = await planoLerJson(`plano-livro-img:${q.imagem}`, null); if(imgCache[q.imagem]) nova.image = imgCache[q.imagem]; }
     return nova;
@@ -22927,9 +22937,12 @@ const HAB_ENEM_CH = {
   H1:'Interpretar fontes documentais sobre aspectos da cultura', H2:'Analisar a produção da memória pelas sociedades', H3:'Associar manifestações culturais do presente a seus processos históricos',
   H4:'Comparar pontos de vista sobre aspectos da cultura', H5:'Identificar a diversidade do patrimônio cultural', H6:'Interpretar representações gráficas e cartográficas',
   H7:'Identificar relações de poder entre as nações', H8:'Analisar a ação dos Estados nos fluxos populacionais', H9:'Comparar organizações políticas e socioeconômicas em diferentes escalas',
-  H10:'Reconhecer a dinâmica dos movimentos sociais', H16:'Identificar o papel das técnicas e tecnologias no trabalho e na vida social', H17:'Analisar o impacto das novas tecnologias na territorialização da produção',
+  H10:'Reconhecer a dinâmica dos movimentos sociais', H11:'Identificar registros de práticas de grupos sociais no tempo e no espaço', H12:'Analisar o papel da justiça como instituição',
+  H13:'Analisar movimentos sociais que mudaram disputas pelo poder', H14:'Comparar pontos de vista sobre instituições sociais, políticas e econômicas', H15:'Avaliar criticamente conflitos culturais, sociais, políticos, econômicos ou ambientais',
+  H16:'Identificar o papel das técnicas e tecnologias no trabalho e na vida social', H17:'Analisar o impacto das novas tecnologias na territorialização da produção',
   H18:'Analisar processos de produção e circulação de riquezas', H19:'Reconhecer transformações técnicas no uso dos espaços rural e urbano', H20:'Selecionar argumentos sobre as novas tecnologias e o trabalho',
-  H21:'Identificar o papel dos meios de comunicação', H26:'Identificar a ocupação dos meios físicos e as relações com a paisagem', H27:'Analisar criticamente as interações sociedade–natureza',
+  H21:'Identificar o papel dos meios de comunicação', H22:'Analisar lutas sociais e conquistas nas leis e políticas públicas', H23:'Analisar a importância dos valores éticos na política',
+  H24:'Relacionar cidadania e democracia', H25:'Identificar estratégias de inclusão social', H26:'Identificar a ocupação dos meios físicos e as relações com a paisagem', H27:'Analisar criticamente as interações sociedade–natureza',
   H28:'Relacionar tecnologias e impactos socioambientais', H29:'Reconhecer a função dos recursos naturais', H30:'Avaliar preservação e degradação da vida no planeta',
 };
 async function planoAnalisarHabilidades(turmaId){
@@ -22939,22 +22952,53 @@ async function planoAnalisarHabilidades(turmaId){
   const alunos = (turma && turma.students) || [];
   const porNome = {}; alunos.forEach(st => porNome[nomeChave(st.name)] = st);
   const todas = await Promise.all(((await window.storage.list('assessment:', true)).keys||[]).map(k => planoLerJson(k, null)));
-  const avs = todas.filter(a => a && assessmentTurmaIds(a).includes(turmaId) && (a.questions||[]).some(q => /^ENEM H\d+/.test(q.descritorSaeb||'')));
-  const turmaH = {}, alunoH = {};
+  // Plano da turma: habilidade de cada questão (pelo texto, para exercícios antigos sem descritor), aulas por habilidade e simulados
+  const prog = s.prog[turmaId] || { exercicios:{}, dadas:{} };
+  const plano = s.planos[s.turmaPlano[turmaId]];
+  const chaveTxt = t => String(t||'').replace(/\s+/g, ' ').trim().slice(0, 160).toLowerCase();
+  const habPorTexto = {}, saesePorTexto = {}, qPorTexto = {}, aulasPorH = {}, simCodes = new Set();
+  if(plano) plano.aulas.forEach(a => {
+    const ex = a.exercicio || {}; const ehSimAula = /^Simulado/i.test(ex.titulo||'');
+    ['questoes','questoesProva','questoesRecuperacao'].forEach(k => (ex[k]||[]).forEach(q => {
+      if(q.saese && q.saese.length) saesePorTexto[chaveTxt(q.texto)] = q.saese;
+      qPorTexto[chaveTxt(q.texto)] = q;
+      if(!q.habilidade) return; habPorTexto[chaveTxt(q.texto)] = q.habilidade;
+      if(!ehSimAula && (k==='questoes' || q.enem)) (aulasPorH[q.habilidade] = aulasPorH[q.habilidade] || new Set()).add(a.n);
+    }));
+    const le = a.slides && a.slides.leituraEnem; if(le && le.hab) (aulasPorH[le.hab] = aulasPorH[le.hab] || new Set()).add(a.n);
+    if(/^Simulado/i.test(ex.titulo||'')) planoCodigosDaAula(prog, a.n).forEach(c => simCodes.add(c));
+  });
+  const habDaQuestao = q => { const m = /^ENEM (H\d+)/.exec(q.descritorSaeb||''); return m ? m[1] : (habPorTexto[chaveTxt(q.text)] || null); };
+  await saeseCorrCarregar(true);
+  const saeseDaQuestao = q => saeseAplicar(saeseChave(q.text), (q.saese && q.saese.length) ? q.saese : (saesePorTexto[chaveTxt(q.text)] || []));
+  const avs = todas.filter(a => a && assessmentTurmaIds(a).includes(turmaId) && (a.questions||[]).some(q => habDaQuestao(q) || saeseDaQuestao(q).length));
+  const turmaH = {}, alunoH = {}, turmaC = {}, alunoC = {}, turmaS = {}, alunoS = {}; const distr = {};
+  const soma = (o, k, ok) => { const x = o[k] = o[k] || [0,0]; x[0]+=ok; x[1]++; };
   await Promise.all(avs.map(async av => {
     const resp = await planoLerJson(`responses:${av.code}`, []);
+    const ehSim = simCodes.has(av.code);
     resp.forEach(r => {
       const st = porNome[nomeChave(r.studentName)]; if(!st) return;
       av.questions.forEach(q => {
-        const m = /^ENEM (H\d+)/.exec(q.descritorSaeb||''); if(!m || q.type!=='mc' || q.annulled) return;
-        const h = m[1]; const ok = r.answers && r.answers[q.id]===q.correctOptionId ? 1 : 0;
-        const t = turmaH[h] = turmaH[h] || [0,0]; t[0]+=ok; t[1]++;
-        const a = (alunoH[st.id] = alunoH[st.id] || {}); const x = a[h] = a[h] || [0,0]; x[0]+=ok; x[1]++;
+        if(q.type!=='mc' || q.annulled) return;
+        const ok = r.answers && r.answers[q.id]===q.correctOptionId ? 1 : 0;
+        { const kq = chaveTxt(q.text); const e = distr[kq] = distr[kq] || { q, n:0, cont:(q.options||[]).map(() => 0), av: av.title || '' }; const iop = (q.options||[]).findIndex(o => o.id===(r.answers||{})[q.id]); e.n++; if(iop>=0) e.cont[iop]++; }
+        saeseDaQuestao(q).forEach(c => { soma(turmaS, c, ok); soma(alunoS[st.id] = alunoS[st.id] || {}, c, ok); });
+        const h = habDaQuestao(q); if(!h) return;
+        soma(turmaH, h, ok); soma(alunoH[st.id] = alunoH[st.id] || {}, h, ok);
+        if(ehSim){ const c = 'C' + (Math.floor((parseInt(h.slice(1)) - 1) / 5) + 1); soma(turmaC, c, ok); soma(alunoC[st.id] = alunoC[st.id] || {}, c, ok); }
       });
     });
   }));
+  // aula sugerida para retomar cada habilidade: a mais recente já dada que trabalha a habilidade (senão, a próxima do plano)
+  const sugestao = {};
+  Object.keys(aulasPorH).forEach(h => {
+    const ns = [...aulasPorH[h]].sort((a,b)=>a-b);
+    const dadas = ns.filter(n => prog.dadas && prog.dadas[n]).sort((a,b) => prog.dadas[b] - prog.dadas[a]);
+    const n = dadas[0] || ns[0]; const au = plano.aulas.find(a => a.n===n);
+    sugestao[h] = { n, titulo: au ? (au.tituloCurto || au.tema || au.titulo || '') : '', dada: !!dadas.length };
+  });
   // busca ativa: entregas dos exercícios do plano
-  const prog = s.prog[turmaId] || { exercicios:{} };
   const codes = Object.values(prog.exercicios||{});
   const entregas = {}; alunos.forEach(st => entregas[st.id] = { feitos:0, vencidosSemFazer:0 });
   await Promise.all(Object.keys(prog.exercicios||{}).map(async nAula => {
@@ -22965,7 +23009,14 @@ async function planoAnalisarHabilidades(turmaId){
     const venceu = av && av.endAt && new Date(av.endAt).getTime() < Date.now();
     alunos.forEach(st => { if(fizeram.has(nomeChave(st.name))) entregas[st.id].feitos++; else if(venceu) entregas[st.id].vencidosSemFazer++; });
   }));
-  s.hab[turmaId] = { turmaH, alunoH, avaliacoes: avs.length, entregas, totalEx: codes.length, em: Date.now() };
+  // análise das alternativas: a alternativa errada mais marcada em cada questão, com o motivo do erro (do plano)
+  const motivosDe = qp => { const m = {}; const t = (qp && qp.explicacao) || ''; const re = /(?:^|\s)([A-E])\) (.+?)(?=\s[A-E]\) |\s🎯|$)/g; let x; while((x = re.exec(t))) m['ABCDE'.indexOf(x[1])] = x[2].trim(); return m; };
+  const errosComuns = Object.values(distr).map(e => { const ci = (e.q.options||[]).findIndex(o => o.id===e.q.correctOptionId); let wi = -1, wn = 0;
+      e.cont.forEach((c, i) => { if(i!==ci && c > wn){ wn = c; wi = i; } });
+      const qp = qPorTexto[chaveTxt(e.q.text)]; const mot = motivosDe(qp);
+      return { texto: e.q.comando || e.q.text, n: e.n, acerto: ci>=0 ? Math.round(e.cont[ci]/e.n*100) : null, letra: 'ABCDE'[wi], alt: wi>=0 ? (e.q.options[wi]||{}).text : '', pct: e.n ? Math.round(wn/e.n*100) : 0, motivo: mot[wi] || '', expl: !mot[wi] && qp && qp.explicacao ? String(qp.explicacao).replace(/🎯.*$/,'').slice(0, 220) : '', saese: saeseDaQuestao(e.q), hab: habDaQuestao(e.q), av: e.av }; })
+    .filter(x => x.n >= 5 && x.pct >= 30 && x.letra).sort((a,b) => b.pct - a.pct).slice(0, 8);
+  s.hab[turmaId] = { errosComuns, turmaH, alunoH, turmaC, alunoC, turmaS, alunoS, sugestao, simulados: simCodes.size, avaliacoes: avs.length, entregas, totalEx: codes.length, em: Date.now() };
   s.habCarregando = null;
   render();
 }
@@ -22980,30 +23031,534 @@ function renderPlanoHabilidades(turmaId){
   else if(!d) corpo = `<button class="btn btn-primary btn-sm" data-action="plano-analisar-hab">🎯 Analisar habilidades e entregas</button>`;
   else {
     const hs = Object.keys(d.turmaH).sort((a,b)=>parseInt(a.slice(1))-parseInt(b.slice(1)));
+    const todasH = Array.from({length:30}, (_, i) => 'H' + (i+1));
     const alunos = ((turma && turma.students)||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
-    const tabelaHab = hs.length ? `
-      <div class="table-scroll"><table style="font-size:.84rem;">
-        <tr><th>Habilidade</th><th>O que avalia</th><th>Acerto da turma</th><th>Alunos abaixo de 50%</th></tr>
-        ${hs.map(h => { const p = pctTxt(d.turmaH[h]); const baixos = alunos.filter(st => { const x = d.alunoH[st.id] && d.alunoH[st.id][h]; const v = pctTxt(x); return v!=null && v<50; });
-          return `<tr><td><strong>${h}</strong></td><td>${esc(HAB_ENEM_CH[h]||'')}</td><td style="background:${cor(p)}; font-weight:700; text-align:center;">${p}%</td><td style="font-size:.8rem;">${baixos.length ? baixos.map(st=>esc(st.name.split(' ')[0])).join(', ') : '—'}</td></tr>`; }).join('')}
+    const sug = d.sugestao || {};
+    // as 3 mais fracas (com pelo menos 5 respostas), para retomar
+    const fracas = hs.filter(h => d.turmaH[h][1] >= 5 && pctTxt(d.turmaH[h]) < 70).sort((a,b) => pctTxt(d.turmaH[a]) - pctTxt(d.turmaH[b])).slice(0, 3);
+    const sugTxt = h => { const g = sug[h]; return g ? `aula ${g.n}${g.titulo ? ' — ' + esc(g.titulo) : ''}${g.dada ? '' : ' <span class="muted">(ainda não dada)</span>'}` : '<span class="muted">—</span>'; };
+    const blocoFracas = fracas.length ? `<div data-hab-fracas style="margin:4px 0 10px; padding:8px 10px; border-radius:8px; background:#fdecea; border:1px solid #f4c7c3;">
+        <strong style="color:#b3261e;">⚠️ Habilidades mais fracas da turma — retomar</strong>
+        <ol style="margin:4px 0 0 18px; font-size:.86rem;">${fracas.map(h => `<li data-hab-fraca="${h}"><b>${h}</b> (${pctTxt(d.turmaH[h])}%) — ${esc(HAB_ENEM_CH[h]||'')}<br><span style="font-size:.82rem;">👉 ${sug[h] ? `Sugestão: retomar a ${sugTxt(h)}, reaplicando a Leitura ENEM da aula.` : 'Nenhuma aula deste plano trabalha essa habilidade: use as questões de outra disciplina da área (veja as conexões) ou do banco de prova.'}</span></li>`).join('')}</ol></div>` : '';
+    const comp = ['Diversidade cultural e memória','Poder, território e nações','Instituições, movimentos e conflitos','Técnica, tecnologia e trabalho','Cidadania, democracia e inclusão','Sociedade e natureza'];
+    const tabelaHab = hs.length ? `${blocoFracas}
+      <div class="table-scroll"><table style="font-size:.84rem;" data-hab-tabela>
+        <tr><th>Habilidade</th><th>O que avalia</th><th>Acerto da turma</th><th>Alunos abaixo de 50%</th><th>Aula para retomar</th></tr>
+        ${todasH.map((h, i) => { const sem = !d.turmaH[h]; const p = pctTxt(d.turmaH[h]);
+          const baixos = sem ? [] : alunos.filter(st => { const v = pctTxt(d.alunoH[st.id] && d.alunoH[st.id][h]); return v!=null && v<50; });
+          const cab = i % 5 === 0 ? `<tr><td colspan="5" style="background:#eef3f8; font-weight:700; color:#1F4E79;">C${i/5+1} — ${comp[i/5]}</td></tr>` : '';
+          return cab + `<tr data-hab="${h}"><td${fracas.includes(h) ? ' style="border-left:5px solid #b3261e;" title="Entre as mais fracas da turma"' : ''}><strong>${h}</strong>${fracas.includes(h) ? ' ⚠️' : ''}</td><td>${esc(HAB_ENEM_CH[h]||'')}</td><td style="background:${cor(p)}; font-weight:700; text-align:center;">${sem ? '<span class="muted" style="font-weight:400;">sem dados</span>' : p + '% <span class="muted" style="font-weight:400; font-size:.75rem;">(' + d.turmaH[h][1] + ')</span>'}</td><td style="font-size:.8rem;">${baixos.length ? baixos.map(st=>esc(st.name.split(' ')[0])).join(', ') : '—'}</td><td style="font-size:.78rem;">${!sem && p < 70 ? sugTxt(h) : sem && sug[h] ? '<span class="muted">' + sugTxt(h) + '</span>' : ''}</td></tr>`; }).join('')}
       </table></div>
       <details style="margin-top:8px;"><summary style="cursor:pointer; font-weight:600;">Mapa por aluno</summary>
-        <div class="table-scroll"><table style="font-size:.78rem;">
-          <tr><th>Aluno</th>${hs.map(h=>`<th>${h}</th>`).join('')}</tr>
-          ${alunos.map(st => `<tr><td>${esc(st.name)}</td>${hs.map(h => { const v = pctTxt(d.alunoH[st.id] && d.alunoH[st.id][h]); return `<td style="background:${cor(v)}; text-align:center;">${v==null?'—':v+'%'}</td>`; }).join('')}</tr>`).join('')}
+        <div class="table-scroll"><table style="font-size:.78rem;" data-hab-alunos>
+          <tr><th>Aluno</th><th>Mais fracas</th>${hs.map(h=>`<th>${h}</th>`).join('')}</tr>
+          ${alunos.map(st => { const ah = d.alunoH[st.id] || {};
+            const fr = Object.keys(ah).filter(h => ah[h][1] >= 2 && pctTxt(ah[h]) < 50).sort((a,b) => pctTxt(ah[a]) - pctTxt(ah[b])).slice(0, 3);
+            return `<tr><td>${esc(st.name)}</td><td style="font-size:.74rem; color:#b3261e;">${fr.join(', ') || '—'}</td>${hs.map(h => { const v = pctTxt(ah[h]); return `<td style="background:${cor(v)}; text-align:center;">${v==null?'—':v+'%'}</td>`; }).join('')}</tr>`; }).join('')}
         </table></div>
-      </details>` : '<p class="muted">Ainda não há provas com habilidades do ENEM respondidas por esta turma. Elas aparecem quando a prova é montada com questões inéditas.</p>';
+      </details>` : '<p class="muted">Ainda não há questões com habilidades do ENEM respondidas por esta turma. Elas aparecem com os exercícios do plano, os simulados e as provas montadas com questões inéditas.</p>';
+    const sk = Object.keys(d.turmaS||{}).sort((a,b) => a.localeCompare(b));
+    const saeseFracos = sk.filter(c => d.turmaS[c][1] >= 5 && pctTxt(d.turmaS[c]) < 60).sort((a,b) => pctTxt(d.turmaS[a]) - pctTxt(d.turmaS[b])).slice(0, 3);
+    const tabelaSaese = sk.length ? `
+      <h4 style="margin:14px 0 6px;">📘 Descritores do SAESE (Língua Portuguesa e Matemática)</h4>
+      <p class="muted" style="font-size:.8rem; margin:0 0 6px;">Leitura e matemática treinadas nas aulas de Ciências Humanas: cada questão do plano indica o descritor do SAESE (3ª série do Ensino Médio) que ela trabalha.</p>
+      ${saeseFracos.length ? `<div data-saese-fracos style="margin:4px 0 8px; padding:6px 10px; border-radius:8px; background:var(--tint-teal); border:1px solid #80cbc4; font-size:.85rem;"><b style="color:var(--teal);">Para reforçar:</b> ${saeseFracos.map(c => `<b>${c}</b> (${pctTxt(d.turmaS[c])}%) — ${esc(SAESE_CAT[c].a)}`).join(' · ')}</div>` : ''}
+      <div class="table-scroll"><table style="font-size:.82rem;" data-saese-tabela>
+        <tr><th>Descritor</th><th>Descrição (matriz)</th><th>Acerto da turma</th><th>Alunos abaixo de 50%</th></tr>
+        ${sk.map(c => { const p = pctTxt(d.turmaS[c]); const baixos = alunos.filter(st => { const v = pctTxt(d.alunoS[st.id] && d.alunoS[st.id][c]); return v!=null && v<50; });
+          return `<tr data-saese="${c}"><td style="white-space:nowrap;"><strong>${c}</strong></td><td>${esc((SAESE_CAT[c]||{}).o||'')}</td><td style="background:${cor(p)}; font-weight:700; text-align:center;">${p}% <span class="muted" style="font-weight:400; font-size:.75rem;">(${d.turmaS[c][1]})</span></td><td style="font-size:.8rem;">${baixos.length ? baixos.map(st=>esc(st.name.split(' ')[0])).join(', ') : '—'}</td></tr>`; }).join('')}
+      </table></div>
+      ${(() => { const grupos = sk.map(c => ({ c, al: alunos.filter(st => { const v = pctTxt(d.alunoS[st.id] && d.alunoS[st.id][c]); return v!=null && v<50; }) })).filter(g => g.al.length).sort((a,b) => b.al.length - a.al.length).slice(0, 6);
+        return grupos.length ? `<h4 style="margin:12px 0 4px;">👥 Grupos de reforço por descritor</h4><p class="muted" style="font-size:.8rem;margin:0 0 4px;">Alunos abaixo de 50% em cada descritor. A retomada tem até 5 questões, só esses alunos veem e não vale nota.</p>
+          <div data-saese-grupos style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;">${grupos.map(g => `<div style="border:1px solid #80cbc4;border-radius:8px;padding:6px 8px;background:var(--tint-teal);font-size:.84rem;" data-saese-grupo="${g.c}"><b style="color:#00695C;">${g.c}</b> · ${esc(SAESE_CAT[g.c].a)}<div style="margin:3px 0;">${g.al.map(st => esc(st.name.split(' ')[0])).join(', ')}</div><button class="btn btn-ghost btn-sm" style="width:auto;padding:2px 8px;" data-action="saese-retomada" data-d="${g.c}">↻ Criar retomada (${g.al.length})</button></div>`).join('')}</div>` : ''; })()}` : '';
+    const errosHtml = (d.errosComuns||[]).length ? `<h4 style="margin:14px 0 6px;">🔎 Erros mais comuns da turma</h4><p class="muted" style="font-size:.8rem;margin:0 0 6px;">Questões em que muitos alunos marcaram a mesma alternativa errada. O motivo vem da correção comentada do plano.</p>
+      <div data-erros-comuns>${d.errosComuns.map(x => `<div style="border:1px solid var(--paper-line);border-left:4px solid #b3261e;border-radius:8px;padding:6px 10px;margin:6px 0;font-size:.86rem;background:var(--surface);">
+        <div>${(x.saese||[]).map(c => `<span class="kit-cod ${c.startsWith('MT')?'mt':'lp'}">${c}</span>`).join(' ')} ${x.hab ? `<span style="font-size:.72rem;background:#e6f0fa;color:#1F4E79;border-radius:5px;padding:0 4px;">${x.hab}</span>` : ''} <span class="muted">${esc(x.av)}</span></div>
+        <div style="margin:3px 0;"><b>${esc(String(x.texto).slice(0, 180))}</b></div>
+        <div><span style="color:#b3261e;font-weight:700;">${x.pct}% marcaram ${x.letra})</span> ${esc(x.alt||'')} <span class="muted">· acerto ${x.acerto}% · ${x.n} respostas</span></div>
+        ${x.motivo ? `<div style="margin-top:2px;">💡 <b>Por que está errada:</b> ${esc(x.motivo)}</div>` : (x.expl ? `<div style="margin-top:2px;">💡 <b>Explicação da questão:</b> ${esc(x.expl)}</div>` : '')}</div>`).join('')}</div>` : '';
+    const acoesSaese = `<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px;" data-saese-acoes><button class="btn btn-primary btn-sm" style="width:auto;" data-action="saese-simulado">📝 Montar simulado SAESE (10 descritores)</button><button class="btn btn-ghost btn-sm" style="width:auto;" data-action="saese-caderneta">🖨️ Imprimir cadernetas da turma</button><button class="btn btn-ghost btn-sm" style="width:auto;" data-action="saese-devolutiva">🖨️ Devolutivas do bimestre (aluno e família)</button></div>` + renderSaeseMetas(turmaId, d);
+    const cs = ['C1','C2','C3','C4','C5','C6'];
+    const tabelaSim = d.turmaC && Object.keys(d.turmaC).length ? `
+      <h4 style="margin:14px 0 6px;">📝 Simulados por competência da área</h4>
+      <div class="table-scroll"><table style="font-size:.8rem;" data-hab-simulados>
+        <tr><th>Aluno</th>${cs.map((c, i) => `<th title="${esc(comp[i])}">${c}</th>`).join('')}</tr>
+        <tr style="font-weight:700;"><td>Turma</td>${cs.map(c => { const v = pctTxt(d.turmaC[c]); return `<td style="background:${cor(v)}; text-align:center;">${v==null?'—':v+'%'}</td>`; }).join('')}</tr>
+        ${alunos.filter(st => d.alunoC[st.id]).map(st => `<tr><td>${esc(st.name)}</td>${cs.map(c => { const v = pctTxt(d.alunoC[st.id][c]); return `<td style="background:${cor(v)}; text-align:center;">${v==null?'—':v+'%'}</td>`; }).join('')}</tr>`).join('')}
+      </table></div>
+      <p class="muted" style="font-size:.78rem;">${cs.map((c, i) => `${c}: ${comp[i]}`).join(' · ')}</p>` : '';
     const sem = alunos.map(st => ({ st, e: d.entregas[st.id] || { feitos:0, vencidosSemFazer:0 } }))
       .filter(x => d.totalEx && (x.e.vencidosSemFazer >= 2 || x.e.feitos/d.totalEx < 0.5))
       .sort((a,b) => b.e.vencidosSemFazer - a.e.vencidosSemFazer || a.e.feitos - b.e.feitos);
     corpo = `
-      <h4 style="margin:6px 0;">🎯 Habilidades do ENEM</h4>${tabelaHab}
+      <h4 style="margin:6px 0;">🎯 Habilidades do ENEM (H1–H30)</h4>${tabelaHab}${tabelaSim}${tabelaSaese}${errosHtml}${acoesSaese}
       <h4 style="margin:14px 0 6px;">🚨 Busca ativa: quem não está entregando os exercícios</h4>
       ${!d.totalEx ? '<p class="muted">Nenhum exercício aplicado ainda.</p>' : sem.length ? `<ul style="margin:0 0 0 18px; font-size:.86rem;">${sem.map(x => `<li data-sem-entregar="${esc(x.st.id)}"><strong>${esc(x.st.name)}</strong> — fez ${x.e.feitos} de ${d.totalEx}${x.e.vencidosSemFazer?` · <span style="color:#b3261e;">${x.e.vencidosSemFazer} com prazo vencido sem fazer</span>`:''}</li>`).join('')}</ul>
         <p class="muted" style="font-size:.8rem;">Sugestão: conversar com o aluno e avisar a coordenação — quem para de entregar costuma aparecer depois no relatório de risco de reprovação.</p>` : '<p style="color:#1d6b31;">✅ Todos estão entregando pelo menos metade dos exercícios.</p>'}
       <div class="row" style="gap:8px; align-items:center; margin-top:8px;"><button class="btn btn-ghost btn-sm" data-action="plano-analisar-hab">↻ Atualizar</button><span class="muted" style="font-size:.8rem;">${d.avaliacoes} avaliação(ões) com habilidades · ${d.totalEx} exercício(s)</span></div>`;
   }
   return `<div class="card" data-plano-hab><h3 style="margin-top:0;">📈 Habilidades e entregas da turma</h3>${corpo}</div>`;
+}
+
+// ---- SAESE: simulado da área, retomada por descritor (reagrupamento) e caderneta ----
+// Banco de questões do plano da turma com descritor SAESE (exercícios e banco de prova)
+function saeseBanco(turmaId){
+  const s = planoState(); const plano = s.planos[s.turmaPlano[turmaId]]; const prog = s.prog[turmaId] || { dadas:{} };
+  const out = []; if(!plano) return out;
+  plano.aulas.forEach(a => { const ex = a.exercicio || {};
+    ['questoes','questoesProva'].forEach(k => (ex[k]||[]).forEach(q => { const cs = saeseDeQuestaoPlano(q); if(q.tipo==='mc' && cs.length) out.push({ q: cs===q.saese ? q : Object.assign({}, q, { saese: cs }), aula: a, dada: !!(prog.dadas && prog.dadas[a.n]) }); })); });
+  return out;
+}
+async function saeseMontarQuestao(x, imgCache){
+  const q = x.q; const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
+  const nova = { id: cryptoId(), type:'mc', text: q.texto, points: 1, image:null, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo: `Aula ${x.aula.n} — ${x.aula.tituloCurto||x.aula.tema}`, options, correctOptionId: options[q.correta].id, explicacao: saeseExplicacao(q), saese: saeseDeQuestaoPlano(q), inedita: !!q.inedita };
+  if(q.comando) nova.comando = q.comando;
+  if(q.imagem){ if(!(q.imagem in imgCache)) imgCache[q.imagem] = await planoLerJson(`plano-livro-img:${q.imagem}`, null); if(imgCache[q.imagem]) nova.image = imgCache[q.imagem]; }
+  return nova;
+}
+// escolhe 1 questão por descritor: prioriza os descritores mais fracos da turma e as questões mais elaboradas (Desafio SAESE, ENEM)
+function saeseEscolher(banco, descs, usadas){
+  const peso = x => (x.q.saeseQ ? 3 : 0) + (x.q.enem || x.q.area ? 2 : 0) + (x.dada ? 4 : 0) + Math.min(2, (x.q.texto||'').length / 200);
+  const out = [];
+  descs.forEach(d => { const c = banco.filter(x => x.q.saese.includes(d) && !usadas.has(x.q)).sort((a,b) => peso(b) - peso(a) || (b.q.saese[0]===d) - (a.q.saese[0]===d));
+    if(c.length){ out.push(c[0]); usadas.add(c[0].q); } });
+  return out;
+}
+async function planoSimuladoSaese(turmaId){
+  const s = planoState(); const p = state.professor;
+  if(state.view==='coordenador'){ alert('Para montar o simulado, entre no painel do professor.'); return; }
+  const plano = s.planos[s.turmaPlano[turmaId]]; if(!plano){ alert('Escolha um plano para a turma.'); return; }
+  const bancoTodo = saeseBanco(turmaId); let banco = bancoTodo; const dadas = banco.filter(x => x.dada); if(dadas.length >= 25) banco = dadas;
+  const d = s.hab[turmaId]; const pct = c => d && d.turmaS && d.turmaS[c] && d.turmaS[c][1] ? d.turmaS[c][0] / d.turmaS[c][1] : null;
+  const freq = {}; banco.forEach(x => x.q.saese.forEach(c => freq[c] = (freq[c]||0) + 1));
+  const descs = Object.keys(freq).sort((a,b) => { const pa = pct(a), pb = pct(b);
+    if(pa!=null || pb!=null) return (pa==null ? 2 : pa) - (pb==null ? 2 : pb);   // mais fracos primeiro; sem dados depois
+    return freq[a] - freq[b]; });                                               // depois, os menos treinados
+  const usadas = new Set(); let esc10 = saeseEscolher(banco, descs, usadas);
+  if(esc10.length < 10 && banco !== bancoTodo){   // completa com aulas ainda não dadas, em descritores que faltaram
+    const tem = new Set(esc10.flatMap(x => x.q.saese)); const freq2 = {}; bancoTodo.forEach(x => x.q.saese.forEach(c => freq2[c] = (freq2[c]||0) + 1));
+    esc10 = esc10.concat(saeseEscolher(bancoTodo, Object.keys(freq2).filter(c => !tem.has(c)).sort((a,b) => freq2[a] - freq2[b]), usadas)); }
+  esc10 = esc10.slice(0, 10);
+  if(esc10.length < 5){ alert('Ainda há poucas questões com descritor SAESE nas aulas desta turma.'); return; }
+  const imgCache = {}; const qs = []; for(const x of esc10) qs.push(await saeseMontarQuestao(x, imgCache));
+  planoPontosIguais(qs, 10);
+  const disc = planoDisciplinaDoProfessor(plano.disciplina||'');
+  const turma = (p.turmas||[]).find(t => t.id===turmaId);
+  const na = freshAssessment();
+  na.instrumento = 'avaliacao'; na.title = `Simulado SAESE — ${plano.disciplina||'Humanas'} — ${turma ? turma.name : ''}`;
+  na.unidade = UNIDADES[Math.max(0, Math.min(3, (esc10[0].aula.bimestre||1)-1))];
+  na.disciplinaId = disc ? disc.id : ''; na.turmaIds = [turmaId]; na.questions = qs; na.saeseSimulado = true;
+  const papel = confirm('Vai aplicar este simulado em PAPEL, como no SAESE?\n\nOK = papel (cartão-resposta com leitura pelo celular)\nCancelar = no app (tablets)');
+  if(papel){ na.title = na.title.replace('Simulado SAESE', 'Simulado SAESE (papel)'); na.securityEnabled = false; na.exigeLiberacao = false; na.minMinutesPerQuestion = null; na.saesePapel = true; }
+  p.newAssessment = na; p.editingCode = null; p.editingResponseCount = 0; p.pickerOpen = false; p.pickerSelected = [];
+  p.subview = 'avaliacoes'; p.mode = 'new'; render(); window.scrollTo(0,0);
+  if(papel) alert(`Simulado SAESE em papel montado com ${qs.length} questões. Depois de salvar:\n1) Em “Minhas avaliações”, toque em “Imprimir / PDF” para o caderno de questões;\n2) Toque em “Gabaritos por aluno” para imprimir os cartões-resposta com QR code;\n3) Depois da prova, use “Ler gabaritos” para corrigir pelo celular. O resultado entra no painel SAESE da turma.\nSugestão: 2 minutos por questão, como na avaliação oficial.`); else
+  alert(`Simulado SAESE montado: ${qs.length} questões, cada uma com um descritor diferente (${esc10.map(x => x.q.saese.find(c => descs.includes(c))).filter((v,i,a)=>a.indexOf(v)===i).length} descritores)${d ? ', começando pelos mais fracos da turma' : ''}. Confira datas e liberação e clique em salvar.`);
+}
+// Reagrupamento: retomada curta (até 5 questões do descritor) só para os alunos abaixo de 50%
+async function planoRetomadaSaese(turmaId, desc){
+  const s = planoState(); const d = s.hab[turmaId]; const p = state.professor; const sess = p.session;
+  const plano = s.planos[s.turmaPlano[turmaId]]; const turma = (p.turmas||[]).find(t => t.id===turmaId);
+  if(!d || !plano || !turma) return;
+  const alunos = (turma.students||[]).filter(st => { const x = d.alunoS && d.alunoS[st.id] && d.alunoS[st.id][desc]; return x && x[1] && x[0]/x[1] < 0.5; });
+  if(!alunos.length){ alert('Nenhum aluno abaixo de 50% neste descritor.'); return; }
+  const banco = saeseBanco(turmaId).filter(x => x.q.saese.includes(desc));
+  const vistas = new Set(); const sel = banco.filter(x => { const k = x.q.texto; if(vistas.has(k)) return false; vistas.add(k); return true; })
+    .sort((a,b) => (b.q.saeseQ?2:0) + (b.q.saese[0]===desc?1:0) - (a.q.saeseQ?2:0) - (a.q.saese[0]===desc?1:0)).slice(0, 5);
+  if(!sel.length){ alert('Não há questões deste descritor no plano.'); return; }
+  if(!confirm(`Criar uma retomada de ${sel.length} questão(ões) de ${desc} (${SAESE_CAT[desc].a}) só para ${alunos.length} aluno(s): ${alunos.map(a => a.name.split(' ')[0]).join(', ')}?`)) return;
+  const imgCache = {}; const qs = []; for(const x of sel) qs.push(await saeseMontarQuestao(x, imgCache));
+  const disc = planoDisciplinaDoProfessor(plano.disciplina||'');
+  const code = genCode();
+  const assessment = { code, title: `Retomada SAESE ${desc} — ${SAESE_CAT[desc].a}`, instrumento:'exercicios', unidade: UNIDADES[Math.max(0, Math.min(3, (sel[0].aula.bimestre||1)-1))],
+    disciplinaId: disc ? disc.id : null, disciplinaName: disc ? disc.name : (plano.disciplina||null), turmaIds:[turmaId], questions: planoPontosIguais(qs, 10),
+    startAt: null, endAt: planoPrazoParaEndAt('7'), agendaTurmas:{}, resultRelease:{ mode:'imediato', releaseAt:'' }, securityEnabled:false, minMinutesPerQuestion:null, exigeLiberacao:false, valeNota:false,
+    somenteAlunos: alunos.map(a => a.id), somenteAlunosNomes: alunos.map(a => a.name), origemPlano:{ planoId: plano.id, turmaId, saeseRetomada: desc },
+    professorId: sess ? sess.id : null, professorName: sess ? sess.displayName : 'Coordenação', createdAt: Date.now(), updatedAt:null };
+  await window.storage.set(`assessment:${code}`, JSON.stringify(assessment), true);
+  (p.assessments = p.assessments||[]).unshift(assessment);
+  s.msg = `✅ Retomada de ${desc} criada para ${alunos.length} aluno(s). Só eles veem, em “Provas” (prazo de 7 dias, não vale nota).`;
+  render();
+}
+// Caderneta da turma para imprimir: uma folha por aluno, com os descritores em linguagem simples
+function saeseCadernetaImprimir(turmaId){
+  const s = planoState(); const d = s.hab[turmaId] || {}; const turma = (state.professor.turmas||[]).find(t => t.id===turmaId);
+  const alunos = ((turma && turma.students)||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+  const cods = Object.keys(SAESE_CAT);
+  const folha = st => { const x = (d.alunoS||{})[st.id] || {};
+    return `<section class="folha"><h1>🎯 Minha caderneta SAESE</h1><div class="sub">${esc(st.name)} · Turma ${esc(turma ? turma.name : '')} · CEETIP</div>
+    <p class="inst">Marque com ✔ como você está em cada descritor ao fim de cada bimestre. A coluna “No app” mostra seu acerto nas questões já respondidas.</p>
+    <table><tr><th>Descritor</th><th>Eu consigo...</th><th>No app</th><th>1º bim</th><th>2º bim</th><th>3º bim</th><th>4º bim</th></tr>
+    ${cods.map(c => { const v = x[c] && x[c][1] ? Math.round(x[c][0]/x[c][1]*100) + '%' : '—';
+      return `<tr><td class="c ${c.startsWith('MT')?'mt':'lp'}">${c}</td><td>${esc(SAESE_CAT[c].a)}</td><td class="n">${v}</td>${[1,2,3,4].map(()=>'<td class="bx">○ ainda não<br>○ às vezes<br>○ já consigo</td>').join('')}</tr>`; }).join('')}
+    </table><p class="rod">LP = Língua Portuguesa · MT = Matemática · Matriz da Avaliação Somativa de Sergipe (SAESE), 3ª série do Ensino Médio.</p></section>`; };
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Caderneta SAESE — ${esc(turma?turma.name:'')}</title><style>
+    body{font-family:Calibri,Arial,sans-serif;color:#222;margin:0} .folha{padding:12mm 12mm 8mm;page-break-after:always} h1{color:#6B1F2E;margin:0;font-size:20pt} .sub{color:#00695C;font-weight:700;margin:2px 0 6px}
+    .inst{font-size:9.5pt;margin:4px 0 6px} table{border-collapse:collapse;width:100%;font-size:8.6pt} th{background:#F3E7C0;color:#6B1F2E} td,th{border:1px solid #bbb;padding:2px 4px;vertical-align:middle}
+    .c{font-weight:700;color:#fff;white-space:nowrap;text-align:center} .lp{background:#00695C} .mt{background:#1F4E79} .n{text-align:center;font-weight:700} .bx{font-size:7pt;line-height:1.15;white-space:nowrap} .rod{font-size:8pt;color:#666;margin-top:4px}
+    @page{size:A4;margin:0}</style></head><body>${alunos.map(folha).join('')}<script>setTimeout(()=>print(),400)<\/script></body></html>`;
+  const w = window.open('', '_blank'); if(!w){ alert('Permita a abertura de janelas para imprimir.'); return; } w.document.write(html); w.document.close();
+}
+// Aluno: Minha caderneta SAESE (desempenho por descritor + autoavaliação)
+async function alunoCadernetaCarregar(){
+  const al = state.aluno; al.caderneta = { carregando:true }; render();
+  const porD = {};
+  (al.dashboardRealizadas||[]).forEach(r => { const a = r.assessment; if(typeof resultReleased==='function' && !resultReleased(a)) return;
+    (a.questions||[]).forEach(q => { if(q.type!=='mc' || q.annulled || !(q.saese||[]).length) return; const ok = r.response && r.response.answers && r.response.answers[q.id]===q.correctOptionId ? 1 : 0;
+      q.saese.forEach(c => { const x = porD[c] = porD[c] || [0,0]; x[0]+=ok; x[1]++; }); }); });
+  const auto = await planoLerJson(`saese-auto:${al.matriculaTurmaId||''}:${al.matriculaStudentId||nomeChave(al.name)}`, {});
+  const metas = await planoLerJson(`saese-metas:${al.matriculaTurmaId||''}`, {});
+  al.caderneta = { porD, auto, metas: (metas||{})['b' + saeseBimAtual()] || null };
+  render();
+}
+function renderAlunoCadernetaBlock(){
+  const al = state.aluno; const c = al.caderneta;
+  if(!c){ setTimeout(alunoCadernetaCarregar, 0); return '<div class="card"><p>⏳ Carregando sua caderneta…</p></div>'; }
+  if(c.carregando) return '<div class="card"><p>⏳ Carregando sua caderneta…</p></div>';
+  const cor = p => p==null ? '#eee' : p < 50 ? '#f4c7c3' : p < 70 ? '#fde3c2' : '#cfead6';
+  const op = [['0','Ainda não'],['1','Às vezes'],['2','Já consigo']];
+  const linha = k => { const x = c.porD[k]; const p = x && x[1] ? Math.round(x[0]/x[1]*100) : null; const v = String((c.auto||{})[k] ?? '');
+    return `<tr data-cad="${k}"><td style="white-space:nowrap;"><span class="av-saesecod" style="background:${k.startsWith('MT')?'#1F4E79':'#00695C'};font-size:.75rem;">${k}</span></td><td>${esc(SAESE_CAT[k].a)}</td>
+      <td style="text-align:center;background:${cor(p)};font-weight:700;">${p==null?'—':p+'%'}${x?`<div class="muted" style="font-weight:400;font-size:.7rem;">${x[1]} questão(ões)</div>`:''}</td>
+      <td style="white-space:nowrap;">${op.map(([val,rot]) => `<button class="btn btn-sm ${v===val?'btn-primary':'btn-ghost'}" style="width:auto;padding:2px 6px;margin:1px;" data-action="saese-auto" data-d="${k}" data-v="${val}">${rot}</button>`).join('')}</td></tr>`; };
+  const fortes = Object.keys(c.porD).filter(k => c.porD[k][1] >= 3 && c.porD[k][0]/c.porD[k][1] >= 0.7);
+  const fracos = Object.keys(c.porD).filter(k => c.porD[k][1] >= 3 && c.porD[k][0]/c.porD[k][1] < 0.5);
+  return `<div class="card" data-caderneta><h3 style="margin-top:0;">🎯 Minha caderneta SAESE</h3>
+    <p class="muted" style="font-size:.88rem;">Os descritores da Avaliação Somativa de Sergipe (SAESE) que você treina nas aulas. A coluna “No app” mostra seu acerto nas questões já corrigidas; na última coluna, diga como você se sente em cada um.</p>
+    ${c.metas && (c.metas.codes||[]).length ? `<div data-cad-metas style="border:1px solid #C9A227;border-radius:8px;padding:6px 10px;margin:6px 0;font-size:.88rem;"><b>🎯 Metas da sua turma neste bimestre</b> (meta: ${c.metas.meta||70}% de acerto)${c.metas.codes.map(k => { const x = c.porD[k]; const p = x && x[1] ? Math.round(x[0]/x[1]*100) : null; return `<div style="margin-top:3px;"><span class="av-saesecod" style="background:${k.startsWith('MT')?'#1F4E79':'#00695C'};font-size:.72rem;">${k}</span> ${esc(SAESE_CAT[k].a)} — você: <b>${p==null?'sem dados':p+'%'}</b> ${p!=null && p >= (c.metas.meta||70) ? '✅' : ''}</div>`; }).join('')}</div>` : ''}
+    ${fortes.length ? `<p style="color:#1d6b31;font-size:.9rem;">💪 Você vai bem em: <b>${fortes.join(', ')}</b></p>` : ''}${fracos.length ? `<div style="color:#b3261e;font-size:.9rem;">📌 Vale treinar mais:${fracos.map(k => `<div style="margin:3px 0 0 8px;"><b>${k}</b> ${esc(SAESE_CAT[k].a)}<div style="color:var(--ink);font-size:.84rem;">🏠 Para treinar em casa: ${esc(SAESE_CASA[k]||'')}</div></div>`).join('')}</div>` : ''}
+    <h4 style="margin:10px 0 4px;color:#00695C;">Língua Portuguesa — leitura</h4>
+    <div class="table-scroll"><table style="font-size:.84rem;"><tr><th>Descritor</th><th>Eu consigo...</th><th>No app</th><th>Como me sinto</th></tr>${Object.keys(SAESE_CAT).filter(k=>k.startsWith('LP')).map(linha).join('')}</table></div>
+    <h4 style="margin:10px 0 4px;color:#1F4E79;">Matemática — dados, gráficos e proporções</h4>
+    <div class="table-scroll"><table style="font-size:.84rem;"><tr><th>Descritor</th><th>Eu consigo...</th><th>No app</th><th>Como me sinto</th></tr>${Object.keys(SAESE_CAT).filter(k=>k.startsWith('MT')).map(linha).join('')}</table></div></div>`;
+}
+async function alunoSaeseAuto(k, v){
+  const al = state.aluno; const c = al.caderneta; if(!c) return;
+  c.auto = Object.assign({}, c.auto, { [k]: Number(v) });
+  await window.storage.set(`saese-auto:${al.matriculaTurmaId||''}:${al.matriculaStudentId||nomeChave(al.name)}`, JSON.stringify(c.auto), true);
+  render();
+}
+
+/* ======================= KIT SAESE (LP e MT a partir das aulas de Humanas) ======================= */
+// Reúne, dos planos de Geografia, Sociologia e História (Versão B), os recursos de cada aula com descritor SAESE
+// (imagens e gráficos, Questão ENEM, Desafio SAESE, número em destaque, debate) e mostra o que as turmas do
+// professor viram nesta semana. Questões podem ser selecionadas para montar uma atividade na disciplina do professor.
+const KIT_SUG = {
+ 'LP D01':'Localizar no texto a informação que responde à pergunta e sublinhá-la.', 'LP D02':'Circular pronomes e expressões que retomam nomes e ligar com setas ao termo retomado.',
+ 'LP D03':'Inferir o sentido do conceito pelo contexto antes de consultar o glossário.', 'LP D04':'Perguntar “o que o texto sugere sem dizer?” e pedir a pista que sustenta a inferência.',
+ 'LP D05':'Leitura multimodal: descrever a imagem, ler a legenda e explicar o que uma acrescenta à outra.', 'LP D06':'Formular em uma frase o tema do texto e comparar com o título.',
+ 'LP D07':'Identificar a tese do trecho e reescrevê-la com as próprias palavras.', 'LP D08':'Montar o esquema tese → argumentos → exemplo com o trecho ou o repertório da aula.',
+ 'LP D09':'Separar informação principal e detalhes: o que pode sair sem prejudicar o sentido?', 'LP D10':'Identificar o conflito, os personagens e o desfecho da narrativa.',
+ 'LP D11':'Montar a cadeia causa → consequência com conectivos (porque, por isso, então).', 'LP D12':'Discutir gênero e finalidade: quem escreveu, para quem, para quê.',
+ 'LP D13':'Marcar vocativos e pronomes que mostram quem fala e para quem.', 'LP D14':'Classificar frases do material em fato (verificável) ou opinião (julgamento).',
+ 'LP D15':'Trocar os conectivos por equivalentes e explicar a relação de sentido.', 'LP D16':'Explicar o humor ou a ironia: o que é dito e o que se quer dizer.',
+ 'LP D17':'Ler com e sem a pontuação (aspas, interrogação) e comparar o efeito.', 'LP D18':'Trocar a palavra-chave por um sinônimo e discutir a mudança de sentido.',
+ 'LP D19':'Analisar caixa alta, repetições e grafias e o efeito que produzem.', 'LP D20':'Comparar duas fontes sobre o mesmo tema: autor, público, intenção.',
+ 'LP D21':'Organizar um quadro com as posições em disputa e os argumentos de cada lado.',
+ 'MT D06':'Localizar pontos por coordenadas, associando latitude e longitude a eixos.', 'MT D14':'Representar datas e tempos numa reta numérica (a.C. como negativos).',
+ 'MT D15':'Calcular razões e proporções com os dados: escala, densidade, por habitante.', 'MT D16':'Calcular porcentagens e variações percentuais com os números do material.',
+ 'MT D20':'Descrever trechos de crescimento, queda e estabilidade no gráfico.', 'MT D21':'Esboçar o gráfico que representa a situação descrita no texto.',
+ 'MT D34':'Formular e resolver problemas com os dados da tabela ou do gráfico.', 'MT D35':'Transformar a tabela em gráfico (ou o gráfico em tabela) e conferir.',
+};
+const KIT_DISCS = ['Geografia','Sociologia','História'];
+function kitState(){ if(!state.kitSaese) state.kitSaese = { carregado:false, carregando:false, rows:[], semana:null, f:{ a:'', desc:'', s:'', d:'', b:'', t:'', q:'', aula:'' }, lim:30, sel:{} }; return state.kitSaese; }
+function kitEhLpMt(){ const p = state.professor; return (p.disciplinas||[]).some(d => /portugu|matem/i.test(d.name||'')); }
+async function kitCarregar(){
+  const k = kitState(); if(k.carregando) return; k.carregando = true; render();
+  try{
+    const s = planoState();
+    if(!s.index || !s.index.length) s.index = await planoLerJson('plano-livro-index', []);
+    PLANO_IDX_CACHE = s.index;
+    const ids = s.index.filter(x => /-B$/.test(x.id) && KIT_DISCS.includes(x.disciplina)).map(x => x.id);
+    await saeseCorrCarregar(true);
+    const rows = []; let id = 0;
+    for(const pid of ids){
+      const pl = await planoObter(pid); if(!pl) continue;
+      const serie = (pl.serie||'').replace(' série','');
+      pl.aulas.forEach(a => { const sl = a.slides; const S = sl && sl.saese; if(!S) return;
+        const base = { pid, s: serie, d: pl.disciplina, n: a.n, b: a.bimestre, t: sl.titulo, pg: sl.paginas||'' };
+        (sl.figuras||[]).forEach((fg, i) => { const cs = (S.fig||[])[i] || []; if(cs.length) rows.push(Object.assign({ id: ++id, ch: 'fig:' + fg.f, c0: cs, k:'Imagem ou gráfico', r: fg.titulo || fg.leg, x: fg.leg || '', q: (fg.perguntas||[]).join(' · '), c: cs, img: fg.f, p: fg.p, resp: fg.resposta || '' }, base)); });
+        const ex = a.exercicio || {}; const prova = ex.questoesProva || []; const exq = ex.questoes || [];
+        const le = sl.leituraEnem;
+        if(le && (S.leitura||[]).length){ const qq = prova.find(q => q.enem) || null; rows.push(Object.assign({ id: ++id, ch: saeseChave(le.base), c0: S.leitura, k:'Questão ENEM', r: le.cmd, x: le.base, ops: le.ops, gab: le.c, c: S.leitura, img: le.img, quest: qq }, base)); }
+        const sq = sl.saeseQ;
+        if(sq){ const qq = exq.find(q => q.saeseQ) || prova.find(q => q.saeseQ) || null; rows.push(Object.assign({ id: ++id, ch: saeseChave(sq.base + '\n' + sq.cmd), c0: [sq.d], k:'Desafio SAESE', r: sq.cmd, x: sq.base, ops: sq.ops, gab: sq.c, c: [sq.d], img: sq.img, dica: sq.passo, quest: qq }, base)); }
+        if(sl.destaque && (S.destaque||[]).some(c => c.startsWith('MT'))) rows.push(Object.assign({ id: ++id, k:'Número em destaque', r: sl.destaque[0], x: sl.destaque[1], c: S.destaque }, base));
+        if(sl.debate && (S.debate||[]).length) rows.push(Object.assign({ id: ++id, k:'Debate', r: sl.debate, x: '', c: S.debate }, base));
+      });
+    }
+    rows.forEach(r => { if(r.ch){ r.c = saeseAplicar(r.ch, r.c0); r.corr = !!(SAESE_CORR && SAESE_CORR[r.ch]); } });
+    k.rows = rows; k.carregado = true;
+    kitCarregarSemana();   // não bloqueia: a seção da semana aparece quando terminar
+  }catch(e){ k.erro = 'Não consegui carregar os planos. Peça à coordenação para importar os planos de Geografia, Sociologia e História.'; }
+  k.carregando = false; render();
+}
+// o que as turmas do professor viram nesta semana em Humanas (aulas marcadas como dadas nos últimos 7 dias)
+async function kitCarregarSemana(){
+  const k = kitState(); const s = planoState(); k.semana = { carregando:true, itens:[] }; render();
+  try{
+    const turmas = (professorTurmas()||[]).slice(0, 12);
+    if(!s.conexProfs) s.conexProfs = await planoLerVinculosProfessores();
+    const limite = Date.now() - 7*86400000; const itens = [];
+    for(const t of turmas){ for(const nome of KIT_DISCS){ const disc = planoDiscKey(nome);
+      const r = await planoCalcularEfetivo([t], { index: s.index, disc, profs: s.conexProfs }); const pid = r.efetivo[t.id]; if(!pid) continue;
+      const prog = await planoLerJson(`plano-livro-prog:${planoTK(t.id, disc)}`, { dadas:{} });
+      Object.entries(prog.dadas||{}).filter(([, ts]) => ts >= limite).forEach(([n, ts]) => {
+        const rs = k.rows.filter(x => x.pid===pid && x.n===Number(n)); if(!rs.length) return;
+        const cs = []; rs.forEach(x => x.c.forEach(c => { if(!cs.includes(c)) cs.push(c); }));
+        itens.push({ turma: t.name, turmaId: t.id, disc: nome, n: Number(n), titulo: rs[0].t, pid, quando: ts, cs, nRec: rs.length });
+      }); } }
+    k.semana = { itens: itens.sort((a,b) => b.quando - a.quando) };
+  }catch(e){ k.semana = { itens:[], erro:true }; }
+  render();
+}
+function kitFiltrar(semDesc){
+  const k = kitState(), f = k.f; const q = (f.q||'').trim().toLowerCase();
+  return k.rows.filter(r => (!f.s || r.s===f.s) && (!f.d || r.d===f.d) && (!f.b || String(r.b)===f.b) && (!f.t || r.k===f.t)
+    && (!f.aula || `${r.pid}|${r.n}`===f.aula)
+    && (!f.a || r.c.some(c => c.startsWith(f.a))) && (semDesc || !f.desc || r.c.includes(f.desc))
+    && (!q || `${r.t} ${r.r} ${r.x} ${r.q||''}`.toLowerCase().includes(q)));
+}
+function kitCodHtml(c, ativo){ return `<span class="kit-cod ${c.startsWith('MT')?'mt':'lp'}${ativo?' on':''}" title="${esc((SAESE_CAT[c]||{}).o||'')}">${c}</span>`; }
+function renderKitSaese(){
+  const k = kitState();
+  if(!k.carregado && !k.carregando && !k.erro) setTimeout(kitCarregar, 0);
+  const cab = `<div class="card" data-kit-saese><h2 style="margin:0 0 4px;">🎯 Kit SAESE</h2>
+    <p style="margin:0 0 6px;">Textos, imagens, gráficos e questões das aulas de Geografia, Sociologia e História, organizados pelos descritores de <b>Língua Portuguesa</b> e <b>Matemática</b> do SAESE (3ª série do Ensino Médio).</p>
+    ${state.view==='coordenador' && SAESE_CORR && Object.keys(SAESE_CORR).length ? `<button class="btn btn-ghost btn-sm" style="width:auto;float:right;" data-action="kit-exportar-corr">⬇ Exportar ${Object.keys(SAESE_CORR).length} correção(ões)</button>` : ''}<p class="muted" style="margin:0;font-size:.86rem;">Use o material que a turma já viu em Humanas para treinar o descritor na sua aula. Marque questões para montar uma atividade na sua disciplina.</p></div>`;
+  if(k.erro) return cab + `<div class="card"><p>${esc(k.erro)}</p></div>`;
+  if(!k.carregado) return cab + '<div class="card"><p>⏳ Reunindo os recursos dos planos de Humanas…</p></div>';
+  const f = k.f;
+  // semana
+  const sem = k.semana;
+  const semana = !sem ? '' : sem.carregando ? '<div class="card"><p class="muted">⏳ Vendo o que suas turmas estudaram nesta semana em Humanas…</p></div>'
+    : `<div class="card" data-kit-semana><h3 style="margin:0 0 6px;">📅 Nesta semana nas suas turmas</h3>${sem.itens.length ? `<div class="kit-sem">${sem.itens.slice(0, 12).map(it => `
+        <button class="kit-semitem${f.aula===`${it.pid}|${it.n}`?' on':''}" data-action="kit-aula" data-k="${esc(it.pid)}|${it.n}"><b>${esc(it.turma)}</b> · ${esc(it.disc)} · aula ${it.n}<br><span>${esc(it.titulo)}</span><div style="margin-top:4px;">${it.cs.slice(0,5).map(c => kitCodHtml(c)).join(' ')}</div></button>`).join('')}</div>
+        <p class="muted" style="font-size:.8rem;margin:6px 0 0;">Toque numa aula para ver só os recursos dela. Aulas marcadas como dadas nos últimos 7 dias.</p>`
+      : '<p class="muted" style="margin:0;">Nenhuma aula de Humanas foi marcada como dada nos últimos 7 dias nas suas turmas. Use os filtros abaixo para escolher pela série e pelo bimestre.</p>'}</div>`;
+  // filtros
+  const sel = (id, lab, opts, v) => `<label class="kit-f"><span>${lab}</span><select data-action-change="kit-filtro" data-k="${id}">${opts.map(([val, rot]) => `<option value="${esc(val)}"${String(v)===String(val)?' selected':''}>${esc(rot)}</option>`).join('')}</select></label>`;
+  const filtros = `<div class="card kit-filtros" data-kit-filtros>
+    <div class="kit-seg">${[['','Todas'],['LP','Língua Portuguesa'],['MT','Matemática']].map(([v, r]) => `<button class="${f.a===v?'on':''}" data-action="kit-area" data-v="${v}">${r}</button>`).join('')}</div>
+    ${sel('s','Série',[['','Todas'],['1ª','1ª'],['2ª','2ª'],['3ª','3ª']], f.s)}${sel('d','Disciplina',[['','Todas']].concat(KIT_DISCS.map(x=>[x,x])), f.d)}
+    ${sel('b','Bimestre',[['','Todos'],['1','1º'],['2','2º'],['3','3º'],['4','4º']], f.b)}${sel('t','Recurso',[['','Todos'],['Imagem ou gráfico','Imagem ou gráfico'],['Questão ENEM','Questão ENEM'],['Desafio SAESE','Desafio SAESE'],['Número em destaque','Número em destaque'],['Debate','Debate']], f.t)}
+    <label class="kit-f" style="flex:1 1 160px;"><span>Buscar</span><input type="search" data-action-input="kit-busca" value="${esc(f.q||'')}" placeholder="ex.: charge, Censo, migração"></label>
+    ${f.aula ? `<button class="btn btn-ghost btn-sm" style="width:auto;align-self:flex-end;" data-action="kit-aula" data-k="">✕ Ver todas as aulas</button>` : ''}</div>`;
+  // índice de descritores
+  const cnt = {}; kitFiltrar(true).forEach(r => r.c.forEach(c => cnt[c] = (cnt[c]||0) + 1));
+  const cods = Object.keys(SAESE_CAT).filter(c => (!f.a || c.startsWith(f.a)) && (!f.aula || cnt[c]));
+  const indice = `<div class="kit-ind" data-kit-indice>${cods.map(c => `<button class="kit-indb${f.desc===c?' on':''}${cnt[c]?'':' zero'}" data-action="kit-desc" data-c="${c}" title="${esc(SAESE_CAT[c].o)}">${kitCodHtml(c)} <span>${esc(SAESE_CAT[c].a)}</span> <em>${cnt[c]||0}</em></button>`).join('')}</div>`;
+  const info = f.desc ? `<div class="card" style="border-left:4px solid ${f.desc.startsWith('MT')?'#1F4E79':'#00695C'};">${kitCodHtml(f.desc)} <b>${esc(SAESE_CAT[f.desc].a)}</b><div class="muted" style="font-size:.84rem;margin-top:4px;">Matriz: ${esc(SAESE_CAT[f.desc].o)}</div><div style="margin-top:6px;font-size:.9rem;">💡 <b>Atividade sugerida:</b> ${esc(KIT_SUG[f.desc]||'')}</div></div>` : '';
+  // lista
+  const rs = kitFiltrar(false);
+  let lista = '', ult = '';
+  rs.slice(0, k.lim).forEach(r => {
+    const ka = `${r.pid}|${r.n}`;
+    if(ka !== ult){ lista += `<div class="kit-aula"><b>${esc(r.d)} · ${esc(r.s)} série · Aula ${r.n}</b> — ${esc(r.t)} <span class="muted">· ${r.b}º bim · livro ${esc(r.pg)}</span></div>`; ult = ka; }
+    const cs = f.desc ? [f.desc].concat(r.c.filter(c => c!==f.desc)) : r.c;
+    const foco = f.desc || cs.find(c => !f.a || c.startsWith(f.a)) || cs[0];
+    const im = r.img && AV_IMG[r.img] ? `<img src="${AV_IMG[r.img]}" alt="" class="kit-img">` : '';
+    const marcado = !!k.sel[r.id];
+    lista += `<div class="kit-item" data-kit-item="${r.id}"><div class="kit-top"><span class="kit-tipo">${esc(r.k)}</span>${cs.map(c => kitCodHtml(c, c===f.desc)).join(' ')}${r.p ? `<span class="muted" style="font-size:.78rem;">p. ${r.p}</span>` : ''}
+        ${r.ch ? `<button class="kit-corr" data-action="kit-corrigir" data-id="${r.id}" title="Marcar outro descritor para este recurso">✎ ${r.corr ? 'corrigido' : 'corrigir descritor'}</button>` : ''}
+        ${r.quest ? `<label class="kit-sel"><input type="checkbox" data-action-change="kit-sel" data-id="${r.id}"${marcado?' checked':''}> usar na minha atividade</label>` : ''}</div>
+      <div class="kit-corpo${im?' com-img':''}">${im}<div style="min-width:0;"><div style="font-weight:600;">${esc(r.r)}</div>${r.x ? `<div style="font-size:.9rem;white-space:pre-line;margin-top:2px;">${esc(r.x)}</div>` : ''}
+        ${r.ops ? `<div class="muted" style="font-size:.85rem;margin-top:4px;">${r.ops.map((o,i) => `${'ABCDE'[i]}) ${esc(o)}`).join(' &nbsp; ')} · <b>Gabarito: ${'ABCDE'[r.gab]}</b></div>` : (r.q ? `<div class="muted" style="font-size:.85rem;margin-top:4px;">${esc(r.q)}</div>` : '')}
+        ${r.dica ? `<div style="font-size:.85rem;margin-top:3px;"><b>Como resolver:</b> ${esc(r.dica)}</div>` : ''}</div></div>
+      ${k.editando===r.id ? `<div class="kit-editor" data-kit-editor><div style="font-size:.84rem;margin-bottom:4px;"><b>Quais descritores este recurso trabalha?</b> <span class="muted">Marque até 3. A correção vale para toda a escola: kit, painéis e novas atividades.</span></div>
+        <div class="kit-ind" style="margin:0;">${Object.keys(SAESE_CAT).map(c => `<button class="kit-indb${(k.editSel||[]).includes(c)?' on':''}" data-action="kit-edit-toggle" data-c="${c}" title="${esc(SAESE_CAT[c].o)}">${kitCodHtml(c)} <span>${esc(SAESE_CAT[c].a)}</span></button>`).join('')}</div>
+        <div class="row" style="gap:8px;margin-top:6px;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" style="width:auto;" data-action="kit-edit-salvar">Salvar correção</button>${r.corr ? `<button class="btn btn-ghost btn-sm" style="width:auto;" data-action="kit-edit-original">Voltar ao original (${r.c0.join(', ')})</button>` : ''}<button class="btn btn-ghost btn-sm" style="width:auto;" data-action="kit-edit-cancelar">Cancelar</button></div></div>` : ''}
+      <div class="kit-sug ${foco.startsWith('MT')?'mt':''}"><b>Na aula de ${foco.startsWith('MT')?'Matemática':'Língua Portuguesa'} (${foco}):</b> ${esc(KIT_SUG[foco]||'')}</div></div>`;
+  });
+  if(!rs.length) lista = '<p class="muted">Nenhum recurso com esses filtros.</p>';
+  if(rs.length > k.lim) lista += `<button class="btn btn-ghost" data-action="kit-mais" style="margin-top:8px;">Mostrar mais (${rs.length - k.lim} restantes)</button>`;
+  const nSel = Object.keys(k.sel).filter(x => k.sel[x]).length;
+  const barra = nSel ? `<div class="kit-barra" data-kit-barra><span><b>${nSel}</b> questão(ões) selecionada(s)</span><button class="btn btn-primary btn-sm" style="width:auto;" data-action="kit-montar">📝 Montar atividade</button><button class="btn btn-ghost btn-sm" style="width:auto;" data-action="kit-limpar">Limpar</button></div>` : '';
+  // carrega as imagens que aparecem na página
+  const faltam = rs.slice(0, k.lim).map(r => r.img).filter(x => x && !(x in AV_IMG));
+  if(faltam.length && !k.carregandoImg){ k.carregandoImg = true; (async () => { for(const key of [...new Set(faltam)]){ AV_IMG[key] = await planoLerJson(`plano-livro-img:${key}`, null); } k.carregandoImg = false; render(); })(); }
+  return `<style>
+    .kit-cod{display:inline-block;font-weight:700;font-size:.72rem;color:#fff;padding:2px 6px;border-radius:5px;white-space:nowrap;vertical-align:middle}.kit-cod.lp{background:#00695C}.kit-cod.mt{background:#1F4E79}.kit-cod.on{outline:2px solid #C9A227}
+    .kit-sem{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}.kit-semitem{text-align:left;border:1px solid var(--paper-line);background:var(--paper);border-radius:8px;padding:8px 10px;cursor:pointer;font:inherit;font-size:.86rem;color:inherit}.kit-semitem > span{color:var(--ink-soft)}.kit-semitem.on{border-color:var(--board-light);box-shadow:0 0 0 1px var(--board-light)}
+    .kit-filtros{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;position:sticky;top:0;z-index:3}.kit-f{display:flex;flex-direction:column;gap:2px;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);font-weight:700}.kit-f select,.kit-f input{font-size:.9rem;text-transform:none;letter-spacing:0;font-weight:400}
+    .kit-seg{display:flex;border:1px solid var(--paper-line);border-radius:7px;overflow:hidden;align-self:flex-end}.kit-seg button{border:0;background:var(--surface);color:var(--ink);padding:6px 10px;cursor:pointer;font:inherit;font-size:.86rem}.kit-seg button.on{background:var(--board);color:#fff}
+    .kit-ind{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}.kit-indb{display:flex;gap:5px;align-items:center;border:1px solid var(--paper-line);background:var(--surface);border-radius:16px;padding:3px 9px 3px 4px;cursor:pointer;font:inherit;font-size:.8rem;color:inherit}.kit-indb em{font-style:normal;color:var(--ink-soft);font-size:.74rem}.kit-indb.on{border-color:var(--board-light);background:var(--tint-vinho)}.kit-indb.zero{opacity:.5}
+    .kit-aula{margin:14px 0 4px;font-size:.92rem}.kit-item{border:1px solid var(--paper-line);background:var(--surface);border-radius:8px;padding:8px 10px;margin:6px 0}.kit-top{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:4px}
+    .kit-tipo{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;color:var(--yellow-dark)}.kit-corr{margin-left:auto;border:0;background:none;color:var(--ink-soft);cursor:pointer;font:inherit;font-size:.8rem;text-decoration:underline}.kit-editor{border:1px dashed var(--board-light);border-radius:8px;padding:8px;margin:6px 0;background:var(--paper)}
+    .kit-sel{font-size:.82rem;display:flex;gap:4px;align-items:center;cursor:pointer}
+    .kit-corpo.com-img{display:grid;grid-template-columns:minmax(120px,220px) 1fr;gap:10px}.kit-img{max-width:100%;max-height:160px;object-fit:contain;border-radius:6px;background:#fff}
+    @media (max-width:560px){.kit-corpo.com-img{grid-template-columns:1fr}}
+    .kit-sug{margin-top:6px;font-size:.86rem;border-left:3px solid #00695C;background:var(--tint-teal);padding:4px 8px;border-radius:0 6px 6px 0}.kit-sug.mt{border-color:#4f7fb5;background:var(--paper)}
+    .kit-barra{position:sticky;bottom:0;z-index:4;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--board-light);border-radius:10px;padding:8px 12px;margin-top:10px;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+  </style>` + cab + semana + filtros + indice + info + `<div class="card"><p class="muted" style="margin:0 0 4px;font-size:.84rem;">${rs.length} recurso(s)</p>${lista}</div>` + barra;
+}
+async function kitMontarAtividade(){
+  const k = kitState(); const p = state.professor;
+  if(state.view==='coordenador'){ alert('Para montar a atividade, entre no painel do professor.'); return; }
+  const rs = k.rows.filter(r => k.sel[r.id] && r.quest);
+  if(!rs.length) return;
+  const imgCache = {}; const qs = [];
+  for(const r of rs) qs.push(await saeseMontarQuestao({ q: r.quest, aula: { n: r.n, tituloCurto: `${r.d} ${r.s} — ${r.t}`, bimestre: r.b } }, imgCache));
+  planoPontosIguais(qs, 10);
+  const disc = (p.disciplinas||[]).find(d => /portugu|matem/i.test(d.name||'')) || (p.disciplinas||[])[0];
+  const na = freshAssessment();
+  na.instrumento = 'exercicios'; na.title = 'Atividade SAESE — ' + [...new Set(rs.flatMap(r => r.c))].slice(0, 4).join(', ');
+  na.disciplinaId = disc ? disc.id : ''; na.turmaIds = []; na.questions = qs; na.securityEnabled = false; na.exigeLiberacao = false; na.minMinutesPerQuestion = null;
+  p.newAssessment = na; p.editingCode = null; p.editingResponseCount = 0; p.pickerOpen = false; p.pickerSelected = [];
+  k.sel = {}; p.subview = 'avaliacoes'; p.mode = 'new'; render(); window.scrollTo(0,0);
+  alert(`Atividade montada com ${qs.length} questão(ões) das aulas de Humanas, cada uma com seu descritor SAESE. Escolha a turma, confira as datas e salve.`);
+}
+
+// ---- SAESE: painel da escola (coordenação), resultado oficial, metas por turma e devolutiva ----
+const SAESE_CASA = {
+ 'LP D01':'Leia uma notícia curta e sublinhe 3 informações que respondem: o quê, quem e quando.', 'LP D02':'Num texto do livro, circule 5 pronomes (ele, ela, isso...) e escreva a quem cada um se refere.',
+ 'LP D03':'Escolha 3 palavras difíceis de um texto e tente explicar o sentido pelo contexto antes de olhar o dicionário.', 'LP D04':'Depois de ler um texto, escreva uma coisa que ele sugere sem dizer diretamente, e a pista que mostra isso.',
+ 'LP D05':'Escolha uma foto ou gráfico de jornal e escreva 3 linhas explicando o que a imagem acrescenta ao texto.', 'LP D06':'Leia uma reportagem e resuma o tema em uma frase de até 15 palavras.',
+ 'LP D07':'Leia um artigo de opinião e escreva, com suas palavras, qual é a ideia que o autor defende.', 'LP D08':'Escolha uma opinião sua e escreva dois argumentos e um exemplo que a sustentem.',
+ 'LP D09':'Num parágrafo do livro, risque o que poderia sair sem mudar o sentido e circule o essencial.', 'LP D10':'Conte uma história curta (real ou inventada) marcando: situação inicial, conflito e desfecho.',
+ 'LP D11':'Monte no caderno uma cadeia “causa → consequência” com 3 elos sobre um tema da aula.', 'LP D12':'Junte 3 textos do dia a dia (anúncio, receita, notícia) e escreva para que serve cada um.',
+ 'LP D13':'Num diálogo, mensagem ou discurso, marque as palavras que mostram quem fala e com quem fala.', 'LP D14':'Numa notícia, copie uma frase que é fato e uma que é opinião, e explique a diferença.',
+ 'LP D15':'Reescreva 3 frases trocando o conectivo (porque, portanto, embora) por outro com o mesmo sentido.', 'LP D16':'Procure uma charge ou tirinha e explique por escrito onde está o humor ou a ironia.',
+ 'LP D17':'Escreva a mesma frase com ponto final, interrogação, exclamação e aspas, e explique a diferença.', 'LP D18':'Encontre duas palavras usadas para a mesma coisa (ex.: “invasão” e “ocupação”) e explique o efeito de cada uma.',
+ 'LP D19':'Procure uma mensagem com CAIXA ALTA ou repetições e explique o efeito que ela quer causar.', 'LP D20':'Compare como dois sites ou jornais deram a mesma notícia: o que muda e por quê?',
+ 'LP D21':'Pergunte a duas pessoas o que pensam de um mesmo assunto e anote os argumentos de cada uma.',
+ 'MT D06':'Num mapa com paralelos e meridianos, localize 3 cidades e escreva as coordenadas aproximadas.', 'MT D14':'Faça uma linha do tempo da sua família ou da história do Brasil, usando números negativos para a.C. se precisar.',
+ 'MT D15':'Calcule a densidade da sua cidade (habitantes ÷ km²) ou use a escala de um mapa para achar uma distância real.', 'MT D16':'Pegue um preço com desconto ou um dado do IBGE e calcule a porcentagem.',
+ 'MT D20':'Num gráfico de linhas, marque onde cresce, onde cai e onde fica estável, e explique.', 'MT D21':'Desenhe o gráfico de uma situação do seu dia (ex.: bateria do celular ao longo do dia).',
+ 'MT D34':'Monte uma pergunta com os dados de uma tabela ou gráfico do livro e resolva.', 'MT D35':'Transforme uma tabela do livro num gráfico de barras no caderno.',
+};
+async function saeseMetasLer(turmaId){ return (await planoLerJson(`saese-metas:${turmaId}`, {})) || {}; }
+function saeseBimAtual(){ const m = new Date().getMonth(); return m < 4 ? 1 : m < 6 ? 2 : m < 9 ? 3 : 4; }
+// Coordenação: mapa de calor turmas × descritores
+function saeseEscolaState(){ if(!state.saeseEscola) state.saeseEscola = { carregado:false, carregando:false }; return state.saeseEscola; }
+async function saeseEscolaCalcular(){
+  const E = saeseEscolaState(); E.carregando = true; E.erro = ''; render();
+  try{
+    await saeseCorrCarregar(true);
+    const s = planoState(); if(!s.index || !s.index.length) s.index = await planoLerJson('plano-livro-index', []);
+    const mapa = {};   // texto da questão do plano → descritores
+    for(const x of s.index.filter(x => /-B$/.test(x.id))){ const pl = await planoObter(x.id); if(!pl) continue;
+      pl.aulas.forEach(a => { const ex = a.exercicio || {}; ['questoes','questoesProva','questoesRecuperacao'].forEach(k => (ex[k]||[]).forEach(q => { const cs = saeseDeQuestaoPlano(q); if(cs.length) mapa[saeseChave(q.texto)] = cs; })); }); }
+    const turmas = (state.professor.turmas||[]).slice().sort((a,b) => (a.name||'').localeCompare(b.name||'', 'pt-BR', { numeric:true }));
+    const porNome = {}; turmas.forEach(t => (t.students||[]).forEach(st => porNome[nomeChave(st.name)] = t.id));
+    const M = {}; const somaT = (tid, c, ok) => { const x = (M[tid] = M[tid] || {}); const y = x[c] = x[c] || [0,0]; y[0]+=ok; y[1]++; };
+    const keys = ((await window.storage.list('assessment:', true)).keys||[]);
+    for(const key of keys){ const av = await planoLerJson(key, null); if(!av || !(av.questions||[]).length) continue;
+      const qs = av.questions.filter(q => q.type==='mc' && !q.annulled).map(q => ({ q, cs: saeseAplicar(saeseChave(q.text), (q.saese||[]).length ? q.saese : (mapa[saeseChave(q.text)] || [])) })).filter(x => x.cs.length);
+      if(!qs.length) continue;
+      const resp = await planoLerJson(`responses:${av.code}`, []);
+      const tids = assessmentTurmaIds(av);
+      resp.forEach(r => { const tid = tids.length === 1 ? tids[0] : porNome[nomeChave(r.studentName)]; if(!tid) return;
+        qs.forEach(({ q, cs }) => { const ok = r.answers && r.answers[q.id]===q.correctOptionId ? 1 : 0; cs.forEach(c => { somaT(tid, c, ok); somaT('__escola', c, ok); }); }); }); }
+    const metas = {}; for(const t of turmas) metas[t.id] = await saeseMetasLer(t.id);
+    E.M = M; E.turmas = turmas.map(t => ({ id: t.id, nome: t.name })); E.metas = metas;
+    E.oficial = await planoLerJson('saese-oficial', null);
+    E.carregado = true; E.em = Date.now();
+  }catch(e){ E.erro = 'Não consegui calcular agora. Tente de novo em instantes.'; }
+  E.carregando = false; render();
+}
+function saeseOficialDe(E, turmaNome, c){ const o = E.oficial; if(!o || !o.linhas) return null; const l = o.linhas.find(x => nomeChave(x.turma)===nomeChave(turmaNome) && x.d===c); return l ? l.pct : null; }
+function renderSaeseEscola(){
+  const E = saeseEscolaState();
+  const cab = `<div class="card"><h2 style="margin:0 0 4px;">📘 SAESE da escola</h2><p style="margin:0;" class="muted">Acerto por turma em cada descritor do SAESE (Língua Portuguesa e Matemática), somando exercícios, provas e simulados com questões marcadas. Células com borda dourada são metas da turma no bimestre.</p></div>`;
+  if(E.carregando) return cab + '<div class="card"><p>⏳ Calculando as turmas…</p></div>';
+  if(!E.carregado) return cab + `<div class="card">${E.erro ? `<p style="color:#b3261e;">${esc(E.erro)}</p>` : ''}<button class="btn btn-primary" style="width:auto;" data-action="saese-escola-calc">📊 Calcular o mapa da escola</button></div>`;
+  const cor = p => p==null ? 'var(--paper)' : p < 50 ? '#f4c7c3' : p < 70 ? '#fde3c2' : '#cfead6';
+  const pct = x => x && x[1] ? Math.round(x[0]/x[1]*100) : null;
+  const esc0 = E.M.__escola || {};
+  const cods = Object.keys(SAESE_CAT).filter(c => esc0[c] || (E.oficial && E.oficial.linhas.some(l => l.d===c)));
+  const bim = saeseBimAtual();
+  const linha = (nome, x, tid) => { const mt = tid ? ((E.metas[tid]||{})['b'+bim] || {}) : {};
+    return `<tr><td style="white-space:nowrap;font-weight:700;">${esc(nome)}</td>${cods.map(c => { const p = pct((x||{})[c]); const of = tid ? saeseOficialDe(E, nome, c) : null; const meta = (mt.codes||[]).includes(c);
+      return `<td style="text-align:center;background:${cor(p)};${meta ? 'outline:3px solid #C9A227;outline-offset:-3px;' : ''}" title="${esc(c + ' — ' + SAESE_CAT[c].a)}${x && x[c] ? ` (${x[c][1]} respostas)` : ''}${meta ? ` · meta ${mt.meta||70}%` : ''}">${p==null ? '—' : p + '%'}${of!=null ? `<div style="font-size:.68rem;color:#333;">of. ${of}%</div>` : ''}</td>`; }).join('')}</tr>`; };
+  // maiores diferenças app × oficial
+  let difs = [];
+  if(E.oficial) E.turmas.forEach(t => cods.forEach(c => { const p = pct((E.M[t.id]||{})[c]); const of = saeseOficialDe(E, t.nome, c); if(p!=null && of!=null && (E.M[t.id][c][1] >= 10)) difs.push({ t: t.nome, c, p, of, d: p - of }); }));
+  difs = difs.sort((a,b) => Math.abs(b.d) - Math.abs(a.d)).slice(0, 6);
+  const piores = cods.map(c => ({ c, p: pct(esc0[c]), n: (esc0[c]||[0,0])[1] })).filter(x => x.p!=null && x.n >= 10).sort((a,b) => a.p - b.p).slice(0, 4);
+  return cab + `<div class="card">
+    ${piores.length ? `<div style="margin-bottom:8px;font-size:.9rem;"><b>Descritores mais fracos na escola:</b> ${piores.map(x => `<span class="kit-cod ${x.c.startsWith('MT')?'mt':'lp'}">${x.c}</span> ${x.p}% (${esc(SAESE_CAT[x.c].a)})`).join(' · ')}</div>` : ''}
+    <div class="table-scroll"><table style="font-size:.8rem;" data-saese-escola><tr><th>Turma</th>${cods.map(c => `<th title="${esc(SAESE_CAT[c].o)}" style="white-space:nowrap;">${c}</th>`).join('')}</tr>
+      ${E.turmas.filter(t => E.M[t.id]).map(t => linha(t.nome, E.M[t.id], t.id)).join('')}
+      <tr style="border-top:2px solid var(--ink);">${linha('Escola', esc0, null).slice(4)}</table></div>
+    ${!cods.length ? '<p class="muted">Ainda não há respostas a questões com descritor SAESE.</p>' : ''}
+    <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;"><button class="btn btn-ghost btn-sm" style="width:auto;" data-action="saese-escola-calc">↻ Atualizar</button><span class="muted" style="font-size:.8rem;">Calculado em ${new Date(E.em).toLocaleString('pt-BR')}</span></div></div>
+    <div class="card"><h3 style="margin:0 0 4px;">🏛️ Resultado oficial do SAESE</h3>
+      <p class="muted" style="margin:0 0 6px;font-size:.86rem;">Quando a SEDUC divulgar o resultado por turma e descritor, importe a planilha (CSV com as colunas turma, componente, descritor e percentual de acerto). O mapa passa a mostrar o oficial em cada célula, e abaixo aparecem as maiores diferenças entre o que o app mediu e o resultado oficial.</p>
+      ${E.oficial ? `<p style="font-size:.88rem;">✅ Resultado importado: <b>${E.oficial.linhas.length}</b> linha(s)${E.oficial.ano ? ` · ${esc(E.oficial.ano)}` : ''} · em ${new Date(E.oficial.em).toLocaleDateString('pt-BR')}</p>` : ''}
+      <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;"><label class="btn btn-ghost btn-sm" style="width:auto;cursor:pointer;">📥 Importar CSV oficial<input type="file" id="saese-oficial-input" accept=".csv,text/csv" style="display:none;"></label><button class="btn btn-ghost btn-sm" style="width:auto;" data-action="saese-oficial-modelo">⬇ Baixar modelo de planilha</button>${E.oficial ? `<button class="btn btn-ghost btn-sm" style="width:auto;" data-action="saese-oficial-limpar">Remover resultado importado</button>` : ''}</div>
+      ${difs.length ? `<h4 style="margin:10px 0 4px;">Maiores diferenças (app × oficial)</h4><ul style="margin:0 0 0 18px;font-size:.86rem;">${difs.map(x => `<li><b>${esc(x.t)}</b> · ${x.c}: app ${x.p}% × oficial ${x.of}% <span style="color:${x.d>0?'#b3261e':'#1d6b31'};">(${x.d>0?'+':''}${x.d} pontos)</span>${x.d > 15 ? ' — o treino no app pode estar mais fácil que a prova' : x.d < -15 ? ' — a turma foi melhor na prova do que no app' : ''}</li>`).join('')}</ul>` : ''}</div>`;
+}
+async function saeseOficialImportar(file){
+  const E = saeseEscolaState();
+  try{
+    const txt = (await file.text()).replace(/^﻿/, ''); const linhas = txt.split(/\r?\n/).filter(l => l.trim());
+    const sep = (linhas[0].match(/;/g)||[]).length >= (linhas[0].match(/,/g)||[]).length ? ';' : ',';
+    const cab = linhas[0].split(sep).map(x => nomeChave(x.replace(/"/g,'')));
+    const iT = cab.findIndex(x => /turma/.test(x)), iC = cab.findIndex(x => /compon|disciplina|area/.test(x)), iD = cab.findIndex(x => /descritor/.test(x)), iP = cab.findIndex(x => /acerto|percent|%/.test(x));
+    if(iT<0 || iD<0 || iP<0){ alert('Não encontrei as colunas turma, descritor e percentual de acerto. Use o modelo de planilha.'); return; }
+    const out = [];
+    linhas.slice(1).forEach(l => { const c = l.split(sep).map(x => x.replace(/"/g,'').trim()); if(!c[iT]) return;
+      let d = c[iD].toUpperCase().replace(/\s+/g,' '); const comp = iC>=0 ? nomeChave(c[iC]) : '';
+      const m = /(LP|MT)?\s*D\s*0?(\d{1,2})/.exec(d); if(!m) return;
+      const area = m[1] || (/mat/.test(comp) ? 'MT' : 'LP'); const cod = `${area} D${String(m[2]).padStart(2,'0')}`; if(!SAESE_CAT[cod]) return;
+      const p = parseFloat(String(c[iP]).replace('%','').replace(',','.')); if(isNaN(p)) return;
+      out.push({ turma: c[iT], d: cod, pct: Math.round(p <= 1 ? p*100 : p) }); });
+    if(!out.length){ alert('Nenhuma linha válida encontrada na planilha.'); return; }
+    const o = { linhas: out, em: Date.now(), ano: String(new Date().getFullYear()) };
+    await window.storage.set('saese-oficial', JSON.stringify(o), true); E.oficial = o; render();
+    alert(`Resultado oficial importado: ${out.length} linha(s).`);
+  }catch(e){ alert('Não consegui ler a planilha. Confira se é um arquivo CSV.'); }
+}
+function saeseOficialModelo(){
+  const turmas = (state.professor.turmas||[]).filter(t => /^3/.test(t.name||'')).map(t => t.name);
+  const linhas = [['turma','componente','descritor','percentual_acerto']];
+  (turmas.length ? turmas : ['3PG']).forEach(t => { linhas.push([t,'Língua Portuguesa','D05','']); linhas.push([t,'Matemática','D34','']); });
+  const csv = linhas.map(l => l.join(';')).join('\n'); const blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'modelo-saese-oficial.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+// Metas da turma (professor, no painel)
+async function saeseMetasSalvar(turmaId, bim, codes, meta){
+  const m = await saeseMetasLer(turmaId); m['b'+bim] = { codes, meta }; await window.storage.set(`saese-metas:${turmaId}`, JSON.stringify(m), true);
+  const s = planoState(); s.saeseMetas = s.saeseMetas || {}; s.saeseMetas[turmaId] = m;
+}
+function renderSaeseMetas(turmaId, d){
+  const s = planoState(); s.saeseMetas = s.saeseMetas || {};
+  if(!(turmaId in s.saeseMetas)){ s.saeseMetas[turmaId] = null; saeseMetasLer(turmaId).then(m => { s.saeseMetas[turmaId] = m; render(); }); return ''; }
+  const m = s.saeseMetas[turmaId]; if(m===null) return '';
+  const bim = s.saeseMetaBim || saeseBimAtual(); const mt = m['b'+bim] || { codes:[], meta:70 };
+  const ed = s.saeseMetaEdit; const pct = c => d && d.turmaS && d.turmaS[c] && d.turmaS[c][1] ? Math.round(d.turmaS[c][0]/d.turmaS[c][1]*100) : null;
+  const barras = (mt.codes||[]).map(c => { const p = pct(c); const ok = p!=null && p >= mt.meta;
+    return `<div style="margin:4px 0;font-size:.86rem;" data-saese-meta="${c}"><span class="kit-cod ${c.startsWith('MT')?'mt':'lp'}">${c}</span> ${esc(SAESE_CAT[c].a)} — <b>${p==null?'sem dados':p+'%'}</b> de ${mt.meta}% ${ok?'✅':''}
+      <div style="height:8px;background:var(--paper-line);border-radius:4px;margin-top:3px;position:relative;"><div style="height:8px;width:${Math.min(100,p||0)}%;background:${ok?'#2e7d32':'#00695C'};border-radius:4px;"></div><div style="position:absolute;top:-3px;left:${mt.meta}%;width:2px;height:14px;background:#C9A227;"></div></div></div>`; }).join('');
+  const editor = ed ? `<div style="border:1px dashed var(--board-light);border-radius:8px;padding:8px;margin-top:6px;"><div style="font-size:.84rem;margin-bottom:4px;"><b>Escolha até 3 descritores para o ${bim}º bimestre</b> <span class="muted">(os mais fracos aparecem primeiro)</span></div>
+      <div class="kit-ind" style="margin:0;">${Object.keys(SAESE_CAT).sort((a,b) => (pct(a)??200) - (pct(b)??200)).map(c => `<button class="kit-indb${(s.saeseMetaSel||[]).includes(c)?' on':''}" data-action="saese-meta-toggle" data-c="${c}">${kitCodHtml(c)} <span>${esc(SAESE_CAT[c].a)}</span>${pct(c)!=null?` <em>${pct(c)}%</em>`:''}</button>`).join('')}</div>
+      <div class="row" style="gap:8px;margin-top:6px;align-items:center;flex-wrap:wrap;">Meta de acerto: <select id="saese-meta-pct">${[50,60,70,80].map(v => `<option${v===(mt.meta||70)?' selected':''}>${v}</option>`).join('')}</select>%<button class="btn btn-primary btn-sm" style="width:auto;" data-action="saese-meta-salvar">Salvar metas</button><button class="btn btn-ghost btn-sm" style="width:auto;" data-action="saese-meta-cancelar">Cancelar</button></div></div>` : '';
+  return `<div data-saese-metas style="margin-top:12px;"><h4 style="margin:0 0 4px;">🎯 Metas da turma — ${[1,2,3,4].map(b => `<button class="btn btn-sm ${b===bim?'btn-primary':'btn-ghost'}" style="width:auto;padding:1px 8px;" data-action="saese-meta-bim" data-b="${b}">${b}º bim</button>`).join(' ')}</h4>
+    ${barras || '<p class="muted" style="font-size:.84rem;margin:0;">Nenhuma meta definida para este bimestre. Escolha 2 ou 3 descritores para focar: a turma vê as metas na caderneta.</p>'}
+    ${ed ? editor : `<button class="btn btn-ghost btn-sm" style="width:auto;margin-top:4px;" data-action="saese-meta-editar">✎ ${barras ? 'Mudar metas' : 'Definir metas'}</button>`}</div>`;
+}
+// Devolutiva do bimestre: uma folha por aluno (aluno e família)
+function saeseDevolutivaImprimir(turmaId){
+  const s = planoState(); const d = s.hab[turmaId] || {}; const turma = (state.professor.turmas||[]).find(t => t.id===turmaId);
+  const metas = ((s.saeseMetas||{})[turmaId] || {})['b' + saeseBimAtual()] || { codes:[] };
+  const alunos = ((turma && turma.students)||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+  const folha = st => { const x = (d.alunoS||{})[st.id] || {}; const pc = c => x[c] && x[c][1] ? Math.round(x[c][0]/x[c][1]*100) : null;
+    const tem = Object.keys(x).filter(c => x[c][1] >= 2);
+    const bem = tem.filter(c => pc(c) >= 70).sort((a,b) => pc(b) - pc(a)).slice(0, 4);
+    const treinar = tem.filter(c => pc(c) < 60).sort((a,b) => pc(a) - pc(b)).slice(0, 3);
+    return `<section class="folha"><h1>Devolutiva do ${saeseBimAtual()}º bimestre</h1><div class="sub">${esc(st.name)} · Turma ${esc(turma ? turma.name : '')} · CEETIP — leitura e matemática nas aulas de Ciências Humanas</div>
+      ${!tem.length ? '<p>Ainda não há questões suficientes respondidas para esta devolutiva.</p>' : `
+      <h2>💪 Em que você avançou</h2>${bem.length ? `<ul>${bem.map(c => `<li><b>${c}</b> — ${esc(SAESE_CAT[c].a)} (${pc(c)}% de acerto)</li>`).join('')}</ul>` : '<p>Continue treinando: ainda não há descritores com 70% ou mais.</p>'}
+      <h2>📌 O que ainda precisa treinar</h2>${treinar.length ? `<ul>${treinar.map(c => `<li><b>${c}</b> — ${esc(SAESE_CAT[c].a)} (${pc(c)}%)<div class="casa">🏠 Para fazer em casa: ${esc(SAESE_CASA[c]||'')}</div></li>`).join('')}</ul>` : '<p>Nenhum descritor abaixo de 60%. Ótimo trabalho!</p>'}`}
+      ${(metas.codes||[]).length ? `<h2>🎯 Metas da turma neste bimestre</h2><p>${metas.codes.map(c => `<b>${c}</b> ${esc(SAESE_CAT[c].a)}${pc(c)!=null ? ` (você: ${pc(c)}%)` : ''}`).join(' · ')} — meta: ${metas.meta||70}% de acerto.</p>` : ''}
+      <div class="ass"><span>Assinatura do(a) responsável: ____________________________</span><span>Professor(a): ____________________</span></div>
+      <p class="rod">SAESE = Avaliação Somativa de Sergipe. LP = Língua Portuguesa; MT = Matemática. Os percentuais vêm das questões respondidas no app.</p></section>`; };
+  const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Devolutivas — ${esc(turma?turma.name:'')}</title><style>
+    body{font-family:Calibri,Arial,sans-serif;color:#222;margin:0}.folha{padding:14mm 14mm 10mm;page-break-after:always}h1{color:#6B1F2E;margin:0;font-size:20pt}h2{color:#00695C;font-size:13pt;margin:12px 0 4px}
+    .sub{color:#555;margin:2px 0 8px}li{margin:4px 0}.casa{font-size:10pt;color:#1F4E79;margin-top:2px}.ass{display:flex;justify-content:space-between;margin-top:26px;font-size:10pt;gap:20px}.rod{font-size:8.5pt;color:#777;margin-top:10px}@page{size:A4;margin:0}
+  </style></head><body>${alunos.map(folha).join('')}<script>setTimeout(()=>print(),400)<\/script></body></html>`;
+  const w = window.open('', '_blank'); if(!w){ alert('Permita a abertura de janelas para imprimir.'); return; } w.document.write(html); w.document.close();
 }
 
 // ---- Aluno: "Estudar" (aulas já dadas, slides, questões que errou) e lembrete de prazo ----
@@ -23147,7 +23702,7 @@ async function planoRegistrarExercicio(turmaId, n, code){
   s.prog[turmaId] = fresh; s.painel = null;
   await window.storage.set(`plano-livro-prog:${planoTK(turmaId)}`, JSON.stringify(fresh), true);
 }
-function planoEditarExercicio(turmaId, n){
+async function planoEditarExercicio(turmaId, n){
   const s = planoState(); const p = state.professor;
   if(state.view==='coordenador'){ alert('Para editar e aplicar, entre no painel do professor (Professores → 👁 Entrar no painel).'); return; }
   const plano = s.planos[s.turmaPlano[turmaId]];
@@ -23159,7 +23714,7 @@ function planoEditarExercicio(turmaId, n){
   na.unidade = UNIDADES[Math.max(0, Math.min(3, (aula.bimestre||1)-1))];
   na.disciplinaId = disc ? disc.id : '';
   na.turmaIds = [turmaId];
-  na.questions = planoQuestoesParaAvaliacao(aula.exercicio, planoMapaDoExercicio(turmaId, aula));
+  na.questions = planoQuestoesParaAvaliacao(aula.exercicio, planoMapaDoExercicio(turmaId, aula)); await planoResolverImagens(na.questions);
   na.securityEnabled = false; na.exigeLiberacao = false; na.minMinutesPerQuestion = null;
   na.endAt = planoPrazoParaEndAt(s.prazo[n]!=null ? s.prazo[n] : '7') || '';
   na.valeNota = s.valeNota[n] !== false;
@@ -23393,6 +23948,9 @@ async function avCarregarRecursos(d){
   const keys = new Set();
   (d.figuras||[]).forEach(f => keys.add(f.f));
   if(d.esquema && d.esquema.fig) keys.add(d.esquema.fig);
+  if(d.aprof){ if(d.aprof.fonte && d.aprof.fonte.img) keys.add(d.aprof.fonte.img); if(d.aprof.enem && d.aprof.enem.img) keys.add(d.aprof.enem.img); }
+  if(d.leituraEnem && d.leituraEnem.img) keys.add(d.leituraEnem.img);
+  if(d.saeseQ && d.saeseQ.img) keys.add(d.saeseQ.img);
   await Promise.all([...keys].filter(k => !(k in AV_IMG)).map(async k => { AV_IMG[k] = await planoLerJson(`plano-livro-img:${k}`, null); }));
   // fotos/imagens dos slides criados pelo professor
   await Promise.all((d.extras||[]).filter(x => x && x.img && !(('ed-' + x.img) in AV_IMG)).map(async x => { AV_IMG['ed-' + x.img] = await planoLerJson(`plano-slides-ed-img:${x.img}`, null); }));
@@ -23418,9 +23976,22 @@ function avMontarSlides(d, opts){
   const passos = avPassosEsquema(d.esquema);
   for(let k=0; k<passos; k++) L.push({ t:'esquema', k, passos });
   ramo();
+  const ap = d.aprof || null;
+  if(ap){
+    if(ap.contexto) L.push({ t:'ap-contexto' });
+    if((ap.conceitos||[]).length) L.push({ t:'ap-conceitos' });
+    if(ap.fonte) L.push({ t:'ap-fonte' }, { t:'ap-fonte-res' });
+    if(ap.processo) L.push({ t:'ap-processo' });
+    if(ap.interpretacoes) L.push({ t:'ap-interp' });
+  }
   L.push({ t:'relampago' }, { t:'resposta' }, { t:'conceito' });
   while(m && r < m.ramos.length) ramo();
   if((d.vf||[]).length) L.push({ t:'vf' });
+  if(d.leituraEnem || (ap && ap.enem)) L.push({ t:'ap-enem' }, { t:'ap-enem-res' });
+  if(d.saeseQ) L.push({ t:'saese-q' }, { t:'saese-q-res' });
+  if(ap && ap.sintese) L.push({ t:'ap-sintese' });
+  if(d.proposta) L.push({ t:'proposta' }, { t:'proposta-res' });
+  if(d.repertorio) L.push({ t:'repertorio' });
   if((d.conexoes||[]).length) L.push({ t:'conexoes' });
   L.push({ t:'pratica' });
   if((!estudo && opts && opts.grupo) || (estudo && d.debate)) L.push({ t:'grupo' });
@@ -23441,6 +24012,11 @@ function avInjetarCss(){
   .av-slide{container-type:inline-size;width:min(100vw, calc((100vh - 70px) * 16 / 9));aspect-ratio:16/9;position:relative;overflow:hidden;background:#fff;color:#222;font-family:Calibri,Carlito,Arial,sans-serif;border-radius:6px;}
   .av-in{position:absolute;inset:0;padding:3.6cqw 4.4cqw;font-size:1.9cqw;line-height:1.3;animation:avFade .45s ease both;}
   .av-escuro{background:#6B1F2E;color:#fff;} .av-azul{background:#1F4E79;color:#fff;}
+  .av-enemtag{position:absolute;top:.7cqw;right:1cqw;z-index:5;background:#C62828;color:#fff;font:700 1cqw/1 Calibri,Carlito,Arial,sans-serif;letter-spacing:.08em;padding:.45cqw .9cqw;border-radius:2cqw;display:flex;align-items:center;gap:.4cqw;box-shadow:0 .15cqw .4cqw rgba(0,0,0,.25);pointer-events:none;}
+  .av-saesetag{position:absolute;bottom:.7cqw;right:1cqw;z-index:5;background:#00695C;color:#fff;font:700 .95cqw/1 Calibri,Carlito,Arial,sans-serif;letter-spacing:.04em;padding:.4cqw .8cqw;border-radius:2cqw;box-shadow:0 .15cqw .4cqw rgba(0,0,0,.25);cursor:help;}
+  .av-saesecod{color:#fff;font-weight:700;font-size:.78em;padding:.12em .45em;border-radius:.35em;white-space:nowrap;}
+  .av-saesebox{background:rgba(255,255,255,.95);color:#2B2B2B;border-left:.35em solid #00695C;border-radius:.4em;padding:.45em .8em;font-size:.78em;line-height:1.25;}
+  .av-enemalerta{position:absolute;top:2.6cqw;left:4.4cqw;max-width:62cqw;display:flex;align-items:center;gap:.6em;background:#FFD23F;color:#6B1F2E;border-radius:.5em;padding:.45em .9em;font-size:.9em;line-height:1.25;box-shadow:0 .2cqw .6cqw rgba(0,0,0,.3);}
   .av-t{font-family:Cambria,Caladea,Georgia,serif;font-weight:700;color:#6B1F2E;font-size:1.75em;line-height:1.12;margin:0 0 .7em;}
   .av-escuro .av-t,.av-azul .av-t{color:#fff;}
   .av-card{background:#F6EEF0;border-radius:.6em;padding:.8em 1em;}
@@ -23488,18 +24064,65 @@ function avInjetarCss(){
   document.head.appendChild(st);
 }
 function avOpcoesHtml(d, ctx){ return avOpcoesGen(d.relampago, ctx, i => `data-action="av-responder" data-i="${i}"`); }
+function avEnemPrio(d){ return (d && Array.isArray(d.enemPrioridade)) ? d.enemPrioridade.filter(Boolean) : []; }
+const SAESE_CAT = {"LP D01": {"o": "Localizar informações explícitas em um texto.", "a": "Encontrar informações que estão escritas no texto"}, "LP D02": {"o": "Estabelecer relações entre partes de um texto, identificando repetições ou substituições que contribuem para a continuidade de um texto.", "a": "Ligar as partes do texto (palavras que retomam ou substituem outras)"}, "LP D03": {"o": "Inferir o sentido de uma palavra ou expressão.", "a": "Descobrir o sentido de uma palavra ou expressão pelo contexto"}, "LP D04": {"o": "Inferir uma informação implícita em um texto.", "a": "Perceber o que o texto sugere sem dizer com todas as letras"}, "LP D05": {"o": "Interpretar texto com auxílio de material gráfico diverso (propagandas, quadrinhos, foto, etc.).", "a": "Ler imagens, fotos, mapas, gráficos e charges junto com o texto"}, "LP D06": {"o": "Identificar o tema de um texto.", "a": "Identificar o tema (o assunto central) de um texto"}, "LP D07": {"o": "Identificar a tese de um texto.", "a": "Identificar a tese: a ideia que o autor defende"}, "LP D08": {"o": "Estabelecer relação entre a tese e os argumentos oferecidos para sustentá-la.", "a": "Relacionar uma ideia aos argumentos que a sustentam"}, "LP D09": {"o": "Diferenciar as partes principais das secundárias em um texto.", "a": "Separar o que é principal do que é secundário"}, "LP D10": {"o": "Identificar o conflito gerador do enredo e os elementos que constroem a narrativa.", "a": "Identificar o conflito e os elementos de uma narrativa"}, "LP D11": {"o": "Estabelecer relação causa/consequência entre partes e elementos do texto.", "a": "Relacionar causas e consequências"}, "LP D12": {"o": "Identificar a finalidade de textos de diferentes gêneros.", "a": "Reconhecer para que serve um texto (sua finalidade)"}, "LP D13": {"o": "Identificar as marcas linguísticas que evidenciam o locutor e o interlocutor de um texto.", "a": "Reconhecer quem fala e com quem fala no texto"}, "LP D14": {"o": "Distinguir um fato da opinião relativa a esse fato.", "a": "Separar fato de opinião"}, "LP D15": {"o": "Estabelecer relações lógico-discursivas presentes no texto, marcadas por conjunções, advérbios, etc.", "a": "Entender o papel dos conectivos (porque, portanto, a fim de, embora...)"}, "LP D16": {"o": "Identificar efeitos de ironia ou humor em textos variados.", "a": "Perceber ironia e humor (charges, tirinhas, cartuns)"}, "LP D17": {"o": "Reconhecer o efeito de sentido decorrente do uso da pontuação e de outras notações.", "a": "Perceber o efeito da pontuação e de outras marcas"}, "LP D18": {"o": "Reconhecer o efeito de sentido decorrente da escolha de uma determinada palavra ou expressão.", "a": "Perceber o efeito da escolha de uma palavra"}, "LP D19": {"o": "Reconhecer o efeito de sentido decorrente da exploração de recursos ortográficos e/ou morfossintáticos.", "a": "Perceber efeitos de recursos ortográficos e gramaticais"}, "LP D20": {"o": "Reconhecer diferentes formas de tratar uma informação na comparação de textos que tratam do mesmo tema, em função das condições em que ele foi produzido e daquelas em que será recebido.", "a": "Comparar como dois textos tratam o mesmo tema"}, "LP D21": {"o": "Reconhecer posições distintas entre duas ou mais opiniões relativas ao mesmo fato ou ao mesmo tema.", "a": "Reconhecer opiniões diferentes sobre o mesmo assunto"}, "MT D06": {"o": "Identificar a localização de pontos no plano cartesiano.", "a": "Localizar pontos por coordenadas (como latitude e longitude)"}, "MT D14": {"o": "Identificar a localização de números reais na reta numérica.", "a": "Localizar números numa reta (como numa linha do tempo)"}, "MT D15": {"o": "Resolver problema que envolva variação proporcional, direta ou inversa, entre grandezas.", "a": "Resolver problemas de proporção (escala, densidade, razões)"}, "MT D16": {"o": "Resolver problema que envolva porcentagem.", "a": "Resolver problemas com porcentagem"}, "MT D20": {"o": "Analisar crescimento/decrescimento, zeros de funções reais apresentadas em gráficos.", "a": "Ver num gráfico quando algo cresce, cai ou se estabiliza"}, "MT D21": {"o": "Identificar o gráfico que representa uma situação descrita em um texto.", "a": "Escolher o gráfico que representa uma situação"}, "MT D34": {"o": "Resolver problema envolvendo informações apresentadas em tabelas e/ou gráficos.", "a": "Resolver problemas com dados de tabelas e gráficos"}, "MT D35": {"o": "Associar informações apresentadas em listas e/ou tabelas simples aos gráficos que as representam e vice-versa.", "a": "Passar dados de uma tabela para um gráfico e vice-versa"}};
+// Descritores do SAESE (Avaliação Somativa de Sergipe, 3ª série do EM) trabalhados em cada parte da aula
+
+// ---- Correções de descritor SAESE feitas pelos professores (saese-correcoes) ----
+let SAESE_CORR = null;
+function saeseChave(t){ return String(t||'').replace(/\s+/g, ' ').trim().slice(0, 160).toLowerCase(); }
+async function saeseCorrCarregar(forcar){ if(SAESE_CORR && !forcar) return SAESE_CORR; SAESE_CORR = (await planoLerJson('saese-correcoes', {})) || {}; return SAESE_CORR; }
+function saeseAplicar(chave, cs){ const c = SAESE_CORR && SAESE_CORR[chave]; return c && Array.isArray(c.c) && c.c.length ? c.c : (cs||[]); }
+function saeseDeQuestaoPlano(q){ return saeseAplicar(saeseChave(q.texto), q.saese); }
+async function saeseCorrSalvar(chave, cs, resumo){
+  const atual = (await planoLerJson('saese-correcoes', {})) || {};
+  const quem = (state.professor.session && state.professor.session.displayName) || 'Coordenação';
+  if(cs && cs.length) atual[chave] = { c: cs, por: quem, em: Date.now(), texto: String(resumo||'').slice(0, 120) }; else delete atual[chave];
+  await window.storage.set('saese-correcoes', JSON.stringify(atual), true); SAESE_CORR = atual;
+}
+function saeseCorrExportar(){
+  const c = SAESE_CORR || {}; const blob = new Blob([JSON.stringify(c, null, 1)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `saese-correcoes-${new Date().toISOString().slice(0,10)}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+function avSaeseDe(d, sl){
+  const S = d && d.saese; if(!S || !sl) return [];
+  switch(sl.t){
+    case 'aprender': return S.aprender||[]; case 'destaque': return S.destaque||[];
+    case 'figura': { const fg = (d.figuras||[])[sl.i]; return saeseAplicar('fig:' + (fg && fg.f), (S.fig||[])[sl.i]||[]); }
+    case 'esquema': return S.esquema||[]; case 'relampago': case 'resposta': return S.relampago||[]; case 'conceito': return S.conceito||[];
+    case 'vf': return S.vf||[]; case 'caderno': case 'mapa-inicio': case 'mapa-final': return S.mapa||[];
+    case 'ap-enem': case 'ap-enem-res': return d.leituraEnem ? saeseAplicar(saeseChave(d.leituraEnem.base), S.leitura||[]) : (S.leitura||[]); case 'repertorio': return S.repertorio||[];
+    case 'saese-q': case 'saese-q-res': return d.saeseQ ? saeseAplicar(saeseChave(d.saeseQ.base + '\n' + d.saeseQ.cmd), S.desafio||[]) : (S.desafio||[]);
+    case 'proposta': case 'proposta-res': return S.proposta||[]; case 'grupo': return S.debate||[]; case 'pratica': return S.pratica||[];
+    case 'ap-contexto': return S.apContexto||[]; case 'ap-conceitos': return S.apConceitos||[]; case 'ap-fonte': case 'ap-fonte-res': return S.apFonte||[];
+    case 'ap-processo': return S.apProcesso||[]; case 'ap-interp': return S.apInterp||[]; case 'ap-sintese': return S.apSintese||[];
+  }
+  return [];
+}
+function saeseExplicacao(q){ const e = q.explicacao||''; const cs = (q.texto ? saeseDeQuestaoPlano(q) : q.saese)||[]; return cs.length ? (e + (e ? ' ' : '') + '🎯 SAESE: ' + cs.map(c => `${c} (${(SAESE_CAT[c]||{}).a||''})`).join('; ') + '.') : e; }
+function saeseTitulo(cs){ return (cs||[]).map(c => `${c} — ${(SAESE_CAT[c]||{}).o||''}`).join('\n'); }
+function saeseListaHtml(cs, cor){ return (cs||[]).map(c => `<div style="display:flex;gap:.5em;align-items:baseline;margin:.18em 0;"><span class="av-saesecod" style="background:${c.startsWith('MT')?'#1F4E79':'#00695C'};">${c}</span><span>${escR((SAESE_CAT[c]||{}).a||'')}</span></div>`).join(''); }
 function avSlideHtml(d, sl, ctx){
+  let h = avSlideHtmlBase(d, sl, ctx); const pr = avEnemPrio(d);
+  const cs = avSaeseDe(d, sl);
+  if(cs.length) h += `<div class="av-saesetag" data-saese="${escR(cs.join(','))}" title="${escR('Descritores SAESE trabalhados neste slide:\n' + saeseTitulo(cs))}">🎯 SAESE · ${escR(cs.join(' · '))}</div>`;
+  if(!pr.length || !sl || sl.t === 'capa') return h;
+  return h + `<div class="av-enemtag" title="Assunto priorizado no ENEM: ${escR(pr.join(', '))}">${avIc('FaTriangleExclamation', '#fff')} PRIORIDADE ENEM</div>`;
+}
+function avSlideHtmlBase(d, sl, ctx){
   const C = { v:'#6B1F2E', o:'#C9A227', a:'#1F4E79' };
   const img = (k, alt) => AV_IMG[k] ? `<img src="${AV_IMG[k]}" alt="" style="max-width:100%;max-height:${alt||38}cqw;object-fit:contain;border-radius:.3em;">` : '<div class="av-fonte">(imagem não importada)</div>';
   const L = ['A','B','C','D','E'];
   const r = d.relampago;
   switch(sl.t){
-  case 'capa': return `<div class="av-in av-escuro">
+  case 'capa': { const pr = avEnemPrio(d); return `<div class="av-in av-escuro">
       <div style="position:absolute;right:4cqw;top:3cqw;opacity:.35;font-size:9em;">${avIc(d.iconeAula, '#C98A9A')}</div>
-      <div style="color:${C.o};font-weight:700;letter-spacing:.15em;font-size:.8em;margin-top:1.5em;">AULA ${String(ctx.n).padStart(2,'0')} · LIVRO ${escR(d.paginas||'')}</div>
+      ${pr.length ? `<div class="av-enemalerta av-pop">${avIc('FaTriangleExclamation', '#6B1F2E', 'font-size:1.25em;')}<span><b>PRIORIDADE ENEM</b> · assunto muito cobrado: ${escR(pr.join(', '))}</span></div>` : ''}
+      <div style="color:${C.o};font-weight:700;letter-spacing:.15em;font-size:.8em;margin-top:${pr.length ? 2.6 : 1.5}em;">AULA ${String(ctx.n).padStart(2,'0')} · LIVRO ${escR(d.paginas||'')}</div>
       <div class="av-t" style="font-size:2.4em;margin-top:1.6em;">${escR(d.titulo)}</div>
       <div style="color:#F3E7C0;">${escR(d.capitulo||'')}</div>
-      <div class="av-card ou av-pop" style="position:absolute;left:4.4cqw;right:4.4cqw;bottom:4cqw;color:${C.v};font-size:1.15em;animation-delay:.3s;"><b>Para começar:</b> <i>${escR(d.pergunta)}</i></div></div>`;
+      ${(d.saese && (d.saese.aula||[]).length) ? `<div class="av-saesebox av-pop" data-saese-capa style="position:absolute;left:4.4cqw;right:4.4cqw;bottom:12.2cqw;animation-delay:.5s;"><b style="color:#00695C;">🎯 Nesta aula você treina (SAESE)</b><div style="display:grid;grid-template-columns:1fr 1fr;column-gap:1.2em;">${saeseListaHtml(d.saese.aula)}</div></div>` : ''}
+      <div class="av-card ou av-pop" style="position:absolute;left:4.4cqw;right:4.4cqw;bottom:4cqw;color:${C.v};font-size:1.15em;animation-delay:.3s;"><b>Para começar:</b> <i>${escR(d.pergunta)}</i></div></div>`; }
   case 'retomada': {
     if(!d.anterior){ const ab = (d.abertura && Array.isArray(d.abertura.cards) && d.abertura.cards.length) ? d.abertura : { titulo:'Começando a Geografia do Ensino Médio', cards:[['Introdução','O espaço geográfico e seus conceitos'],['Capítulo 1','Representações cartográficas e escalas'],['Revisão e prova','Aulas 19 e 20 do bimestre']] };
       return `<div class="av-in"><div class="av-t">${escR(ab.titulo||'')}</div><div class="av-g3" style="align-items:stretch;">
@@ -23622,7 +24245,77 @@ function avSlideHtml(d, sl, ctx){
         : foto ? `<div style="height:76%;display:flex;align-items:center;justify-content:center;">${foto}</div>` : `<div class="av-card" style="font-size:1.1em;">${texto}</div>`}</div>`;
   }
   case 'volte': return `<div class="av-in av-azul"><div class="av-t">Volte à pergunta inicial</div><div style="font-size:1.6em;font-style:italic;margin:1.2em 0;">${escR(d.pergunta)}</div>
-      <div class="av-card ou" style="color:${C.v};font-weight:700;">Escreva no caderno, em até 3 linhas, a sua resposta com o que aprendeu hoje.</div></div>`;
+      <div class="av-card ou" style="color:${C.v};font-weight:700;">Escreva no caderno, em até 3 linhas, a sua resposta com o que aprendeu hoje.</div>
+      ${(d.saese && (d.saese.aula||[]).length) ? `<div class="av-saesebox" data-saese-volte style="margin-top:.9em;font-size:.85em;"><b style="color:#00695C;">🎯 Hoje você treinou (SAESE) — marque ✔ no caderno o que já consegue fazer:</b>${saeseListaHtml(d.saese.aula)}</div>` : ''}</div>`;
+  case 'ap-contexto': { const c = d.aprof.contexto; const it = [['FaCalendarDays','Quando', c.quando],['FaMapLocationDot','Onde', c.onde],['FaUsers','Quem', c.quem]].filter(x=>x[2]);
+    return `<div class="av-in"><div class="av-fonte" style="font-size:.7em;letter-spacing:.14em;color:${C.a};font-weight:700;">APROFUNDAMENTO · CONTEXTO</div><div class="av-t">${escR(c.titulo||'Em que contexto isso aconteceu?')}</div>
+      <div class="av-g3" style="align-items:stretch;">${it.map(([ic,t,x],i)=>`<div class="av-card ${i===0?'ou':'az'} av-pop" style="animation-delay:${i*.15}s;"><div class="av-row">${avCirc(ic, C.v, '#fff', 1.8)}<b style="color:${C.v};">${t}</b></div><div style="margin-top:.4em;">${escR(x)}</div></div>`).join('')}</div>
+      ${c.texto?`<div class="av-card av-pop" style="margin-top:.9em;font-size:1.05em;animation-delay:.5s;">${escR(c.texto)}</div>`:''}</div>`; }
+  case 'ap-conceitos': { const cs = d.aprof.conceitos.slice(0,6); const g = cs.length > 4 ? 'repeat(3,1fr)' : '1fr 1fr';
+    return `<div class="av-in"><div class="av-fonte" style="font-size:.7em;letter-spacing:.14em;color:${C.a};font-weight:700;">APROFUNDAMENTO · CONCEITOS-CHAVE</div><div class="av-t">Vocabulário da aula</div>
+      <div style="display:grid;grid-template-columns:${g};gap:.7em;font-size:${cs.length>4?'.9em':'1em'};">${cs.map(([t,x],i)=>`<div class="av-card av-pop" style="animation-delay:${i*.12}s;border-left:.35em solid ${C.o};"><b style="color:${C.v};font-size:1.1em;">${escR(t)}</b><div style="margin-top:.25em;">${escR(x)}</div></div>`).join('')}</div></div>`; }
+  case 'ap-fonte': case 'ap-fonte-res': { const f = d.aprof.fonte; const res = sl.t === 'ap-fonte-res';
+    const esq = f.img ? `<div style="display:flex;align-items:center;justify-content:center;">${img(f.img, 30)}</div>` : '';
+    return `<div class="av-in"><div class="av-fonte" style="font-size:.7em;letter-spacing:.14em;color:${C.a};font-weight:700;">APROFUNDAMENTO · FONTE EM FOCO</div><div class="av-t">${escR(f.titulo||'Analise a fonte')}</div>
+      <div style="display:grid;grid-template-columns:${f.img?'1fr 1.2fr':'1fr'};gap:1em;">${esq}<div>
+      ${f.trecho?`<div class="av-card ou" style="font-style:italic;font-size:1em;">${/^\s*[“"]/.test(f.trecho)?escR(f.trecho):'“'+escR(f.trecho)+'”'}<div class="av-fonte" style="font-style:normal;margin-top:.4em;">${escR(f.ref||'')}</div></div>`:''}
+      ${res ? `<div class="av-card av-pop" style="background:#E9F6EC;margin-top:.7em;font-size:1em;"><b style="color:#1d6b31;">Leitura da fonte:</b> ${escR(f.resposta||'')}</div>` : `<ol style="margin:.7em 0 0 1.2em;padding:0;font-size:1.05em;">${(f.perguntas||[]).map((q,i)=>`<li class="av-pop" style="margin:.3em 0;animation-delay:${.3+i*.2}s;">${escR(q)}</li>`).join('')}</ol>`}
+      </div></div></div>`; }
+  case 'ap-processo': { const pr = d.aprof.processo; const cols = pr.colunas || []; const cores = ['#F3E7C0','#F6EEF0','#DCE6F1','#E9F6EC'];
+    return `<div class="av-in"><div class="av-fonte" style="font-size:.7em;letter-spacing:.14em;color:${C.a};font-weight:700;">APROFUNDAMENTO · RELAÇÕES</div><div class="av-t">${escR(pr.titulo||'Causas, processo e consequências')}</div>
+      <div style="display:grid;grid-template-columns:repeat(${cols.length},1fr);gap:.6em;font-size:.97em;">${cols.map(([t,its],i)=>`<div class="av-pop" style="animation-delay:${i*.25}s;background:${cores[i%4]};border-radius:.6em;padding:.7em .8em;position:relative;"><b style="color:${C.v};font-size:1.1em;">${escR(t)}</b><ul style="margin:.4em 0 0 1em;padding:0;">${its.map(x=>`<li style="margin:.25em 0;">${escR(x)}</li>`).join('')}</ul>${i<cols.length-1?`<span style="position:absolute;right:-.62em;top:45%;color:${C.v};font-size:1.3em;z-index:2;">▶</span>`:''}</div>`).join('')}</div></div>`; }
+  case 'ap-interp': { const ip = d.aprof.interpretacoes;
+    return `<div class="av-in"><div class="av-fonte" style="font-size:.7em;letter-spacing:.14em;color:${C.a};font-weight:700;">APROFUNDAMENTO · INTERPRETAÇÕES</div><div class="av-t">${escR(ip.titulo||'Diferentes leituras do mesmo tema')}</div>
+      <div style="display:grid;grid-template-columns:repeat(${Math.min(3,(ip.itens||[]).length)},1fr);gap:.7em;font-size:.97em;">${(ip.itens||[]).map(([q,x],i)=>`<div class="av-card ${i%2?'az':''} av-pop" style="animation-delay:${i*.2}s;">${avIc('FaQuoteLeft', C.o, 'font-size:1.3em;')}<div><b style="color:${C.v};">${escR(q)}</b></div><div style="margin-top:.3em;">${escR(x)}</div></div>`).join('')}</div>
+      ${ip.pergunta?`<div class="av-card ou av-pop" style="margin-top:.8em;animation-delay:.7s;"><b>Para debater:</b> ${escR(ip.pergunta)}</div>`:''}</div>`; }
+  case 'ap-enem': case 'ap-enem-res': { const q = d.leituraEnem || d.aprof.enem; const res = sl.t === 'ap-enem-res';
+    if(q.err){ const imgH = res ? 0 : 36;
+      return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t" style="margin:0;">${res?'Resolvendo passo a passo':'Leitura ENEM'}</div><span style="background:${C.a};color:#fff;border-radius:.4em;padding:.15em .6em;font-size:.75em;font-weight:700;">ENEM · ${escR(q.hab||'')}</span></div>
+      ${res ? `<div style="font-size:.95em;margin-top:.35em;"><div style="font-weight:700;color:${C.v};">${escR(q.cmd)}</div>
+        <div class="av-g2" style="gap:.3em 1em;margin:.3em 0 .45em;">${q.ops.map((o,i)=>`<div style="${i===q.c?'color:#1d6b31;font-weight:700;':'color:#888;'}">${L[i]}) ${escR(o)}</div>`).join('')}</div>
+        <div class="av-g3" style="align-items:stretch;gap:.6em;">
+          <div class="av-card ou av-pop" style="margin:0;"><b style="color:${C.v};">1. O que o comando pede</b><div style="margin-top:.25em;">${escR(q.pede)}</div></div>
+          <div class="av-card az av-pop" style="margin:0;animation-delay:.15s;"><b style="color:${C.a};">2. A pista no texto</b><div style="margin-top:.25em;">${escR(q.pista)}</div></div>
+          <div class="av-card av-pop" style="margin:0;background:#E9F6EC;animation-delay:.3s;"><b style="color:#1d6b31;">3. Por que as outras estão erradas</b>${q.err.map((e,i)=> e ? `<div style="margin-top:.2em;font-size:.92em;"><b>${L[i]})</b> ${escR(e)}</div>` : '').join('')}</div>
+        </div></div>`
+      : `<div style="display:grid;grid-template-columns:${q.img?'1.1fr 1fr':'1fr'};gap:.9em;margin-top:.5em;font-size:${q.img?'.95em':'1.05em'};">${q.img?`<div style="display:flex;align-items:flex-start;justify-content:center;">${img(q.img, imgH)}</div>`:''}
+        <div><div style="white-space:pre-line;">${escR(q.base)}</div><div style="margin:.5em 0 .3em;font-weight:700;color:${C.v};">${escR(q.cmd)}</div>
+        ${q.ops.map((o,i)=>`<div style="margin:.15em 0;">${L[i]}) ${escR(o)}</div>`).join('')}</div></div>`}</div>`; }
+    return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t" style="margin:0;">${res?'Resolvendo passo a passo':'Leitura ENEM'}</div><span style="background:${C.a};color:#fff;border-radius:.4em;padding:.15em .6em;font-size:.75em;font-weight:700;">ENEM · ${escR(q.hab||'')}</span></div>
+      <div style="display:grid;grid-template-columns:${q.img?'1.15fr 1fr':'1fr'};gap:.9em;margin-top:.5em;font-size:${q.img?'.86em':'.95em'};">${q.img?`<div style="display:flex;align-items:flex-start;justify-content:center;">${img(q.img, 34)}</div>`:''}
+      <div><div style="white-space:pre-line;">${escR(q.base)}</div><div style="margin:.5em 0 .3em;font-weight:700;color:${C.v};">${escR(q.cmd)}</div>
+      ${q.ops.map((o,i)=>`<div style="margin:.15em 0;${res&&i===q.c?'color:#1d6b31;font-weight:700;':(res?'color:#999;':'')}">${L[i]}) ${escR(o)}</div>`).join('')}
+      ${res?`<div class="av-card av-pop" style="background:#E9F6EC;margin-top:.5em;"><ol style="margin:0 0 0 1.1em;padding:0;">${(q.passos||[]).map(x=>`<li style="margin:.2em 0;">${escR(x)}</li>`).join('')}</ol></div>`:''}</div></div></div>`; }
+  case 'saese-q': case 'saese-q-res': { const q = d.saeseQ; const res = sl.t === 'saese-q-res'; const T = '#00695C'; const cat = SAESE_CAT[q.d] || {};
+    const larga = q.img && (q.ar||1.5) > 2.2;
+    const cab = `<div class="av-row" style="justify-content:space-between;"><div class="av-t" style="margin:0;">${res?'Resolvendo o desafio':'Desafio SAESE'}</div><span title="${escR(q.d + ' — ' + (cat.o||''))}" style="background:${T};color:#fff;border-radius:.4em;padding:.15em .6em;font-size:.75em;font-weight:700;">SAESE · ${escR(q.d)}</span></div>
+      <div style="color:${T};font-size:.8em;margin:.1em 0 .2em;">🎯 ${escR(cat.a||'')}</div>`;
+    if(res) return `<div class="av-in">${cab}<div style="font-size:.95em;"><div style="font-weight:700;color:${C.v};">${escR(q.cmd)}</div>
+        <div class="av-g2" style="gap:.3em 1em;margin:.3em 0 .45em;">${q.ops.map((o,i)=>`<div style="${i===q.c?'color:#1d6b31;font-weight:700;':'color:#888;'}">${L[i]}) ${escR(o)}</div>`).join('')}</div>
+        <div class="av-g3" style="align-items:stretch;gap:.6em;">
+          <div class="av-card av-pop" style="margin:0;background:#E0F2F1;"><b style="color:${T};">1. O que o descritor pede</b><div style="margin-top:.25em;">${escR(q.pede)}</div><div class="av-fonte" style="margin-top:.35em;font-size:.78em;">${escR(q.d)}: ${escR(cat.o||'')}</div></div>
+          <div class="av-card az av-pop" style="margin:0;animation-delay:.15s;"><b style="color:${C.a};">2. Como resolver</b><div style="margin-top:.25em;">${escR(q.passo)}</div></div>
+          <div class="av-card av-pop" style="margin:0;background:#E9F6EC;animation-delay:.3s;"><b style="color:#1d6b31;">3. Por que as outras estão erradas</b>${q.err.map((e,i)=> e ? `<div style="margin-top:.2em;font-size:.92em;"><b>${L[i]})</b> ${escR(e)}</div>` : '').join('')}</div>
+        </div></div></div>`;
+    if(larga) return `<div class="av-in">${cab}<div style="text-align:center;margin:.2em 0 .3em;">${img(q.img, 15)}</div>
+        <div style="font-size:.92em;"><div style="white-space:pre-line;">${escR(q.base)}</div><div style="margin:.35em 0 .2em;font-weight:700;color:${C.v};">${escR(q.cmd)}</div>
+        <div class="av-g2" style="gap:.15em 1em;">${q.ops.map((o,i)=>`<div>${L[i]}) ${escR(o)}</div>`).join('')}</div></div></div>`;
+    return `<div class="av-in">${cab}<div style="display:grid;grid-template-columns:${q.img?'1.15fr 1fr':'1fr'};gap:.9em;margin-top:.3em;font-size:${q.img?'.95em':'1.08em'};">${q.img?`<div style="display:flex;align-items:flex-start;justify-content:center;">${img(q.img, 34)}</div>`:''}
+        <div><div style="white-space:pre-line;">${escR(q.base)}</div><div style="margin:.5em 0 .3em;font-weight:700;color:${C.v};">${escR(q.cmd)}</div>
+        ${q.ops.map((o,i)=>`<div style="margin:.15em 0;">${L[i]}) ${escR(o)}</div>`).join('')}</div></div></div>`; }
+  case 'repertorio': { const r = d.repertorio; return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t" style="margin:0;">Repertório para a redação</div>${avCirc('FaFeatherPointed', C.v, '#fff', 2.2)}</div>
+      <div style="color:${C.a};margin:.3em 0 .8em;">Para citar na redação do ENEM, a partir desta aula:</div>
+      <div class="av-card ou av-pop" style="font-size:1.12em;"><span style="background:${C.v};color:#fff;border-radius:.35em;padding:.05em .5em;font-size:.7em;font-weight:700;letter-spacing:.06em;">${escR((r.tipo||'').toUpperCase())}</span>
+        <div class="av-t" style="font-size:1.45em;margin:.35em 0 .25em;">${escR(r.titulo)}</div><div>${escR(r.texto)}</div></div>
+      <div class="av-card az av-pop" style="animation-delay:.25s;"><b style="color:${C.a};">Como usar:</b> ${escR(r.uso)}</div></div>`; }
+  case 'proposta': case 'proposta-res': { const p = d.proposta; const res = sl.t === 'proposta-res';
+      const el = [['Agente','Quem vai agir?','agente'],['Ação','O que será feito?','acao'],['Meio','Como? Por meio de quê?','meio'],['Finalidade','Para quê? Qual efeito?','finalidade'],['Detalhamento','Um detalhe a mais sobre um dos elementos','detalhamento']];
+      return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t" style="margin:0;">${res?'Proposta de intervenção: um modelo':'Proposta de intervenção'}</div>${avCirc('FaLightbulb', C.o, '#fff', 2.2)}</div>
+      <div class="av-card ou" style="margin:.4em 0 .6em;"><b>Problema:</b> ${escR(p.problema)}</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:.5em;font-size:.86em;">${el.map(([t,g,k],i)=>`<div class="av-card ${i%2?'az':''} av-pop" style="margin:0;animation-delay:${i*.1}s;min-height:9em;"><b style="color:${C.v};">${t}</b><div style="color:#777;font-size:.88em;margin:.15em 0 .35em;">${g}</div>${res?escR(p[k]||''):''}</div>`).join('')}</div>
+      ${res?'':`<div style="margin-top:.6em;color:${C.a};">No caderno, complete os cinco elementos, como na redação do ENEM. Depois comparamos com um modelo.</div>`}</div>`; }
+  case 'ap-sintese': return `<div class="av-in"><div class="av-row">${avCirc('FaPenToSquare', C.v, '#fff', 2.2)}<div class="av-t" style="margin:0;">Síntese para o caderno</div></div>
+      <div class="av-card" style="margin-top:.8em;font-size:1em;line-height:1.45;white-space:pre-line;">${escR(d.aprof.sintese)}</div></div>`;
   case 'conexoes': { const cx = (d.conexoes||[]).slice(0, 3); const icD = disc => ({ geografia:'FaEarthAmericas', sociologia:'FaPeopleGroup', historia:'FaLandmark' })[planoDiscKey(disc)] || 'FaBookOpen';
     return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Conexões na área</div>${avCirc('FaDiagramProject', C.a, '#fff', 2.2)}</div>
       <div style="margin-bottom:.7em;color:${C.a};">Este assunto também aparece em outra disciplina de Ciências Humanas:</div>
@@ -23944,6 +24637,22 @@ function sedValor(el){
   if(/\.perguntas$/.test(path)) return el.value.split('\n').map(x => x.trim()).filter(Boolean);
   return el.value;
 }
+
+// Kit SAESE: filtros, busca e seleção de questões
+document.addEventListener('change', e => {
+  if(e.target && e.target.id==='saese-oficial-input' && e.target.files && e.target.files[0]){ saeseOficialImportar(e.target.files[0]); e.target.value=''; return; }
+  const el = e.target; const a = el && el.dataset && el.dataset.actionChange; if(!a || !a.startsWith('kit-')) return;
+  const k = kitState();
+  if(a==='kit-filtro'){ k.f[el.dataset.k] = el.value; k.lim = 30; render(); }
+  else if(a==='kit-sel'){ k.sel[el.dataset.id] = el.checked; render(); }
+});
+let kitBuscaTimer = null;
+document.addEventListener('input', e => {
+  const el = e.target; if(!el || !el.dataset || el.dataset.actionInput!=='kit-busca') return;
+  kitState().f.q = el.value; clearTimeout(kitBuscaTimer);
+  kitBuscaTimer = setTimeout(() => { const pos = el.selectionStart; kitState().lim = 30; render();
+    const n = document.querySelector('[data-action-input="kit-busca"]'); if(n){ n.focus(); try{ n.setSelectionRange(pos, pos); }catch(_){} } }, 350);
+});
 document.addEventListener('input', e => {
   const el = e.target; if(!el || !el.dataset || !el.dataset.sed) return;
   const se = planoState().sedAberto; if(!se || !se.wd) return;
@@ -25595,7 +26304,7 @@ async function planoAplicarDiagnostica(turmaId, b){
   const questions = [];
   for(const { q } of itens){ const options = q.opcoes.map(t => ({ id: cryptoId(), text: t }));
     let image = null; if(q.imagem){ if(!(q.imagem in imgCache)) imgCache[q.imagem] = await planoLerJson(`plano-livro-img:${q.imagem}`, null); image = imgCache[q.imagem] || null; }
-    const nq = { id: cryptoId(), type:'mc', text: q.texto, points: pts, image, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo: 'Diagnóstica', options, correctOptionId: options[q.correta].id, explicacao: q.explicacao||'' };
+    const nq = { id: cryptoId(), type:'mc', text: q.texto, points: pts, image, annulled:false, descritorSaeb: q.habilidade ? 'ENEM ' + q.habilidade : '', conteudo: 'Diagnóstica', options, correctOptionId: options[q.correta].id, explicacao: saeseExplicacao(q), saese: saeseDeQuestaoPlano(q) };
     if(q.comando) nq.comando = q.comando; questions.push(nq); }
   const faixa = nums.length > 1 ? `aulas ${nums[0]} a ${nums[nums.length-1]}` : `aula ${nums[0]}`;
   const a = { code, title: `Avaliação diagnóstica — ${b}º bimestre (${faixa})`, instrumento: 'diagnostica', unidade: UNIDADES[Math.max(0, Math.min(3, b-1))],
@@ -27384,6 +28093,32 @@ document.addEventListener('click', (e) => {
   else if(act==='plano-video-remover'){ const s = planoState(); planoRemoverVideo(s.turmaPlano[s.turmaSel], parseInt(btn.dataset.n), btn.dataset.id); }
   else if(act==='plano-feedback-prof'){ planoEnviarFeedbackProf(parseInt(btn.dataset.n), parseInt(btn.dataset.v)); }
   else if(act==='plano-analisar-hab'){ planoAnalisarHabilidades(planoState().turmaSel); }
+  else if(act==='saese-simulado'){ planoSimuladoSaese(planoState().turmaSel); }
+  else if(act==='saese-devolutiva'){ saeseDevolutivaImprimir(planoState().turmaSel); }
+  else if(act==='saese-escola-calc'){ saeseEscolaCalcular(); }
+  else if(act==='saese-oficial-modelo'){ saeseOficialModelo(); }
+  else if(act==='saese-oficial-limpar'){ (async () => { if(!confirm('Remover o resultado oficial importado?')) return; await window.storage.set('saese-oficial', 'null', true); saeseEscolaState().oficial = null; render(); })(); }
+  else if(act==='saese-meta-bim'){ const s = planoState(); s.saeseMetaBim = Number(btn.dataset.b); s.saeseMetaEdit = false; render(); }
+  else if(act==='saese-meta-editar'){ const s = planoState(); const m = (s.saeseMetas||{})[s.turmaSel] || {}; s.saeseMetaSel = ((m['b' + (s.saeseMetaBim || saeseBimAtual())] || {}).codes || []).slice(); s.saeseMetaEdit = true; render(); }
+  else if(act==='saese-meta-cancelar'){ planoState().saeseMetaEdit = false; render(); }
+  else if(act==='saese-meta-toggle'){ const s = planoState(); const c = btn.dataset.c; s.saeseMetaSel = s.saeseMetaSel || []; if(s.saeseMetaSel.includes(c)) s.saeseMetaSel = s.saeseMetaSel.filter(x => x!==c); else if(s.saeseMetaSel.length < 3) s.saeseMetaSel.push(c); render(); }
+  else if(act==='saese-meta-salvar'){ (async () => { const s = planoState(); const el = document.getElementById('saese-meta-pct'); await saeseMetasSalvar(s.turmaSel, s.saeseMetaBim || saeseBimAtual(), s.saeseMetaSel || [], Number(el ? el.value : 70)); s.saeseMetaEdit = false; render(); })(); }
+  else if(act==='kit-area'){ const k = kitState(); k.f.a = btn.dataset.v; if(k.f.desc && k.f.a && !k.f.desc.startsWith(k.f.a)) k.f.desc = ''; k.lim = 30; render(); }
+  else if(act==='kit-desc'){ const k = kitState(); k.f.desc = k.f.desc===btn.dataset.c ? '' : btn.dataset.c; k.lim = 30; render(); }
+  else if(act==='kit-aula'){ const k = kitState(); k.f.aula = btn.dataset.k===k.f.aula ? '' : btn.dataset.k; k.lim = 30; render(); }
+  else if(act==='kit-mais'){ kitState().lim += 30; render(); }
+  else if(act==='kit-montar'){ kitMontarAtividade(); }
+  else if(act==='kit-corrigir'){ const k = kitState(); const r = k.rows.find(x => String(x.id)===btn.dataset.id); k.editando = k.editando===r.id ? null : r.id; k.editSel = r.c.slice(); render(); }
+  else if(act==='kit-edit-toggle'){ const k = kitState(); const c = btn.dataset.c; k.editSel = k.editSel||[]; if(k.editSel.includes(c)) k.editSel = k.editSel.filter(x => x!==c); else if(k.editSel.length < 3) k.editSel.push(c); render(); }
+  else if(act==='kit-edit-cancelar'){ kitState().editando = null; render(); }
+  else if(act==='kit-edit-salvar' || act==='kit-edit-original'){ (async () => { const k = kitState(); const r = k.rows.find(x => x.id===k.editando); if(!r) return;
+    const cs = act==='kit-edit-original' ? [] : (k.editSel||[]); if(act==='kit-edit-salvar' && !cs.length){ alert('Marque pelo menos um descritor.'); return; }
+    await saeseCorrSalvar(r.ch, cs, r.r); k.rows.filter(x => x.ch===r.ch).forEach(x => { x.c = saeseAplicar(x.ch, x.c0); x.corr = !!SAESE_CORR[x.ch]; }); k.editando = null; render(); })(); }
+  else if(act==='kit-exportar-corr'){ saeseCorrExportar(); }
+  else if(act==='kit-limpar'){ kitState().sel = {}; render(); }
+  else if(act==='saese-retomada'){ planoRetomadaSaese(planoState().turmaSel, btn.dataset.d); }
+  else if(act==='saese-caderneta'){ saeseCadernetaImprimir(planoState().turmaSel); }
+  else if(act==='saese-auto'){ alunoSaeseAuto(btn.dataset.d, btn.dataset.v); }
   else if(act==='plano-analisar-erros'){ planoAnalisarErros(planoState().turmaSel); }
   else if(act==='plano-aplicar-revisao'){ planoState().msg=''; aplicarListaRevisao(planoState().turmaSel); }
   else if(act==='plano-montar-prova'){ planoAbrirMontarProva(planoState().turmaSel, parseInt(btn.dataset.b)); }
