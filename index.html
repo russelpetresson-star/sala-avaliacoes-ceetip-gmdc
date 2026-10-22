@@ -747,6 +747,62 @@
   .bib-filtros{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:8px; }
   .bib-filtros input{ grid-column:1 / -1; }
   .bib-filtros input, .bib-filtros select{ margin:0; width:100%; min-width:0; }
+  .tr-faixa-cab{ display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline; margin-bottom:8px; }
+  .tr-grade{ display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:8px; }
+  .tr-chip{ display:flex; flex-direction:column; gap:3px; text-align:left; background:#fff; border:1px solid #e3dccf; border-left:5px solid var(--tc); border-radius:10px; padding:8px 10px; cursor:pointer; font:inherit; color:inherit; }
+  .tr-chip:hover{ background:#faf7f2; }
+  .tr-chip-ic{ font-size:1.3rem; line-height:1; }
+  .tr-chip-q{ font-weight:700; color:var(--tc); font-size:.93rem; }
+  .tr-chip-meta{ font-size:.76rem; color:#666; }
+  .tr-barra{ display:block; height:6px; background:#eee; border-radius:4px; overflow:hidden; margin-top:4px; }
+  .tr-barra > span{ display:block; height:100%; border-radius:4px; }
+  .tr-cab{ display:flex; gap:14px; align-items:flex-start; }
+  .tr-cab > div:last-child{ flex:1; min-width:0; }
+  .tr-cab-ic{ font-size:2.4rem; line-height:1; }
+  .tr-serie{ margin-bottom:10px; }
+  .tr-serie h4{ margin:.4em 0; }
+  .tr-serie:not(.atual){ opacity:.75; }
+  .tr-etapa{ display:flex; gap:10px; align-items:flex-start; padding:7px 0; border-bottom:1px dashed #e6e0d6; }
+  .tr-num{ flex:0 0 28px; height:28px; border-radius:50%; border:2px solid; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.82rem; background:#fff; }
+  .tr-etapa-txt{ flex:1; min-width:0; font-size:.88rem; }
+  .tr-papel{ font-size:.82rem; color:#444; margin-top:2px; }
+  .tr-resposta textarea{ width:100%; box-sizing:border-box; }
+  .tr-resp-ant{ background:#f6f3ee; border-radius:8px; padding:6px 10px; margin:0 0 8px; font-size:.86rem; }
+  .tr-resp-ant p{ margin:4px 0 0; white-space:pre-wrap; }
+  .tr-aula{ margin:6px 0; padding:8px 10px; border-radius:8px; background:#f7f4fb; border:1px solid #e2d9ef; font-size:.86rem; }
+  .tr-aula-item{ border-left:4px solid; padding:2px 0 2px 8px; margin-top:6px; }
+  .tr-sel{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .tr-sel-btn{ border:1px solid #ddd; border-left:4px solid var(--tc); background:#fff; border-radius:8px; padding:5px 9px; cursor:pointer; font:inherit; font-size:.84rem; }
+  .tr-sel-btn.ativa{ background:#f3eee6; font-weight:700; }
+  .tr-badge{ display:inline-block; background:#1F4E79; color:#fff; border-radius:9px; padding:0 6px; font-size:.72rem; }
+  .tr-painel{ background:#fff; border:1px solid #e6e0d6; border-radius:10px; padding:10px 12px; }
+  .tr-cols{ display:grid; grid-template-columns:minmax(0, 1.4fr) minmax(0, 1fr); gap:14px; }
+  @media (max-width: 760px){ .tr-cols{ grid-template-columns:1fr; } .tr-cab-ic{ font-size:1.8rem; } }
+  .tr-lista{ margin:6px 0 0 18px; padding:0; font-size:.86rem; }
+  .tr-lista li{ margin:5px 0; }
+  .tr-st{ font-size:.76rem; color:#777; white-space:nowrap; }
+  .tr-st.ok{ color:#1d6b31; font-weight:700; }
+  .tr-st.outra{ color:#a4521b; }
+  .tr-box{ background:#f8f6f2; border-radius:8px; padding:8px 10px; margin-bottom:8px; font-size:.86rem; }
+  .tr-resp{ border-top:1px solid #e6e0d6; padding:4px 0; }
+  .tr-resp summary{ cursor:pointer; }
+  .tr-resp p{ margin:4px 0; white-space:pre-wrap; }
+  .tr-abas{ display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .tr-abas .btn{ flex:0 0 auto; width:auto; }
+  .tr-abas .btn.ativa{ background:#1F4E79; color:#fff; border-color:#1F4E79; }
+  .pt-grade{ display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:8px; }
+  .pt-card{ background:#fff; border:1px solid #e6e0d6; border-left:5px solid; border-radius:10px; padding:8px 10px; display:flex; flex-direction:column; gap:2px; }
+  .pt-pront{ flex:0 0 auto; white-space:nowrap; font-size:.76rem; color:#666; background:#f1efe9; border-radius:8px; padding:1px 7px; }
+  .pt-pront.ok{ color:#1d6b31; background:#e3f2e6; font-weight:700; }
+  .pt-lib{ flex:0 0 auto; white-space:nowrap; font-size:.76rem; color:#1F4E79; font-weight:700; }
+  .pt-det{ background:#fff; border:1px solid #e6e0d6; border-radius:10px; padding:10px 12px; }
+  .pt-problema{ font-weight:700; font-size:1rem; background:#f5f1ea; border-radius:8px; padding:8px 10px; margin:6px 0; }
+  .pt-acoes{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:8px 0; }
+  .pt-passos{ display:flex; flex-direction:column; gap:6px; }
+  .pt-passo{ display:flex; gap:8px; font-size:.86rem; align-items:flex-start; }
+  .pt-min{ flex:0 0 40px; text-align:center; background:#1F4E79; color:#fff; border-radius:6px; font-weight:700; font-size:.78rem; padding:2px 0; }
+  .pt-trecho{ margin:6px 0; padding:6px 10px; background:#fafafa; border-left:3px solid #bbb; font-size:.86rem; }
+  .pt-aula{ background:#f2f7f4; border-color:#d3e6da; }
   .bib-contagem{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:10px; }
   .bib-contagem .pill{ flex:0 0 auto; width:auto; }
   .bib-barras{ display:flex; flex-direction:column; gap:6px; }
@@ -1235,7 +1291,7 @@ const SEG_EMAIL_COORD = 'coordenacao@sala-ceetip.app';
 // Chaves que só a equipe pode gravar (alunos, monitores e biblioteca continuam gravando o resto)
 const SEG_SO_EQUIPE_PREFIXOS = ['assessment', 'pesos-instrumentos', 'notas-manuais', 'bloco-lancamentos', 'disciplinas', 'question-bank',
   'plano-livro', 'plano-livro-parte', 'plano-livro-img', 'plano-livro-prog', 'plano-livro-slides', 'plano-livro-videos', 'plano-config', 'plano-visto',
-  'plano-termometro', 'plano-slides-ed', 'plano-slides-ed-t', 'plano-slides-ed-img', 'slide-img', 'gemini-api-key-professor', 'avulso-respostas', 'aula-viva', 'seg-teste'];
+  'plano-termometro', 'plano-slides-ed', 'plano-slides-ed-t', 'plano-slides-ed-img', 'slide-img', 'gemini-api-key-professor', 'avulso-respostas', 'aula-viva', 'seg-teste', 'ponte-liberada'];
 const SEG_SO_EQUIPE_CHAVES = ['recursos-config', 'professores', 'coordenador-senha', 'coordenador-senha-salt', 'pin-liberacao', 'periodos-avaliacao', 'socio-config',
   'sessao-config', 'gabaritos-avulsos', 'gemini-api-key', 'temporada-atual', 'slides-decks', 'avisos', 'cronograma', 'dias-letivos',
   'turno-horarios', 'livros-didaticos', 'materiais-turma', 'tarefas', 'mapasmentais', 'lixeira', 'backup-ultimo', 'areas-disciplinas',
@@ -22811,6 +22867,306 @@ function conexoesEstudarHtml(e, a){
     const d = (e.discs||[]).find(x => x.k===planoDiscKey(c.disc)); const pode = d && d.planoId===c.planoId;
     return `<div style="margin-top:6px;">${conexIcone(c.disc)} <b>${esc(c.disc)}</b> · ${esc(c.rel||'')}: ${esc(c.titulo)}<br><span class="muted" style="font-size:.8rem;">Tema em comum: ${esc(c.tema||'')}</span>${pode ? ` <button class="btn btn-ghost btn-sm" data-action="estudar-conexao" data-k="${esc(d.k)}" data-n="${c.n}" style="width:auto; padding:2px 8px;">Abrir esta aula</button>` : ''}</div>`; }).join('')}</div>`;
 }
+// ===== Trilhas de grandes perguntas (Humanas) =====
+// Catálogo em plano.trilhas (igual em todos os planos B de Humanas); cada aula-etapa traz aula.trilhas (posição, papel, vizinhas).
+// Resposta do aluno: um documento por aluno, trilha-resp:<studentId> = { studentId, studentName, turmaId, turmaName, respostas: { trilhaId: { '1': {texto, em}, ... } } }
+const TRILHA_RESP_PREFIXO = 'trilha-resp:';
+function trilhaSerieNum(serie){ const m = String(serie||'').match(/(\d)/); return m ? parseInt(m[1]) : 0; }
+function trilhaCatalogo(pl){ return (pl && Array.isArray(pl.trilhas)) ? pl.trilhas : []; }
+function trilhaBarra(feitas, total, cor){ const p = total ? Math.round(feitas / total * 100) : 0; return `<span class="tr-barra" aria-label="${feitas} de ${total}"><span style="width:${p}%; background:${cor};"></span></span>`; }
+function trilhaDataCurta(ts){ return ts ? new Date(ts).toLocaleDateString('pt-BR') : ''; }
+// ---- aluno ----
+async function trilhaCarregarAluno(forcar){
+  const al = state.aluno; const e = estudarState();
+  if(!al.turma || (e.trProg && !forcar) || e.trCarregando) return;
+  e.trCarregando = true;
+  const prog = {};
+  for(const d of (e.discs||[])){ const pr = await planoLerJson(`plano-livro-prog:${planoTK(al.turma.id, d.k)}`, { dadas:{} }); prog[d.k] = { planoId: d.planoId, dadas: (pr && pr.dadas) || {} }; }
+  let r = null; try{ const x = await window.storage.get(TRILHA_RESP_PREFIXO + al.matriculaStudentId, true); r = x && x.value ? JSON.parse(x.value) : null; }catch(_){ r = null; }
+  e.trProg = prog; e.trResp = r && r.respostas ? r : { respostas:{} }; e.trCarregando = false;
+  render();
+}
+function trilhaEtapaStatus(e, et){
+  const st = (e.trProg||{})[planoDiscKey(et.disc)];
+  if(!st || st.planoId!==et.planoId) return null;
+  return { ts: st.dadas[et.n] || 0 };
+}
+function trilhasAlunoFaixaHtml(e){
+  const cat = trilhaCatalogo(e.plano); if(!cat.length) return '';
+  if(!e.trProg) setTimeout(() => trilhaCarregarAluno(), 0);
+  const s = trilhaSerieNum(e.plano.serie);
+  return `<div class="card tr-faixa" data-trilhas-aluno>
+    <div class="tr-faixa-cab"><strong>🧭 Grandes perguntas</strong><span class="muted">perguntas que atravessam Geografia, História, Sociologia e Filosofia, da 1ª à 3ª série</span></div>
+    <div class="tr-grade">${cat.map(t => {
+      const minhas = t.etapas.filter(x => x.s===s); const feitas = minhas.filter(x => (trilhaEtapaStatus(e, x)||{}).ts).length;
+      const resp = (((e.trResp||{}).respostas||{})[t.id]||{})[s];
+      return `<button class="tr-chip" data-action="estudar-trilha" data-id="${esc(t.id)}" style="--tc:${esc(t.cor)};">
+        <span class="tr-chip-ic">${t.icone}</span><span class="tr-chip-q">${esc(t.pergunta)}</span>
+        <span class="tr-chip-meta">${e.trProg ? `${feitas} de ${minhas.length} etapas da sua série` : `${minhas.length} etapas na sua série`}${resp ? ' · ✍️ respondida' : ''}</span>
+        ${trilhaBarra(feitas, minhas.length, t.cor)}</button>`; }).join('')}</div></div>`;
+}
+function trilhaAlunoHtml(e){
+  const t = trilhaCatalogo(e.plano).find(x => x.id===e.trilha); if(!t) return '';
+  if(!e.trProg) setTimeout(() => trilhaCarregarAluno(), 0);
+  const s = trilhaSerieNum(e.plano.serie);
+  const resp = ((e.trResp||{}).respostas||{})[t.id] || {};
+  const grupos = [1,2,3].map(sr => {
+    const ets = t.etapas.filter(x => x.s===sr); if(!ets.length) return '';
+    const rot = sr < s ? 'você já passou por aqui' : sr===s ? 'sua série agora' : 'vem aí';
+    return `<div class="tr-serie ${sr===s?'atual':''}" data-tr-serie="${sr}"><h4>${sr}ª série <span class="muted">· ${rot}</span></h4>${ets.map(x => {
+      const st = sr===s ? trilhaEtapaStatus(e, x) : null; const feita = !!(st && st.ts); const idx = t.etapas.indexOf(x) + 1;
+      const d = (e.discs||[]).find(dd => dd.k===planoDiscKey(x.disc)); const pode = feita && d && d.planoId===x.planoId;
+      return `<div class="tr-etapa ${feita?'feita':''}" data-tr-etapa="${esc(planoDiscKey(x.disc))}-${x.n}">
+        <span class="tr-num" style="${feita ? `background:${t.cor}; color:#fff;` : `color:${t.cor};`} border-color:${t.cor};">${feita ? '✓' : idx}</span>
+        <div class="tr-etapa-txt"><div>${conexIcone(x.disc)} <b>${esc(x.disc)}</b> · ${x.bim}º bim · aula ${x.n} — ${esc(x.titulo)}</div>
+          <div class="tr-papel">${esc(x.papel)}</div>
+          ${st ? `<div class="muted" style="font-size:.78rem;">${feita ? 'Vista em ' + trilhaDataCurta(st.ts) : 'Ainda não aconteceu na sua turma'}</div>` : ''}
+          ${pode ? `<button class="btn btn-ghost btn-sm" data-action="estudar-conexao" data-k="${esc(d.k)}" data-n="${x.n}" style="width:auto; padding:2px 8px; margin-top:4px;">Abrir esta aula</button>` : ''}</div></div>`; }).join('')}</div>`;
+  }).join('');
+  const minhas = t.etapas.filter(x => x.s===s); const feitas = minhas.filter(x => (trilhaEtapaStatus(e, x)||{}).ts).length;
+  const anteriores = [1,2].filter(sr => sr < s && resp[sr]).map(sr => `<div class="tr-resp-ant" data-tr-resp-ant="${sr}"><b>Sua resposta na ${sr}ª série</b> <span class="muted">(${trilhaDataCurta(resp[sr].em)})</span><p>${esc(resp[sr].texto)}</p></div>`).join('');
+  const rasc = (e.trRasc||{})[t.id]!=null ? e.trRasc[t.id] : ((resp[s]||{}).texto || '');
+  return `<button class="btn btn-ghost btn-sm" data-action="estudar-trilha-voltar" style="width:auto; margin-bottom:8px;">← Voltar às aulas</button>
+    <div class="card tr-cab" data-trilha-aluno="${esc(t.id)}" style="border-top:6px solid ${t.cor};">
+      <div class="tr-cab-ic">${t.icone}</div>
+      <div><div class="muted" style="font-size:.78rem; letter-spacing:.06em;">GRANDE PERGUNTA</div><h2 style="margin:.1em 0 .3em; color:${t.cor};">${esc(t.pergunta)}</h2>
+      <p style="margin:0 0 6px;">${esc(t.abertura)}</p>
+      <p class="muted" style="margin:0; font-size:.84rem;">${t.etapas.length} etapas em ${esc(t.disciplinas.join(', '))} · na sua série: ${e.trProg ? `${feitas} de ${minhas.length} já aconteceram` : `${minhas.length} etapas`}</p>
+      ${trilhaBarra(feitas, minhas.length, t.cor)}</div></div>
+    <div class="card">${grupos}</div>
+    ${ponteAlunoHtml(e, t)}
+    <div class="card tr-resposta" data-tr-resposta>
+      <h3 style="margin-top:0;">✍️ Minha resposta</h3>
+      <p style="margin:0 0 8px;"><b>${esc((t.chegada||{})[s] || t.pergunta)}</b></p>
+      ${anteriores}
+      <textarea data-action="estudar-trilha-texto" data-id="${esc(t.id)}" rows="5" maxlength="2000" placeholder="Escreva com suas palavras, usando o que você viu nas aulas desta trilha (cite pelo menos duas disciplinas).">${esc(rasc)}</textarea>
+      <div class="row" style="gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px;">
+        <button class="btn btn-primary btn-sm" data-action="estudar-trilha-salvar" data-id="${esc(t.id)}" style="width:auto; flex:0 0 auto;" ${e.trSalvando?'disabled':''}>${e.trSalvando ? 'Salvando…' : 'Salvar minha resposta'}</button>
+        ${e.trMsg ? `<span data-tr-msg style="font-size:.84rem; color:${e.trMsg.ok ? '#1d6b31' : '#a4521b'};">${esc(e.trMsg.txt)}</span>` : (resp[s] ? `<span class="muted" style="font-size:.8rem;">Salva em ${trilhaDataCurta(resp[s].em)}</span>` : '')}
+      </div>
+      <p class="muted" style="font-size:.78rem; margin:6px 0 0;">Sua resposta fica guardada e volta a aparecer nas próximas séries, para você ver como seu pensamento mudou. Os professores de Humanas da sua turma podem ler.</p>
+    </div>`;
+}
+async function trilhaSalvarResposta(id){
+  const al = state.aluno; const e = estudarState(); if(!al.turma || !e.plano) return;
+  const s = String(trilhaSerieNum(e.plano.serie));
+  const texto = String((e.trRasc||{})[id]!=null ? e.trRasc[id] : '').trim();
+  if(texto.length < 20){ e.trMsg = { ok:false, txt:'Escreva pelo menos uma ou duas frases antes de salvar.' }; render(); return; }
+  e.trSalvando = true; e.trMsg = null; render();
+  try{
+    let doc = null; try{ const x = await window.storage.get(TRILHA_RESP_PREFIXO + al.matriculaStudentId, true); doc = x && x.value ? JSON.parse(x.value) : null; }catch(_){ doc = null; }
+    doc = doc && doc.respostas ? doc : { respostas:{} };
+    doc.studentId = al.matriculaStudentId; doc.studentName = al.name || ''; doc.turmaId = al.turma.id; doc.turmaName = al.turma.name || '';
+    doc.respostas[id] = doc.respostas[id] || {}; doc.respostas[id][s] = { texto: texto.slice(0, 2000), em: Date.now() };
+    await window.storage.set(TRILHA_RESP_PREFIXO + al.matriculaStudentId, JSON.stringify(doc), true);
+    e.trResp = doc; if(e.trRasc) delete e.trRasc[id];
+    e.trMsg = { ok:true, txt:'✅ Resposta salva.' };
+  }catch(err){ e.trMsg = { ok:false, txt:'Não consegui salvar agora. Confira a internet e tente de novo.' }; }
+  e.trSalvando = false; render();
+}
+function trilhasEstudarHtml(e, a){
+  const tr = a.trilhas || (a.slides && a.slides.trilhas) || []; if(!tr.length || !trilhaCatalogo(e.plano).length) return '';
+  return `<div class="tr-aula" data-estudar-trilhas>${tr.map(x => `<div class="tr-aula-item" style="border-left-color:${esc(x.cor)};">${x.icone} Esta aula é a <b>etapa ${x.etapa} de ${x.total}</b> da grande pergunta <b style="color:${esc(x.cor)};">${esc(x.pergunta)}</b><br><span class="muted" style="font-size:.82rem;">${esc(x.papel)}</span>
+    <button class="btn btn-ghost btn-sm" data-action="estudar-trilha" data-id="${esc(x.id)}" style="width:auto; padding:2px 8px; margin-left:4px;">Ver a trilha</button></div>`).join('')}</div>`;
+}
+// ---- professor ----
+function trilhaVizinhaTxt(v){ return v ? `${conexIcone(v.disc)} ${esc(v.disc)} · ${esc(v.serie)} · aula ${v.n} — ${esc(v.titulo)}` : ''; }
+function trilhasProfHtml(turmaId, plano, aula){
+  const tr = aula.trilhas || (aula.slides && aula.slides.trilhas) || []; if(!tr.length) return '';
+  const cat = trilhaCatalogo(plano); const s = String(trilhaSerieNum(plano.serie));
+  return `<div class="tr-aula prof" data-pl-trilhas><strong style="color:#1F4E79;">🧭 Grandes perguntas</strong> <span class="muted" style="font-size:.78rem;">— esta aula é uma etapa de uma pergunta que atravessa as Humanas</span>
+    ${tr.map(x => { const t = cat.find(c => c.id===x.id) || {}; const cul = (t.culminancia||{})[s];
+      return `<div class="tr-aula-item" style="border-left-color:${esc(x.cor)};">${x.icone} <b style="color:${esc(x.cor)};">${esc(x.pergunta)}</b> · etapa ${x.etapa} de ${x.total}<br><span style="font-size:.84rem;">${esc(x.papel)}</span>
+        <div class="muted" style="font-size:.78rem; margin-top:2px;">${x.antes ? `← antes: ${trilhaVizinhaTxt(x.antes)}` : '← é a primeira etapa'}${x.depois ? `<br>→ depois: ${trilhaVizinhaTxt(x.depois)}` : '<br>→ é a última etapa'}</div>
+        ${cul ? `<div style="font-size:.8rem; margin-top:3px;">💡 <b>Culminância sugerida (${s}ª série):</b> ${esc(cul)}</div>` : ''}</div>`; }).join('')}
+    <button class="btn btn-ghost btn-sm" data-action="plano-trilhas-abrir" data-id="${esc(tr[0].id)}" style="width:auto; margin-top:4px;">Ver a trilha e as respostas da turma</button></div>`;
+}
+async function trilhaCarregarRespostasTurma(turmaId, forcar){
+  const s = planoState(); s.trResp = s.trResp || {};
+  if(s.trResp[turmaId] && !forcar) return; s.trResp[turmaId] = { carregando:true, lista:[] };
+  let lista = [];
+  try{
+    const r = await window.storage.list(TRILHA_RESP_PREFIXO, true);
+    const docs = await Promise.all((r.keys||[]).map(async k => { try{ const v = r.values && r.values[k]!==undefined ? r.values[k] : (await window.storage.get(k, true)).value; return JSON.parse(v); }catch(_){ return null; } }));
+    lista = docs.filter(d => d && d.turmaId===turmaId);
+  }catch(_){ lista = []; }
+  s.trResp[turmaId] = { carregando:false, lista, em: Date.now() };
+  render();
+}
+function renderPlanoTrilhas(turmaId, plano){
+  const s = planoState(); const cat = trilhaCatalogo(plano); if(!cat.length) return '';
+  const sr = trilhaSerieNum(plano.serie); const srK = String(sr);
+  s.conex = s.conex || {};
+  const discs = [...new Set(cat.flatMap(t => t.etapas.filter(x => x.s===sr).map(x => planoDiscKey(x.disc))))];
+  discs.forEach(dk => { if(s.conex[turmaId + '|' + dk]===undefined) setTimeout(() => conexCarregarStatus(turmaId, dk), 0); });
+  const rs = (s.trResp||{})[turmaId]; if(!rs) setTimeout(() => trilhaCarregarRespostasTurma(turmaId), 0);
+  const t = cat.find(x => x.id===s.trSel) || cat[0];
+  const statusEt = x => { const st = s.conex[turmaId + '|' + planoDiscKey(x.disc)]; if(!st) return { txt:'…', cls:'' }; if(!st.planoId || st.planoId!==x.planoId) return { txt:'esta turma segue outra versão do plano', cls:'outra' }; const ts = st.dadas[x.n]; return ts ? { txt:'✓ dada em ' + trilhaDataCurta(ts), cls:'ok', ts } : { txt:'ainda não dada', cls:'' }; };
+  const ets = t.etapas.filter(x => x.s===sr); const feitas = ets.filter(x => statusEt(x).ts).length;
+  const turma = (state.professor.turmas||[]).find(x => x.id===turmaId) || (state.coordenador && (state.coordenador.turmas||[]).find(x => x.id===turmaId)) || {};
+  const nAlunos = (turma.students||[]).length;
+  const resp = rs && !rs.carregando ? rs.lista.filter(d => d.respostas && d.respostas[t.id] && d.respostas[t.id][srK]).sort((a, b) => String(a.studentName).localeCompare(String(b.studentName), 'pt-BR')) : [];
+  const nP = ponteCatalogo(plano).filter(p => p.serie===sr).length;
+  const abasTP = nP ? `<div class="tr-abas" data-tr-abas><button class="btn btn-ghost btn-sm ${s.trAba!=='pontes'?'ativa':''}" data-action="plano-trilhas-aba" data-aba="trilhas">🧭 Trilhas</button><button class="btn btn-ghost btn-sm ${s.trAba==='pontes'?'ativa':''}" data-action="plano-trilhas-aba" data-aba="pontes">🌉 Atividades ponte (${nP})</button></div>` : '';
+  if(nP && s.trAba==='pontes') return abasTP + renderPlanoPontes(turmaId, plano);
+  return abasTP + `<div data-pl-trilhas-painel>
+    <p class="muted" style="font-size:.84rem; margin-top:0;">Oito perguntas que atravessam Geografia, História, Sociologia e Filosofia nas três séries. Cada aula-etapa mostra o que acrescenta à resposta; no fim, o aluno escreve a sua resposta em <b>Estudar → Grandes perguntas</b>.</p>
+    <div class="tr-sel">${cat.map(c => { const n = rs && !rs.carregando ? rs.lista.filter(d => d.respostas && d.respostas[c.id] && d.respostas[c.id][srK]).length : null;
+      return `<button class="tr-sel-btn ${c.id===t.id?'ativa':''}" data-action="plano-trilha-sel" data-id="${esc(c.id)}" style="--tc:${esc(c.cor)};">${c.icone} ${esc(c.pergunta)}${n ? ` <span class="tr-badge">${n}</span>` : ''}</button>`; }).join('')}</div>
+    <div class="tr-painel" style="border-top:5px solid ${t.cor};" data-tr-painel="${esc(t.id)}">
+      <h3 style="margin:.2em 0; color:${t.cor};">${t.icone} ${esc(t.pergunta)}</h3>
+      <p style="margin:0 0 6px; font-size:.9rem;">${esc(t.abertura)}</p>
+      ${(t.competencias||[]).length ? `<p class="muted" style="font-size:.8rem; margin:0 0 8px;"><b>BNCC (competências específicas de CHSA mais mobilizadas):</b> ${t.competencias.map(c => `${c.c}. ${esc(c.txt)}`).join(' · ')}</p>` : ''}
+      <div class="tr-cols">
+        <div><h4 style="margin:.3em 0;">Etapas na ${sr}ª série <span class="muted" style="font-weight:400;">(${feitas} de ${ets.length} dadas nesta turma)</span></h4>
+          ${trilhaBarra(feitas, ets.length, t.cor)}
+          <ol class="tr-lista">${ets.map(x => { const st = statusEt(x); return `<li data-tr-prof-etapa="${esc(planoDiscKey(x.disc))}-${x.n}">${conexIcone(x.disc)} <b>${esc(x.disc)}</b> · ${x.bim}º bim · aula ${x.n} — ${esc(x.titulo)}<br><span style="font-size:.8rem;">${esc(x.papel)}</span> <span class="tr-st ${st.cls}">${esc(st.txt)}</span></li>`; }).join('')}</ol>
+          <p class="muted" style="font-size:.78rem;">Nas outras séries: ${[1,2,3].filter(x => x!==sr).map(x => `${x}ª série ${t.porSerie[String(x)]} etapa(s)`).join(' · ')}.</p></div>
+        <div>
+          ${(t.culminancia||{})[srK] ? `<div class="tr-box"><b>💡 Culminância sugerida (${sr}ª série)</b><br>${esc(t.culminancia[srK])}<br><span class="muted" style="font-size:.78rem;">Combine com os professores das outras disciplinas da turma: dá para valer como atividade de mais de uma disciplina.</span></div>` : ''}
+          <div class="tr-box"><b>✍️ Pergunta de chegada (o aluno responde no app)</b><br>${esc((t.chegada||{})[srK] || t.pergunta)}</div>
+          <div class="tr-box" data-tr-respostas><div class="row" style="justify-content:space-between; align-items:center; gap:6px;"><b>Respostas da turma</b>
+            <button class="btn btn-ghost btn-sm" data-action="plano-trilha-atualizar" style="width:auto; flex:0 0 auto; padding:2px 8px;">↻ Atualizar</button></div>
+            ${!rs || rs.carregando ? '<p class="muted">Carregando…</p>' : resp.length ? `<p class="muted" style="font-size:.8rem; margin:4px 0;">${resp.length}${nAlunos ? ' de ' + nAlunos : ''} aluno(s) responderam.</p>${resp.map(d => `<details class="tr-resp" data-tr-resp="${esc(d.studentId)}"><summary><b>${esc(d.studentName||'Aluno')}</b> <span class="muted">· ${trilhaDataCurta(d.respostas[t.id][srK].em)}</span></summary><p>${esc(d.respostas[t.id][srK].texto)}</p></details>`).join('')}` : '<p class="muted" style="font-size:.84rem;">Ainda ninguém respondeu nesta turma. Sugestão: reserve 10 minutos depois da última etapa do bimestre para os alunos escreverem no app.</p>'}
+          </div>
+        </div>
+      </div>
+    </div></div>`;
+}
+// ===== Atividades ponte (Humanas) =====
+// Catálogo em plano.pontes (igual nos planos B). Cada aula envolvida traz aula.pontes. Liberação por turma: ponte-liberada:<turmaId> = { ponteId: {em, por, disc} } (só a equipe grava).
+const PONTE_PREFIXO = 'ponte-liberada:';
+let PONTE_LIB = {};
+function ponteCatalogo(pl){ return (pl && Array.isArray(pl.pontes)) ? pl.pontes : []; }
+async function ponteCarregarLiberadas(turmaId, forcar){
+  if(!turmaId || (PONTE_LIB[turmaId] && !forcar)) return;
+  PONTE_LIB[turmaId] = { carregando:true, mapa:{} };
+  const m = await planoLerJson(PONTE_PREFIXO + turmaId, {});
+  PONTE_LIB[turmaId] = { carregando:false, mapa: m || {} };
+  render();
+}
+function ponteLiberadas(turmaId){
+  const c = PONTE_LIB[turmaId]; if(!c){ setTimeout(() => ponteCarregarLiberadas(turmaId), 0); return null; }
+  return c.carregando ? null : c.mapa;
+}
+async function ponteLiberar(turmaId, id, liberar){
+  const m = (await planoLerJson(PONTE_PREFIXO + turmaId, {})) || {};
+  if(liberar) m[id] = { em: Date.now(), por: (state.professor.session && state.professor.session.displayName) || (state.view==='coordenador' ? 'Coordenação' : ''), disc: planoDiscAtual() || '' };
+  else delete m[id];
+  await window.storage.set(PONTE_PREFIXO + turmaId, JSON.stringify(m), true);
+  PONTE_LIB[turmaId] = { carregando:false, mapa:m }; render();
+}
+// status de uma aula de qualquer disciplina nesta turma (usa o mesmo cache das conexões)
+function ponteStatusAula(turmaId, x){
+  const s = planoState(); s.conex = s.conex || {}; const dk = planoDiscKey(x.disc); const st = s.conex[turmaId + '|' + dk];
+  if(st===undefined){ setTimeout(() => conexCarregarStatus(turmaId, dk), 0); return { txt:'…', cls:'' }; }
+  if(!st) return { txt:'…', cls:'' };
+  if(!st.planoId || st.planoId!==x.planoId) return { txt:'turma em outra versão do plano', cls:'outra' };
+  const ts = st.dadas[x.n]; return ts ? { txt:'✓ dada em ' + trilhaDataCurta(ts), cls:'ok', ts } : { txt:'ainda não dada', cls:'' };
+}
+function ponteProntidao(turmaId, p){ const sts = p.aulas.map(x => ponteStatusAula(turmaId, x)); return { feitas: sts.filter(x => x.ts).length, total: p.aulas.length, sts }; }
+function ponteAulasTxt(lista){ return lista.map(y => `${conexIcone(y.disc)} ${esc(y.disc)} aula ${y.n}`).join(' + '); }
+// ---- ficha impressa (aluno) e roteiro (professor)
+function ponteFichaHtml(p, modo){
+  const docs = (p.documentos||[]).map((d, i) => `<div class="doc"><h3>Documento ${i+1} · ${esc(d.disc)}${d.titulo ? ' — ' + esc(d.titulo) : ''}</h3><blockquote>${esc(d.trecho)}</blockquote><p class="ref">${esc(d.ref)}</p>${(d.perguntas||[]).length ? `<ol>${d.perguntas.map(q => `<li>${esc(q)}</li>`).join('')}</ol>` : ''}</div>`).join('');
+  const cab = `<header><div class="esc">CEETIP Governador Marcelo Déda Chagas - DRE04 · Ciências Humanas · ${p.serie}ª série</div><h1>🌉 ${esc(p.titulo)}</h1><div class="trilha">${p.icone} Grande pergunta: ${esc(p.pergunta)} · ${esc(p.disciplinas.join(' + '))}</div></header>`;
+  const css = `body{font-family:Arial,Helvetica,sans-serif;color:#222;max-width:780px;margin:0 auto;padding:18px;line-height:1.4;font-size:14px;} h1{font-size:22px;margin:4px 0;color:#6B1F2E;} h2{font-size:16px;margin:16px 0 6px;color:#1F4E79;border-bottom:1px solid #ddd;padding-bottom:2px;} h3{font-size:14px;margin:10px 0 4px;} .esc{font-size:11px;color:#666;} .trilha{font-size:12px;color:#555;} .problema{font-size:17px;font-weight:bold;background:#f5f1ea;border-left:5px solid ${p.cor};padding:8px 12px;margin:10px 0;} blockquote{margin:4px 0;padding:6px 10px;background:#fafafa;border-left:3px solid #bbb;} .ref{font-size:11px;color:#666;margin:2px 0 4px;} .doc{page-break-inside:avoid;} table{border-collapse:collapse;width:100%;} td,th{border:1px solid #ccc;padding:5px 7px;vertical-align:top;text-align:left;font-size:13px;} .linhas div{border-bottom:1px solid #bbb;height:26px;} .nomes{margin:8px 0;} @media print{body{padding:0;}}`;
+  if(modo==='prof') return `<!doctype html><html><head><meta charset="utf-8"><title>Roteiro — ${esc(p.titulo)}</title><style>${css}</style></head><body>${cab}
+    <div class="problema">Pergunta-problema: ${esc(p.problema)}</div>
+    <p><b>Objetivo:</b> ${esc(p.objetivo)}</p><p><b>Quando:</b> ${esc(p.quando)} <b>Duração:</b> ${esc(p.duracao)}.</p><p><b>Recursos:</b> ${esc(p.semRecursos)}</p>
+    <h2>Aulas envolvidas e o que cada disciplina traz</h2><ul>${p.aulas.map(x => `<li><b>${esc(x.disc)}</b> · ${x.bim}º bim · aula ${x.n} — ${esc(x.titulo)}</li>`).join('')}</ul><ul>${p.papeis.map(x => `<li><b>${esc(x.disc)}:</b> ${esc(x.txt)}</li>`).join('')}</ul>
+    <h2>Roteiro (100 min)</h2><table><tr><th>Tempo</th><th>Etapa</th><th>O que fazer</th></tr>${p.passos.map(x => `<tr><td>${x.min} min</td><td><b>${esc(x.titulo)}</b></td><td>${esc(x.txt)}</td></tr>`).join('')}</table>
+    <h2>Produto do grupo</h2><p>${esc(p.produto)}</p>
+    <h2>Critérios de avaliação</h2><ol>${p.criterios.map(c => `<li>${esc(c)}</li>`).join('')}</ol><p>${esc(p.avaliacao)}</p>
+    <h2>Documentos da ficha do aluno</h2>${docs}</body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Ficha — ${esc(p.titulo)}</title><style>${css}</style></head><body>${cab}
+    <div class="nomes">Grupo: ______________________________________________________ Turma: ________ Data: ___/___</div>
+    <div class="problema">${esc(p.problema)}</div>
+    <h2>O que vocês já estudaram</h2><ul>${p.aulas.map(x => `<li><b>${esc(x.disc)}</b>, aula ${x.n}: ${esc(x.titulo)}</li>`).join('')}</ul>
+    <h2>1. Leiam os documentos e respondam no caderno</h2>${docs}
+    <h2>2. Tarefa do grupo</h2><p>${esc(p.passos[2].txt)}</p><p><b>Vocês vão entregar:</b> ${esc(p.produto)}</p>
+    <h2>3. Como o trabalho será avaliado</h2><ol>${p.criterios.map(c => `<li>${esc(c)}</li>`).join('')}</ol>
+    <h2>4. Minha resposta (individual)</h2><p>${esc(p.problema)} Use pelo menos um conceito de cada disciplina.</p><div class="linhas">${'<div></div>'.repeat(8)}</div></body></html>`;
+}
+function ponteImprimir(p, modo){
+  const w = window.open('', '_blank'); if(!w){ alert('O navegador bloqueou a janela de impressão. Permita pop-ups para este site e tente de novo.'); return; }
+  w.document.write(ponteFichaHtml(p, modo)); w.document.close(); w.focus(); setTimeout(() => { try{ w.print(); }catch(_){} }, 300);
+}
+// ---- professor
+function ponteDetalheHtml(turmaId, p){
+  const lib = ponteLiberadas(turmaId); const l = lib && lib[p.id]; const pr = ponteProntidao(turmaId, p);
+  return `<div class="pt-det" data-ponte-det="${esc(p.id)}" style="border-top:5px solid ${p.cor};">
+    <button class="btn btn-ghost btn-sm" data-action="ponte-fechar" style="width:auto;">← Todas as atividades ponte</button>
+    <div class="muted" style="font-size:.78rem; margin-top:8px;">${p.icone} ${esc(p.pergunta)} · ${p.serie}ª série · ${esc(p.disciplinas.join(' + '))}</div>
+    <h3 style="margin:.2em 0; color:${p.cor};">🌉 ${esc(p.titulo)}</h3>
+    <div class="pt-problema">${esc(p.problema)}</div>
+    <p style="font-size:.88rem; margin:6px 0;"><b>Objetivo:</b> ${esc(p.objetivo)}</p>
+    <p style="font-size:.84rem; margin:4px 0;" class="muted">⏱️ ${esc(p.duracao)} · 🗓️ ${esc(p.quando)} · ${esc(p.semRecursos)}</p>
+    <div class="pt-acoes">
+      <button class="btn btn-primary btn-sm" data-action="ponte-imprimir" data-id="${esc(p.id)}" data-modo="aluno" style="width:auto; flex:0 0 auto;">🖨️ Ficha do aluno</button>
+      <button class="btn btn-ghost btn-sm" data-action="ponte-imprimir" data-id="${esc(p.id)}" data-modo="prof" style="width:auto; flex:0 0 auto;">🖨️ Roteiro do professor</button>
+      ${l ? `<button class="btn btn-ghost btn-sm" data-action="ponte-liberar" data-id="${esc(p.id)}" data-v="0" style="width:auto; flex:0 0 auto;">🔒 Recolher dos alunos</button><span class="pt-lib" data-ponte-liberada>🔓 Liberada aos alunos em ${trilhaDataCurta(l.em)}${l.por ? ' por ' + esc(l.por) : ''}</span>`
+          : `<button class="btn btn-ghost btn-sm" data-action="ponte-liberar" data-id="${esc(p.id)}" data-v="1" style="width:auto; flex:0 0 auto;">🔓 Liberar a ficha no app dos alunos</button>`}
+    </div>
+    <div class="tr-cols">
+      <div>
+        <h4 style="margin:.6em 0 .3em;">Aulas envolvidas <span class="muted" style="font-weight:400;">(${pr.feitas} de ${pr.total} dadas nesta turma)</span></h4>
+        <ul class="tr-lista" style="list-style:none; margin-left:0;">${p.aulas.map((x, i) => `<li data-ponte-aula="${esc(planoDiscKey(x.disc))}-${x.n}">${conexIcone(x.disc)} <b>${esc(x.disc)}</b> · ${x.bim}º bim · aula ${x.n} — ${esc(x.titulo)} <span class="tr-st ${pr.sts[i].cls}">${esc(pr.sts[i].txt)}</span></li>`).join('')}</ul>
+        <h4 style="margin:.8em 0 .3em;">Roteiro (100 min)</h4>
+        <div class="pt-passos">${p.passos.map(x => `<div class="pt-passo"><span class="pt-min">${x.min}′</span><div><b>${esc(x.titulo)}.</b> ${esc(x.txt)}</div></div>`).join('')}</div>
+      </div>
+      <div>
+        <div class="tr-box"><b>O que cada disciplina traz</b><ul style="margin:4px 0 0 16px; padding:0;">${p.papeis.map(x => `<li><b>${esc(x.disc)}:</b> ${esc(x.txt)}</li>`).join('')}</ul></div>
+        <div class="tr-box"><b>📦 Produto do grupo</b><br>${esc(p.produto)}</div>
+        <div class="tr-box"><b>✅ Critérios</b><ol style="margin:4px 0 0 18px; padding:0;">${p.criterios.map(c => `<li>${esc(c)}</li>`).join('')}</ol><span class="muted" style="font-size:.78rem;">${esc(p.avaliacao)}</span></div>
+      </div>
+    </div>
+    <h4 style="margin:.8em 0 .3em;">Documentos da ficha <span class="muted" style="font-weight:400;">(trechos do Aprofundamento das próprias aulas)</span></h4>
+    ${(p.documentos||[]).map((d, i) => `<details class="tr-resp" data-ponte-doc="${i}"><summary><b>Documento ${i+1}</b> · ${esc(d.disc)} — ${esc(d.titulo||'')}</summary><blockquote class="pt-trecho">${esc(d.trecho)}</blockquote><div class="muted" style="font-size:.76rem;">${esc(d.ref)}</div>${(d.perguntas||[]).length ? `<ol style="font-size:.84rem;">${d.perguntas.map(q => `<li>${esc(q)}</li>`).join('')}</ol>` : ''}</details>`).join('')}
+  </div>`;
+}
+function renderPlanoPontes(turmaId, plano){
+  const s = planoState(); const sr = trilhaSerieNum(plano.serie);
+  const lista = ponteCatalogo(plano).filter(p => p.serie===sr);
+  const aberta = lista.find(p => p.id===s.ponteAberta);
+  if(aberta) return ponteDetalheHtml(turmaId, aberta);
+  const lib = ponteLiberadas(turmaId) || {};
+  return `<div data-pl-pontes><p class="muted" style="font-size:.84rem; margin-top:0;">Uma atividade por grande pergunta, juntando 2 ou 3 aulas de disciplinas diferentes da ${sr}ª série. Cada uma tem roteiro de 100 minutos, ficha do aluno para imprimir (não precisa de data show), documentos e critérios. Combine com o(a) colega da outra disciplina e aplique depois que as aulas tiverem sido dadas.</p>
+    <div class="pt-grade">${lista.map(p => { const pr = ponteProntidao(turmaId, p); const pronta = pr.feitas===pr.total; const l = lib[p.id];
+      return `<div class="pt-card" data-ponte="${esc(p.id)}" style="border-left-color:${p.cor};">
+        <div class="muted" style="font-size:.74rem;">${p.icone} ${esc(p.pergunta)}</div>
+        <b style="color:${p.cor};">🌉 ${esc(p.titulo)}</b>
+        <div style="font-size:.82rem; margin:3px 0;">${esc(p.problema)}</div>
+        <div style="font-size:.78rem;">${ponteAulasTxt(p.aulas)}</div>
+        <div class="row" style="gap:6px; align-items:center; flex-wrap:wrap; margin-top:4px;">
+          <span class="pt-pront ${pronta ? 'ok' : ''}" data-ponte-pront="${pr.feitas}/${pr.total}">${pronta ? '✅ pronta para aplicar' : `${pr.feitas} de ${pr.total} aulas dadas`}</span>
+          ${l ? `<span class="pt-lib">🔓 liberada</span>` : ''}
+          <button class="btn btn-ghost btn-sm" data-action="ponte-abrir" data-id="${esc(p.id)}" style="width:auto; flex:0 0 auto; margin-left:auto;">Abrir roteiro</button>
+        </div></div>`; }).join('')}</div></div>`;
+}
+function pontesProfHtml(turmaId, plano, aula){
+  const ps = aula.pontes || []; if(!ps.length) return '';
+  const cat = ponteCatalogo(plano);
+  return `<div class="tr-aula pt-aula" data-pl-pontes-aula>${ps.map(x => { const p = cat.find(c => c.id===x.id); const pr = p ? ponteProntidao(turmaId, p) : null;
+    return `<div>🌉 <b>Atividade ponte:</b> <span style="color:${esc(x.cor)}; font-weight:700;">${esc(x.titulo)}</span> — junto com ${ponteAulasTxt(x.outras)}${pr ? ` · <span class="muted">${pr.feitas} de ${pr.total} aulas dadas</span>` : ''}
+      <button class="btn btn-ghost btn-sm" data-action="ponte-abrir" data-id="${esc(x.id)}" data-ir="1" style="width:auto; padding:2px 8px; margin-left:4px;">Ver roteiro</button></div>`; }).join('')}</div>`;
+}
+// ---- aluno (ficha liberada, dentro da trilha)
+function ponteAlunoHtml(e, t){
+  const al = state.aluno; if(!al.turma) return '';
+  const s = trilhaSerieNum(e.plano.serie); const p = ponteCatalogo(e.plano).find(x => x.trilha===t.id && x.serie===s); if(!p) return '';
+  const lib = ponteLiberadas(al.turma.id); if(!lib || !lib[p.id]) return '';
+  return `<div class="card pt-aluno" data-ponte-aluno="${esc(p.id)}" style="border-left:6px solid ${p.cor};">
+    <div class="muted" style="font-size:.76rem; letter-spacing:.05em;">🌉 ATIVIDADE PONTE · ${esc(p.disciplinas.join(' + '))}</div>
+    <h3 style="margin:.2em 0; color:${p.cor};">${esc(p.titulo)}</h3>
+    <div class="pt-problema">${esc(p.problema)}</div>
+    <p style="font-size:.86rem; margin:6px 0;"><b>Vocês já estudaram:</b> ${p.aulas.map(x => `${esc(x.disc)}, aula ${x.n} (${esc(x.titulo)})`).join('; ')}.</p>
+    ${(p.documentos||[]).map((d, i) => `<details class="tr-resp"><summary><b>Documento ${i+1}</b> · ${esc(d.disc)} — ${esc(d.titulo||'')}</summary><blockquote class="pt-trecho">${esc(d.trecho)}</blockquote><div class="muted" style="font-size:.76rem;">${esc(d.ref)}</div>${(d.perguntas||[]).length ? `<ol style="font-size:.84rem;">${d.perguntas.map(q => `<li>${esc(q)}</li>`).join('')}</ol>` : ''}</details>`).join('')}
+    <p style="font-size:.88rem; margin:8px 0 4px;"><b>Tarefa do grupo:</b> ${esc(p.passos[2].txt)}</p>
+    <p style="font-size:.88rem; margin:0 0 4px;"><b>Vocês vão entregar:</b> ${esc(p.produto)}</p>
+    <details style="font-size:.84rem;"><summary>Como será avaliado</summary><ol>${p.criterios.map(c => `<li>${esc(c)}</li>`).join('')}</ol></details>
+  </div>`;
+}
 function planoDiscSeletorHtml(){
   const ds = planoDiscsDoUsuario(); if(ds.length < 2) return '';
   const atual = planoDiscAtual();
@@ -24339,8 +24695,9 @@ function renderAlunoEstudarBlock(){
   if(!e.carregado){ setTimeout(()=>carregarEstudarAluno(), 0); return '<div class="card"><p class="muted">Carregando…</p></div>'; }
   const abas = (e.discs||[]).length > 1 ? `<div class="pl-turmas" data-estudar-discs style="margin:0 0 10px;">${e.discs.map(d => `<button class="pl-turma ${d.k===e.disc?'ativa':''}" data-action="estudar-disc" data-k="${esc(d.k)}">📘 ${esc(d.label)}</button>`).join('')}</div>` : '';
   if(!e.plano) return `<div class="card"><h2>📖 Estudar</h2>${abas}<p class="muted">Sua turma ainda não segue um plano de aulas do livro.</p></div>`;
+  if(e.trilha && trilhaCatalogo(e.plano).some(t => t.id===e.trilha)) return `<h2>📖 Estudar</h2>${trilhaAlunoHtml(e)}`;
   const dadas = e.plano.aulas.filter(a => e.prog.dadas && e.prog.dadas[a.n]).sort((a,b) => e.prog.dadas[b.n] - e.prog.dadas[a.n]);
-  if(!dadas.length) return `<div class="card"><h2>📖 Estudar</h2>${abas}${e.aviso ? `<p data-estudar-aviso style="color:#a4521b;">${esc(e.aviso)}</p>` : ''}<p class="muted">Assim que o professor marcar as aulas${abas ? ' desta disciplina' : ''} como dadas, elas aparecem aqui com os slides e as questões para revisar.</p></div>`;
+  if(!dadas.length) return `<div class="card"><h2>📖 Estudar</h2>${abas}${e.aviso ? `<p data-estudar-aviso style="color:#a4521b;">${esc(e.aviso)}</p>` : ''}<p class="muted">Assim que o professor marcar as aulas${abas ? ' desta disciplina' : ''} como dadas, elas aparecem aqui com os slides e as questões para revisar.</p></div>${trilhasAlunoFaixaHtml(e)}`;
   const item = a => {
     const code = planoCodigoDoAluno(e.prog, a.n, al.matriculaStudentId);
     const feito = code ? estudarMinhaResposta(code) : null;
@@ -24386,6 +24743,7 @@ function renderAlunoEstudarBlock(){
         ${(((planoState().videos[e.planoId]||{})[a.n])||[]).length ? planoVideosHtml(e.planoId, a.n, false) : ''}
         ${estudarMapaHtml(e, a)}
         ${conexoesEstudarHtml(e, a)}
+        ${trilhasEstudarHtml(e, a)}
         ${exHtml}
         ${desafioPend ? `<p style="margin:6px 0;"><button class="btn btn-primary btn-sm" data-action="dashboard-start-exam" data-code="${esc(desafioCode)}">⭐ Desafio extra liberado — fazer agora</button> <span class="muted" style="font-size:.8rem;">(não vale nota, vale +3 fichas)</span></p>` : ''}
         ${(() => { const f = (e.feedback||[]).find(x => x.n===a.n); return `<div style="margin-top:10px; font-size:.88rem;">Esta aula ajudou você a entender o conteúdo?
@@ -24397,6 +24755,7 @@ function renderAlunoEstudarBlock(){
   return `<h2>📖 Estudar</h2>
     ${abas}
     ${e.aviso ? `<div class="card" data-estudar-aviso style="background:#fff4e5; border:1px solid #f0b46b; font-size:.9rem;">${esc(e.aviso)}</div>` : ''}
+    ${trilhasAlunoFaixaHtml(e)}
     <p class="muted" style="margin-top:-6px;">As aulas que já aconteceram: reveja os slides (bom para quem faltou) e treine as questões que você errou.</p>
     ${dadas.map(item).join('')}`;
 }
@@ -24719,6 +25078,7 @@ function avMontarSlides(d, opts){
   if(d.proposta) L.push({ t:'proposta' }, { t:'proposta-res' });
   if(d.repertorio) L.push({ t:'repertorio' });
   if((d.conexoes||[]).length) L.push({ t:'conexoes' });
+  if((d.trilhas||[]).length) L.push({ t:'trilha' });
   L.push({ t:'pratica' });
   if((!estudo && opts && opts.grupo) || (estudo && d.debate)) L.push({ t:'grupo' });
   if(m) L.push({ t:'mapa-final' });
@@ -25042,7 +25402,17 @@ function avSlideHtmlBase(d, sl, ctx){
       ${res?'':`<div style="margin-top:.6em;color:${C.a};">No caderno, complete os cinco elementos, como na redação do ENEM. Depois comparamos com um modelo.</div>`}</div>`; }
   case 'ap-sintese': return `<div class="av-in"><div class="av-row">${avCirc('FaPenToSquare', C.v, '#fff', 2.2)}<div class="av-t" style="margin:0;">Síntese para o caderno</div></div>
       <div class="av-card" style="margin-top:.8em;font-size:1em;line-height:1.45;white-space:pre-line;">${escR(d.aprof.sintese)}</div></div>`;
-  case 'conexoes': { const cx = (d.conexoes||[]).slice(0, 3); const icD = disc => ({ geografia:'FaEarthAmericas', sociologia:'FaPeopleGroup', historia:'FaLandmark' })[planoDiscKey(disc)] || 'FaBookOpen';
+  case 'trilha': { const tr = (d.trilhas||[]).slice(0, 2); const viz = v => v ? `${escR(v.disc)} · ${escR(v.serie||'')} · aula ${v.n}: ${escR(v.titulo)}` : '';
+    return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Grande pergunta</div>${avCirc('FaCompass', C.a, '#fff', 2.2)}</div>
+      <div style="margin-bottom:.6em;color:${C.a};">A aula de hoje é uma peça de uma pergunta que atravessa Geografia, História, Sociologia e Filosofia:</div>
+      <div class="${tr.length > 1 ? 'av-g2' : ''}" style="align-items:stretch;">${tr.map((x, i) => `<div class="av-card av-pop" style="animation-delay:${i*.15}s;border-left:.35em solid ${x.cor};">
+        <div style="font-size:2.1em;line-height:1;">${x.icone}</div>
+        <div class="av-t" style="font-size:${tr.length > 1 ? 1.35 : 1.7}em;margin:.25em 0 .35em;color:${x.cor};">${escR(x.pergunta)}</div>
+        <div style="display:flex;gap:.25em;flex-wrap:wrap;margin:.2em 0 .5em;">${Array.from({ length: x.total }, (_, k) => `<span style="width:.75em;height:.75em;border-radius:50%;display:inline-block;background:${k < x.etapa ? x.cor : '#ddd'};${k===x.etapa-1 ? 'box-shadow:0 0 0 .15em #fff,0 0 0 .28em ' + x.cor + ';' : ''}"></span>`).join('')}</div>
+        <div><b>Etapa ${x.etapa} de ${x.total}.</b> ${escR(x.papel)}</div>
+        <div style="margin-top:.55em;font-size:.82em;color:${C.a};">${x.antes ? '← Antes: ' + viz(x.antes) : '← Esta é a primeira etapa.'}<br>${x.depois ? '→ Depois: ' + viz(x.depois) : '→ Esta é a última etapa: hora de responder à pergunta!'}</div></div>`).join('')}</div>
+      <div style="margin-top:.8em;font-weight:700;color:${C.v};">Pense e anote no caderno: como o que vimos hoje ajuda a responder a esta pergunta?</div></div>`; }
+  case 'conexoes': { const cx = (d.conexoes||[]).slice(0, 3); const icD = disc => ({ geografia:'FaEarthAmericas', sociologia:'FaPeopleGroup', historia:'FaLandmark', filosofia:'FaLightbulb' })[planoDiscKey(disc)] || 'FaBookOpen';
     return `<div class="av-in"><div class="av-row" style="justify-content:space-between;"><div class="av-t">Conexões na área</div>${avCirc('FaDiagramProject', C.a, '#fff', 2.2)}</div>
       <div style="margin-bottom:.7em;color:${C.a};">Este assunto também aparece em outra disciplina de Ciências Humanas:</div>
       <div class="${cx.length >= 3 ? 'av-g3' : 'av-g2'}" style="align-items:stretch;">${cx.map((c, i) => `<div class="av-card ${c.quando==='junto' ? 'ou' : 'az'} av-pop" style="animation-delay:${i*.15}s;">
@@ -27439,6 +27809,8 @@ function planoAulaDetalheHtml(turmaId, plano, aula, prog, destaque, ctxHero){
         ${aula.objetivo?`<p style="margin:0 0 6px; font-size:.9rem;"><strong>Objetivo:</strong> ${esc(aula.objetivo)}</p>`:''}
         ${planoCursosHtml(turmaId, aula)}
         ${conexoesProfHtml(turmaId, plano, aula)}
+        ${trilhasProfHtml(turmaId, plano, aula)}
+        ${pontesProfHtml(turmaId, plano, aula)}
       </div>
     </div>
     ${aula.tipo==='Revisão' ? `<p class="pl-nota">📉 Dia de revisão: abra <strong>“📝 Avaliação do bimestre”</strong>, logo abaixo, para ver o que a turma mais errou e aplicar a lista de revisão.</p>` : ''}
@@ -27569,6 +27941,7 @@ function renderPlanoLivro(){
         ${s.registroAberto ? '' : renderPlanoRegistro(turmaId)}
       </div>
       ${renderPlanoErros(turmaId, revisaoHoje)}`, revisaoHoje || provaHoje)}
+    ${trilhaCatalogo(plano).length ? plGrupoHtml('trilhas', '🧭 Grandes perguntas', `${trilhaCatalogo(plano).length} perguntas que atravessam as Humanas · etapas, atividades ponte e respostas dos alunos`, () => renderPlanoTrilhas(turmaId, plano), false) : ''}
     ${plGrupoHtml('habil', '📈 Habilidades e entregas', 'como a turma vai em cada habilidade do ENEM e nas entregas', () => renderPlanoHabilidades(turmaId), false)}
     ${plGrupoHtml('pdf', '🖥️ Slides próprios (PDF)', nSlides ? `${nSlides} aula(s) com PDF enviado` : 'só se você tiver slides próprios', () => `
       <p class="muted" style="font-size:.86rem; margin-top:0;">Selecione <strong>vários PDFs de uma vez</strong>. O app liga cada arquivo à aula pelo número no nome: <code>aula-01.pdf</code> → Aula 1, <code>aula-02.pdf</code> → Aula 2…</p>
@@ -29289,7 +29662,18 @@ document.addEventListener('click', (e) => {
   else if(act==='goto-aluno-livros'){ stopAlunoEnquetePoll(); al.stage='aluno-livros'; if(state.professor.livrosLoading){ loadLivros(); } render(); }
   else if(act==='back-to-student-dashboard'){ loadStudentDashboard(); }
   else if(act==='estudar-disc'){ const e = estudarState(); e.disc = btn.dataset.k; try{ localStorage.setItem('estudar-disc', e.disc); }catch(_){} e.aberta = null; e.deck = null; e.av = null; carregarEstudarAluno(true); }
-  else if(act==='estudar-conexao'){ const e = estudarState(); const k = btn.dataset.k, n = parseInt(btn.dataset.n); if(k===e.disc){ e.aberta = n; render(); setTimeout(() => { const el = document.querySelector(`[data-estudar-aula="${n}"]`); if(el) el.scrollIntoView({ block:'start' }); }, 50); } else { e.disc = k; try{ localStorage.setItem('estudar-disc', k); }catch(_){} e.abrirApos = n; e.deck = null; e.av = null; carregarEstudarAluno(true); } }
+  else if(act==='estudar-trilha'){ const e = estudarState(); e.trilha = btn.dataset.id; e.trMsg = null; render(); window.scrollTo(0, 0); }
+  else if(act==='estudar-trilha-voltar'){ const e = estudarState(); e.trilha = null; e.trMsg = null; render(); }
+  else if(act==='estudar-trilha-salvar'){ trilhaSalvarResposta(btn.dataset.id); }
+  else if(act==='plano-trilhas-abrir'){ const s = planoState(); s.trSel = btn.dataset.id; plGruposAbertos()['trilhas'] = true; render(); setTimeout(() => { const el = document.querySelector('[data-pl-grupo="trilhas"]'); if(el) el.scrollIntoView({ block:'start' }); }, 60); }
+  else if(act==='plano-trilhas-aba'){ const s = planoState(); s.trAba = btn.dataset.aba; s.ponteAberta = null; render(); }
+  else if(act==='ponte-abrir'){ const s = planoState(); s.trAba = 'pontes'; s.ponteAberta = btn.dataset.id; if(btn.dataset.ir){ plGruposAbertos()['trilhas'] = true; } render(); setTimeout(() => { const el = document.querySelector('[data-ponte-det]') || document.querySelector('[data-pl-grupo="trilhas"]'); if(el) el.scrollIntoView({ block:'start' }); }, 60); }
+  else if(act==='ponte-fechar'){ planoState().ponteAberta = null; render(); }
+  else if(act==='ponte-imprimir'){ const p = Object.values(planoState().planos||{}).flatMap(ponteCatalogo).find(x => x.id===btn.dataset.id); if(p) ponteImprimir(p, btn.dataset.modo); }
+  else if(act==='ponte-liberar'){ const tid = planoState().turmaSel; if(tid) ponteLiberar(tid, btn.dataset.id, btn.dataset.v==='1'); }
+  else if(act==='plano-trilha-sel'){ const s = planoState(); s.trSel = btn.dataset.id; render(); }
+  else if(act==='plano-trilha-atualizar'){ const tid = planoState().turmaSel; if(tid) trilhaCarregarRespostasTurma(tid, true); }
+  else if(act==='estudar-conexao'){ const e = estudarState(); e.trilha = null; const k = btn.dataset.k, n = parseInt(btn.dataset.n); if(k===e.disc){ e.aberta = n; render(); setTimeout(() => { const el = document.querySelector(`[data-estudar-aula="${n}"]`); if(el) el.scrollIntoView({ block:'start' }); }, 50); } else { e.disc = k; try{ localStorage.setItem('estudar-disc', k); }catch(_){} e.abrirApos = n; e.deck = null; e.av = null; carregarEstudarAluno(true); } }
   else if(act==='plano-disc'){ planoTrocarDisciplina(btn.dataset.k); }
   else if(act==='area-serie'){ const A = areaState(); A.serie = btn.dataset.s; render(); }
   else if(act==='area-bim'){ const A = areaState(); A.bim = parseInt(btn.dataset.b)||1; render(); }
@@ -29403,6 +29787,7 @@ document.addEventListener('input', (e) => {
   const p = state.professor, al = state.aluno;
 
   if(act==='plano-video-campo'){ const s = planoState(); const n = parseInt(el.dataset.n); s.videoRascunho = s.videoRascunho||{}; (s.videoRascunho[n] = s.videoRascunho[n]||{})[el.dataset.campo] = el.value; return; }
+  if(act==='estudar-trilha-texto'){ const e = estudarState(); e.trRasc = e.trRasc || {}; e.trRasc[el.dataset.id] = el.value; e.trMsg = null; return; }
   if(act==='plano-feedback-texto'){ const s = planoState(); s.feedbackRascunho = s.feedbackRascunho||{}; s.feedbackRascunho[parseInt(el.dataset.n)] = el.value; return; }
   if(el.id==='monitoria-horario-input'){ al.monitoria.novoVinculoHorario = el.value; }
   else if(el.id==='monitoria-edit-horario-input'){ al.monitoria.editHorarioValor = el.value; }
