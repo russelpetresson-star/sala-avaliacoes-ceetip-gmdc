@@ -7724,6 +7724,7 @@ const JG_CSS = `
 .jg-temas-lista{max-height:260px;overflow:auto;margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:4px 14px}
 .jg-temas-g{grid-column:1/-1;font-weight:800;margin-top:6px;color:var(--wine,#7a1f2b)}
 .jg-ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.jg-som{display:inline-flex;gap:6px;align-items:center}.jg-som input{width:110px;accent-color:#7a1f33}
 .jg-ctrl-info{margin-left:auto;font-size:.85rem;color:var(--muted,#666)}
 .jg-presentes{margin-top:10px}.jg-presentes summary{cursor:pointer;font-weight:600}
 .jg-presentes-l{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:.88rem}
@@ -8071,7 +8072,7 @@ async function jgAuto(j){
   if(votando && j.inicio){
     const semSinal = new Set(jgSemSinal()); const quem = jgQuemResponde(j).filter(id => !semSinal.has(id)); const todos = quem.length && quem.every(id => g.resp[id]);
     if(jgRestante(j)<=0 || todos){ if(j.tipo==='escada' && j.votacao) await jgEscFecharVotacao(); else await jgRevelar(); return true; }
-    const r = Math.ceil(jgRestante(j)); if(r<=5 && r>0 && r!==g.ultTick && g.apresentar){ g.ultTick = r; try{ quizPlayTick(); }catch(e){} }
+    const r = Math.ceil(jgRestante(j)); if(r<=5 && r>0 && r!==g.ultTick && g.apresentar && !(typeof JGM!=='undefined' && jgSomLigado() && JGM.pronto())){ g.ultTick = r; try{ quizPlayTick(); }catch(e){} }
   }
   if(j.tipo==='naval' && j.fase==='tiros'){
     if(j.aguarda && j.capitao){ const t = g.resp[j.capitao]; if(t && t.r!=null && t.c!=null && !j.tiros[t.r][t.c]){ await jgNavAtirar(t.r, t.c); return true; } }
@@ -8500,7 +8501,7 @@ function jgControlesHtml(j, cls){
   else if(j.fase==='tiros') bt = b('proxima', j.r + 1 >= j.perguntas.length || j.frota.every(n => n.afundou) ? 'Ver o resultado' : 'Próxima questão', true, j.vez!=null);
   const pres = g.daAula ? b('voltar-aula', '↩ Voltar à aula', j.fase==='fim') : jgSemProjAtivo() ? '' : b('apresentar', g.apresentar ? '🗗 Sair da tela cheia' : '📺 Tela cheia no telão');
   const fim = j.fase!=='fim' && !g.daAula ? b('encerrar', 'Encerrar jogo') : '';
-  return `<div class="jg-ctrl ${cls||''}">${bt}${pres}${fim}${q && j.fase!=='sala' && j.fase!=='fim' && !(j.tipo==='missao' && !['pergunta','revelado'].includes(j.fase)) ? `<span class="jg-ctrl-info">${esc(jgFonteQ(q))}${q.tema ? ' · ' + esc(q.tema) : ''}</span>` : ''}</div>`;
+  return `<div class="jg-ctrl ${cls||''}">${bt}${pres}${jgSomControlesHtml()}${fim}${q && j.fase!=='sala' && j.fase!=='fim' && !(j.tipo==='missao' && !['pergunta','revelado'].includes(j.fase)) ? `<span class="jg-ctrl-info">${esc(jgFonteQ(q))}${q.tema ? ' · ' + esc(q.tema) : ''}</span>` : ''}</div>`;
 }
 /* ---------- sala sem projetor: o professor conduz pelo celular e cada tablet é a tela do aluno ---------- */
 function jgSemProjAtivo(){ const g = jgState(); if(g.semProj==null){ let v = null; try{ v = localStorage.getItem('jg-semproj'); }catch(e){} g.semProj = v!=null ? v==='1' : (typeof window!=='undefined' && window.innerWidth < 760); } return !!g.semProj; }
@@ -9110,6 +9111,341 @@ const JG_MIS_CSS = `
 @media (orientation:portrait){.jg-al-painel-missao{max-height:none}}
 `;
 try{ document.head.insertAdjacentHTML('beforeend', '<style>' + JG_MIS_CSS + '</style>'); }catch(e){}
+/* ---------------- TRILHAS DOS JOGOS (compostas por código com Web Audio; sem arquivos de áudio, sem direitos de terceiros) ----------------
+   Estilo "trilha de filme": tambores graves, cordas em ostinato, metais, baixo distorcido, reverberação, subidas e impactos.
+   JGM.tocar('missao'|'naval'|'escada'|'qes'), JGM.parar(), JGM.pergunta(true|false) abaixa e abafa enquanto a pergunta está no ar,
+   JGM.efeito(nome, jogo?) toca o efeito do jogo (ou do jogo que está tocando): 'acerto','erro','revelar','vitoria','tique' + os próprios de cada jogo
+   (JGM.EFEITOS[jogo]), JGM.volume(0..1), JGM.mudo(bool). */
+const JGM = (() => {
+  let ctx = null, mestre, comp, musica, filtro, seco, revM, efeitos, efSeco, revE, ruido, curvaDist, timer = null, tema = null, nomeTema = null, nomeAtual = null;
+  let passo = 0, ciclo = 0, proxT = 0, vol = 0.75, mudo = false, emPergunta = false;
+  const NOTAS = { C:0, 'C#':1, Db:1, D:2, 'D#':3, Eb:3, E:4, F:5, 'F#':6, Gb:6, G:7, 'G#':8, Ab:8, A:9, 'A#':10, Bb:10, B:11 };
+  const hz = n => { if(typeof n==='number') return n; const m = /^([A-G][#b]?)(-?\d)$/.exec(n); return 440 * Math.pow(2, ((+m[2] + 1) * 12 + NOTAS[m[1]] - 69) / 12); };
+  const L = s => s.trim().split(/\s+/);
+  function impulso(seg, decai){ const n = Math.floor(ctx.sampleRate * seg), b = ctx.createBuffer(2, n, ctx.sampleRate);
+    for(let c = 0; c < 2; c++){ const d = b.getChannelData(c); for(let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, decai); } return b; }
+  function iniciar(){
+    if(ctx) return true;
+    const AC = window.AudioContext || window.webkitAudioContext; if(!AC) return false;
+    ctx = new AC();
+    const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -4; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.1; lim.connect(ctx.destination);
+    mestre = ctx.createGain(); mestre.gain.value = mudo ? 0 : vol; mestre.connect(lim);
+    comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 6; comp.attack.value = 0.004; comp.release.value = 0.2; comp.connect(mestre);
+    filtro = ctx.createBiquadFilter(); filtro.type = 'lowpass'; filtro.frequency.value = 18000; filtro.Q.value = 0.8; filtro.connect(comp);
+    musica = ctx.createGain(); musica.gain.value = 0; musica.connect(filtro);
+    seco = ctx.createGain(); seco.connect(musica);
+    const cvM = ctx.createConvolver(); cvM.buffer = impulso(2.6, 3); cvM.connect(musica); revM = ctx.createGain(); revM.gain.value = 0.55; revM.connect(cvM);
+    efeitos = ctx.createGain(); efeitos.gain.value = 1; efeitos.connect(comp);
+    efSeco = ctx.createGain(); efSeco.connect(efeitos);
+    const cvE = ctx.createConvolver(); cvE.buffer = impulso(2.2, 3); cvE.connect(efeitos); revE = ctx.createGain(); revE.gain.value = 0.5; revE.connect(cvE);
+    ruido = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate); const d = ruido.getChannelData(0); for(let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    curvaDist = new Float32Array(1024); for(let i = 0; i < 1024; i++){ const x = i / 511.5 - 1; curvaDist[i] = Math.tanh(x * 4); }
+    return true;
+  }
+  // saída de uma nota: seco + envio para a reverberação (música ou efeitos)
+  function saida(o){ const g = ctx.createGain(); const ef = o.ef; g.connect(ef ? efSeco : seco);
+    if(o.rev){ const r = ctx.createGain(); r.gain.value = o.rev; g.connect(r); r.connect(ef ? revE : revM); } return g; }
+  /* voz genérica. o: onda, vozes(detunes), vol, ataque, sustenta(0..1), rel, corte, corteEnv:[pico,fim], q, dist, rev, desliza, ef */
+  function voz(t, n, dur, o){
+    o = o || {}; const f = hz(n), pico = o.vol == null ? 0.2 : o.vol, at = o.ataque || 0.004, rel = o.rel == null ? 0.1 : o.rel, fim = t + dur + rel;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(pico, t + at);
+    if(o.sustenta == null) g.gain.exponentialRampToValueAtTime(0.0001, fim);
+    else { g.gain.exponentialRampToValueAtTime(Math.max(0.0002, pico * o.sustenta), t + Math.max(at + 0.01, dur)); g.gain.exponentialRampToValueAtTime(0.0001, fim); }
+    let cad = g;
+    if(o.dist){ const ws = ctx.createWaveShaper(); ws.curve = curvaDist; ws.oversample = '2x'; cad.connect(ws); cad = ws; }
+    if(o.corte){ const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = o.q || 0.8;
+      if(o.corteEnv){ lp.frequency.setValueAtTime(o.corte, t); lp.frequency.exponentialRampToValueAtTime(o.corteEnv[0], t + Math.min(0.06, dur)); lp.frequency.exponentialRampToValueAtTime(o.corteEnv[1], fim); }
+      else lp.frequency.value = o.corte;
+      cad.connect(lp); cad = lp; }
+    cad.connect(saida(o));
+    (o.vozes || [0]).forEach(det => { const os = ctx.createOscillator(); os.type = o.onda || 'sawtooth'; os.frequency.setValueAtTime(f, t); os.detune.value = det;
+      if(o.desliza) os.frequency.exponentialRampToValueAtTime(hz(o.desliza), t + dur);
+      os.connect(g); os.start(t); os.stop(fim + 0.05); });
+  }
+  function chiado(t, dur, freq, tipo, v, o){ o = o || {}; const s = ctx.createBufferSource(); s.buffer = ruido; const f = ctx.createBiquadFilter(); f.type = tipo || 'highpass'; f.frequency.setValueAtTime(freq, t); f.Q.value = o.q || 0.8;
+    if(o.ate) f.frequency.exponentialRampToValueAtTime(o.ate, t + dur);
+    const g = ctx.createGain(); if(o.sobe){ g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + dur * 0.95); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.03); }
+    else { g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); }
+    s.connect(f); f.connect(g); g.connect(saida(o)); s.start(t, Math.random()); s.stop(t + dur + 0.05); }
+  // ---- percussão ----
+  function tambor(t, v, o){ o = o || {}; const os = ctx.createOscillator(), g = ctx.createGain(), a = o.agudo || 1; os.type = 'sine'; os.frequency.setValueAtTime(110 * a, t); os.frequency.exponentialRampToValueAtTime(38 * a, t + 0.25);
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + (o.dur || 0.7)); os.connect(g); g.connect(saida({ rev: o.rev == null ? 0.5 : o.rev, ef: o.ef })); os.start(t); os.stop(t + (o.dur || 0.7) + 0.05);
+    chiado(t, 0.08, 900 * a, 'lowpass', v * 0.5, { rev: 0.4, ef: o.ef }); }
+  function bumbo(t, v, ef){ const os = ctx.createOscillator(), g = ctx.createGain(); os.type = 'sine'; os.frequency.setValueAtTime(160, t); os.frequency.exponentialRampToValueAtTime(45, t + 0.1);
+    g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35); os.connect(g); g.connect(saida({ ef })); os.start(t); os.stop(t + 0.4); chiado(t, 0.015, 3000, 'highpass', v * 0.3, { ef }); }
+  const caixa = (t, v, ef) => { chiado(t, 0.22, 1800, 'highpass', v, { rev: 0.45, ef }); voz(t, 180, 0.06, { onda:'triangle', vol: v * 0.7, rel: 0.06, ef, desliza: 140 }); };
+  const chimbal = (t, v, aberto) => chiado(t, aberto ? 0.25 : 0.04, 8000, 'highpass', v);
+  const palmas = (t, v) => [0, 0.011, 0.022].forEach(d => chiado(t + d, 0.12, 1500, 'bandpass', v, { rev: 0.4, q: 1.5 }));
+  const prato = (t, v, ef) => chiado(t, 2.2, 5000, 'highpass', v, { rev: 0.6, ef });
+  const tique = (t, v, alto, ef) => voz(t, alto ? 2400 : 1700, 0.012, { onda:'square', vol: v, rel: 0.03, corte: 5000, ef, rev: 0.2 });
+  function impacto(t, v, ef){ voz(t, 70, 1.2, { onda:'sine', vol: v, rel: 0.8, desliza: 28, ef, rev: 0.5 }); chiado(t, 1.6, 2200, 'lowpass', v * 0.7, { rev: 0.8, ef, ate: 200 }); }
+  const subida = (t, dur, v, ef) => { chiado(t, dur, 300, 'bandpass', v, { sobe: true, ate: 7000, q: 2, rev: 0.4, ef }); voz(t, 'C3', dur, { vol: v * 0.25, ataque: dur * 0.9, rel: 0.05, desliza: 'C6', corte: 3000, vozes: [-15, 15], ef }); };
+  // ---- instrumentos ----
+  const cordaCurta = (t, n, dp, v) => voz(t, n, dp * 0.7, { vol: v || 0.07, ataque: 0.006, rel: 0.07, corte: 600, corteEnv: [3200, 900], vozes: [-9, 9], rev: 0.25 });
+  const pad = (t, notas, dur, v) => notas.forEach(n => voz(t, n, dur, { vol: v || 0.03, ataque: dur * 0.3, sustenta: 0.8, rel: 0.6, corte: 1300, vozes: [-12, 0, 12], rev: 0.7 }));
+  const metal = (t, notas, dur, v) => notas.forEach(n => voz(t, n, dur, { vol: v || 0.06, ataque: 0.02, sustenta: 0.6, rel: 0.25, corte: 300, corteEnv: [2800, 700], q: 2, vozes: [-7, 7], rev: 0.45 }));
+  const trompa = (t, n, dur, v) => voz(t, n, dur, { vol: v || 0.07, ataque: 0.08, sustenta: 0.85, rel: 0.35, corte: 500, corteEnv: [1800, 1100], vozes: [-6, 0, 6], rev: 0.6 });
+  const baixoDist = (t, n, dur, v) => voz(t, n, dur, { vol: v || 0.12, ataque: 0.004, rel: 0.05, dist: true, corte: 300, corteEnv: [1400, 250], q: 3, vozes: [0, -1200] });
+  const sub = (t, n, dur, v) => voz(t, n, dur, { onda:'sine', vol: v || 0.3, ataque: 0.01, sustenta: 0.8, rel: 0.1 });
+  const linha = (lin, s, dp) => { const tok = lin[s]; if(!tok || tok==='.' || tok==='-') return null; let k = 1; while(lin[s + k]==='-') k++; return [tok, k * dp]; };
+  const T = {};
+  // 🕶️ MISSÃO POSSÍVEL: ré menor, 138 bpm. Cordas em semicolcheias sem parar, baixo distorcido sincopado, taikos, metais e trompa sombria.
+  T.missao = { bpm: 138, passos: 16, barras: 4,
+    ost: [L('D3 D3 A3 D3 F3 D3 A3 D3 D3 D3 Bb3 D3 A3 D3 F3 E3'), L('Bb2 Bb2 F3 Bb2 D3 Bb2 F3 Bb2 Bb2 Bb2 G3 Bb2 F3 Bb2 D3 C3'), L('G2 G2 D3 G2 Bb2 G2 D3 G2 G2 G2 Eb3 G2 D3 G2 Bb2 A2'), L('A2 A2 E3 A2 C#3 A2 E3 A2 A2 A2 F3 A2 E3 A2 C#3 E3')],
+    raiz: ['D2', 'Bb1', 'G1', 'A1'], acordes: [['D3','A3','D4','F4'], ['Bb2','F3','Bb3','D4'], ['G2','D3','G3','Bb3'], ['A2','E3','A3','C#4']],
+    trompa: [L('D4 - - - - - - - F4 - - - E4 - - -'), L('D4 - - - - - - - - - - - . . . .'), L('G4 - - - - - - - Bb4 - - - A4 - - -'), L('C#4 - - - - - - - E4 - - - - - - -')],
+    tocar(b, s, t, dp, c){
+      cordaCurta(t, this.ost[b][s], dp, s % 4 === 0 ? 0.085 : 0.06);
+      if([0, 3, 6, 8, 11, 14].includes(s)) baixoDist(t, this.raiz[b], dp * 1.6, 0.11);
+      if(s === 0) { sub(t, this.raiz[b], dp * 15, 0.22); pad(t, this.acordes[b], dp * 16, 0.022); }
+      if(c % 2 === 1){ const x = linha(this.trompa[b], s, dp); if(x) trompa(t, x[0], x[1], 0.075); }
+      if((b === 0 || b === 2) && (s === 0 || s === 3)) metal(t, this.acordes[b].slice(0, 3), dp * 1.2, 0.05);
+      if([0, 6, 11].includes(s)) tambor(t, 0.75); if(s === 8) tambor(t, 0.4, { agudo: 1.4 });
+      if(s === 4 || s === 12) caixa(t, 0.3);
+      if(b === 3 && s >= 12) caixa(t, 0.12 + (s - 12) * 0.06);
+      chimbal(t, s % 2 ? 0.035 : 0.06);
+      if(b === 0 && s === 0 && c > 0) { impacto(t, 0.5); prato(t, 0.12); }
+      if(b === 3 && s === 0) subida(t, dp * 16, 0.12);
+    } };
+  // ⚓ BATALHA NAVAL: aventura pirata em ré menor, 6/8 rápido. Cordas graves a galope sem parar, metais pesados, tambores, pratos e tema heroico original.
+  T.naval = { dp: 0.072, passos: 12, barras: 8,
+    raiz: ['D2', 'D2', 'Bb1', 'C2', 'D2', 'G1', 'A1', 'A1'],
+    acordes: [['D3','A3','D4','F4'], ['D3','A3','D4','F4'], ['Bb2','F3','Bb3','D4'], ['C3','G3','C4','E4'], ['D3','A3','D4','F4'], ['G2','D3','G3','Bb3'], ['A2','E3','A3','C#4'], ['A2','E3','A3','C#4']],
+    tema: [L('A4 - - - - - D5 - - - E5 -'), L('F5 - - - E5 - D5 - - - A4 -'), L('Bb4 - - - - - D5 - - - F5 -'), L('E5 - - - - - C5 - - - - -'),
+           L('D5 - - - F5 - A5 - - - G5 -'), L('F5 - - - E5 - D5 - - - Bb4 -'), L('C#5 - - - E5 - A5 - - - G5 -'), L('F5 - - - E5 - - - - - . .')],
+    tocar(b, s, t, dp, c){
+      const r = this.raiz[b], ac = this.acordes[b];
+      if(s % 2 === 0){ const acento = s === 0 || s === 6; voz(t, s === 0 || s === 6 ? r : hz(r) * 2, dp * 1.6, { vol: acento ? 0.15 : 0.1, ataque: 0.004, rel: 0.06, corte: 400, corteEnv: [2200, 500], q: 1.5, vozes: [-8, 8], rev: 0.2 });
+        cordaCurta(t, hz(ac[0]) * 2, dp * 1.4, acento ? 0.075 : 0.05); }
+      if(b === 7 && s === 11) cordaCurta(t, hz(ac[0]) * 2, dp, 0.06);
+      if(s === 0) { sub(t, r, dp * 11, 0.22); pad(t, ac, dp * 12, 0.03); }
+      const comTema = c >= 1;
+      if(comTema){ const x = linha(this.tema[b], s, dp); if(x){ trompa(t, x[0], x[1], 0.085); voz(t, hz(x[0]) / 2, x[1], { vol: 0.05, ataque: 0.05, sustenta: 0.85, rel: 0.3, corte: 1200, vozes: [-6, 6], rev: 0.5 }); voz(t, x[0], x[1], { vol: 0.035, ataque: 0.03, sustenta: 0.9, rel: 0.25, corte: 3500, vozes: [-10, 0, 10], rev: 0.5 }); } }
+      if(s === 0 || s === 6) metal(t, ac.slice(0, 3), dp * (comTema ? 1.5 : 3), comTema ? 0.04 : 0.065);
+      if(s === 0) tambor(t, 0.9); if(s === 6) { tambor(t, 0.65); caixa(t, 0.25); }
+      if(s === 4 || s === 10) tambor(t, 0.3, { agudo: 1.6 });
+      if(b === 7 && s >= 6) tambor(t, 0.25 + (s - 6) * 0.08, { agudo: 1.2 + (s % 3) * 0.3 });
+      if(s % 2 === 0) chimbal(t, 0.03);
+      if((b === 0 || b === 4) && s === 0) prato(t, b === 0 ? 0.14 : 0.08);
+      if(b === 0 && s === 0 && c > 0) impacto(t, 0.5);
+      if(b === 7 && s === 0) subida(t, dp * 12, 0.09);
+    } };
+  // 🪜 ESCADA DO SABER: clima de programa de perguntas valendo prêmio, si menor, 96 bpm. Pulso de sintetizador em colcheias, grave sustentado,
+  // cordas agudas subindo devagar, tímpano, coração e uma "virada" com estrondo a cada 8 compassos.
+  T.escada = { bpm: 96, passos: 16, barras: 8,
+    raiz: ['B1', 'B1', 'G1', 'G1', 'E1', 'E1', 'F#1', 'F#1'],
+    acordes: [['B2','F#3','B3','D4'], ['B2','F#3','C#4','D4'], ['G2','D3','G3','B3'], ['G2','D3','A3','B3'], ['E2','B2','E3','G3'], ['E2','B2','F#3','G3'], ['F#2','C#3','F#3','B3'], ['F#2','C#3','F#3','A#3']],
+    pulso: ['F#4', 'F#4', 'D4', 'D4', 'E4', 'E4', 'C#4', 'C#4'],
+    alto: ['F#5', 'F#5', 'G5', 'A5', 'B5', 'A5', 'A#5', 'C#6'],
+    tocar(b, s, t, dp, c){
+      const ac = this.acordes[b];
+      if(s === 0){ sub(t, this.raiz[b], dp * 16, 0.26); pad(t, ac, dp * 16, 0.034); }
+      // pulso em colcheias, com o filtro abrindo ao longo do compasso
+      if(s % 2 === 0){ const n = s % 4 === 0 ? this.pulso[b] : hz(this.pulso[b]) / 2 * 2; voz(t, n, dp * 1.3, { vol: 0.055, rel: 0.05, corte: 500, corteEnv: [1400 + s * 120 + (b % 2) * 600, 500], q: 4, vozes: [-7, 7], rev: 0.35 });
+        voz(t, hz(this.raiz[b]) * 2, dp * 1.2, { vol: 0.07, rel: 0.04, dist: true, corte: 250, corteEnv: [700, 200], q: 3 }); }
+      // corda aguda sustentada, crescendo
+      if(s === 0 && c >= 1) voz(t, this.alto[b], dp * 16, { vol: 0.035, ataque: dp * 8, sustenta: 0.9, rel: 0.5, corte: 4000, vozes: [-10, 0, 10], rev: 0.7 });
+      // coração e tímpano
+      if(s === 0 || s === 8) bumbo(t, 0.85); if(s === 2 || s === 10) bumbo(t, 0.5);
+      if(s === 0 && b % 2 === 0) tambor(t, 0.55, { agudo: 0.9 });
+      if(s % 4 === 0) tique(t, 0.035, (s / 4) % 2 === 0);
+      // virada: rufar de tímpano + subida no último compasso, estrondo e prato na volta
+      if(b === 7 && s >= 8) tambor(t, 0.15 + (s - 8) * 0.06, { agudo: 0.9, dur: 0.3 });
+      if(b === 7 && s === 0) subida(t, dp * 16, 0.12);
+      if(b === 3 && s === 12) metal(t, ['G2','D3','G3'], dp * 3, 0.05);
+      if(b === 0 && s === 0 && c > 0){ impacto(t, 0.55); prato(t, 0.12); metal(t, ['B2','F#3','B3'], dp * 4, 0.06); }
+    } };
+  // 🎯 QUEM ERRA SAI: eletrônica de pista em fá menor, 128 bpm. Bumbo reto, baixo rolando, acordes "supersaw" pulsando, gancho em 3-3-3-3-2-2, subida e queda a cada 8 compassos.
+  T.qes = { bpm: 128, passos: 16, barras: 8,
+    raiz: ['F1', 'Db2', 'Ab1', 'Eb2'],
+    acordes: [['F3','Ab3','C4','F4'], ['Db3','F3','Ab3','Db4'], ['Ab3','C4','Eb4','Ab4'], ['Eb3','G3','Bb3','Eb4']],
+    gancho: [L('F5 . . C5 . . Ab5 . . G5 . . F5 . Eb5 .'), L('F5 . . C5 . . Ab5 . . G5 . . F5 . C5 .'), L('Eb5 . . C5 . . Ab5 . . G5 . . Eb5 . C5 .'), L('G5 . . Eb5 . . Bb5 . . Ab5 . . G5 . Bb4 .')],
+    tocar(b, s, t, dp, c){
+      const k = b % 4, ac = this.acordes[k], r = this.raiz[k], subindo = b >= 6, finalBuild = b === 7;
+      // bumbo reto (some no último compasso da subida)
+      if(s % 4 === 0 && !(finalBuild && s >= 8)) { bumbo(t, 1); sub(t, r, dp * 0.9, 0.2); }
+      // baixo rolando no contratempo
+      if(s % 4 === 2 || s % 4 === 3) voz(t, hz(r) * (s % 4 === 3 ? 2 : 1), dp * 0.8, { vol: 0.17, rel: 0.03, dist: true, corte: 300, corteEnv: [1800, 300], q: 3, vozes: [0, -1200] });
+      // acordes supersaw "bombeando" após cada bumbo
+      if(s % 4 === 0) ac.slice(0, 3).forEach(n => voz(t + 0.03, hz(n) * 2, dp * 3.2, { vol: 0.036, ataque: dp * 1.8, rel: 0.04, corte: subindo ? 1200 + s * 150 + (b - 6) * 2500 : 4000, vozes: [-25, -12, -4, 4, 12, 25], rev: 0.3 }));
+      // gancho em pluck (dobra uma oitava acima na segunda volta)
+      const x = linha(this.gancho[k], s, dp); if(x && !finalBuild){ voz(t, x[0], dp * 1.6, { onda: 'sawtooth', vol: 0.09, rel: 0.12, corte: 600, corteEnv: [6000, 900], q: 2, vozes: [-10, 10], rev: 0.35 });
+        if(c % 2 === 1) voz(t, hz(x[0]) * 2, dp * 1.2, { onda: 'square', vol: 0.025, rel: 0.1, corte: 5000, rev: 0.35 }); }
+      // pratos e palmas
+      if(s === 4 || s === 12) palmas(t, 0.32);
+      if(s % 4 === 2) chimbal(t, 0.09, true); else chimbal(t, 0.03);
+      // subida: caixa acelerando e ruído subindo
+      if(b === 6 && s % 4 === 0) caixa(t, 0.12);
+      if(finalBuild) caixa(t, 0.08 + s * 0.015);
+      if(b === 6 && s === 0) subida(t, dp * 32, 0.12);
+      if(b === 0 && s === 0 && c > 0) { impacto(t, 0.45); prato(t, 0.15); }
+    } };
+  // ---- efeitos de cada jogo ----
+  const E = {};
+  const ef = { ef: true };
+  E.missao = {
+    acerto(t){ ['D6','A6','D7'].forEach((n, i) => voz(t + i * 0.05, n, 0.04, { onda:'square', vol: 0.06, rel: 0.03, corte: 6000, ef: true })); voz(t + 0.15, 'D4', 0.4, { vol: 0.09, ataque: 0.02, sustenta: 0.7, rel: 0.3, corte: 400, corteEnv: [3000, 900], vozes: [-7, 7], ef: true, rev: 0.4 }); voz(t + 0.15, 'A4', 0.4, { vol: 0.07, ataque: 0.02, sustenta: 0.7, rel: 0.3, corte: 400, corteEnv: [3000, 900], vozes: [-7, 7], ef: true, rev: 0.4 }); },
+    erro(t){ for(let i = 0; i < 3; i++){ voz(t + i * 0.22, 'A3', 0.1, { onda:'square', vol: 0.09, rel: 0.02, corte: 2200, ef: true }); voz(t + i * 0.22 + 0.11, 'Eb3', 0.1, { onda:'square', vol: 0.09, rel: 0.02, corte: 2200, ef: true }); } tambor(t, 0.6, { ef: true }); },
+    revelar(t){ chiado(t, 0.6, 400, 'bandpass', 0.2, { ate: 6000, q: 6, ef: true }); for(let i = 0; i < 6; i++) voz(t + i * 0.08, 1200 + i * 250, 0.02, { onda:'square', vol: 0.04, rel: 0.02, ef: true }); impacto(t + 0.6, 0.4, true); },
+    vitoria(t){ const a = [['D4','F4','A4'], ['Bb3','D4','F4'], ['C4','E4','G4'], ['D4','F#4','A4','D5']]; a.forEach((ac, i) => { const d = i === 3 ? 1.6 : 0.28; ac.forEach(n => voz(t + i * 0.3, n, d, { vol: 0.06, ataque: 0.02, sustenta: 0.8, rel: 0.5, corte: 400, corteEnv: [3000, 1200], vozes: [-7, 7], ef: true, rev: 0.5 })); tambor(t + i * 0.3, 0.7, { ef: true }); }); prato(t + 0.9, 0.15, true); },
+    decodificar(t){ for(let i = 0; i < 10; i++) voz(t + i * 0.06, 800 + Math.random() * 2400, 0.03, { onda:'square', vol: 0.04, rel: 0.02, corte: 5000, ef: true }); voz(t + 0.65, 'A5', 0.25, { onda:'sine', vol: 0.12, rel: 0.3, ef: true, rev: 0.4 }); },
+    desarmar(t){ chiado(t, 0.03, 4000, 'highpass', 0.4, ef); chiado(t + 0.04, 0.5, 2000, 'bandpass', 0.15, { ate: 300, ef: true }); voz(t + 0.1, 'A2', 0.6, { vol: 0.1, rel: 0.3, corte: 800, desliza: 'A1', ef: true }); },
+    alarme(t){ for(let i = 0; i < 4; i++) voz(t + i * 0.3, 'E5', 0.28, { onda:'sawtooth', vol: 0.05, rel: 0.02, corte: 3000, desliza: 'B4', ef: true }); }
+  };
+  E.naval = {
+    acerto(t){ impacto(t, 0.6, true); chiado(t, 0.9, 1200, 'lowpass', 0.5, { ate: 150, rev: 0.6, ef: true }); tambor(t, 0.9, { ef: true }); },
+    erro(t){ chiado(t, 0.7, 3000, 'lowpass', 0.35, { ate: 300, rev: 0.5, ef: true }); chiado(t + 0.05, 0.35, 5000, 'highpass', 0.1, ef); voz(t, 'G2', 0.4, { onda:'sine', vol: 0.12, desliza: 'D2', ef: true }); },
+    revelar(t){ voz(t, 'B5', 0.03, { onda:'sine', vol: 0.18, rel: 1.4, ef: true, rev: 0.9 }); voz(t + 0.7, 'B5', 0.03, { onda:'sine', vol: 0.08, rel: 1.2, ef: true, rev: 0.9 }); },
+    vitoria(t){ [['D4','A4'], ['F4','C5'], ['G4','D5'], ['A4','D5','F#5','A5']].forEach((ac, i) => { ac.forEach(n => trompaEf(t + i * 0.25, n, i === 3 ? 1.6 : 0.22)); tambor(t + i * 0.25, 0.8, { ef: true }); }); [0, 0.25, 0.5].forEach(d => impacto(t + 1 + d, 0.35, true)); },
+    canhao(t){ // estampido seco + estrondo grave distorcido + ronco longo + eco
+      chiado(t, 0.06, 1200, 'highpass', 1, { ef: true }); chiado(t, 0.12, 400, 'bandpass', 1, { q: 0.5, ef: true });
+      voz(t, 95, 0.9, { onda: 'sine', vol: 1, ataque: 0.002, rel: 0.6, desliza: 24, ef: true, rev: 0.4 });
+      voz(t, 60, 0.5, { onda: 'sawtooth', vol: 0.5, ataque: 0.002, rel: 0.4, dist: true, corte: 900, corteEnv: [1500, 120], desliza: 30, ef: true });
+      chiado(t + 0.01, 3.2, 1800, 'lowpass', 0.8, { ate: 60, rev: 0.9, ef: true });
+      chiado(t + 0.45, 1.8, 700, 'lowpass', 0.25, { ate: 60, rev: 0.9, ef: true }); voz(t + 0.45, 70, 0.6, { onda: 'sine', vol: 0.3, rel: 0.5, desliza: 25, ef: true, rev: 0.8 }); },
+    afundou(t){ impacto(t, 0.6, true); for(let i = 0; i < 8; i++) voz(t + 0.5 + i * 0.12 + Math.random() * 0.05, 300 + Math.random() * 500, 0.04, { onda:'sine', vol: 0.06, rel: 0.04, desliza: 900, ef: true }); voz(t + 0.3, 'C2', 1.4, { vol: 0.08, corte: 400, rel: 0.4, desliza: 'C1', ef: true }); },
+    sonar(t){ E.naval.revelar(t); }
+  };
+  function trompaEf(t, n, d){ voz(t, n, d, { vol: 0.07, ataque: 0.04, sustenta: 0.85, rel: 0.4, corte: 500, corteEnv: [2400, 1200], vozes: [-6, 0, 6], ef: true, rev: 0.6 }); }
+  function plateia(t, dur){ // auditório aplaudindo: ~28 pessoas batendo palmas em ritmos próprios, crescendo e sumindo, com burburinho
+    const pessoas = 28;
+    for(let p = 0; p < pessoas; p++){ const ritmo = 0.16 + Math.random() * 0.1, tom = 700 + Math.random() * 1900, ini = Math.random() * 0.25, fimP = dur * (0.6 + Math.random() * 0.4);
+      for(let x = ini; x < fimP; x += ritmo * (0.9 + Math.random() * 0.2)){ const env = Math.min(1, x / 0.35) * Math.pow(1 - x / dur, 1.3);
+        if(env > 0.02) chiado(t + x, 0.02 + Math.random() * 0.03, tom, 'bandpass', 0.11 * env, { q: 1.3, rev: 0.25, ef: true }); } }
+    chiado(t, dur, 1100, 'bandpass', 0.05, { q: 0.6, rev: 0.6, ef: true, sobe: false });
+    voz(t + 0.3, 'C6', 0.5, { onda: 'sine', vol: 0.025, ataque: 0.15, rel: 0.4, desliza: 'G6', vibrato: 0, ef: true, rev: 0.6 }); }
+  E.escada = {
+    acerto(t){ ['A4','C5','E5','A5'].forEach((n, i) => voz(t + i * 0.05, n, 0.12, { onda:'square', vol: 0.06, rel: 0.12, corte: 400, corteEnv: [5000, 1500], q: 3, ef: true, rev: 0.3 })); ['A3','E4','A4','C#5'].forEach(n => voz(t + 0.22, n, 0.4, { vol: 0.045, ataque: 0.01, sustenta: 0.7, rel: 0.4, corte: 600, corteEnv: [4000, 1500], vozes: [-9, 9], ef: true, rev: 0.4 })); bumbo(t + 0.22, 0.8, true);
+      plateia(t + 0.15, 3); },
+    erro(t){ voz(t, 'E3', 0.6, { onda:'sawtooth', vol: 0.12, rel: 0.1, dist: true, corte: 1500, desliza: 'A1', ef: true }); bumbo(t, 0.9, true); },
+    revelar(t){ for(let i = 0; i < 16; i++) tambor(t + i * 0.05, 0.12 + i * 0.03, { agudo: 0.9, dur: 0.25, ef: true }); subida(t, 0.8, 0.12, true); impacto(t + 0.8, 0.5, true); prato(t + 0.8, 0.18, true); ['B2','F#3','B3','D4'].forEach(n => voz(t + 0.8, n, 0.8, { vol: 0.05, ataque: 0.01, sustenta: 0.6, rel: 0.6, corte: 300, corteEnv: [2600, 700], q: 2, vozes: [-7, 7], ef: true, rev: 0.6 })); },
+    vitoria(t){ subida(t, 0.8, 0.15, true); ['A3','C#4','E4','A4','C#5','E5'].forEach(n => voz(t + 0.8, n, 1.8, { vol: 0.04, ataque: 0.02, sustenta: 0.8, rel: 0.8, corte: 800, corteEnv: [5000, 2000], vozes: [-10, 10], ef: true, rev: 0.6 })); bumbo(t + 0.8, 1, true); prato(t + 0.8, 0.22, true); plateia(t + 0.8, 3.5); },
+    subir(t){ ['E4','A4','E5'].forEach((n, i) => voz(t + i * 0.07, n, 0.08, { onda:'square', vol: 0.06, rel: 0.1, corte: 5000, ef: true, rev: 0.3 })); },
+    cair(t){ for(let i = 0; i < 5; i++) voz(t + i * 0.09, hz('E5') / Math.pow(1.26, i), 0.07, { onda:'square', vol: 0.06, rel: 0.05, corte: 3000, ef: true }); bumbo(t + 0.5, 0.9, true); },
+    rufar(t){ E.escada.revelar(t); }
+  };
+  const serra = (t, n, d, v, o) => voz(t, n, d, Object.assign({ vol: v, ataque: 0.005, sustenta: 0.7, rel: 0.3, corte: 5000, vozes: [-25, -12, -4, 4, 12, 25], ef: true, rev: 0.4 }, o || {}));
+  E.qes = {
+    acerto(t){ voz(t, 'C5', 0.18, { onda:'square', vol: 0.06, rel: 0.05, desliza: 'C7', corte: 7000, ef: true }); ['F4','Ab4','C5','F5'].forEach(n => serra(t + 0.16, n, 0.3, 0.025)); bumbo(t + 0.16, 0.9, true); },
+    erro(t){ E.qes.eliminado(t); },
+    revelar(t){ subida(t, 0.7, 0.16, true); for(let i = 0; i < 12; i++) caixa(t + i * 0.055, 0.04 + i * 0.012, true); ['F3','C4','F4','Ab4'].forEach(n => serra(t + 0.7, n, 0.5, 0.03)); bumbo(t + 0.7, 1, true); prato(t + 0.7, 0.18, true); },
+    vitoria(t){ subida(t, 0.9, 0.15, true); [0, 0.11, 0.22, 0.33].forEach((d, i) => caixa(t + 0.45 + d, 0.1 + i * 0.05, true));
+      ['Ab3','C4','Eb4','Ab4','C5','Eb5'].forEach(n => serra(t + 0.9, n, 1.6, 0.025, { rel: 0.9 })); [0, 0.47, 0.94].forEach(d => bumbo(t + 0.9 + d, 1, true)); prato(t + 0.9, 0.22, true); impacto(t + 0.9, 0.4, true); },
+    eliminado(t){ voz(t, 'F3', 0.6, { onda:'sawtooth', vol: 0.15, rel: 0.2, dist: true, corte: 2000, corteEnv: [3000, 150], q: 6, desliza: 'F1', vozes: [0, -1200], ef: true }); bumbo(t, 1, true); impacto(t + 0.05, 0.55, true); },
+    tensao(t){ subida(t, 1.6, 0.15, true); for(let i = 0; i < 24; i++) caixa(t + 1.6 * (1 - Math.pow(1 - i / 24, 1.6)), 0.03 + i * 0.006, true); },
+    tique(t){ voz(t, 'F6', 0.02, { onda:'square', vol: 0.08, rel: 0.03, corte: 8000, ef: true }); bumbo(t, 0.6, true); }
+  };
+  const EF_GERAL = { tique(t){ tique(t, 0.11, true, true); bumbo(t, 0.4, true); } };
+  function durPasso(){ return tema.dp || 60 / tema.bpm / 4; }
+  function agendar(){
+    if(!tema) return; const dp = durPasso();
+    while(proxT < ctx.currentTime + 0.15){ const b = Math.floor(passo / tema.passos), s = passo % tema.passos;
+      try{ tema.tocar(b, s, proxT, dp, ciclo); }catch(e){}
+      proxT += dp; passo++; if(passo >= tema.passos * tema.barras){ passo = 0; ciclo++; } }
+  }
+  const nivel = () => emPergunta ? 0.32 : 0.95;
+  return {
+    temas: Object.keys(T),
+    pronto: () => !!(ctx && ctx.state === 'running'),
+    desbloquear(){ if(!iniciar()) return; try{ if(ctx.state !== 'running') ctx.resume(); }catch(e){} },
+    EFEITOS: Object.fromEntries(Object.keys(E).map(k => [k, Object.keys(E[k])])),
+    tocando: () => nomeAtual,
+    tocar(nome){
+      if(!T[nome] || !iniciar()) return; try{ ctx.resume(); }catch(e){}
+      if(nomeAtual === nome && timer) return;
+      clearInterval(timer); tema = T[nome]; nomeTema = nome; nomeAtual = nome; passo = 0; ciclo = 0; proxT = ctx.currentTime + 0.1;
+      musica.gain.cancelScheduledValues(ctx.currentTime); musica.gain.setValueAtTime(0.0001, ctx.currentTime); musica.gain.linearRampToValueAtTime(nivel(), ctx.currentTime + 0.6);
+      timer = setInterval(agendar, 25); agendar();
+    },
+    parar(){
+      if(!ctx || !timer){ nomeAtual = null; return; } const t = ctx.currentTime;
+      musica.gain.cancelScheduledValues(t); musica.gain.setValueAtTime(musica.gain.value, t); musica.gain.linearRampToValueAtTime(0.0001, t + 0.8);
+      const tm = timer; timer = null; nomeAtual = null; setTimeout(() => { clearInterval(tm); if(!timer) tema = null; }, 850);
+    },
+    pergunta(sim){
+      emPergunta = !!sim; if(!ctx) return; const t = ctx.currentTime;
+      musica.gain.cancelScheduledValues(t); musica.gain.setValueAtTime(musica.gain.value, t); musica.gain.linearRampToValueAtTime(timer ? nivel() : 0.0001, t + 0.5);
+      filtro.frequency.cancelScheduledValues(t); filtro.frequency.setValueAtTime(filtro.frequency.value, t); filtro.frequency.exponentialRampToValueAtTime(emPergunta ? 900 : 18000, t + 0.5);
+    },
+    volume(v){ vol = Math.max(0, Math.min(1, v)); if(ctx && !mudo) mestre.gain.setTargetAtTime(vol, ctx.currentTime, 0.05); },
+    mudo(m){ mudo = !!m; if(ctx) mestre.gain.setTargetAtTime(mudo ? 0 : vol, ctx.currentTime, 0.05); },
+    estado: () => ({ vol, mudo, emPergunta, tocando: nomeAtual }),
+    efeito(nome, jogo){
+      if(!iniciar()) return; try{ ctx.resume(); }catch(e){}
+      const j = jogo || nomeTema || 'missao', f = (E[j] && E[j][nome]) || EF_GERAL[nome] || (E.missao[nome]);
+      if(f) try{ f(ctx.currentTime + 0.03); }catch(e){}
+    }
+  };
+})();
+/* ---------------- SOM DOS JOGOS: liga as trilhas e os efeitos (JGM) ao andamento do jogo ----------------
+   Só toca no aparelho do professor (o que está ligado ao som da sala); os tablets dos alunos ficam em silêncio.
+   Compara o estado do jogo a cada 0,4 s e dispara: trilha do jogo, abafar durante a pergunta, tique nos 5 s finais,
+   revelação + acerto/erro/eliminado, tiros da Batalha Naval, envelopes da Missão, degraus da Escada e vitória no fim.
+   Som ligado/desligado e volume ficam guardados no aparelho (localStorage jg-som / jg-som-vol). */
+const JG_SOM = { prev: null, tick: '', perg: null, timers: [] };
+const JG_SOM_TEMA = { missao: 'missao', naval: 'naval', escada: 'escada', qes: 'qes' };
+function jgSomLigado(){ let v = null; try{ v = localStorage.getItem('jg-som'); }catch(e){} return v !== '0'; }
+function jgSomVol(){ let v = null; try{ v = localStorage.getItem('jg-som-vol'); }catch(e){} const n = parseFloat(v); return isNaN(n) ? 0.75 : Math.max(0, Math.min(1, n)); }
+function jgSomAplicar(){ JGM.volume(jgSomVol()); JGM.mudo(!jgSomLigado()); }
+function jgSomSetLigado(v){ try{ localStorage.setItem('jg-som', v ? '1' : '0'); }catch(e){} jgSomAplicar(); if(v) JGM.desbloquear(); render(); }
+function jgSomSetVol(v){ try{ localStorage.setItem('jg-som-vol', String(v)); }catch(e){} JGM.volume(v); }
+function jgSomControlesHtml(){
+  const on = jgSomLigado();
+  return `<span class="jg-som"><button class="btn btn-ghost" data-jg="som" title="Música e efeitos no aparelho do professor">${on ? '🔊 Música' : '🔇 Música'}</button>${on ? `<input type="range" min="0" max="100" value="${Math.round(jgSomVol() * 100)}" data-jg-vol aria-label="Volume da música">` : ''}</span>`;
+}
+function jgSomJogo(){ const p = typeof state !== 'undefined' && state.view === 'professor' && state.professor; return p && p.subview === 'jogos' && p.jogos && p.jogos.current || null; }
+function jgSomDepois(ms, f){ JG_SOM.timers.push(setTimeout(f, ms)); }
+function jgSomLimpar(){ JG_SOM.timers.forEach(clearTimeout); JG_SOM.timers = []; }
+function jgSomResultado(j){
+  const u = j.ult || {};
+  if(j.tipo === 'qes') return (u.sairam || []).length && !u.salva ? 'eliminado' : 'acerto';
+  if(j.tipo === 'naval') return (j.fila || []).length ? 'acerto' : 'erro';
+  if(j.tipo === 'escada') return j.acertou ? 'acerto' : 'erro';
+  if(j.tipo === 'missao') return (u.ganhou || []).length ? 'acerto' : 'erro';
+  return 'acerto';
+}
+function jgSomSync(){
+  const j = jgSomJogo();
+  if(!j){ if(JGM.tocando()) JGM.parar(); if(JG_SOM.perg){ JGM.pergunta(false); JG_SOM.perg = false; } JG_SOM.prev = null; return; }
+  const tema = JG_SOM_TEMA[j.tipo] || 'qes';
+  const P = JG_SOM.prev && JG_SOM.prev.id === j.id ? JG_SOM.prev : null;
+  JG_SOM.prev = { id: j.id, fase: j.fase, nivel: j.nivel || 0, efeitoAt: j.efeitoAt || null };
+  if(!JGM.pronto()) return;                       // o navegador só libera o som depois de um toque do professor
+  // trilha: toca do início ao fim; para na tela final (entra a vitória)
+  if(j.fase === 'fim'){ if(JGM.tocando()) JGM.parar(); }
+  else if(JGM.tocando() !== tema) JGM.tocar(tema);
+  // abafa enquanto a pergunta está no ar
+  const perg = j.fase === 'pergunta' || !!j.votacao;
+  if(perg !== JG_SOM.perg){ JGM.pergunta(perg); JG_SOM.perg = perg; }
+  // tique nos 5 segundos finais
+  if(perg && j.inicio){ const r = Math.ceil(jgRestante(j)); const k = (j.rk || '') + ':' + r; if(r <= 5 && r > 0 && JG_SOM.tick !== k){ JG_SOM.tick = k; JGM.efeito('tique', tema); } }
+  if(!P) return;                                  // primeira leitura (ex.: recarregou a página): não repete efeitos antigos
+  if(P.fase !== j.fase){
+    jgSomLimpar();
+    if(j.fase === 'revelado'){ JGM.efeito('revelar', tema); jgSomDepois(900, () => JGM.efeito(jgSomResultado(j), tema)); }
+    else if(j.fase === 'fim') JGM.efeito(j.tipo === 'escada' && !j.final ? 'cair' : 'vitoria', tema);
+    else if(j.fase === 'pergunta' && j.tipo === 'qes') JGM.efeito('tensao', tema);
+    else if(j.tipo === 'missao' && (j.fase === 'abrindo' || j.fase === 'msg')) JGM.efeito('decodificar', tema);
+    else if(j.tipo === 'missao' && j.fase === 'armadilha') JGM.efeito('alarme', tema);
+  }
+  if(j.tipo === 'escada' && j.fase === 'pergunta' && (j.nivel || 0) > P.nivel) JGM.efeito('subir', tema);
+  if(j.tipo === 'naval' && j.efeitoAt && j.efeitoAt !== P.efeitoAt && j.ultimo){
+    const [r, c] = j.ultimo; const st = j.tiros && j.tiros[r] && j.tiros[r][c];
+    JGM.efeito('canhao', 'naval'); jgSomDepois(650, () => JGM.efeito(st === 'agua' ? 'erro' : st === 'afundado' ? 'afundou' : 'acerto', 'naval'));
+  }
+}
+if(typeof window !== 'undefined'){
+  setInterval(() => { try{ jgSomSync(); }catch(e){} }, 400);
+  // qualquer toque do professor na tela dos jogos libera o som do navegador
+  document.addEventListener('click', ev => {
+    const p = state.view === 'professor' && state.professor; if(!p || p.subview !== 'jogos') return;
+    const el = ev.target.closest && ev.target.closest('[data-jg="som"]');
+    if(el){ ev.preventDefault(); jgSomSetLigado(!jgSomLigado()); return; }
+    if(jgSomLigado()){ jgSomAplicar(); JGM.desbloquear(); }
+  }, true);
+  document.addEventListener('input', ev => { const el = ev.target; if(el && el.dataset && el.dataset.jgVol !== undefined) jgSomSetVol(el.value / 100); });
+}
 /* ---------------- PLANEJADO × DADO × APRENDIDO (Meu Painel) ---------------- */
 // Planejado: aulas do plano que, pelo calendário dos bimestres (chave `calendario-bimestres`) e pelos dias letivos, já deveriam ter sido dadas.
 // Dado: aulas marcadas como dadas (plano-livro-prog). Aprendido: acerto nos exercícios do plano (avaliações com origemPlano),
