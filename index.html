@@ -9389,12 +9389,31 @@ async function planoRemoverVersaoA(planos){
   }
   return ids.length;
 }
+// Banco do ENEM em partes: o Firebase aceita até 1 MB por documento e o banco já passa disso.
+// `enem-oficial` guarda só o cabeçalho {partes, total}; as questões ficam em `enem-oficial-parte:<k>` (até ~600 KB cada).
+// Lê também o formato antigo (lista inteira em `enem-oficial`).
+async function enemOfLerBanco(){
+  const cab = await planoLerJson('enem-oficial', []); if(Array.isArray(cab)) return cab;
+  const out = []; for(let k = 0; k < ((cab && cab.partes) || 0); k++){ const p = await planoLerJson(`enem-oficial-parte:${k}`, []); if(Array.isArray(p)) out.push(...p); }
+  return out;
+}
+async function enemOfSalvarBanco(lista){
+  const partes = []; let atual = [], tam = 0;
+  (lista||[]).forEach(q => { const t = new Blob([JSON.stringify(q)]).size; if(atual.length && tam + t > 600000){ partes.push(atual); atual = []; tam = 0; } atual.push(q); tam += t; });
+  if(atual.length) partes.push(atual);
+  const antigo = await planoLerJson('enem-oficial', null);
+  for(let k = 0; k < partes.length; k++) await window.storage.set(`enem-oficial-parte:${k}`, JSON.stringify(partes[k]), true);
+  await window.storage.set('enem-oficial', JSON.stringify({ partes: partes.length, total: (lista||[]).length, em: Date.now() }), true);
+  const nAnt = antigo && !Array.isArray(antigo) ? (antigo.partes||0) : 0;
+  for(let k = partes.length; k < nAnt; k++){ try{ await window.storage.delete(`enem-oficial-parte:${k}`, true); }catch(e){} }
+  return partes.length;
+}
 // Banco do ENEM (arquivo enem-oficial.json): questões num documento único da escola e imagens em documentos próprios
 async function importarEnemOficial(pac){
   const s = planoState(); const qs = Array.isArray(pac.questoes) ? pac.questoes : []; const imgs = Object.entries(pac.imagens || {});
   s.enviando = { atual:0, total: imgs.length + 1, texto:'Guardando o banco de questões do ENEM...' }; render();
-  try{ const atual = (await planoLerJson('enem-oficial', [])) || []; const m = new Map(atual.map(q => [q.id, q])); qs.forEach(q => m.set(q.id, q));
-    await window.storage.set('enem-oficial', JSON.stringify([...m.values()]), true); ENEM_OF_CACHE = null; }
+  try{ const atual = (await enemOfLerBanco()) || []; const m = new Map(atual.map(q => [q.id, q])); qs.forEach(q => m.set(q.id, q));
+    await enemOfSalvarBanco([...m.values()]); ENEM_OF_CACHE = null; }
   catch(e){ s.enviando = null; s.erro = 'Não consegui guardar o banco do ENEM agora. Tente de novo.'; render(); return; }
   for(let i = 0; i < imgs.length; i++){ s.enviando = { atual: i + 2, total: imgs.length + 1, texto:'Guardando as imagens das questões do ENEM...' }; if(i % 10===0) render();
     try{ await window.storage.set(`plano-livro-img:${imgs[i][0]}`, JSON.stringify(imgs[i][1]), true); }catch(e){} }
@@ -11080,7 +11099,7 @@ function renderBanco(){
 let ENEM_OF_CACHE = null;
 const ENEM_OF_DISC = { geografia:'Geografia', historia:'História', sociologia:'Sociologia', filosofia:'Filosofia' };
 const ENEM_OF_COD = { GEO:'Geografia', HIS:'História', SOC:'Sociologia', FIL:'Filosofia' };
-async function enemOfCarregar(){ if(!ENEM_OF_CACHE) ENEM_OF_CACHE = ((await planoLerJson('enem-oficial', [])) || []).slice().sort((a,b) => (b.ano - a.ano) || (a.numero - b.numero)); return ENEM_OF_CACHE; }
+async function enemOfCarregar(){ if(!ENEM_OF_CACHE) ENEM_OF_CACHE = ((await enemOfLerBanco()) || []).slice().sort((a,b) => (b.ano - a.ano) || (a.numero - b.numero)); return ENEM_OF_CACHE; }
 function enemOfAulaTxt(c){ const m = /^([A-Z]{3})(\d)-(\d+)$/.exec(c||''); return m ? `${ENEM_OF_COD[m[1]]||m[1]} · ${m[2]}ª série · aula ${m[3]}` : c; }
 function enemOfNorm(t){ return (t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim(); }
 function enemOfNoBanco(q){ return (state.professor.bank||[]).some(x => x.enemId===q.id); }
@@ -24865,7 +24884,7 @@ async function importarPlanoLivro(file){
   // ícones: soma aos que já existem (cada disciplina traz os seus; importar Sociologia não apaga os da Geografia)
   if(pac && pac.icones){ try{ const atuais = await planoLerJson('plano-livro-icones', {}); await window.storage.set('plano-livro-icones', JSON.stringify(Object.assign({}, atuais || {}, pac.icones)), true); AV_ICONES = null; }catch(e){} }
   // questões oficiais do ENEM (INEP) que vêm junto com o plano: banco único da escola, somado por id
-  if(pac && Array.isArray(pac.enemOficial) && pac.enemOficial.length){ try{ const atual = (await planoLerJson('enem-oficial', [])) || []; const m = new Map(atual.map(q => [q.id, q])); pac.enemOficial.forEach(q => m.set(q.id, q)); await window.storage.set('enem-oficial', JSON.stringify([...m.values()]), true); ENEM_OF_CACHE = null; }catch(e){} }
+  if(pac && Array.isArray(pac.enemOficial) && pac.enemOficial.length){ try{ const atual = (await enemOfLerBanco()) || []; const m = new Map(atual.map(q => [q.id, q])); pac.enemOficial.forEach(q => m.set(q.id, q)); await enemOfSalvarBanco([...m.values()]); ENEM_OF_CACHE = null; }catch(e){ s.erro = 'O plano foi importado, mas não consegui guardar as questões do ENEM que vieram junto.'; } }
   // imagens das questões de prova (mapas e fotos do livro): cada uma num documento próprio
   const imgs = Object.entries((pac && pac.imagens) || {});
   for(let i=0; i<imgs.length; i++){
@@ -24876,7 +24895,7 @@ async function importarPlanoLivro(file){
   PLANO_IDX_CACHE = index; s.area = null;
   const removidosA = await planoRemoverVersaoA(planos.filter(pl => pl.id && Array.isArray(pl.aulas)));
   if(removidosA){ s.index = (await planoLerJson('plano-livro-index', [])) || []; PLANO_IDX_CACHE = s.index; }
-  const temEnem = (((await planoLerJson('enem-oficial', [])) || []).length) > 0;
+  const temEnem = await (async () => { const v = await planoLerJson('enem-oficial', null); return Array.isArray(v) ? v.length > 0 : !!(v && v.total); })();
   await planoAtualizarEfetivo(); s.painel = null;
   s.enviando = null;
   s.msg = `✅ ${planos.length} plano(s) importado(s). As turmas já foram vinculadas automaticamente pela disciplina e pela série.${removidosA ? ` A Versão A foi retirada (${removidosA} plano(s)); as turmas que a usavam passaram para a Versão B.` : ''}${temEnem ? '' : ' Importe também o arquivo enem-oficial.json (banco de questões do ENEM, uma vez só para todas as disciplinas).'}`;
