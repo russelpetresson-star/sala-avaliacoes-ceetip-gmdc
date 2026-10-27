@@ -9853,7 +9853,7 @@ document.addEventListener('click', async ev => {
 const USO_NOMES = { aula_viva:'📡 Aula ao vivo', aula_dada:'✅ Aula marcada como dada', exercicio:'📝 Exercício do plano aplicado', simulado:'🧪 Simulado ENEM montado',
   reforco:'📲 Reforço enviado', mais_opcoes:'⚙️ Mais opções da aula', semproj:'📱 Modo sem projetor', 'jogo:qes':'🎯 Quem Erra Sai', 'jogo:naval':'⚓ Batalha Naval',
   'jogo:escada':'🪜 Escada do Saber', 'jogo:missao':'🕶️ Missão Possível', 'painel:pma':'🧭 Painel Planejado × Dado × Aprendido', 'painel:enem':'📝 Painel do ENEM',
-  'painel:notas':'📝 Lançar notas', 'painel:desempenho':'📊 Desempenho', 'painel:conteudo':'🎯 Conteúdo & SAEB', 'painel:alunos':'👥 Alunos (painel)' };
+  'painel:notas':'📝 Lançar notas', 'painel:desempenho':'📊 Desempenho', 'painel:conteudo':'🎯 Conteúdo & SAEB', 'painel:alunos':'👥 Alunos (painel)', modo_completo:'🔓 Liberou todos os recursos', modo_essencial:'🌱 Voltou ao modo essencial' };
 function usoMes(d){ d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 function usoReg(ev){
   try{ if(state.view!=='professor') return; const p = state.professor; if(!p.session || p.session.viaCoord) return;
@@ -10520,6 +10520,50 @@ function calLimitarAvisos(lista){
   const it = (lista || []).filter(x => x && String(x).trim()); if(it.length <= 2) return it.join('');
   return it.slice(0, 2).join('') + `<details class="cal-mais" data-cal-mais style="margin-top:6px;font-size:.82rem;"><summary style="cursor:pointer;color:var(--wine,#6B1F2E);font-weight:600;">+${it.length - 2} aviso(s)</summary>${it.slice(2).join('')}</details>`;
 }
+/* ---------------- MODO ESSENCIAL (professor) ----------------
+   Todo professor começa no modo essencial: o menu mostra só o principal (Hoje, aulas do plano, notas e desempenho,
+   alunos, chamada, minhas avaliações e os jogos). O resto fica escondido, não apagado. O professor libera tudo em
+   “Ver todos os recursos” e volta quando quiser. A escolha fica salva por professor (`prof-pref:<id>`), vale em qualquer aparelho. */
+const ESS_RECURSOS = ['jogos'];
+const ESS_SUBS_OCULTAS = ['banco', 'kitsaese', 'bloco', 'leitura', 'avulso', 'freqpainel', 'lixeira', 'pesos'];
+function essState(){ const p = state.professor; if(!p.ess) p.ess = { carregado:false, carregando:false, essencial:null }; return p.ess; }
+function essAtivo(){
+  const p = state.professor; if(state.view!=='professor' || !p || !p.session || p.session.viaCoord) return false;
+  const e = essState();
+  if(e.essencial===null){ let v = null; try{ v = localStorage.getItem('ess:' + p.session.id); }catch(x){} e.essencial = v===null ? true : v==='1'; }
+  if(!e.carregado && !e.carregando){ e.carregando = true; const id = p.session.id;
+    planoLerJson('prof-pref:' + id, null).then(pr => { e.carregado = true; e.carregando = false; if(pr && typeof pr.essencial==='boolean' && pr.essencial!==e.essencial){ e.essencial = pr.essencial; try{ localStorage.setItem('ess:' + id, pr.essencial ? '1' : '0'); }catch(x){} render(); } })
+      .catch(() => { e.carregado = true; e.carregando = false; }); }
+  return e.essencial !== false;
+}
+async function essDefinir(v){
+  const p = state.professor; if(!p.session) return; const e = essState(); e.essencial = !!v;
+  try{ localStorage.setItem('ess:' + p.session.id, v ? '1' : '0'); }catch(x){}
+  render();
+  try{ const atual = (await planoLerJson('prof-pref:' + p.session.id, {})) || {}; atual.essencial = !!v; atual.em = Date.now(); await window.storage.set('prof-pref:' + p.session.id, JSON.stringify(atual), true); }catch(x){}
+  try{ usoReg(v ? 'modo_essencial' : 'modo_completo'); }catch(x){}
+}
+function essBarraHtml(onde){
+  if(state.view!=='professor' || !state.professor.session || state.professor.session.viaCoord) return '';
+  if(essAtivo()) return `<div class="ess-barra" data-ess-barra><span>🌱 <b>Modo essencial</b>: o app mostra só o principal${onde==='ferr' ? ' (aqui, os jogos da turma)' : ''}. Os outros recursos estão guardados.</span><button class="btn btn-ghost btn-sm" data-ess="completo" style="width:auto;">Ver todos os recursos</button></div>`;
+  return onde==='ferr' || onde==='inicio' ? `<div class="ess-barra ess-off" data-ess-barra><span>🧰 Todos os recursos à mostra.</span><button class="btn btn-ghost btn-sm" data-ess="essencial" style="width:auto;">Voltar ao modo essencial</button></div>` : '';
+}
+(function(){
+  const emb = (nome, f) => { try{ const orig = window[nome] || eval(nome); if(typeof orig!=='function') return; const nova = f(orig); eval(nome + ' = nova'); }catch(e){} };
+  emb('recursoAtivo', orig => function(id){ if(!orig(id)) return false; if(essAtivo()){ const r = RECURSOS.find(x => x.id===id); if(r && r.prof && !ESS_RECURSOS.includes(id)) return false; } return true; });
+  emb('subAtivo', orig => function(role, sub){ if(!orig(role, sub)) return false;
+    if(role==='professor' && essAtivo()){
+      if(ESS_SUBS_OCULTAS.includes(sub)) return false;
+      if(sub==='liberacoes'){ try{ return liberacoesVisiveis().some(r => !r.released); }catch(e){ return false; } }
+      const r = RECURSOS.find(x => x.prof===sub); if(r && !ESS_RECURSOS.includes(r.id)) return false;
+    }
+    return true; });
+  emb('renderFerramentas', orig => function(){ return essBarraHtml('ferr') + orig.apply(this, arguments); });
+  emb('renderProfessorInicio', orig => function(){ return orig.apply(this, arguments) + essBarraHtml('inicio'); });
+})();
+document.addEventListener('click', ev => { const el = ev.target.closest && ev.target.closest('[data-ess]'); if(!el) return; ev.preventDefault(); essDefinir(el.dataset.ess==='essencial'); });
+(function(){ try{ const st = document.createElement('style'); st.textContent = `.ess-barra{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin:0 0 12px;padding:10px 14px;border-radius:12px;background:rgba(29,107,49,.08);border:1px solid rgba(29,107,49,.25);font-size:.9rem}
+.ess-barra.ess-off{background:rgba(122,31,51,.05);border-color:rgba(122,31,51,.15);margin-top:12px}`; document.head.appendChild(st); }catch(e){} })();
 
 /* ---------------- APRESENTAÇÃO DE SLIDES ---------------- */
 
