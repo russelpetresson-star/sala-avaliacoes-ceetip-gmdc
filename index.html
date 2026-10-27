@@ -10236,7 +10236,7 @@ function calSituacao(tid, plano, prog){
   return { devia: prev ? prev.size : 0, dadas, atraso: (prev ? prev.size : 0) - dadas, bim, bi, R, F };
 }
 function calInicioTurmaHtml(tid, plano, prog){
-  const st = calSituacao(tid, plano, prog); if(!st || !st.dadas) return calReforcoInicioHtml(tid, plano, prog);
+  const st = calSituacao(tid, plano, prog); if(!st || !st.dadas) return '';
   const hoje = planoAulaDeHoje(plano, prog); const linhas = [];
   if(st.atraso >= 2) linhas.push(`⏳ Pelo horário, até hoje eram ${st.devia} aulas; você marcou ${st.dadas}. Está ${st.atraso} aula${st.atraso > 1 ? 's' : ''} atrás do previsto.`);
   else if(st.atraso <= -2) linhas.push(`⏩ Adiantado em ${-st.atraso} aulas em relação ao horário.`);
@@ -10249,7 +10249,7 @@ function calInicioTurmaHtml(tid, plano, prog){
       <button class="btn btn-ghost btn-sm" data-cal="replan" data-tid="${esc(tid)}" style="width:auto;">🗓️ Replanejar o bimestre</button></div>` : '';
   const rp = CAL.replan && CAL.replan.tid===tid ? calReplanHtml(tid, plano) : '';
   const estH = est.length ? `<div data-cal-estudo style="margin-top:6px;font-size:.82rem;">📚 Estudo dirigido: ${est.map(n => `<button class="btn btn-ghost btn-sm" data-cal="estudo-ex" data-tid="${esc(tid)}" data-n="${n}" style="width:auto;padding:1px 8px;font-size:.78rem;">enviar exercício da aula ${n}</button>`).join(' ')}</div>` : '';
-  return (linhas.length ? `<div data-cal-situacao style="margin-top:8px;font-size:.82rem;color:#a4521b;">${linhas.join(' ')}${acoes}</div>` : '') + rp + estH + calReforcoInicioHtml(tid, plano, prog);
+  return (linhas.length ? `<div data-cal-situacao style="margin-top:8px;font-size:.82rem;color:#a4521b;">${linhas.join(' ')}${acoes}</div>` : '') + rp + estH;
 }
 
 /* ---------- juntar, estudo dirigido e replanejar ---------- */
@@ -10310,6 +10310,10 @@ async function calReplanAplicar(){
 async function calMarcarAuto(tid, pid, n, motivo){
   if(!tid || !pid || !n || state.view!=='professor') return;
   try{ const prog = await calProgLer(tid, pid); if(prog.dadas[n]) return;
+    const plano = planoState().planos[pid] || await planoObter(pid); const hoje = plano ? planoAulaDeHoje(plano, prog) : null;
+    if(!hoje || hoje.n!==n){   // não é a aula do dia (ex.: abriu uma aula adiantada): não marca sozinho, só oferece
+      const t = (state.professor.turmas || []).find(x => x.id===tid);
+      calToast(`A aula ${n} de ${t ? t.name : 'turma'} não é a aula do dia${hoje ? ` (a do dia é a ${hoje.n})` : ''}, por isso não foi marcada como dada.`, { tid, pid, n, marcar: true }); return; }
     prog.dadas[n] = Date.now(); const m = (prog.juntas || {})[n]; if(m) prog.dadas[m] = prog.dadas[n];
     prog.auto = prog.auto || {}; prog.auto[n] = { motivo, em: Date.now() };
     await calProgGravar(tid, pid, prog);
@@ -10324,7 +10328,7 @@ async function calDesfazerAuto(tid, pid, n){
 function calToast(txt, desfazer){
   try{ let el = document.getElementById('cal-toast'); if(el) el.remove(); el = document.createElement('div'); el.id = 'cal-toast';
     el.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:100000;background:#2a1a1f;color:#fff;padding:10px 14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.3);font:600 .9rem system-ui,sans-serif;max-width:min(92vw,560px);display:flex;gap:10px;align-items:center;';
-    el.innerHTML = `<span>${esc(txt)}</span>${desfazer ? `<button data-cal="desfazer" data-tid="${esc(desfazer.tid)}" data-pid="${esc(desfazer.pid)}" data-n="${desfazer.n}" style="background:#c9a227;color:#2a1a1f;border:0;border-radius:8px;padding:5px 10px;font-weight:700;cursor:pointer;">Desfazer</button>` : ''}`;
+    el.innerHTML = `<span>${esc(txt)}</span>${desfazer ? `<button data-cal="${desfazer.marcar ? 'marcar' : 'desfazer'}" data-tid="${esc(desfazer.tid)}" data-pid="${esc(desfazer.pid)}" data-n="${desfazer.n}" style="background:#c9a227;color:#2a1a1f;border:0;border-radius:8px;padding:5px 10px;font-weight:700;cursor:pointer;">${desfazer.marcar ? 'Marcar como dada' : 'Desfazer'}</button>` : ''}`;
     document.body.appendChild(el); clearTimeout(calToast.t); calToast.t = setTimeout(() => { if(el.parentNode) el.remove(); }, desfazer ? 12000 : 7000); }catch(e){}
 }
 function calAvisosAutoHtml(){
@@ -10333,8 +10337,8 @@ function calAvisosAutoHtml(){
     Object.entries(prog.auto).forEach(([n, a]) => { if(Date.now() - (a.em || 0) < 3 * 86400000 && prog.dadas[n]) itens.push({ tid: turmaId, pid, n: +n, a }); }); });
   if(!itens.length) return '';
   const nome = id => ((state.professor.turmas || []).find(t => t.id===id) || {}).name || '';
-  return `<div class="card inicio-card" data-cal-auto style="border-left:5px solid #1d6b31;padding:10px 14px;"><b>✅ Marcadas como dadas automaticamente</b>
-    <div style="font-size:.86rem;margin-top:4px;">${itens.map(i => `<div>${esc(nome(i.tid))} · aula ${i.n} <span class="muted">(${esc(i.a.motivo)}, ${new Date(i.a.em).toLocaleDateString('pt-BR')})</span> <button class="btn btn-ghost btn-sm" data-cal="desfazer" data-tid="${esc(i.tid)}" data-pid="${esc(i.pid)}" data-n="${i.n}" style="width:auto;padding:1px 8px;font-size:.75rem;">Desfazer</button></div>`).join('')}</div></div>`;
+  return `<details class="card inicio-card" data-cal-auto style="border-left:5px solid #1d6b31;padding:8px 14px;"><summary style="cursor:pointer;font-size:.9rem;"><b>✅ ${itens.length} aula(s) marcada(s) como dada(s) automaticamente</b> <span class="muted">· ver ou desfazer</span></summary>
+    <div style="font-size:.86rem;margin-top:4px;">${itens.map(i => `<div>${esc(nome(i.tid))} · aula ${i.n} <span class="muted">(${esc(i.a.motivo)}, ${new Date(i.a.em).toLocaleDateString('pt-BR')})</span> <button class="btn btn-ghost btn-sm" data-cal="desfazer" data-tid="${esc(i.tid)}" data-pid="${esc(i.pid)}" data-n="${i.n}" style="width:auto;padding:1px 8px;font-size:.75rem;">Desfazer</button></div>`).join('')}</div></details>`;
 }
 (function(){
   const depois = (nome, f) => { try{ const orig = window[nome] || eval(nome); if(typeof orig!=='function') return;
@@ -10462,6 +10466,7 @@ document.addEventListener('click', ev => {
   else if(a==='replan-fechar'){ CAL.replan = null; render(); }
   else if(a==='replan-aplicar') calReplanAplicar();
   else if(a==='desfazer') calDesfazerAuto(tid, el.dataset.pid, n);
+  else if(a==='marcar') calMarcarManual(tid, el.dataset.pid, n);
   else if(a==='semana-ok') calSemanaConfirmar(tid);
   else if(a==='semana-nao') calSemanaNao(el.dataset.k);
   else if(a==='reforco') calEnviarReforco(el.dataset.code);
@@ -10507,6 +10512,14 @@ async function calDsaAdd(){
 async function calDsaDel(d){ const c = CAL.cal; if(!c) return; c.diasSemAula = (c.diasSemAula || []).filter(x => x.d!==d); try{ await calSalvarCal(); planoState().msg = '✅ Dia retirado.'; }catch(e){} render(); }
 document.addEventListener('click', ev => { const el = ev.target.closest && ev.target.closest('[data-cal="dsa-add"],[data-cal="dsa-del"]'); if(!el) return; ev.preventDefault(); ev.stopImmediatePropagation();
   if(el.dataset.cal==='dsa-add') calDsaAdd(); else calDsaDel(el.dataset.d); }, true);
+
+async function calMarcarManual(tid, pid, n){ const prog = await calProgLer(tid, pid); prog.dadas[n] = Date.now(); const m = (prog.juntas || {})[n]; if(m) prog.dadas[m] = prog.dadas[n];
+  await calProgGravar(tid, pid, prog); const el = document.getElementById('cal-toast'); if(el) el.remove(); try{ usoReg('aula_dada'); }catch(e){} render(); }
+// no máximo 2 avisos por turma no Início; o resto fica em “+N avisos”
+function calLimitarAvisos(lista){
+  const it = (lista || []).filter(x => x && String(x).trim()); if(it.length <= 2) return it.join('');
+  return it.slice(0, 2).join('') + `<details class="cal-mais" data-cal-mais style="margin-top:6px;font-size:.82rem;"><summary style="cursor:pointer;color:var(--wine,#6B1F2E);font-weight:600;">+${it.length - 2} aviso(s)</summary>${it.slice(2).join('')}</details>`;
+}
 
 /* ---------------- APRESENTAÇÃO DE SLIDES ---------------- */
 
@@ -30879,12 +30892,9 @@ function renderInicioAulasCard(){
           <div style="font-weight:700;">Aula ${hoje.n} — ${esc(hoje.tituloCurto || hoje.tema)}${calJuntaTxt(turmaId, prog, hoje)}</div>
           <div class="muted" style="font-size:.8rem;">${esc(hoje.tipo||'')}${hoje.paginas ? ' · livro ' + esc(hoje.paginas) : ''}${hoje.bimestre ? ` · ${hoje.bimestre}º bimestre` : ''}</div>
         </div>` : '<div style="margin-top:10px;">🎉 Plano concluído!</div>'}
-      ${calInicioTurmaHtml(turmaId, plano, prog)}
-      ${(() => { const ts = (s.termo||{})[turmaId]||{}; const ns = Object.keys(ts).map(Number).filter(n => ts[n] && ts[n].total); if(!ns.length) return ''; const u = Math.max(...ns.map(n => ts[n].at||0)); const n = ns.find(k => (ts[k].at||0)===u); const r = avTermoResumo(ts[n]);
-        return `<div data-inicio-termo style="margin-top:8px; font-size:.82rem; color:${r.pctNao>=30?'#b3261e':'#1d6b31'};">🌡️ Termômetro da aula ${n}: ${r.pctOk}% entenderam${r.pctNao>=30 ? ` · ${r.pctNao}% não entenderam — retome no começo da próxima aula` : ''}</div>`; })()}
-      ${(() => { const semV = plano.aulas.filter(a => a.slides && a.slides.mapa && prog.dadas[a.n] && !Object.keys(planoVistoDe(turmaId, a.n)).length).map(a => a.n);
-        return semV.length ? `<div data-inicio-visto style="margin-top:8px; font-size:.82rem; color:#a4521b;">📒 Falta dar o visto no caderno: aula${semV.length>1?'s':''} ${semV.slice(-4).join(', ')}.</div>` : ''; })()}
-      ${esquecidas.length ? `<div data-esquecidas style="margin-top:8px; font-size:.82rem; color:#a4521b;">⚠️ Ficaram sem marcar: aula${esquecidas.length>1?'s':''} ${esquecidas.slice(0,6).join(', ')}${esquecidas.length>6?'…':''}. Se você já deu, marque em “Todas as aulas”.</div>` : ''}
+      ${calLimitarAvisos([calInicioTurmaHtml(turmaId, plano, prog), calReforcoInicioHtml(turmaId, plano, prog), (() => { const ts = (s.termo||{})[turmaId]||{}; const ns = Object.keys(ts).map(Number).filter(n => ts[n] && ts[n].total); if(!ns.length) return ''; const u = Math.max(...ns.map(n => ts[n].at||0)); const n = ns.find(k => (ts[k].at||0)===u); const r = avTermoResumo(ts[n]);
+        return `<div data-inicio-termo style="margin-top:8px; font-size:.82rem; color:${r.pctNao>=30?'#b3261e':'#1d6b31'};">🌡️ Termômetro da aula ${n}: ${r.pctOk}% entenderam${r.pctNao>=30 ? ` · ${r.pctNao}% não entenderam — retome no começo da próxima aula` : ''}</div>`; })(), esquecidas.length ? `<div data-esquecidas style="margin-top:8px; font-size:.82rem; color:#a4521b;">⚠️ Ficaram sem marcar: aula${esquecidas.length>1?'s':''} ${esquecidas.slice(0,6).join(', ')}${esquecidas.length>6?'…':''}. Se você já deu, marque em “Todas as aulas”.</div>` : '', (() => { const semV = plano.aulas.filter(a => a.slides && a.slides.mapa && prog.dadas[a.n] && !Object.keys(planoVistoDe(turmaId, a.n)).length).map(a => a.n);
+        return semV.length ? `<div data-inicio-visto style="margin-top:8px; font-size:.82rem; color:#a4521b;">📒 Falta dar o visto no caderno: aula${semV.length>1?'s':''} ${semV.slice(-4).join(', ')}.</div>` : ''; })()])}
       <div class="row" style="gap:6px; margin-top:10px; flex-wrap:wrap;">
         <button class="btn btn-primary btn-sm" data-action="inicio-abrir-plano" data-tid="${esc(turmaId)}">Abrir aula de hoje</button>
         ${hoje && hoje.slides ? `<button class="btn btn-ghost btn-sm" data-action="inicio-apresentar" data-tid="${esc(turmaId)}" data-n="${hoje.n}">📡 Apresentar</button>` : ''}
