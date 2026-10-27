@@ -2752,9 +2752,9 @@ const COORD_SECOES = [
   { id:'painel', icon:'🏠', label:'Painel', abas:[['dashboard','🏠 Painel']] },
   { id:'aval', icon:'📝', label:'Avaliações e notas', abas:[['avaliacoes','📝 Todas as avaliações'], ['liberacoes','🔓 Liberações'], ['notas','🧮 Notas finais e risco'], ['saeseescola','📘 SAESE da escola'], ['importarnotas','📥 Importar notas (CSV)'], ['periodos','📅 Períodos'], ['bloco','🖨️ Prova em papel'], ['avulso','🗒️ Gabarito avulso']] },
   { id:'turmas', icon:'👥', label:'Turmas e frequência', abas:[['turmas','👥 Turmas'], ['chamada','🪪 Chamada'], ['freqpainel','📊 Painel de frequência']] },
-  { id:'profs', icon:'🧑‍🏫', label:'Professores', abas:[['professores','🧑‍🏫 Professores'], ['frequencia','📈 Frequência dos professores'], ['pesosprof','⚖️ Pesos dos professores'], ['usoapp','📈 Uso do app']] },
+  { id:'profs', icon:'🧑‍🏫', label:'Professores', abas:[['professores','🧑‍🏫 Professores'], ['frequencia','📈 Frequência dos professores'], ['pesosprof','⚖️ Pesos dos professores'], ['usoapp','🤝 Apoio aos professores']] },
   { id:'alunos', icon:'💛', label:'Alunos', abas:[['monitoria','🎯 Monitoria de desempenho'], ['buscaativa','🚌 Busca ativa e transporte'], ['socio','💛 Socioemocional'], ['portfolio','🗂️ Portfólio'], ['campanha','📢 Jovens Protagonistas'], ['conquistas','🏅 Hall de conquistas'], ['temporada','🏆 Temporada de desafios']] },
-  { id:'aulas', icon:'📚', label:'Aulas e comunicação', abas:[['planolivro','🗓️ Plano de aulas do livro'], ['pmaescola','🧭 Planejado × Dado × Aprendido'], ['areabim','🧭 Visão da área'], ['kitsaese','🎯 Kit SAESE'], ['livros','📘 Livros didáticos'], ['mural','📌 Mural de avisos'], ['diario','📷 Diário de bordo'], ['enquete','📣 Enquete'], ['roleta','🎡 Roleta'], ['duelo','⚔️ Duelo'], ['slides','🖥️ Slides']] },
+  { id:'aulas', icon:'📚', label:'Aulas e comunicação', abas:[['planolivro','🗓️ Plano de aulas do livro'], ['calhor','📅 Calendário e horário'], ['pmaescola','🧭 Planejado × Dado × Aprendido'], ['areabim','🧭 Visão da área'], ['kitsaese','🎯 Kit SAESE'], ['livros','📘 Livros didáticos'], ['mural','📌 Mural de avisos'], ['diario','📷 Diário de bordo'], ['enquete','📣 Enquete'], ['roleta','🎡 Roleta'], ['duelo','⚔️ Duelo'], ['slides','🖥️ Slides']] },
   { id:'config', icon:'⚙️', label:'Configurações', abas:[['sessao','🔐 Sessão e prova'], ['freqconfig','⏰ Frequência'], ['ia','🤖 IA'], ['lixeira','🗑️ Lixeira']] },
 ];
 function navAcao(role){ return role==='aluno' ? 'aluno-sub-view' : role==='coordenador' ? 'coord-sub-view' : 'sub-view'; }
@@ -7724,7 +7724,10 @@ const JG_CSS = `
 .jg-temas-lista{max-height:260px;overflow:auto;margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:4px 14px}
 .jg-temas-g{grid-column:1/-1;font-weight:800;margin-top:6px;color:var(--wine,#7a1f2b)}
 .jg-ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
-.jg-som{display:inline-flex;gap:6px;align-items:center}.jg-som input{width:110px;accent-color:#7a1f33}
+.jg-som{display:inline-flex;gap:6px;align-items:center}
+.jg-faltam{font-size:.86rem;margin:8px 0;padding:8px 10px;border-radius:10px;background:#fbf3df;color:#5a3b00}
+#jg-aviso-aluno{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:99990;display:flex;gap:12px;align-items:center;background:#7a1f33;color:#fff;padding:12px 16px;border-radius:16px;box-shadow:0 8px 24px rgba(0,0,0,.3);font:600 1rem system-ui,sans-serif;max-width:94vw}
+#jg-aviso-aluno button{background:#c9a227;color:#2a1a1f;border:0;border-radius:10px;padding:10px 16px;font-weight:800;font-size:1rem;cursor:pointer}.jg-som input{width:110px;accent-color:#7a1f33}
 .jg-ctrl-info{margin-left:auto;font-size:.85rem;color:var(--muted,#666)}
 .jg-presentes{margin-top:10px}.jg-presentes summary{cursor:pointer;font-weight:600}
 .jg-presentes-l{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:.88rem}
@@ -8314,6 +8317,12 @@ function jgSalaHtml(j, cls){
     <div class="jg-sala-n">${al.length}${total ? ` de ${total}` : ''} aluno(s) na sala</div>
     <div class="jg-avs">${al.map(a => jgAv(a)).join('')}</div></div>`;
 }
+function jgFaltamHtml(j){
+  if(j.fase!=='sala') return ''; const g = jgState(); const turma = (state.professor.turmas||[]).find(t => t.id===j.turmaId); if(!turma) return '';
+  const alunos = turma.students || []; const falta = alunos.filter(st => !g.presenca[st.id]); const n = alunos.length - falta.length;
+  if(!alunos.length) return '';
+  return `<div class="jg-faltam" data-jg-faltam><b>${n} de ${alunos.length} entraram.</b>${falta.length ? ` Faltam (${falta.length}): ${falta.slice(0, 40).map(st => esc((st.name||'').split(' ')[0] + ' ' + ((st.name||'').split(' ').slice(-1)[0] || '').slice(0, 1) + '.')).join(', ')}${falta.length > 40 ? '…' : ''}` : ' Todos na sala!'}</div>`;
+}
 function jgMinha(j){ const al = state.aluno, m = al.jogoMinha; return m && j && m.jogoId===j.id && m.rk===j.rk ? m : null; }
 function jgAlunoPodeResponder(j){
   if(!jgEhAluno() || !j || !j.rk) return false;
@@ -8538,6 +8547,7 @@ function renderJogoCelular(){
     <div class="jgc-fase"><span>${esc(FASE[j.fase] || j.fase)}${rodada ? ' · ' + rodada : ''}</span>${votando && j.inicio ? `<span class="jgc-timer" data-jg-timer-txt>${Math.ceil(jgRestante(j))}s</span>` : ''}</div>
     ${respLinha}${semLinha}
     ${j.fase==='sala' ? `<div class="jgc-resp"><b>${pres.length}</b> aluno(s) na sala<div class="jgc-nomes">${pres.map(a => esc(a.nome)).join(' · ') || 'Peça para os alunos tocarem em “Entrar no jogo” no tablet.'}</div></div>` : ''}
+    ${jgFaltamHtml(j)}
     ${pergunta}
     ${j.fase!=='sala' ? `<div class="jgc-placar">${jgPlacarCelular(j)}</div>` : ''}
     ${jgControlesHtml(j, 'jgc-ctrl')}
@@ -8553,6 +8563,7 @@ function renderJogoAoVivo(){
     <div class="row" style="align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><h2 style="margin:0;">${JG_INFO[j.tipo].icon} ${esc(JG_INFO[j.tipo].nome)} · ${esc(j.turmaName)}</h2></div>
     <div class="jg-telao-wrap">${jgTelaoHtml(j)}</div>
     ${jgControlesHtml(j)}
+    ${jgFaltamHtml(j)}
     ${lista}
     ${jgSemSinal().length ? `<p class="jgc-sem">📶 ${jgSemSinal().length} tablet(s) sem sinal. O jogo segue sem esperar por eles.</p>` : ''}
     <p style="margin:6px 0;"><button class="btn btn-ghost btn-sm" data-jg="semproj-on" style="width:auto;">📱 Sala sem projetor: conduzir pelo celular</button></p>
@@ -8841,6 +8852,21 @@ document.addEventListener('keydown', ev => {
   const j = g.current; const k = ev.key.toUpperCase();
   if(j.tipo==='escada' && j.cfg.modo==='palco' && j.fase==='pergunta' && ['A','B','C','D'].includes(k)) jgEscEscolher(JG_L.indexOf(k));
 });
+
+/* ---------- aviso no tablet: jogo aberto pelo professor aparece em qualquer tela do aluno ---------- */
+function jgAvisoAlunoSync(){
+  try{
+    const al = state.aluno; let el = document.getElementById('jg-aviso-aluno');
+    const j = state.view==='aluno' && al && al.stage==='dashboard' ? al.jogoAtivo : null;
+    const mostrar = j && j.fase!=='fim' && !jgAlunoEntrou(j) && !(al.jogoSaiu && al.jogoSaiu===j.id) && !document.querySelector('#app [data-jg="al-entrar"]');
+    if(!mostrar){ if(el) el.remove(); return; }
+    if(!el){ el = document.createElement('div'); el.id = 'jg-aviso-aluno'; document.body.appendChild(el); }
+    const info = JG_INFO[j.tipo] || { icon:'🎮', nome:'Jogo' };
+    const html = `<span>${info.icon} <b>${esc(info.curto || info.nome)}</b> aberto pelo professor</span><button data-jg="al-entrar">Entrar no jogo</button>`;
+    if(el.dataset.h!==html){ el.innerHTML = html; el.dataset.h = html; }
+  }catch(e){}
+}
+if(typeof window!=='undefined') setInterval(jgAvisoAlunoSync, 700);
 /* ---------- ENEM Missão Possível (esquadrões ou individual, mapa de 20 envelopes) ---------- */
 JG_INFO.missao = { nome:'ENEM Missão Possível', icon:'🕶️', curto:'Missão Possível', desc:'Esquadrões (ou agentes) abrem envelopes num mapa de 20. Cada envelope é uma missão do ENEM; quem cumpre carimba o envelope com o seu brasão.', min:2 };
 const JG_MIS_ESQ = [{nome:'Falcão',ico:'🦅',cor:'#e63946'},{nome:'Raposa',ico:'🦊',cor:'#f08c00'},{nome:'Lobo',ico:'🐺',cor:'#3b8cff'},{nome:'Lince',ico:'🐆',cor:'#d4a514'},{nome:'Coruja',ico:'🦉',cor:'#9775fa'},{nome:'Cobra',ico:'🐍',cor:'#2fbf71'}];
@@ -9455,6 +9481,7 @@ function pmaState(){ const p = state.professor; if(!p.pma) p.pma = { cal:null, c
 async function pmaCarregarCal(){
   const m = pmaState(); if(m.calCarregando) return; m.calCarregando = true;
   try{ await ensureDiasLetivosLoaded(); }catch(e){}
+  try{ if(typeof calCarregar==='function') await calCarregar(); }catch(e){}
   try{ const r = await window.storage.get(PMA_CAL_KEY, true); m.cal = JSON.parse(r.value); }catch(e){ m.cal = null; }
   m.calCarregado = true; m.calCarregando = false; render();
 }
@@ -9476,7 +9503,9 @@ function pmaBimAtual(cal, hoje){
   return b;
 }
 // conjunto das aulas (n) que já deveriam ter sido dadas até hoje
-function pmaPrevistas(plano, cal, hoje){
+function pmaPrevistas(plano, cal, hoje, turmaId){
+  // com calendário escolar + horário importados: aulas reais da turma (calPrevistasSet)
+  if(turmaId && typeof calPrevistasSet==='function'){ try{ const x = calPrevistasSet(plano, turmaId); if(x) return x; }catch(e){} }
   const set = new Set(); if(!pmaCalOk(cal)) return null;
   for(let b = 1; b <= 4; b++){
     const fr = pmaFracBim(cal.bims[b-1], hoje); if(fr==null) continue;
@@ -9511,7 +9540,7 @@ function pmaSoma(lista){
 function pmaResumoTurma(turma, bimFiltro, ctx){
   const s = planoState(); const m = pmaState(); const planoId = ctx ? ctx.planoId : s.turmaPlano[turma.id]; const plano = ctx ? ctx.plano : s.planos[planoId]; if(!plano) return null;
   const prog = (ctx ? ctx.prog : s.prog[turma.id]) || { dadas:{} }; const hoje = new Date();
-  const prev = pmaPrevistas(plano, m.cal, hoje); const med = pmaMedicoes(turma, planoId, plano, ctx);
+  const prev = pmaPrevistas(plano, m.cal, hoje, turma.id); const med = pmaMedicoes(turma, planoId, plano, ctx);
   const aulas = plano.aulas.filter(a => bimFiltro==='todos' || +a.bimestre===bimFiltro);
   const grupos = []; const idx = {};
   aulas.forEach(a => { const nome = (a.capitulo || '').trim() || 'Revisões, avaliações e ENEM'; const k = (+a.bimestre) + '|' + nome;
@@ -9865,23 +9894,28 @@ async function coordUsoCarregar(){
 function renderCoordUso(){
   const c = state.coordenador; let u = c.uso;
   if(!u || u.mesCarregado!==u.mes){ u = c.uso = Object.assign(u || {}, { mes: (u && u.mes) || usoMes() }); u.mesCarregado = u.mes; u.docs = null; setTimeout(coordUsoCarregar, 0); }
-  if(u.carregando || !u.docs) return '<div class="card"><h2>📈 Uso do app</h2><div class="spinner"></div></div>';
+  if(u.carregando || !u.docs) return '<div class="card"><h2>🤝 Apoio aos professores</h2><div class="spinner"></div></div>';
   const meses = []; for(let i = 0; i < 6; i++){ const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i); meses.push(usoMes(d)); }
   const tot = {}; u.docs.forEach(d => { Object.entries(d.ev||{}).forEach(([k, v]) => { tot[k] = (tot[k]||0) + v; }); Object.entries(d.telas||{}).forEach(([k, v]) => { tot['tela:' + k] = (tot['tela:' + k]||0) + v; }); });
   const top = Object.entries(tot).sort((a, b) => b[1] - a[1]); const max = top.length ? top[0][1] : 1;
   const col = ['aula_viva', 'aula_dada', 'exercicio', 'simulado', 'reforco'];
   const jogos = d => Object.entries(d.ev||{}).filter(([k]) => k.startsWith('jogo:')).reduce((a, [, v]) => a + v, 0);
   const comUso = new Set(u.docs.map(d => d.id)); const semUso = (u.profs||[]).filter(pf => !comUso.has(pf.id));
+  const comecando = u.docs.filter(d => Object.keys(d.dias||{}).length <= 2);
   const chave = ['aula_viva','aula_dada','exercicio','simulado','reforco','jogo:qes','jogo:naval','jogo:escada','jogo:missao','painel:pma','painel:enem','semproj'];
   const nunca = chave.filter(k => !tot[k]);
-  return `<div class="card" data-coord-uso><h2>📈 Uso do app pelos professores</h2>
-    <p class="muted">Quantas vezes cada recurso foi usado no mês, por professor. Serve para decidir o que manter, o que explicar melhor na formação e o que pode sair do app. Conta só o uso dos professores (não o da coordenação entrando como professor).</p>
+  const nomeOrd = (a, b) => String(a.nome||'').localeCompare(String(b.nome||''), 'pt-BR');
+  return `<div class="card" data-coord-uso><h2>🤝 Apoio aos professores</h2>
+    <p class="muted">Para a coordenação saber quem pode precisar de uma visita, de uma ajuda com o app ou de uma formação, e quais recursos precisam ser mais bem explicados. Não é ranking: cada professor vê os próprios números em <b>Meu Painel → 🙋 Meu mês</b>, exatamente como aparecem aqui.</p>
     <div class="row" style="gap:10px;align-items:flex-end;flex-wrap:wrap;"><div><label>Mês</label><select data-coord-uso-mes>${meses.map(m => `<option value="${m}" ${m===u.mes?'selected':''}>${m.slice(5)}/${m.slice(0, 4)}</option>`).join('')}</select></div>
       <div class="muted" style="font-size:.85rem;padding-bottom:8px;">${u.docs.length} professor(es) usaram o app neste mês${semUso.length ? ` · ${semUso.length} sem uso registrado` : ''}</div></div>
-    ${u.docs.length ? `<div style="overflow-x:auto;margin-top:10px;"><table class="pma-tab" data-uso-tabela><thead><tr><th>Professor</th><th>Dias ativos</th>${col.map(k => `<th>${esc(USO_NOMES[k])}</th>`).join('')}<th>🕹️ Jogos</th><th>Última atividade</th></tr></thead><tbody>
-      ${u.docs.slice().sort((a, b) => Object.keys(b.dias||{}).length - Object.keys(a.dias||{}).length).map(d => `<tr><td><b>${esc(d.nome || d.id)}</b></td><td>${Object.keys(d.dias||{}).length}</td>${col.map(k => `<td>${(d.ev||{})[k] || '<span class="muted">0</span>'}</td>`).join('')}<td>${jogos(d) || '<span class="muted">0</span>'}</td><td>${d.ult ? d.ult.split('-').reverse().join('/') : '—'}</td></tr>`).join('')}
+    ${semUso.length || comecando.length ? `<div class="q-card" data-uso-apoio style="margin-top:10px;border-left:5px solid #c9a227;"><b>Quem pode precisar de apoio</b>
+      ${semUso.length ? `<p style="font-size:.88rem;margin:6px 0;"><b>Sem uso registrado no mês:</b> ${semUso.map(pf => esc(pf.displayName || pf.email || pf.id)).join(', ')}</p>` : ''}
+      ${comecando.length ? `<p style="font-size:.88rem;margin:6px 0;"><b>Começando (1 ou 2 dias no mês):</b> ${comecando.sort(nomeOrd).map(d => esc(d.nome || d.id)).join(', ')}</p>` : ''}
+      <p class="muted" style="font-size:.8rem;margin:4px 0 0;">Sugestão: uma conversa rápida para perguntar o que está difícil (tablets, internet, tempo, alguma tela) e combinar uma ajuda na sala.</p></div>` : ''}
+    ${u.docs.length ? `<div style="overflow-x:auto;margin-top:10px;"><table class="pma-tab" data-uso-tabela><thead><tr><th>Professor</th><th>Dias com o app</th>${col.map(k => `<th>${esc(USO_NOMES[k])}</th>`).join('')}<th>🕹️ Jogos</th><th>Última atividade</th></tr></thead><tbody>
+      ${u.docs.slice().sort(nomeOrd).map(d => `<tr><td><b>${esc(d.nome || d.id)}</b></td><td>${Object.keys(d.dias||{}).length}</td>${col.map(k => `<td>${(d.ev||{})[k] || '<span class="muted">0</span>'}</td>`).join('')}<td>${jogos(d) || '<span class="muted">0</span>'}</td><td>${d.ult ? d.ult.split('-').reverse().join('/') : '—'}</td></tr>`).join('')}
       </tbody></table></div>` : '<div class="empty">Nenhum uso registrado neste mês ainda.</div>'}
-    ${semUso.length ? `<p style="font-size:.88rem;margin-top:10px;"><b>Sem uso registrado no mês:</b> ${semUso.map(pf => esc(pf.displayName || pf.email || pf.id)).join(', ')}</p>` : ''}
     <h3 style="margin-top:20px;">Recursos mais usados na escola</h3>
     ${top.slice(0, 15).map(([k, v]) => `<div style="margin-bottom:8px;"><div class="row" style="justify-content:space-between;font-size:.85rem;"><span>${esc(usoNome(k))}</span><span class="muted">${v}</span></div><div class="chart-track"><div class="chart-fill" style="width:${Math.round(v / max * 100)}%;background:var(--wine,#7a1f2b);"></div></div></div>`).join('') || '<p class="muted">—</p>'}
     ${nunca.length ? `<h3 style="margin-top:20px;">Não usados neste mês</h3><p style="font-size:.88rem;">${nunca.map(k => esc(usoNome(k))).join(' · ')}</p><p class="muted" style="font-size:.8rem;">Antes de retirar um recurso, vale perguntar aos professores se é falta de interesse ou de saber usar.</p>` : ''}
@@ -9980,6 +10014,499 @@ document.addEventListener('click', ev => { const el = ev.target.closest('[data-c
 document.addEventListener('change', ev => { const el = ev.target;
   if(el.dataset && el.dataset.coordPmaSel){ state.coordenador.pmaEsc[el.dataset.coordPmaSel] = el.value; render(); }
   else if(el.dataset && el.dataset.coordUsoMes!==undefined){ const u = state.coordenador.uso; u.mes = el.value; render(); } });
+/* ---------------- CALENDÁRIO ESCOLAR + HORÁRIO DAS TURMAS (ligados ao plano de aulas) ----------------
+   `calendario-escolar:<ano>`  dias letivos, eventos (AV, EIA, RPP, SAE...), semestres e bimestres (gerado de cal_parse.py a partir do PDF da SEDUC).
+   `horario-turmas:<ano>`      horário de cada turma (dia 1–5 × aula 1–9 → disciplina), com `vinculos` { nome no horário: id da turma no app } (hor_parse.py).
+   Com os dois, o app sabe exatamente quando cada turma tem cada disciplina: agenda do professor, aulas previstas reais por bimestre,
+   atraso, replanejamento, confirmação da semana e marcação automática de aula dada. */
+const CAL = { cal:null, hor:null, carregado:false, carregando:false, cache:{}, ex:{}, msg:'', replan:null };
+const CAL_DSEM = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+const CAL_EV_NOMES = { AV:'Avaliação', EIA:'Estudos de Intensificação', RPP:'Recuperação Paralela', RPF:'Recuperação Final', SAE:'Período do SAESE na rede', SEN:'Simula ENEM', RNCC:'Conselho de Classe',
+  RCE:'Reunião do Conselho Escolar', ACE:'Assembleia do Conselho Escolar', ASE:'Acolhimento Socioemocional', VCM:'Semana de Combate à Violência contra a Mulher', FD:'Feriado', PF:'Ponto facultativo',
+  NL:'Dia não letivo', SL:'Sábado letivo', FR:'Férias', RC:'Recesso', PL:'Planejamento', SP:'Semana Pedagógica', MT:'Matrícula', FA:'Fim do ano letivo' };
+const CAL_SC_OPCOES = [['AV','Semanas de avaliação (AV)'], ['EIA','Estudos de Intensificação (EIA)'], ['RPP','Recuperação paralela (RP)']];
+function calDia(ds){ return new Date(ds + 'T12:00:00'); }
+function calHoje(){ return pmaDiaStr(new Date()); }
+function calAgoraHM(){ const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+function calDataBR(ds){ if(!ds) return '—'; const [y, m, d] = ds.split('-'); return `${d}/${m}`; }
+function calAddDias(ds, n){ const d = calDia(ds); d.setDate(d.getDate() + n); return pmaDiaStr(d); }
+function calEvNome(cod){ const k = Object.keys(CAL_EV_NOMES).sort((a, b) => b.length - a.length).find(p => cod.startsWith(p)); if(!k) return cod; const r = cod.slice(k.length); return CAL_EV_NOMES[k] + (/^\d$/.test(r) && ['AV','EIA','RPP'].includes(k) ? ` ${r}` : ''); }
+async function calCarregar(forcar){
+  if(CAL.carregando || (CAL.carregado && !forcar)) return; CAL.carregando = true;
+  try{
+    const ano = new Date().getFullYear(); let cal = await planoLerJson(`calendario-escolar:${ano}`, null);
+    if(!cal){ const anos = (await planoLerJson('calendario-escolar-anos', [])) || []; const a = anos.filter(x => x <= ano).sort().pop() || anos.sort().pop(); if(a) cal = await planoLerJson(`calendario-escolar:${a}`, null); }
+    CAL.cal = cal;
+    let hor = await planoLerJson(`horario-turmas:${cal ? cal.ano : ano}`, null); if(!hor) hor = await planoLerJson('horario-turmas-atual', null);
+    CAL.hor = hor;
+  }catch(e){}
+  CAL.cache = {}; CAL.carregado = true; CAL.carregando = false; render();
+}
+function calOk(){ return !!(CAL.cal && Array.isArray(CAL.cal.letivos) && CAL.cal.letivos.length); }
+function calHorOk(){ return !!(CAL.hor && Array.isArray(CAL.hor.turmas) && CAL.hor.turmas.length); }
+function calTurmaHor(tid){ if(!calHorOk()) return null; const v = CAL.hor.vinculos || {}; return CAL.hor.turmas.find(t => v[t.nome]===tid) || null; }
+function calEventos(ds){ return (CAL.cal && CAL.cal.eventos && CAL.cal.eventos[ds]) || []; }
+function calLetivo(ds){ return calOk() && CAL.cal.letivos.includes(ds); }
+function calDiaEscola(ds){ return ((CAL.cal && CAL.cal.diasSemAula) || []).find(x => x.d===ds) || null; }
+// o período do SAESE impresso no calendário é o da rede; a escola aplica num dia só (escolhido em diasSemAula)
+function calSemConteudo(ds){ if(calDiaEscola(ds)) return true; const sc = ((CAL.cal && CAL.cal.semConteudo) || []).filter(p => p!=='SAE'); return calEventos(ds).some(e => sc.some(p => e.startsWith(p))); }
+// todas as aulas do ano de uma turma numa disciplina, pelo horário e pelos dias letivos (sábado letivo não tem horário definido: não entra)
+function calSlots(tid, discKey){
+  const k = tid + '|' + discKey; if(k in CAL.cache) return CAL.cache[k];
+  const th = calTurmaHor(tid); if(!th || !calOk()) return CAL.cache[k] = null;
+  const out = [];
+  CAL.cal.letivos.forEach(ds => { const wd = calDia(ds).getDay(); if(wd < 1 || wd > 5) return;
+    (th.dias[String(wd)] || []).forEach(a => { if(normalizarTextoPlano(a.disc)!==discKey) return; const tp = (th.tempos || {})[a.aula] || [];
+      out.push({ d: ds, aula: a.aula, ini: tp[0] || '', fim: tp[1] || '', conteudo: !calSemConteudo(ds), prof: a.prof || '' }); }); });
+  return CAL.cache[k] = out.length ? out : null;
+}
+function calPassou(sl){ const h = calHoje(); if(sl.d < h) return true; if(sl.d > h) return false; return !!sl.fim && sl.fim <= calAgoraHM(); }
+function calBimIdx(ds){ const b = (CAL.cal && CAL.cal.bimestres) || []; return b.findIndex(x => ds >= x.ini && ds <= x.fim); }
+function calBimAtualIdx(){ const b = (CAL.cal && CAL.cal.bimestres) || []; const h = calHoje(); let i = b.findIndex(x => h >= x.ini && h <= x.fim);
+  if(i < 0){ i = b.findIndex(x => x.ini > h); if(i < 0) i = b.length - 1; } return Math.max(0, i); }
+// aulas do plano que já deveriam ter sido dadas: em cada bimestre, a fração das aulas reais (do horário) que já passaram
+function calPrevistasSet(plano, tid, discKey){
+  const sl = calSlots(tid, discKey || planoDiscKey(plano.disciplina)); if(!sl) return null;
+  const set = new Set(); const h = calHoje();
+  for(let b = 1; b <= 4; b++){
+    const doB = sl.filter(x => x.conteudo && calBimIdx(x.d)===b - 1); const aulas = plano.aulas.filter(a => +a.bimestre===b).sort((x, y) => x.n - y.n);
+    if(!doB.length){ const bi = (CAL.cal.bimestres || [])[b - 1]; if(bi && bi.fim < h) aulas.forEach(a => set.add(a.n)); continue; }
+    const e = doB.filter(calPassou).length; aulas.slice(0, Math.floor(aulas.length * e / doB.length + 1e-9)).forEach(a => set.add(a.n));
+  }
+  return set;
+}
+function calQuando(ds){ const h = calHoje(); if(ds===h) return 'hoje'; if(ds===calAddDias(h, 1)) return 'amanhã'; const d = calDia(ds); return `${CAL_DSEM[d.getDay()]}, ${calDataBR(ds)}`; }
+function calAulasTxt(ns){ const o = ns.map(n => n + 'ª'); return (o.length > 1 ? o.slice(0, -1).join(', ') + ' e ' + o[o.length - 1] : o[0]) + ' aula' + (o.length > 1 ? 's' : ''); }
+function calProximas(tid, discKey){ const sl = calSlots(tid, discKey); if(!sl) return null; const prox = sl.filter(x => !calPassou(x)); if(!prox.length) return null;
+  const p0 = prox[0]; const mesmas = prox.filter(x => x.d===p0.d); return { d: p0.d, ini: p0.ini, aulas: mesmas.map(x => x.aula), quando: calQuando(p0.d), semConteudo: !p0.conteudo }; }
+
+/* ---------- importação (coordenação) ---------- */
+function calTurmaSig(nome){
+  const t = normalizarTextoPlano(nome).replace(/[º°ª.\-]/g, '').replace(/serie|ano/g, '').replace(/\s+/g, '');
+  const m = t.match(/^(\d)(pg|st|eletromecanica|eletro|elet|em|el|l|[a-z]+?)(iii|ii|i|\d)?$/); if(!m) return null;
+  const curso = ['eletromecanica','eletro','elet','em','el','l'].includes(m[2]) ? 'elet' : m[2];
+  const g = m[3] ? ({ i:1, ii:2, iii:3 }[m[3]] || +m[3]) : null; return { serie: +m[1], curso, grupo: g };
+}
+function calVincularAuto(horTurmas, appTurmas, atuais){
+  const v = Object.assign({}, atuais || {}); const usados = new Set(Object.values(v));
+  horTurmas.forEach(h => { if(v[h.nome] && appTurmas.some(t => t.id===v[h.nome])) return; const a = calTurmaSig(h.nome); if(!a) return;
+    const cand = appTurmas.filter(t => !usados.has(t.id)).filter(t => { const b = calTurmaSig(t.name); return b && b.serie===a.serie && b.curso===a.curso && (b.grupo===a.grupo || (!b.grupo && !a.grupo)); });
+    let esc = cand.length===1 ? cand[0] : null;
+    if(!esc){ const solto = appTurmas.filter(t => !usados.has(t.id)).filter(t => { const b = calTurmaSig(t.name); return b && b.serie===a.serie && b.curso===a.curso && (!b.grupo || !a.grupo); }); if(solto.length===1) esc = solto[0]; }
+    if(esc){ v[h.nome] = esc.id; usados.add(esc.id); } });
+  return v;
+}
+async function calImportarCalendario(pac){
+  const s = planoState(); const ano = +pac.ano; if(!ano || !Array.isArray(pac.letivos)){ s.erro = 'Esse arquivo de calendário não está completo.'; render(); return; }
+  s.enviando = { atual:0, total:3, texto:'Guardando o calendário escolar...' }; render();
+  try{
+    await window.storage.set(`calendario-escolar:${ano}`, JSON.stringify(pac), true);
+    const anos = new Set((await planoLerJson('calendario-escolar-anos', [])) || []); anos.add(ano); await window.storage.set('calendario-escolar-anos', JSON.stringify([...anos].sort()), true);
+    s.enviando.atual = 1; render();
+    // datas dos bimestres (painel Planejado × Dado × Aprendido) e dias letivos do app inteiro (chamada, frequência)
+    await window.storage.set(PMA_CAL_KEY, JSON.stringify({ ano: String(ano), bims: pac.bimestres.map(b => ({ ini: b.ini, fim: b.fim })), em: Date.now(), origem: 'calendario' }), true);
+    try{ await ensureDiasLetivosLoaded(); }catch(e){}
+    const let_ = new Set(pac.letivos); const map = Object.assign({}, state.diasLetivos.map || {});
+    for(let d = calDia(`${ano}-01-01`); d.getFullYear()===ano; d.setDate(d.getDate() + 1)){ const ds = pmaDiaStr(d); map[ds] = let_.has(ds); }
+    state.diasLetivos.map = map; await saveDiasLetivosToStorage();
+    s.enviando.atual = 3;
+  }catch(e){ s.enviando = null; s.erro = 'Não consegui guardar o calendário agora. Tente de novo.'; render(); return; }
+  const m = pmaState(); m.calCarregado = false; m.cal = null; CAL.carregado = false; await calCarregar(true);
+  s.enviando = null;
+  s.msg = `📅 Calendário ${ano} guardado: ${pac.letivos.length} dias letivos (${(pac.sabadosLetivos||[]).length} sábados letivos), bimestres de ${pac.bimestres.map(b => calDataBR(b.ini) + ' a ' + calDataBR(b.fim)).join(' · ')}. Os dias letivos e as datas dos bimestres do app foram atualizados.${calHorOk() ? '' : ' Importe também o horário das turmas (horario-' + ano + '.json).'}`;
+  render();
+}
+async function calImportarHorario(pac){
+  const s = planoState(); const ano = +pac.ano || new Date().getFullYear();
+  if(!Array.isArray(pac.turmas) || !pac.turmas.length){ s.erro = 'Não encontrei turmas nesse arquivo de horário.'; render(); return; }
+  try{ if(!(state.professor.turmas || []).length) await loadTurmas(); }catch(e){}
+  const atual = await planoLerJson(`horario-turmas:${ano}`, null);
+  const vinculos = calVincularAuto(pac.turmas, state.professor.turmas || [], atual && atual.vinculos);
+  const doc = Object.assign({}, pac, { ano, vinculos, em: Date.now() });
+  try{ await window.storage.set(`horario-turmas:${ano}`, JSON.stringify(doc), true); await window.storage.set('horario-turmas-atual', JSON.stringify(doc), true); }
+  catch(e){ s.erro = 'Não consegui guardar o horário agora. Tente de novo.'; render(); return; }
+  CAL.carregado = false; await calCarregar(true);
+  const nomes = id => ((state.professor.turmas || []).find(t => t.id===id) || {}).name || id;
+  const ok = pac.turmas.filter(t => vinculos[t.nome]), sem = pac.turmas.filter(t => !vinculos[t.nome]);
+  s.msg = `🕘 Horário de ${pac.turmas.length} turmas guardado. Vinculadas: ${ok.map(t => `${t.nome} → ${nomes(vinculos[t.nome])}`).join(', ') || 'nenhuma'}.${sem.length ? ` Sem vínculo: ${sem.map(t => t.nome).join(', ')} (vincule em Coordenação → Aulas → 📅 Calendário e horário).` : ''}${calOk() ? '' : ' Importe também o calendário escolar.'}`;
+  render();
+}
+async function calSalvarHor(){ const ano = CAL.hor.ano || new Date().getFullYear(); await window.storage.set(`horario-turmas:${ano}`, JSON.stringify(CAL.hor), true); await window.storage.set('horario-turmas-atual', JSON.stringify(CAL.hor), true); CAL.cache = {}; }
+async function calSalvarCal(){ await window.storage.set(`calendario-escolar:${CAL.cal.ano}`, JSON.stringify(CAL.cal), true); CAL.cache = {}; }
+
+/* ---------- tela da coordenação: Calendário e horário ---------- */
+function renderCoordCalHor(){
+  if(!CAL.carregado){ if(!CAL.carregando) setTimeout(() => calCarregar(), 0); return '<div class="card"><h2>📅 Calendário e horário</h2><div class="spinner"></div></div>'; }
+  const s = planoState(); const turmas = (state.professor.turmas || []).slice().sort((a, b) => (a.name||'').localeCompare(b.name||'', 'pt-BR', { numeric:true }));
+  const c = CAL.cal, h = CAL.hor; const hoje = calHoje();
+  const avisos = `${s.msg ? `<div class="pl-msg ok" style="margin:8px 0;">${esc(s.msg)}</div>` : ''}${s.erro ? `<div class="pl-msg erro" style="margin:8px 0;color:#b3261e;">${esc(s.erro)}</div>` : ''}${s.enviando ? `<p class="muted">${esc(s.enviando.texto)} (${s.enviando.atual}/${s.enviando.total})</p>` : ''}`;
+  const imp = `<div class="row" style="gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0;"><label class="btn btn-primary btn-sm" style="width:auto;cursor:pointer;text-transform:none;letter-spacing:normal;">⬆️ Importar calendário ou horário (.json)<input type="file" accept=".json,application/json" data-cal-import style="display:none;"></label>
+    <span class="muted" style="font-size:.82rem;">Arquivos <b>calendario-AAAA.json</b> e <b>horario-AAAA.json</b>, gerados dos PDFs da escola. Todo ano, com o calendário novo, é só importar de novo.</span></div>`;
+  let calH = '<p class="muted">Nenhum calendário importado ainda.</p>';
+  if(c){
+    const bimN = c.bimestres.map(b => c.letivos.filter(d => d >= b.ini && d <= b.fim).length);
+    const prox = Object.entries(c.eventos || {}).filter(([d]) => d >= hoje && d <= calAddDias(hoje, 30)).slice(0, 14);
+    calH = `<p style="margin:4px 0;"><b>${c.ano}</b>: ${c.letivos.length} dias letivos (${(c.sabadosLetivos||[]).length} sábados letivos) · 1º semestre ${calDataBR(c.semestres[0].ini)} a ${calDataBR(c.semestres[0].fim)} · 2º semestre ${calDataBR(c.semestres[1].ini)} a ${calDataBR(c.semestres[1].fim)}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0;">${c.bimestres.map((b, i) => `<span class="cal-chip ${calBimAtualIdx()===i ? 'atual' : ''}">${i+1}º bim · ${calDataBR(b.ini)} a ${calDataBR(b.fim)} · ${bimN[i]} dias</span>`).join('')}</div>
+      ${prox.length ? `<details><summary style="cursor:pointer;">Próximos 30 dias no calendário</summary><ul style="margin:6px 0 0 18px;font-size:.88rem;">${prox.map(([d, ev]) => `<li>${calDataBR(d)} (${CAL_DSEM[calDia(d).getDay()]}): ${ev.map(calEvNome).join(', ')}${calLetivo(d) ? '' : ' · <span class="muted">não letivo</span>'}</li>`).join('')}</ul></details>` : ''}
+      <div style="margin-top:10px;"><b style="font-size:.92rem;">Dias que não contam como aula de conteúdo</b>
+      <p class="muted" style="font-size:.82rem;margin:2px 0 6px;">Nesses dias o app não espera aula nova do plano (não conta como atraso). Os planos já têm aulas de revisão e de avaliação no fim de cada bimestre, por isso AV e EIA vêm desmarcados.</p>
+      ${calDiasEscolaHtml()}
+      <div style="font-size:.84rem;margin-top:8px;">Tipos de dia que também não contam:</div>
+      <div class="row" style="gap:12px;flex-wrap:wrap;">${CAL_SC_OPCOES.map(([k, t]) => `<label style="font-size:.88rem;text-transform:none;letter-spacing:normal;font-weight:400;"><input type="checkbox" data-cal-sc="${k}" ${(c.semConteudo||[]).includes(k) ? 'checked' : ''}> ${t}</label>`).join('')}</div></div>`;
+  }
+  let horH = '<p class="muted">Nenhum horário importado ainda.</p>';
+  if(h){
+    const v = h.vinculos || {};
+    horH = `<div style="overflow-x:auto;"><table class="pma-tab" data-cal-hor-tabela><thead><tr><th>Turma no horário</th><th>Turma no app</th><th>Aulas/semana</th><th>Humanas por semana</th></tr></thead><tbody>
+      ${h.turmas.map(t => { const tot = Object.values(t.dias).reduce((a, d) => a + d.length, 0); const hum = ['Geografia','História','Sociologia','Filosofia'].map(dn => [dn, Object.values(t.dias).reduce((a, d) => a + d.filter(x => x.disc===dn).length, 0)]).filter(x => x[1]);
+        return `<tr><td><b>${esc(t.nome)}</b></td><td><select data-cal-vinc="${esc(t.nome)}"><option value="">— escolha —</option>${turmas.map(tm => `<option value="${esc(tm.id)}" ${v[t.nome]===tm.id ? 'selected' : ''}>${esc(tm.name)}</option>`).join('')}</select></td><td>${tot}</td><td style="font-size:.84rem;">${hum.map(x => `${x[0].slice(0, 4)}. ${x[1]}`).join(' · ')}</td></tr>`; }).join('')}
+      </tbody></table></div>`;
+  }
+  // aulas reais por bimestre × aulas do plano (onde o plano não cabe no horário)
+  let fitH = '';
+  if(calOk() && calHorOk() && s.carregado){
+    const linhas = [];
+    turmas.forEach(t => { (planoDiscsDisponiveis() || []).forEach(dd => { const sl = calSlots(t.id, dd.k); if(!sl) return;
+      const pid = calPlanoDaTurma(t.id, dd.k); const pl = pid && s.planos[pid]; const porB = [0,1,2,3].map(i => sl.filter(x => x.conteudo && calBimIdx(x.d)===i).length);
+      const plB = pl ? [1,2,3,4].map(b => pl.aulas.filter(a => +a.bimestre===b).length) : null;
+      linhas.push(`<tr><td>${esc(t.name)}</td><td>${esc(dd.label)}</td>${porB.map((n, i) => { const l = plB ? plB[i] : null; return `<td style="color:${l!=null && n < l ? '#b3261e' : ''};">${n}${l!=null ? ` / ${l}` : ''}${l!=null && n < l ? ' ⚠' : ''}</td>`; }).join('')}</tr>`); }); });
+    if(linhas.length) fitH = `<h3 style="margin-top:18px;">Aulas reais por bimestre × aulas do plano</h3><p class="muted" style="font-size:.84rem;">Aulas que o horário oferece em cada bimestre (fora os dias marcados acima) / aulas do plano naquele bimestre. Onde aparece ⚠ o plano não cabe: o professor recebe a sugestão de juntar aulas ou passar uma para estudo dirigido.</p>
+      <div style="overflow-x:auto;"><table class="pma-tab" data-cal-fit><thead><tr><th>Turma</th><th>Disciplina</th><th>1º bim</th><th>2º bim</th><th>3º bim</th><th>4º bim</th></tr></thead><tbody>${linhas.join('')}</tbody></table></div>`;
+    else fitH = '';
+  } else if(calOk() && calHorOk() && !s.carregado){ setTimeout(() => carregarPlanoLivro().then(calPreCarregarPlanos), 0); }
+  return `<div class="card" data-coord-calhor><h2>📅 Calendário e horário</h2>
+    <p class="muted">Com o calendário da escola e o horário das turmas, o app sabe em que dia cada turma tem cada disciplina: mostra ao professor a agenda do dia e a próxima aula do plano, calcula as aulas previstas reais e avisa quando o plano não cabe no bimestre.</p>
+    ${avisos}${imp}
+    <h3 style="margin-top:14px;">Calendário escolar</h3>${calH}
+    <h3 style="margin-top:18px;">Horário das turmas</h3>${horH}
+    ${fitH}
+  </div>`;
+}
+async function calPreCarregarPlanos(){ const s = planoState(); const ids = new Set(); CAL.tp = await planoLerJson('plano-livro-turmas', {}) || {}; CAL.regras = await planoLerJson('plano-livro-regras', {}) || {}; (state.professor.turmas || []).forEach(t => (planoDiscsDisponiveis()||[]).forEach(dd => { const p = calPlanoDaTurma(t.id, dd.k); if(p) ids.add(p); }));
+  for(const id of ids){ try{ await planoObter(id); }catch(e){} } render(); }
+// plano efetivo da turma numa disciplina (vínculo manual por turma|disciplina ou regra da série)
+function calPlanoDaTurma(tid, discKey){
+  const s = planoState(); if(planoDiscAtual()===discKey && s.turmaPlano[tid]) return s.turmaPlano[tid];
+  const idx = s.index || []; const t = (state.professor.turmas || []).find(x => x.id===tid); if(!t) return null;
+  const tp = CAL.tp || {}; const k = `${tid}|${discKey}`; if(tp[k]) return tp[k]==='__nenhum' ? null : tp[k];
+  const serie = planoSerieNum(t.name); const rg = (CAL.regras || {})[`${discKey}|${serie}`]; if(rg) return rg;
+  const cand = idx.filter(p => planoDiscKey(p.disciplina)===discKey && planoSerieNum(p.serie)===serie);
+  return (cand.find(p => /-B$/.test(p.id)) || cand[0] || {}).id || null;
+}
+
+/* ---------- professor: agenda de hoje, próxima aula, atraso ---------- */
+function calAgendaItens(ds){
+  const p = state.professor; if(!p.session || !calOk() || !calHorOk()) return [];
+  const wd = calDia(ds).getDay(); if(wd < 1 || wd > 5 || !calLetivo(ds)) return [];
+  const itens = [];
+  (p.disciplinas || []).forEach(d => { const dk = normalizarTextoPlano(d.name);
+    (d.turmaIds || []).forEach(tid => { const th = calTurmaHor(tid); if(!th) return; const t = (p.turmas || []).find(x => x.id===tid);
+      const aulas = (th.dias[String(wd)] || []).filter(a => normalizarTextoPlano(a.disc)===dk).map(a => a.aula).sort((a, b) => a - b); if(!aulas.length) return;
+      const tp = th.tempos || {}; itens.push({ tid, turma: t ? t.name : th.nome, disc: d.name, aulas, ini: (tp[aulas[0]] || [])[0] || '', fim: (tp[aulas[aulas.length - 1]] || [])[1] || '' }); }); });
+  return itens.sort((a, b) => a.ini.localeCompare(b.ini));
+}
+function calAgendaHojeHtml(){
+  if(!CAL.carregado){ if(!CAL.carregando) setTimeout(() => calCarregar(), 0); return ''; }
+  if(state.view!=='professor' || !state.professor.session || !calOk() || !calHorOk()) return '';
+  const h = calHoje(); const de = calDiaEscola(h); const ev = calEventos(h).filter(e => !/^SL\d$/.test(e) && !(de && /^SAE/.test(e)));
+  const evTxt = (de ? ` · <span style="color:#b3261e;">${esc(de.motivo || 'Sem aula de conteúdo')} (sem aula de conteúdo)</span>` : '') + (ev.length ? ` · <span style="color:#a4521b;">${ev.map(calEvNome).join(', ')}</span>` : '');
+  if(!calLetivo(h) || [0, 6].includes(calDia(h).getDay())){
+    let prox = null; for(let i = 1; i < 30 && !prox; i++){ const d = calAddDias(h, i); if(calAgendaItens(d).length) prox = d; }
+    return `<div data-cal-agenda style="margin:8px 0;font-size:.88rem;">📅 Hoje não há aulas no seu horário${evTxt}.${prox ? ` Próximo dia com aula: <b>${calQuando(prox)}</b>.` : ''}</div>`;
+  }
+  const itens = calAgendaItens(h); if(!itens.length) return `<div data-cal-agenda style="margin:8px 0;font-size:.88rem;">📅 Hoje você não tem aula no horário${evTxt}.</div>`;
+  const agora = calAgoraHM();
+  return `<div data-cal-agenda style="margin:8px 0;"><div style="font-size:.8rem;font-weight:700;color:var(--wine,#6B1F2E);">📅 HOJE NO SEU HORÁRIO${evTxt}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">${itens.map(it => `<span class="cal-chip" style="${it.fim && it.fim <= agora ? 'opacity:.55;' : ''}">${esc(it.ini)} · <b>${esc(it.turma)}</b> · ${esc(it.disc)} <span class="muted">(${calAulasTxt(it.aulas)})</span></span>`).join('')}</div></div>`;
+}
+function calRotuloAula(tid, plano){
+  const pr = calOk() && plano ? calProximas(tid, planoDiscKey(plano.disciplina)) : null;
+  if(!pr || pr.d===calHoje()) return `📌 AULA DE HOJE${pr ? ` · ${calAulasTxt(pr.aulas)} (${esc(pr.ini)})` : ''}`;
+  return `📌 PRÓXIMA AULA · ${esc(pr.quando)}, ${calAulasTxt(pr.aulas)} (${esc(pr.ini)})`;
+}
+function calJuntaTxt(tid, prog, aula){ const m = ((prog || {}).juntas || {})[aula.n]; return m ? ` <span style="font-weight:600;color:#2f5d8a;">+ aula ${m} (juntas)</span> <button class="btn btn-ghost btn-sm" data-cal="separar" data-tid="${esc(tid)}" data-n="${aula.n}" style="width:auto;padding:1px 8px;font-size:.75rem;">separar</button>` : ''; }
+function calSituacao(tid, plano, prog){
+  if(!calOk() || !plano) return null; const dk = planoDiscKey(plano.disciplina); const sl = calSlots(tid, dk); if(!sl) return null;
+  const prev = calPrevistasSet(plano, tid, dk); const dadas = plano.aulas.filter(a => prog.dadas && prog.dadas[a.n]).length;
+  const bim = calBimAtualIdx(); const bi = CAL.cal.bimestres[bim];
+  const parceiras = new Set(Object.values(prog.juntas || {}).map(Number));
+  const R = sl.filter(x => x.conteudo && calBimIdx(x.d)===bim && !calPassou(x)).length;
+  const F = plano.aulas.filter(a => +a.bimestre <= bim + 1 && !(prog.dadas && prog.dadas[a.n]) && !parceiras.has(a.n)).length;
+  return { devia: prev ? prev.size : 0, dadas, atraso: (prev ? prev.size : 0) - dadas, bim, bi, R, F };
+}
+function calInicioTurmaHtml(tid, plano, prog){
+  const st = calSituacao(tid, plano, prog); if(!st || !st.dadas) return calReforcoInicioHtml(tid, plano, prog);
+  const hoje = planoAulaDeHoje(plano, prog); const linhas = [];
+  if(st.atraso >= 2) linhas.push(`⏳ Pelo horário, até hoje eram ${st.devia} aulas; você marcou ${st.dadas}. Está ${st.atraso} aula${st.atraso > 1 ? 's' : ''} atrás do previsto.`);
+  else if(st.atraso <= -2) linhas.push(`⏩ Adiantado em ${-st.atraso} aulas em relação ao horário.`);
+  const naoCabe = st.F > st.R;
+  if(naoCabe) linhas.push(`Faltam ${st.F} aula${st.F > 1 ? 's' : ''} do plano até o fim do ${st.bim + 1}º bimestre (${calDataBR(st.bi.fim)}) e o horário tem ${st.R}.`);
+  const est = Object.keys(prog.modo || {}).filter(n => prog.modo[n]==='estudo' && !(prog.exercicios || {})[n]).map(Number).filter(n => plano.aulas.some(a => a.n===n && a.exercicio));
+  const acoes = (st.atraso >= 2 || naoCabe) && hoje ? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px;">
+      ${!(prog.juntas || {})[hoje.n] && plano.aulas.some(a => a.n > hoje.n && !prog.dadas[a.n]) ? `<button class="btn btn-ghost btn-sm" data-cal="juntar" data-tid="${esc(tid)}" data-n="${hoje.n}" style="width:auto;">🔗 Juntar com a próxima</button>` : ''}
+      <button class="btn btn-ghost btn-sm" data-cal="estudo" data-tid="${esc(tid)}" data-n="${hoje.n}" style="width:auto;">📚 Aula ${hoje.n} como estudo dirigido</button>
+      <button class="btn btn-ghost btn-sm" data-cal="replan" data-tid="${esc(tid)}" style="width:auto;">🗓️ Replanejar o bimestre</button></div>` : '';
+  const rp = CAL.replan && CAL.replan.tid===tid ? calReplanHtml(tid, plano) : '';
+  const estH = est.length ? `<div data-cal-estudo style="margin-top:6px;font-size:.82rem;">📚 Estudo dirigido: ${est.map(n => `<button class="btn btn-ghost btn-sm" data-cal="estudo-ex" data-tid="${esc(tid)}" data-n="${n}" style="width:auto;padding:1px 8px;font-size:.78rem;">enviar exercício da aula ${n}</button>`).join(' ')}</div>` : '';
+  return (linhas.length ? `<div data-cal-situacao style="margin-top:8px;font-size:.82rem;color:#a4521b;">${linhas.join(' ')}${acoes}</div>` : '') + rp + estH + calReforcoInicioHtml(tid, plano, prog);
+}
+
+/* ---------- juntar, estudo dirigido e replanejar ---------- */
+async function calProgLer(tid, pid){ const p = await planoLerJson(`plano-livro-prog:${planoTKP(tid, pid)}`, null) || {}; p.dadas = p.dadas || {}; p.exercicios = p.exercicios || {}; return p; }
+async function calProgGravar(tid, pid, prog){ await window.storage.set(`plano-livro-prog:${planoTKP(tid, pid)}`, JSON.stringify(prog), true);
+  const s = planoState(); if(s.turmaPlano[tid]===pid) s.prog[tid] = prog; s.painel = null; }
+function calPlanoAtual(tid){ const s = planoState(); const pid = s.turmaPlano[tid]; return { pid, plano: pid && s.planos[pid] }; }
+async function calJuntar(tid, n){
+  const { pid, plano } = calPlanoAtual(tid); if(!plano) return; const prog = await calProgLer(tid, pid);
+  const prox = plano.aulas.filter(a => a.n > n && !prog.dadas[a.n] && !Object.values(prog.juntas || {}).map(Number).includes(a.n)).sort((a, b) => a.n - b.n)[0]; if(!prox) return;
+  prog.juntas = prog.juntas || {}; prog.juntas[n] = prox.n; await calProgGravar(tid, pid, prog);
+  CAL.msg = `🔗 Aulas ${n} e ${prox.n} juntas: quando marcar a aula ${n} como dada, a ${prox.n} vai junto.`; render(); calToast(CAL.msg);
+}
+async function calSeparar(tid, n){ const { pid } = calPlanoAtual(tid); const prog = await calProgLer(tid, pid); if(prog.juntas){ delete prog.juntas[n]; } await calProgGravar(tid, pid, prog); render(); }
+async function calEstudoDirigido(tid, n, semPerguntar){
+  const { pid, plano } = calPlanoAtual(tid); if(!plano) return; const aula = plano.aulas.find(a => a.n===n); if(!aula) return;
+  if(!semPerguntar && !confirm(`Transformar a aula ${n} (${aula.tituloCurto || aula.tema}) em estudo dirigido?\n\nEla conta como dada e sai da sequência das aulas em sala.${aula.exercicio ? ' Em seguida, você pode enviar o exercício da aula como tarefa para a turma (prazo de 7 dias).' : ''}`)) return;
+  const prog = await calProgLer(tid, pid); prog.dadas[n] = Date.now(); prog.modo = prog.modo || {}; prog.modo[n] = 'estudo';
+  await calProgGravar(tid, pid, prog);
+  if(!semPerguntar && aula.exercicio && !prog.exercicios[n] && confirm(`Enviar agora o exercício da aula ${n} como tarefa para a turma?`)){ planoState().prazo[n] = '7'; await aplicarExercicioPlano(tid, n); }
+  render();
+}
+function calReplanCalc(tid){
+  const { pid, plano } = calPlanoAtual(tid); if(!plano) return null; const s = planoState(); const prog = s.prog[tid] || { dadas:{} };
+  const st = calSituacao(tid, plano, prog); if(!st) return null;
+  const parceiras = new Set(Object.values(prog.juntas || {}).map(Number));
+  const pend = plano.aulas.filter(a => +a.bimestre <= st.bim + 1 && !prog.dadas[a.n] && !parceiras.has(a.n) && !(prog.juntas || {})[a.n]).sort((a, b) => a.n - b.n);
+  const D = st.F - st.R; const itens = [];
+  if(D > 0){
+    const hojeN = (planoAulaDeHoje(plano, prog) || {}).n;
+    const estudo = pend.filter(a => ['Atividades','Projeto/Debate'].includes(a.tipo) && a.n!==hojeN).reverse();
+    estudo.slice(0, D).forEach(a => itens.push({ tipo:'estudo', n:a.n, t: a.tituloCurto || a.tema }));
+    const usados = new Set(itens.map(i => i.n));
+    const ok = a => ['Conteúdo','Revisão EF'].includes(a.tipo) && !usados.has(a.n);
+    for(let i = pend.length - 1; i > 0 && itens.length < D; i--){ const b = pend[i], a = pend[i - 1];
+      if(b.n===a.n + 1 && ok(a) && ok(b) && (a.capitulo||'')===(b.capitulo||'')){ itens.push({ tipo:'juntar', n:a.n, m:b.n, t: `${a.tituloCurto || a.tema} + ${b.tituloCurto || b.tema}` }); usados.add(a.n); usados.add(b.n); i--; } }
+    itens.sort((x, y) => x.n - y.n);
+  }
+  return { tid, pid, D, R: st.R, F: st.F, bim: st.bim, fim: st.bi.fim, itens, falta: Math.max(0, D - itens.length), marcados: itens.map(() => true) };
+}
+function calReplanHtml(tid, plano){
+  const r = CAL.replan; if(!r) return '';
+  if(r.D <= 0) return `<div data-cal-replan class="q-card" style="margin-top:8px;font-size:.85rem;border-left:4px solid #1d6b31;">✅ Cabe: faltam ${r.F} aulas do plano até ${calDataBR(r.fim)} e o horário tem ${r.R}. ${r.R > r.F ? `Sobram ${r.R - r.F} para revisão ou retomada.` : ''} <button class="btn btn-ghost btn-sm" data-cal="replan-fechar" style="width:auto;">Fechar</button></div>`;
+  return `<div data-cal-replan class="q-card" style="margin-top:8px;font-size:.85rem;border-left:4px solid #c9a227;">
+    <b>🗓️ Replanejar o ${r.bim + 1}º bimestre</b><p style="margin:4px 0;">Faltam ${r.F} aulas do plano e o horário tem ${r.R} até ${calDataBR(r.fim)}. Para caber, a sugestão é:</p>
+    ${r.itens.map((it, i) => `<label style="display:block;margin:3px 0;text-transform:none;letter-spacing:normal;font-weight:400;"><input type="checkbox" data-cal-rp="${i}" ${r.marcados[i] ? 'checked' : ''}> ${it.tipo==='estudo' ? `📚 Aula ${it.n} vira estudo dirigido` : `🔗 Juntar as aulas ${it.n} e ${it.m}`} <span class="muted">— ${esc(it.t)}</span></label>`).join('') || '<p class="muted">Não achei aulas que dê para juntar ou passar para estudo dirigido sem perder conteúdo.</p>'}
+    ${r.falta ? `<p style="margin:6px 0;color:#b3261e;">Mesmo assim faltariam ${r.falta} aula(s): vale combinar com a coordenação (usar a aula de revisão ou um sábado letivo).</p>` : ''}
+    <div class="row" style="gap:6px;margin-top:6px;">${r.itens.length ? `<button class="btn btn-primary btn-sm" data-cal="replan-aplicar" style="width:auto;">Aplicar</button>` : ''}<button class="btn btn-ghost btn-sm" data-cal="replan-fechar" style="width:auto;">Fechar</button></div></div>`;
+}
+async function calReplanAplicar(){
+  const r = CAL.replan; if(!r) return; const prog = await calProgLer(r.tid, r.pid); prog.juntas = prog.juntas || {}; prog.modo = prog.modo || {}; let nj = 0, ne = 0;
+  r.itens.forEach((it, i) => { if(!r.marcados[i]) return; if(it.tipo==='juntar'){ prog.juntas[it.n] = it.m; nj++; } else { prog.dadas[it.n] = Date.now(); prog.modo[it.n] = 'estudo'; ne++; } });
+  await calProgGravar(r.tid, r.pid, prog); CAL.replan = null;
+  calToast(`🗓️ Bimestre replanejado: ${nj} par(es) de aulas juntas e ${ne} aula(s) como estudo dirigido.${ne ? ' Os exercícios do estudo dirigido podem ser enviados pelo cartão da turma.' : ''}`); render();
+}
+
+/* ---------- aula dada automática (aula ao vivo, exercício, jogo da aula) ---------- */
+async function calMarcarAuto(tid, pid, n, motivo){
+  if(!tid || !pid || !n || state.view!=='professor') return;
+  try{ const prog = await calProgLer(tid, pid); if(prog.dadas[n]) return;
+    prog.dadas[n] = Date.now(); const m = (prog.juntas || {})[n]; if(m) prog.dadas[m] = prog.dadas[n];
+    prog.auto = prog.auto || {}; prog.auto[n] = { motivo, em: Date.now() };
+    await calProgGravar(tid, pid, prog);
+    const t = (state.professor.turmas || []).find(x => x.id===tid);
+    calToast(`✅ Aula ${n}${m ? ` (+${m})` : ''} de ${t ? t.name : 'turma'} marcada como dada (${motivo}).`, { tid, pid, n });
+  }catch(e){}
+}
+async function calDesfazerAuto(tid, pid, n){
+  const prog = await calProgLer(tid, pid); const m = (prog.juntas || {})[n]; delete prog.dadas[n]; if(m) delete prog.dadas[m]; if(prog.auto) delete prog.auto[n];
+  await calProgGravar(tid, pid, prog); const el = document.getElementById('cal-toast'); if(el) el.remove(); render();
+}
+function calToast(txt, desfazer){
+  try{ let el = document.getElementById('cal-toast'); if(el) el.remove(); el = document.createElement('div'); el.id = 'cal-toast';
+    el.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:100000;background:#2a1a1f;color:#fff;padding:10px 14px;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.3);font:600 .9rem system-ui,sans-serif;max-width:min(92vw,560px);display:flex;gap:10px;align-items:center;';
+    el.innerHTML = `<span>${esc(txt)}</span>${desfazer ? `<button data-cal="desfazer" data-tid="${esc(desfazer.tid)}" data-pid="${esc(desfazer.pid)}" data-n="${desfazer.n}" style="background:#c9a227;color:#2a1a1f;border:0;border-radius:8px;padding:5px 10px;font-weight:700;cursor:pointer;">Desfazer</button>` : ''}`;
+    document.body.appendChild(el); clearTimeout(calToast.t); calToast.t = setTimeout(() => { if(el.parentNode) el.remove(); }, desfazer ? 12000 : 7000); }catch(e){}
+}
+function calAvisosAutoHtml(){
+  if(state.view!=='professor') return ''; const s = planoState(); const itens = [];
+  ((s.resumoInicio || {}).linhas || []).forEach(({ turmaId }) => { const prog = s.prog[turmaId]; const pid = s.turmaPlano[turmaId]; if(!prog || !prog.auto) return;
+    Object.entries(prog.auto).forEach(([n, a]) => { if(Date.now() - (a.em || 0) < 3 * 86400000 && prog.dadas[n]) itens.push({ tid: turmaId, pid, n: +n, a }); }); });
+  if(!itens.length) return '';
+  const nome = id => ((state.professor.turmas || []).find(t => t.id===id) || {}).name || '';
+  return `<div class="card inicio-card" data-cal-auto style="border-left:5px solid #1d6b31;padding:10px 14px;"><b>✅ Marcadas como dadas automaticamente</b>
+    <div style="font-size:.86rem;margin-top:4px;">${itens.map(i => `<div>${esc(nome(i.tid))} · aula ${i.n} <span class="muted">(${esc(i.a.motivo)}, ${new Date(i.a.em).toLocaleDateString('pt-BR')})</span> <button class="btn btn-ghost btn-sm" data-cal="desfazer" data-tid="${esc(i.tid)}" data-pid="${esc(i.pid)}" data-n="${i.n}" style="width:auto;padding:1px 8px;font-size:.75rem;">Desfazer</button></div>`).join('')}</div></div>`;
+}
+(function(){
+  const depois = (nome, f) => { try{ const orig = window[nome] || eval(nome); if(typeof orig!=='function') return;
+    const nova = async function(...a){ const r = await orig.apply(this, a); try{ await f(a, r); }catch(x){} return r; }; eval(nome + ' = nova'); }catch(e){} };
+  depois('iniciarAulaViva', async () => { const av = aulaVivaState(); const se = av && av.sess; if(!se) return; await calMarcarAuto(se.turmaId, se.planoId || planoState().turmaPlano[se.turmaId], se.n, 'aula ao vivo'); });
+  depois('aplicarExercicioPlano', async (a) => { const [tid, n] = a; const s = planoState(); if(((s.prog[tid] || {}).exercicios || {})[n]) await calMarcarAuto(tid, s.turmaPlano[tid], n, 'exercício aplicado'); });
+  depois('jgAbrirQesDaAulaPlano', async (a) => { jgState().origemAula = { pid: a[0], n: a[1], tid: a[2] }; });
+  depois('jgAbrirSugestaoPlano', async (a) => { jgState().origemAula = { pid: a[0], n: a[1], tid: a[2] }; });
+  depois('jgComecar', async () => { const g = jgState(); const o = g.origemAula; if(o && g.current && g.current.turmaId===o.tid && g.current.fase!=='sala'){ g.origemAula = null; await calMarcarAuto(o.tid, o.pid, o.n, 'jogo da aula'); } });
+})();
+
+/* ---------- Confirme sua semana ---------- */
+function calSemanaIni(){ const h = calDia(calHoje()); const wd = h.getDay(); const back = wd===0 ? 6 : wd - 1; h.setDate(h.getDate() - back - (wd===1 ? 7 : 0)); return pmaDiaStr(h); }
+function calSemanaOk(){ try{ return JSON.parse(localStorage.getItem('cal-semana-ok') || '[]'); }catch(e){ return []; } }
+function calSemanaDados(){
+  if(!calOk() || !calHorOk() || state.view!=='professor') return [];
+  const s = planoState(); const ini = calSemanaIni(); const iniTs = calDia(ini).getTime() - 12 * 3600000; const ok = calSemanaOk(); const out = [];
+  ((s.resumoInicio || {}).linhas || []).forEach(({ turmaId }) => {
+    const pid = s.turmaPlano[turmaId]; const plano = s.planos[pid]; const prog = s.prog[turmaId]; if(!plano || !prog) return;
+    const dk = planoDiscKey(plano.disciplina); if(ok.includes(`${turmaId}|${dk}|${ini}`)) return;
+    if(!Object.keys(prog.dadas || {}).length) return;   // turma que ainda não começou o plano: não cobra
+    const sl = (calSlots(turmaId, dk) || []).filter(x => x.d >= ini && calPassou(x)); if(!sl.length) return;
+    const marcas = Object.values(prog.dadas || {}).filter(ts => ts >= iniTs && ts <= Date.now()).map(ts => pmaDiaStr(new Date(ts)));
+    const deficit = sl.length - marcas.length; if(deficit <= 0) return;
+    const sobra = marcas.slice(); const livres = sl.filter(x => { const i = sobra.indexOf(x.d); if(i >= 0){ sobra.splice(i, 1); return false; } return true; });
+    const cand = plano.aulas.filter(a => !prog.dadas[a.n] && !Object.values(prog.juntas || {}).map(Number).includes(a.n)).sort((a, b) => a.n - b.n).slice(0, deficit);
+    out.push({ tid: turmaId, pid, dk, ini, total: sl.length, marcadas: marcas.length, itens: cand.map((a, i) => ({ n: a.n, t: a.tituloCurto || a.tema, d: (livres[i] || livres[livres.length - 1] || sl[sl.length - 1]).d })) });
+  });
+  return out;
+}
+function calSemanaHtml(){
+  const dados = calSemanaDados(); if(!dados.length) return '';
+  const nome = id => ((state.professor.turmas || []).find(t => t.id===id) || {}).name || '';
+  return `<div class="card inicio-card" data-cal-semana style="border-left:5px solid #c9a227;"><b>🗓️ Confirme sua semana</b>
+    <p class="muted" style="font-size:.84rem;margin:2px 0 6px;">Pelo horário, estas aulas já aconteceram e ainda não foram marcadas. Confira e confirme: a data de cada aula vai certa para o registro.</p>
+    ${dados.map(x => `<div style="margin:8px 0;padding-top:6px;border-top:1px solid var(--border,#e6dcc8);"><b>${esc(nome(x.tid))}</b> <span class="muted" style="font-size:.84rem;">— o horário teve ${x.total} aula(s) desde ${calDataBR(x.ini)}; ${x.marcadas} marcada(s)</span>
+      ${x.itens.map(it => `<label style="display:block;font-size:.88rem;margin:3px 0;text-transform:none;letter-spacing:normal;font-weight:400;"><input type="checkbox" data-cal-sem="${esc(x.tid)}" data-n="${it.n}" data-d="${it.d}" checked> Aula ${it.n} — ${esc(it.t)} <span class="muted">(${calQuando(it.d)})</span></label>`).join('')}
+      <div class="row" style="gap:6px;margin-top:4px;"><button class="btn btn-primary btn-sm" data-cal="semana-ok" data-tid="${esc(x.tid)}" style="width:auto;">✅ Confirmar</button><button class="btn btn-ghost btn-sm" data-cal="semana-nao" data-tid="${esc(x.tid)}" data-k="${esc(x.tid + '|' + x.dk + '|' + x.ini)}" style="width:auto;">Não houve aula</button></div></div>`).join('')}
+  </div>`;
+}
+async function calSemanaConfirmar(tid){
+  const s = planoState(); const pid = s.turmaPlano[tid]; const marc = [...document.querySelectorAll(`[data-cal-sem="${CSS.escape(tid)}"]`)].filter(el => el.checked).map(el => ({ n: +el.dataset.n, d: el.dataset.d }));
+  if(!marc.length) return; const prog = await calProgLer(tid, pid);
+  marc.forEach(m => { const ts = Math.min(Date.now(), calDia(m.d).getTime()); prog.dadas[m.n] = ts; const j = (prog.juntas || {})[m.n]; if(j) prog.dadas[j] = ts; });
+  await calProgGravar(tid, pid, prog); try{ usoReg('aula_dada'); }catch(e){}
+  calToast(`✅ ${marc.length} aula(s) confirmada(s).`); render();
+}
+function calSemanaNao(k){ const l = calSemanaOk(); l.push(k); try{ localStorage.setItem('cal-semana-ok', JSON.stringify(l.slice(-80))); }catch(e){} render(); }
+
+/* ---------- reforço sugerido pelo próprio exercício ---------- */
+function calExDoPlano(a){ const o = a && a.origemPlano; return !!(o && o.aula && o.planoId && !o.recuperacao && !o.apoio && !o.desafio && !o.diagnostica && !o.revisao && !o.saeseRetomada && a.instrumento==='exercicios'); }
+function calAbaixo(a, responses){ const max = (a.questions || []).reduce((x, q) => x + (q.annulled ? 0 : (q.points || 0)), 0); if(!max) return [];
+  return (responses || []).filter(r => (r.total || 0) / max < 0.5).map(r => r.studentName); }
+function calReforcoJaEnviado(code){ return (state.professor.assessments || []).some(x => x.reforco && x.reforco.origemCode===code); }
+function calReforcoResultadoHtml(a, responses){
+  if(state.view!=='professor' || !calExDoPlano(a)) return ''; const ab = calAbaixo(a, responses); if(!ab.length) return '';
+  if(calReforcoJaEnviado(a.code)) return `<div class="q-card" data-cal-reforco style="border-left:5px solid #1d6b31;font-size:.88rem;">📲 Reforço deste exercício já enviado.</div>`;
+  return `<div class="q-card" data-cal-reforco style="border-left:5px solid #c9a227;font-size:.9rem;"><b>📲 ${ab.length} aluno(s) com dificuldade neste tema</b> (abaixo de 50%): ${esc(ab.slice(0, 8).join(', '))}${ab.length > 8 ? '…' : ''}
+    <div style="margin-top:6px;"><button class="btn btn-primary btn-sm" data-cal="reforco" data-code="${esc(a.code)}" style="width:auto;">Enviar reforço para eles</button> <span class="muted" style="font-size:.8rem;">5 questões do ENEM dos temas da aula, sem nota, com correção na hora.</span></div></div>`;
+}
+async function calReforcoCarregar(tid, code){
+  const k = tid + '|' + code; if(CAL.ex[k] && Date.now() - CAL.ex[k].em < 120000) return; CAL.ex[k] = { em: Date.now(), carregando: true };
+  let a = (state.professor.assessments || []).find(x => x.code===code); if(!a) a = await planoLerJson(`assessment:${code}`, null);
+  const resp = (await planoLerJson(`responses:${code}`, [])) || [];
+  CAL.ex[k] = { em: Date.now(), a, resp, abaixo: a ? calAbaixo(a, resp) : [] }; render();
+}
+function calReforcoInicioHtml(tid, plano, prog){
+  const ex = Object.entries(prog.exercicios || {}).filter(([n, c]) => c && plano.aulas.some(a => a.n===+n)).sort((x, y) => +y[0] - +x[0])[0]; if(!ex) return '';
+  const [n, code] = ex; const k = tid + '|' + code; const c = CAL.ex[k];
+  if(!c){ setTimeout(() => calReforcoCarregar(tid, code), 0); return ''; }
+  if(c.carregando || !c.a || (c.resp || []).length < 3 || !c.abaixo.length || calReforcoJaEnviado(code)) return '';
+  return `<div data-cal-reforco-inicio style="margin-top:8px;font-size:.82rem;color:#7a4a00;">📲 ${c.abaixo.length} aluno(s) abaixo de 50% no exercício da aula ${n}. <button class="btn btn-ghost btn-sm" data-cal="reforco" data-code="${esc(code)}" style="width:auto;padding:1px 8px;font-size:.78rem;">Enviar reforço</button></div>`;
+}
+async function calEnviarReforco(code){
+  let a = (state.professor.assessments || []).find(x => x.code===code); if(!a) a = await planoLerJson(`assessment:${code}`, null); if(!a || !calExDoPlano(a)) return;
+  const resp = (await planoLerJson(`responses:${code}`, [])) || []; const nomes = calAbaixo(a, resp); if(!nomes.length){ alert('Nenhum aluno abaixo de 50% neste exercício.'); return; }
+  const o = a.origemPlano; const tid = o.turmaId || (a.turmaIds || [])[0]; const turma = (state.professor.turmas || []).find(t => t.id===tid);
+  const alvos = nomes.map(nm => (turma && (turma.students || []).find(st => mesmoNomeAluno(st.name, nm))) || null).filter(Boolean);
+  if(!alvos.length){ alert('Não achei esses alunos na lista da turma.'); return; }
+  const plano = await planoObter(o.planoId); const aula = plano && plano.aulas.find(x => x.n===o.aula); if(!aula) return;
+  let temas = [...new Set(((aula.slides && aula.slides.enemOficial) || []).map(q => q && q.tema).filter(Boolean))];
+  if(!temas.length) temas = [...new Set(plano.aulas.filter(x => (x.capitulo || '')===(aula.capitulo || '')).flatMap(x => ((x.slides && x.slides.enemOficial) || []).map(q => q && q.tema)).filter(Boolean))];
+  const disc = pmaDiscKey(plano); let reg = []; try{ reg = await enemOfCarregar(); }catch(e){}
+  const usadas = enemOfJaAplicadas(); const base = reg.filter(q => q.disciplina===disc && temas.includes(q.tema)); const ined = base.filter(q => !usadas.has(q.id)); const pool = ined.length >= 5 ? ined : base;
+  const porTema = {}; pool.slice().sort(() => Math.random() - .5).forEach(q => (porTema[q.tema] = porTema[q.tema] || []).push(q));
+  const filas = Object.values(porTema); const escolha = []; let k = 0; while(escolha.length < 5 && filas.some(f => f.length)){ const f = filas[k++ % filas.length]; if(f.length) escolha.push(f.shift()); }
+  if(escolha.length < 3){ alert('Há poucas questões do ENEM com os temas desta aula para montar o reforço.'); return; }
+  if(!confirm(`Enviar um reforço de ${escolha.length} questões do ENEM (${temas.slice(0, 4).join(', ')}) para ${alvos.length} aluno(s)?\n\n${alvos.map(x => x.name).join(', ')}\n\nNão vale nota. Cada aluno vê a correção e a explicação assim que terminar.`)) return;
+  const cache = {}; const qs = []; for(const q of escolha) qs.push(await enemOfQuestaoAvaliacao(q, cache)); planoPontosIguais(qs, 10);
+  const sess = state.professor.session; const novo = genCode();
+  const r = { code: novo, title: `🔁 Reforço — Aula ${o.aula}: ${aula.tituloCurto || aula.tema}`, instrumento:'exercicios', unidade: a.unidade || UNIDADES[Math.max(0, Math.min(3, (aula.bimestre || 1) - 1))],
+    disciplinaId: a.disciplinaId || null, disciplinaName: a.disciplinaName || plano.disciplina || null, turmaIds: [tid], questions: qs, startAt: null, endAt: planoPrazoParaEndAt('7'), agendaTurmas: {},
+    resultRelease: { mode:'imediato', releaseAt:'' }, securityEnabled: false, minMinutesPerQuestion: null, exigeLiberacao: false, valeNota: false,
+    somenteAlunos: alvos.map(x => x.id), somenteAlunosNomes: alvos.map(x => x.name), reforco: { planoId: o.planoId, aula: o.aula, grupo: `Aula ${o.aula}`, temas, origemCode: code },
+    professorId: sess ? sess.id : null, professorName: sess ? sess.displayName : 'Coordenação', createdAt: Date.now(), updatedAt: null };
+  try{ await window.storage.set(`assessment:${novo}`, JSON.stringify(r), true); }catch(e){ alert('Não consegui enviar agora. Tente de novo.'); return; }
+  (state.professor.assessments = state.professor.assessments || []).unshift(r); try{ usoReg('reforco'); }catch(e){}
+  calToast(`📲 Reforço enviado para ${alvos.length} aluno(s) (código ${novo}). Aparece só para eles, com prazo de 7 dias.`); render();
+}
+
+/* ---------- Meu mês (o professor vê o mesmo que a coordenação) ---------- */
+function renderMeuMes(){
+  const p = state.professor; if(!p.session) return '';
+  const st = p.meuMes = p.meuMes || { mes: usoMes() };
+  if(!st.doc && !st.carregando){ st.carregando = true; (async () => { try{ await usoGravar(); }catch(e){} st.doc = (await planoLerJson(`uso:professor:${p.session.id}:${st.mes}`, {})) || {}; st.carregando = false; render(); })(); }
+  if(!st.doc) return '<div class="spinner"></div>';
+  const ev = {}, dias = []; Object.entries(st.doc).forEach(([k, v]) => { if(k.startsWith('acao:')) ev[k.slice(5)] = v; else if(k.startsWith('dia:')) dias.push(k.slice(4)); });
+  const lista = Object.entries(ev).sort((a, b) => b[1] - a[1]);
+  return `<div class="card" data-meu-mes><h2>🙋 Meu mês</h2>
+    <p class="muted">Estes são os mesmos números que a coordenação vê na tela “Apoio aos professores”. Servem para a escola saber quem pode precisar de ajuda com o app ou de uma formação, não para comparar professores.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;"><span class="cal-chip">📆 ${dias.length} dia(s) com o app em ${st.mes.slice(5)}/${st.mes.slice(0, 4)}</span>${['aula_viva','aula_dada','exercicio','reforco'].map(k => `<span class="cal-chip">${esc(USO_NOMES[k])}: <b>${ev[k] || 0}</b></span>`).join('')}</div>
+    ${lista.length ? `<ul style="margin:6px 0 0 18px;font-size:.9rem;">${lista.map(([k, v]) => `<li>${esc(usoNome(k))}: ${v}</li>`).join('')}</ul>` : '<p class="muted">Nenhum uso registrado neste mês ainda.</p>'}
+    <p class="muted" style="font-size:.8rem;margin-top:8px;">Os números são atualizados a cada poucos minutos.</p></div>`;
+}
+
+/* ---------- cliques e campos ---------- */
+document.addEventListener('click', ev => {
+  const el = ev.target.closest && ev.target.closest('[data-cal]'); if(!el || el.disabled) return; ev.preventDefault();
+  const a = el.dataset.cal, tid = el.dataset.tid, n = +el.dataset.n;
+  if(a==='juntar') calJuntar(tid, n);
+  else if(a==='separar') calSeparar(tid, n);
+  else if(a==='estudo') calEstudoDirigido(tid, n);
+  else if(a==='estudo-ex'){ planoState().prazo[n] = '7'; aplicarExercicioPlano(tid, n).then(() => render()); }
+  else if(a==='replan'){ CAL.replan = calReplanCalc(tid); render(); }
+  else if(a==='replan-fechar'){ CAL.replan = null; render(); }
+  else if(a==='replan-aplicar') calReplanAplicar();
+  else if(a==='desfazer') calDesfazerAuto(tid, el.dataset.pid, n);
+  else if(a==='semana-ok') calSemanaConfirmar(tid);
+  else if(a==='semana-nao') calSemanaNao(el.dataset.k);
+  else if(a==='reforco') calEnviarReforco(el.dataset.code);
+});
+document.addEventListener('change', async ev => {
+  const el = ev.target; if(!el || !el.dataset) return;
+  if(el.dataset.calRp!==undefined && CAL.replan){ CAL.replan.marcados[+el.dataset.calRp] = el.checked; return; }
+  if(el.dataset.calImport!==undefined && el.files && el.files[0]){ const s = planoState(); s.msg = ''; s.erro = ''; await importarPlanoLivro(el.files[0]); el.value = ''; render(); return; }
+  if(el.dataset.calVinc!==undefined && CAL.hor){ CAL.hor.vinculos = CAL.hor.vinculos || {}; const nome = el.dataset.calVinc;
+    Object.keys(CAL.hor.vinculos).forEach(k => { if(CAL.hor.vinculos[k]===el.value && k!==nome) delete CAL.hor.vinculos[k]; });
+    if(el.value) CAL.hor.vinculos[nome] = el.value; else delete CAL.hor.vinculos[nome];
+    try{ await calSalvarHor(); planoState().msg = '✅ Vínculo salvo.'; }catch(e){ planoState().erro = 'Não consegui salvar agora.'; } render(); return; }
+  if(el.dataset.calSc!==undefined && CAL.cal){ const k = el.dataset.calSc; const l = new Set(CAL.cal.semConteudo || []); if(el.checked) l.add(k); else l.delete(k); CAL.cal.semConteudo = [...l];
+    try{ await calSalvarCal(); planoState().msg = '✅ Salvo. As aulas previstas foram recalculadas.'; }catch(e){ planoState().erro = 'Não consegui salvar agora.'; } render(); return; }
+});
+
+(function(){ try{ const st = document.createElement('style'); st.textContent = `.cal-chip{display:inline-block;padding:4px 10px;border-radius:999px;background:rgba(122,31,51,.08);border:1px solid rgba(122,31,51,.18);font:600 .82rem system-ui,sans-serif;line-height:1.3;color:inherit}
+.cal-chip.atual{background:rgba(201,162,39,.2);border-color:#c9a227}`; document.head.appendChild(st); }catch(e){} })();
+
+/* ---------- dias escolhidos pela escola (ex.: o dia em que a escola aplica o SAESE) ---------- */
+function calDiasEscolaHtml(){
+  const c = CAL.cal; if(!c) return ''; const l = (c.diasSemAula || []).slice().sort((a, b) => a.d.localeCompare(b.d));
+  const sae = Object.entries(c.eventos || {}).filter(([, ev]) => ev.some(e => /^SAE/.test(e))).map(([d]) => d).sort();
+  const faixa = sae.length ? `${calDataBR(sae[0])} a ${calDataBR(sae[sae.length - 1])}` : '';
+  const temSaesEscola = l.some(x => /SAESE/i.test(x.motivo || ''));
+  return `<div data-cal-dias-escola style="margin:6px 0 4px;padding:8px 10px;border-radius:10px;background:rgba(201,162,39,.12);">
+    ${faixa ? `<div style="font-size:.86rem;"><b>SAESE:</b> a rede aplica de ${faixa}, mas cada escola escolhe <b>um dia</b>. ${temSaesEscola ? '' : '<span style="color:#a4521b;">Marque abaixo o dia escolhido pela escola.</span>'}</div>` : ''}
+    <div class="row" style="gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px;">
+      <input type="date" class="input" data-cal-dsa-data value="${esc(c._dsaRasc || (faixa && !temSaesEscola ? sae[0] : ''))}" style="width:auto;">
+      <select data-cal-dsa-motivo style="width:auto;"><option>Dia do SAESE na escola</option><option>Evento da escola</option><option>Sem aula (outro motivo)</option></select>
+      <button class="btn btn-primary btn-sm" data-cal="dsa-add" style="width:auto;">Marcar dia sem aula de conteúdo</button></div>
+    ${l.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${l.map(x => `<span class="cal-chip">${calDataBR(x.d)} (${CAL_DSEM[calDia(x.d).getDay()]}) · ${esc(x.motivo || '')} <button data-cal="dsa-del" data-d="${esc(x.d)}" title="Tirar" style="border:0;background:none;cursor:pointer;font-weight:800;">✕</button></span>`).join('')}</div>` : ''}
+  </div>`;
+}
+async function calDsaAdd(){
+  const c = CAL.cal; if(!c) return; const d = (document.querySelector('[data-cal-dsa-data]') || {}).value; const motivo = (document.querySelector('[data-cal-dsa-motivo]') || {}).value || 'Sem aula de conteúdo';
+  if(!d){ planoState().erro = 'Escolha a data.'; render(); return; }
+  if(!c.letivos.includes(d)){ planoState().erro = `${calDataBR(d)} não é dia letivo no calendário.`; render(); return; }
+  c.diasSemAula = (c.diasSemAula || []).filter(x => x.d!==d).concat([{ d, motivo }]);
+  try{ await calSalvarCal(); planoState().erro = ''; planoState().msg = `✅ ${calDataBR(d)} marcado como “${motivo}”: não conta como aula de conteúdo. As aulas previstas foram recalculadas.`; }catch(e){ planoState().erro = 'Não consegui salvar agora.'; }
+  render();
+}
+async function calDsaDel(d){ const c = CAL.cal; if(!c) return; c.diasSemAula = (c.diasSemAula || []).filter(x => x.d!==d); try{ await calSalvarCal(); planoState().msg = '✅ Dia retirado.'; }catch(e){} render(); }
+document.addEventListener('click', ev => { const el = ev.target.closest && ev.target.closest('[data-cal="dsa-add"],[data-cal="dsa-del"]'); if(!el) return; ev.preventDefault(); ev.stopImmediatePropagation();
+  if(el.dataset.cal==='dsa-add') calDsaAdd(); else calDsaDel(el.dataset.d); }, true);
 
 /* ---------------- APRESENTAÇÃO DE SLIDES ---------------- */
 
@@ -11128,6 +11655,7 @@ function renderResults(){
     const worst = Math.min(...scores);
 
     body = `
+      ${calReforcoResultadoHtml(a, responses)}
       ${renderStatCards(responses.length, avg, best, worst, max)}
       ${renderQuestionChart(a, responses, max, true)}
       ${renderDistributionChart(responses, max)}
@@ -13438,6 +13966,7 @@ function renderProfessorPainel(){
     { id:'conteudo', label:'🎯 Conteúdo & SAEB' },
     { id:'enem', label:'📝 ENEM' },
     { id:'pma', label:'🧭 Planejado × Dado × Aprendido' },
+    { id:'meumes', label:'🙋 Meu mês' },
     { id:'alunos', label:'👥 Alunos' },
   ];
   const activeTab = tabs.some(t=>t.id===p.painelTab) ? p.painelTab : 'notas';
@@ -13508,6 +14037,8 @@ function renderProfessorPainel(){
     tabContent = renderPainelEnem();
   } else if(activeTab==='pma'){
     tabContent = renderPainelPMA();
+  } else if(activeTab==='meumes'){
+    tabContent = renderMeuMes();
   } else if(activeTab==='alunos'){
     // Agrupa alunos e ausências por turma, na mesma ordem das turmas do professor.
     const porAlunoPorTurma = {};
@@ -14346,6 +14877,7 @@ function renderCoordenador(){
   else if(c.subview==='planolivro') content = renderPlanoLivro();
   else if(c.subview==='usoapp') content = renderCoordUso();
   else if(c.subview==='pmaescola') content = renderCoordPMA();
+  else if(c.subview==='calhor') content = renderCoordCalHor();
   else if(c.subview==='areabim') content = renderAreaBimestre();
   else if(c.subview==='kitsaese') content = renderKitSaese();
   else if(c.subview==='mural') content = renderMuralAvisos(true);
@@ -14376,7 +14908,8 @@ function renderCoordSessao(){
       ${sel('sessao-profMin', opcMin, cfg.profMin)}
       <p class="muted" style="font-size:.82rem;">Também é o tempo de inatividade para o professor ser desconectado com o app aberto. Em computadores compartilhados, prefira um tempo curto.</p>
       <label>Alunos</label>
-      ${sel('sessao-alunoMin', opcMin, cfg.alunoMin)}
+      ${sel('sessao-alunoMin', opcMin.concat([[4320,'3 dias'],[10080,'7 dias (tablet fixo do aluno)'],[43200,'30 dias (tablet fixo do aluno)']]), cfg.alunoMin)}
+      <p class="muted" style="font-size:.82rem;">Se cada aluno usa sempre o mesmo tablet, escolha 7 ou 30 dias: ele não precisa digitar a senha a cada aula e entra mais rápido nos jogos e exercícios.</p>
       <h3 style="margin-top:22px;">Tolerância durante a prova</h3>
       <p class="muted">Durante a prova o app pede ao celular para <strong>não apagar a tela</strong>. Se mesmo assim a tela apagar ou o aluno sair da prova por um instante (uma notificação, por exemplo) e voltar dentro deste tempo, a prova <strong>não é bloqueada</strong>: ele só toca em "Voltar para a prova". Cada saída fica registrada para o professor. Depois de ${MAX_SAIDAS_TOLERADAS} saídas, ou se demorar mais que a tolerância para voltar, a prova é bloqueada como antes.</p>
       <label>Tolerância</label>
@@ -25196,6 +25729,8 @@ async function importarPlanoLivro(file){
   if(!file) return;
   let pac;
   try{ pac = JSON.parse(await file.text()); }catch(e){ s.erro = 'Esse arquivo não é um plano válido (precisa ser o .json do plano de aulas).'; render(); return; }
+  if(pac && pac.tipo==='calendario-escolar'){ await calImportarCalendario(pac); return; }
+  if(pac && pac.tipo==='horario-turmas'){ await calImportarHorario(pac); return; }
   if(pac && pac.tipo==='enem-oficial' && Array.isArray(pac.questoes)){ await importarEnemOficial(pac); return; }
   if(pac && pac.tipo==='plano-imagens' && pac.imagens){ await importarPlanoImagens(pac); return; }
   // artes dos jogos da turma (arquivo jogos-arte.json): cada jogo num documento próprio, baixado só quando o jogo é usado
@@ -25276,6 +25811,9 @@ async function planoMarcarDada(turmaId, n, dada){
   const fresh = await planoLerJson(`plano-livro-prog:${planoTK(turmaId)}`, prog);
   fresh.dadas = fresh.dadas || {}; fresh.exercicios = fresh.exercicios || {};
   if(dada) fresh.dadas[n] = Date.now(); else delete fresh.dadas[n];
+  // aulas juntas (replanejamento): a parceira vai junto
+  const junta = (fresh.juntas || {})[n]; if(junta){ if(dada) fresh.dadas[junta] = fresh.dadas[n]; else delete fresh.dadas[junta]; }
+  if(!dada && fresh.modo) delete fresh.modo[n];
   s.prog[turmaId] = fresh;
   await planoSalvarProg(turmaId);
   s.painel = null; s.resumoInicio = null;
@@ -30337,10 +30875,11 @@ function renderInicioAulasCard(){
       <div style="margin:8px 0 2px; background:#eee; border-radius:6px; height:10px; overflow:hidden;"><div style="width:${pct}%; height:100%; background:var(--wine,#6B1F2E);"></div></div>
       <div style="font-size:.8rem;" class="muted">${dadas} de ${total} aulas dadas (${pct}%)${ultimaTs ? ` · última marcada em ${new Date(ultimaTs).toLocaleDateString('pt-BR')}` : ''}</div>
       ${hoje ? `<div style="margin-top:10px; background:#fbf3df; border-radius:8px; padding:8px 10px;">
-          <div style="font-size:.75rem; font-weight:700; color:var(--wine,#6B1F2E);">📌 AULA DE HOJE</div>
-          <div style="font-weight:700;">Aula ${hoje.n} — ${esc(hoje.tituloCurto || hoje.tema)}</div>
+          <div style="font-size:.75rem; font-weight:700; color:var(--wine,#6B1F2E);">${calRotuloAula(turmaId, plano)}</div>
+          <div style="font-weight:700;">Aula ${hoje.n} — ${esc(hoje.tituloCurto || hoje.tema)}${calJuntaTxt(turmaId, prog, hoje)}</div>
           <div class="muted" style="font-size:.8rem;">${esc(hoje.tipo||'')}${hoje.paginas ? ' · livro ' + esc(hoje.paginas) : ''}${hoje.bimestre ? ` · ${hoje.bimestre}º bimestre` : ''}</div>
         </div>` : '<div style="margin-top:10px;">🎉 Plano concluído!</div>'}
+      ${calInicioTurmaHtml(turmaId, plano, prog)}
       ${(() => { const ts = (s.termo||{})[turmaId]||{}; const ns = Object.keys(ts).map(Number).filter(n => ts[n] && ts[n].total); if(!ns.length) return ''; const u = Math.max(...ns.map(n => ts[n].at||0)); const n = ns.find(k => (ts[k].at||0)===u); const r = avTermoResumo(ts[n]);
         return `<div data-inicio-termo style="margin-top:8px; font-size:.82rem; color:${r.pctNao>=30?'#b3261e':'#1d6b31'};">🌡️ Termômetro da aula ${n}: ${r.pctOk}% entenderam${r.pctNao>=30 ? ` · ${r.pctNao}% não entenderam — retome no começo da próxima aula` : ''}</div>`; })()}
       ${(() => { const semV = plano.aulas.filter(a => a.slides && a.slides.mapa && prog.dadas[a.n] && !Object.keys(planoVistoDe(turmaId, a.n)).length).map(a => a.n);
@@ -30353,12 +30892,13 @@ function renderInicioAulasCard(){
       </div>
     </div>`;
   }).join('');
-  return planoLembretesHtml() + `<div class="card inicio-card" data-inicio-aulas>
+  return calAvisosAutoHtml() + planoLembretesHtml() + calSemanaHtml() + `<div class="card inicio-card" data-inicio-aulas>
     <div class="row" style="justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
       <strong style="font-size:1.05rem;">🗓️ Minhas aulas do livro</strong>
       <button class="btn btn-ghost btn-sm" data-action="sub-view" data-sub="planolivro">Ver plano completo</button>
     </div>
     ${planoDiscSeletorHtml()}
+    ${calAgendaHojeHtml()}
     <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; margin-top:10px;">${cards}</div>
     <details style="margin-top:12px;" ${s.resumoInicio.linhas.every(({turmaId}) => !Object.keys((s.prog[turmaId]||{}).dadas||{}).length) ? 'open' : ''}>
       <summary style="cursor:pointer; font-weight:600;">❓ Como saber qual é a aula de hoje e conferir as aulas</summary>
