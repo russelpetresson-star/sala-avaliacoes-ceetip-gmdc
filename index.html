@@ -35795,15 +35795,16 @@ document.addEventListener('click', async ev => {
 
 /* ======================= ETAPA 4 · MEDIÇÃO DOS DESCRITORES PRIORIZADOS =======================
    Quatro momentos por turma × foco × bimestre:
-     diag = Diagnóstico do bimestre (Avaliação Diagnóstica do app, 2 questões por foco, criada pelo professor da área, uma por turma);
+     diag = Sondagem do bimestre (1ª semana; Exercícios de Fixação que não vale nota, 2 questões por foco, criada pelo professor da área, uma por turma).
+     Não é a Avaliação Diagnóstica da escola (feita depois da metade do bimestre, compõe a NP2);
      aula = questões ★ do foco nos exercícios das aulas e nas retomadas;
      np1  = questões 1 e 2 da NP1 (Avaliação Mensal/Bimestral); rec = questões 1 e 2 da Recuperação Paralela.
-   Ganho = NP1 − diagnóstico (pontos percentuais). Aviso quando a turma fica abaixo de 50% nas aulas.
+   Ganho = NP1 − sondagem (pontos percentuais). Aviso quando a turma fica abaixo de 50% nas aulas.
    Professor: card no Início e aba ⭐ Descritores do bimestre em Meu Painel (turmas, alunos abaixo de 50%, retomada).
    Aluno: caderneta e resultado da prova (questões 1 e 2 e o que treinar). Coordenação: quadro turmas × focos e cumprimento,
    na tela ⭐ Descritores do bimestre; o acerto da NP1 entra na sugestão de repriorização. */
 const PM = { prof:null, coord:null, msg:'', bim:0 };
-const PM_ROT = { diag:'Diagnóstico', aula:'Aulas (★)', np1:'NP1 (Q1 e Q2)', rec:'Recuperação' };
+const PM_ROT = { diag:'Sondagem', aula:'Aulas (★)', np1:'NP1 (Q1 e Q2)', rec:'Recuperação' };
 const PM_AREA = { LP:'Língua Portuguesa', MT:'Matemática' };
 function pmProfSlot(){ const sid = ((state.professor.session || {}).id) || ''; if(PM.prof && PM.prof.sid!==sid) PM.prof = null; return PM.prof; }
 function pmBimSel(){ return PM.bim || saeseBimAtual(); }
@@ -35898,8 +35899,8 @@ async function pmCriarDiag(tid, area){
   const t = priorTurmaPorId(tid); const serie = t && priorSerieNome(t.name); const bim = saeseBimAtual(); if(!serie) return;
   const focos = priorFocos(serie, bim, area).slice(0, 2); if(focos.length < 2){ PM.msg = 'Esta série não tem dois focos definidos neste bimestre.'; render(); return; }
   const k = `pm-diag:${tid}:${bim}:${area}`; const ja = await planoLerJson(k, null);
-  if(ja && ja.code && await planoLerJson(`assessment:${ja.code}`, null)){ PM.msg = `A turma ${t.name} já tem o diagnóstico de ${PM_AREA[area]} do ${bim}º bimestre (código ${ja.code}). Cada turma faz um só diagnóstico por área.`; PM.prof = null; render(); return; }
-  PM.msg = '⏳ Montando o diagnóstico…'; render();
+  if(ja && ja.code && await planoLerJson(`assessment:${ja.code}`, null)){ PM.msg = `A turma ${t.name} já tem a sondagem de ${PM_AREA[area]} do ${bim}º bimestre (código ${ja.code}). Cada turma faz uma só sondagem por área.`; PM.prof = null; render(); return; }
+  PM.msg = '⏳ Montando a sondagem…'; render();
   const disc = (p.disciplinas || []).find(d => (d.turmaIds || []).includes(tid) && priorAreaDisc(d.name)===area);
   const evitar = new Set(await pnpUsadasTurmas([tid])); pnpUsadas([tid]).forEach(x => evitar.add(x));
   const cache = {}; const qs = []; const faltou = [];
@@ -35911,7 +35912,7 @@ async function pmCriarDiag(tid, area){
   }
   if(!qs.length){ PM.msg = 'Ainda não há questões destes descritores no plano da série.'; render(); return; }
   const code = genCode();
-  const a = { code, title: `⭐ Diagnóstico do ${bim}º bimestre — ${PM_AREA[area]} — ${t.name}`, instrumento: 'diagnostica', unidade: UNIDADES[bim - 1],
+  const a = { code, title: `⭐ Sondagem do ${bim}º bimestre — ${PM_AREA[area]} — ${t.name}`, instrumento: 'exercicios', unidade: UNIDADES[bim - 1],
     disciplinaId: disc ? disc.id : null, disciplinaName: disc ? disc.name : null, turmaIds: [tid], questions: qs,
     startAt: null, endAt: planoPrazoParaEndAt('7'), agendaTurmas: {}, resultRelease: { mode: 'imediato', releaseAt: '' }, securityEnabled: false, minMinutesPerQuestion: null, exigeLiberacao: false, valeNota: false,
     priorDiag: { serie, bim, area, focos }, professorId: sess.id || null, professorName: sess.displayName || 'Coordenação', createdAt: Date.now(), updatedAt: null };
@@ -35919,7 +35920,7 @@ async function pmCriarDiag(tid, area){
   await window.storage.set(k, JSON.stringify({ code, prof: sess.id || null, em: Date.now() }), true);
   try{ const atual = (await planoLerJson(`pnp-usadas:${tid}`, [])) || []; await window.storage.set(`pnp-usadas:${tid}`, JSON.stringify([...new Set(atual.concat(qs.map(q => pnpChave(q.text))))].slice(-2000)), true); }catch(e){}
   (p.assessments = p.assessments || []).unshift(a); PM.prof = null;
-  PM.msg = `✅ Diagnóstico de ${PM_AREA[area]} criado para ${t.name}: ${qs.length} questões (${focos.join(' e ')}), não vale nota, prazo de 7 dias. Os alunos já veem em “Provas”.${faltou.length ? ` Faltou questão para completar ${faltou.join(' e ')}.` : ''}`;
+  PM.msg = `✅ Sondagem de ${PM_AREA[area]} criada para ${t.name}: ${qs.length} questões (${focos.join(' e ')}), não vale nota, prazo de 7 dias. Os alunos já veem em “Provas”.${faltou.length ? ` Faltou questão para completar ${faltou.join(' e ')}.` : ''}`;
   render();
 }
 // ---------- retomada para os alunos abaixo de 50% ----------
@@ -35953,7 +35954,7 @@ function pmTabela(R, tid, bim, area, opts){
 function pmProfHtml(){
   priorGarantir(); priorCss(); const R = pmProfSlot(); const bim = pmBimSel(); const bimA = saeseBimAtual();
   const cab = `<div class="card" data-pm-prof><div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3 style="margin:0;">⭐ Medição dos descritores do bimestre</h3><div>${pmBimBotoes()} <button class="btn btn-ghost btn-sm" style="width:auto;" data-pm="atualizar">↻ Atualizar</button></div></div>
-    <p class="muted" style="margin:4px 0 0;font-size:.86rem;">Acerto da turma em cada foco: no diagnóstico do início do bimestre, nas questões ★ das aulas, nas questões 1 e 2 da NP1 e da recuperação. Ganho = NP1 − diagnóstico.</p>
+    <p class="muted" style="margin:4px 0 0;font-size:.86rem;">Acerto da turma em cada foco: na sondagem do início do bimestre, nas questões ★ das aulas, nas questões 1 e 2 da NP1 e da recuperação. Ganho = NP1 − sondagem.</p>
     ${PM.msg ? `<p style="margin:6px 0 0;font-size:.88rem;" data-pm-msg>${esc(PM.msg)}</p>` : ''}</div>`;
   if(!R){ setTimeout(pmCarregarProf, 0); return cab + '<div class="card"><p>⏳ Calculando…</p></div>'; }
   if(R.carregando) return cab + '<div class="card"><p>⏳ Calculando…</p></div>';
@@ -35961,8 +35962,8 @@ function pmProfHtml(){
   if(!R.turmas.length) return cab + '<div class="card"><p class="muted">Suas disciplinas não têm descritores priorizados (as técnicas ficam fora), ou você ainda não vinculou turmas.</p></div>';
   return cab + R.turmas.map(t => pmAreasProfTurma(t.id).map(area => {
     const st = ((R.C[t.id] || {})[bim] || { diag: {} }).diag[area];
-    const diag = st ? `<span data-pm-diag="feito">📋 Diagnóstico aplicado · ${st.n} resposta(s)${st.prof ? ` · ${esc(st.prof)}` : ''}</span>`
-      : bim===bimA ? `<button class="btn btn-primary btn-sm" style="width:auto;" data-pm="diag" data-t="${t.id}" data-a="${area}">📋 Criar o diagnóstico do bimestre (2 questões por foco)</button>` : '<span class="muted" data-pm-diag="sem">Sem diagnóstico neste bimestre.</span>';
+    const diag = st ? `<span data-pm-diag="feito">📋 Sondagem aplicada · ${st.n} resposta(s)${st.prof ? ` · ${esc(st.prof)}` : ''}</span>`
+      : bim===bimA ? `<button class="btn btn-primary btn-sm" style="width:auto;" data-pm="diag" data-t="${t.id}" data-a="${area}">📋 Criar a sondagem do bimestre (2 questões por foco, não vale nota)</button>` : '<span class="muted" data-pm-diag="sem">Sem sondagem neste bimestre.</span>';
     const f = priorFocos(priorSerieNome(t.name), bim, area).slice(0, 2);
     const baixo = f.map(c => ({ c, al: pmAbaixo(R, t.id, bim, c) })).filter(x => x.al.length);
     return `<div class="card" data-pm-turma="${t.id}-${area}"><div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><strong>${esc(t.name)} · ${PM_AREA[area]}</strong>${diag}</div>
@@ -35980,9 +35981,9 @@ function pmCardProf(){
     return { t, area, ls, st, alerta: ls.some(l => l.alerta) }; }));
   const sem = itens.filter(x => !x.st); const alertas = itens.filter(x => x.alerta);
   return `<div class="card inicio-card" data-pm-card style="border-left:4px solid #C9A227;"><div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><strong>📊 Medição dos focos · ${bim}º bimestre</strong><button class="btn btn-ghost btn-sm" style="width:auto;" data-pm="abrir">Ver a medição</button></div>
-    ${sem.length ? `<div style="font-size:.86rem;margin-top:4px;" data-pm-sem>📋 Falta o diagnóstico do bimestre em: <b>${sem.map(x => `${esc(x.t.name)} (${x.area})`).join(', ')}</b>.</div>` : '<div style="font-size:.86rem;margin-top:4px;color:#1d6b31;">📋 Diagnóstico do bimestre feito em todas as suas turmas.</div>'}
+    ${sem.length ? `<div style="font-size:.86rem;margin-top:4px;" data-pm-sem>📋 Falta a sondagem do bimestre em: <b>${sem.map(x => `${esc(x.t.name)} (${x.area})`).join(', ')}</b>.</div>` : '<div style="font-size:.86rem;margin-top:4px;color:#1d6b31;">📋 Sondagem do bimestre feita em todas as suas turmas.</div>'}
     ${alertas.length ? `<div style="font-size:.86rem;margin-top:4px;color:#b3261e;font-weight:700;" data-pm-alertas>⚠ Abaixo de 50% nas aulas: ${alertas.map(x => `${esc(x.t.name)} (${x.ls.filter(l => l.alerta).map(l => l.c).join(', ')})`).join('; ')}</div>` : ''}
-    <div style="font-size:.82rem;margin-top:4px;">${itens.map(x => `${esc(x.t.name)} ${x.ls.map(l => `${priorChip(l.c)}${pmPct(l.np1)!=null ? `NP1 ${pmPct(l.np1)}%` : pmPct(l.aula)!=null ? `aulas ${pmPct(l.aula)}%` : pmPct(l.diag)!=null ? `diag. ${pmPct(l.diag)}%` : '—'}`).join(' ')}`).join(' · ')}</div></div>`;
+    <div style="font-size:.82rem;margin-top:4px;">${itens.map(x => `${esc(x.t.name)} ${x.ls.map(l => `${priorChip(l.c)}${pmPct(l.np1)!=null ? `NP1 ${pmPct(l.np1)}%` : pmPct(l.aula)!=null ? `aulas ${pmPct(l.aula)}%` : pmPct(l.diag)!=null ? `sond. ${pmPct(l.diag)}%` : '—'}`).join(' ')}`).join(' · ')}</div></div>`;
 }
 // ---------- aluno ----------
 function pmAlunoDados(){ const al = state.aluno; const out = {};
@@ -35996,8 +35997,8 @@ function pmAlunoHtml(){
   const f = ['LP', 'MT'].flatMap(a => priorFocos(s, bim, a).slice(0, 2));
   const res = x => x && x[1] ? `${x[0]} de ${x[1]}` : '—';
   return `<div class="card" data-pm-aluno style="border-left:4px solid #C9A227;"><h3 style="margin:0 0 4px;">⭐ Meus descritores do ${bim}º bimestre</h3>
-    <p class="muted" style="margin:0 0 6px;font-size:.86rem;">Quantas você acertou de cada foco: no diagnóstico do começo do bimestre, nas questões ★ das aulas e nas questões 1 e 2 da NP1 e da recuperação.</p>
-    <div class="table-scroll"><table style="font-size:.84rem;"><tr><th>Foco</th><th>Diagnóstico</th><th>Aulas (★)</th><th>NP1 (Q1 e Q2)</th><th>Recuperação</th></tr>
+    <p class="muted" style="margin:0 0 6px;font-size:.86rem;">Quantas você acertou de cada foco: na sondagem do começo do bimestre, nas questões ★ das aulas e nas questões 1 e 2 da NP1 e da recuperação.</p>
+    <div class="table-scroll"><table style="font-size:.84rem;"><tr><th>Foco</th><th>Sondagem</th><th>Aulas (★)</th><th>NP1 (Q1 e Q2)</th><th>Recuperação</th></tr>
     ${f.map(c => { const x = D[c] || {}; const tot = ['diag', 'aula', 'np1', 'rec'].reduce((s2, k) => pmJunta(s2, x[k]), [0, 0]); const p = pmPct(tot);
       return `<tr data-pm-al="${c}"><td>${priorChip(c, true)} <span style="font-size:.78rem;">${esc((SAESE_CAT[c] || {}).a || '')}</span>${p!=null && p < 50 ? `<div style="font-size:.78rem;color:#b3261e;">🏠 Treinar em casa: ${esc(pmTreinar(c))}</div>` : p!=null && p >= 70 ? '<div style="font-size:.78rem;color:#1d6b31;">💪 Você vai bem neste.</div>' : ''}</td>
         ${['diag', 'aula', 'np1', 'rec'].map(k => `<td style="text-align:center;background:${pmCor(pmPct(x[k]))};color:#222;">${res(x[k])}</td>`).join('')}</tr>`; }).join('')}</table></div></div>`;
@@ -36005,7 +36006,7 @@ function pmAlunoHtml(){
 // no resultado da prova: as questões 1 e 2 (ou as do diagnóstico) e o que treinar
 function pmResultadoAluno(a, r){
   const it = pmItens(a).filter(x => x.mom!=='aula'); if(!it.length || !r) return '';
-  const tit = a.priorDiag ? '⭐ Diagnóstico dos descritores do bimestre' : '⭐ Questões 1 e 2: os descritores do bimestre';
+  const tit = a.priorDiag ? '⭐ Sondagem dos descritores do bimestre' : '⭐ Questões 1 e 2: os descritores do bimestre';
   return `<div class="q-card" data-pm-resultado style="border:2px solid #C9A227;background:#fbf4dc;"><strong>${tit}</strong>
     ${it.map(({ q, i, c }) => { const ok = pmAcertou(r, q); return `<div style="margin-top:6px;" data-pm-q="${ok ? 'certo' : 'errado'}">Questão ${i + 1} · ${priorChip(c)} ${esc((SAESE_CAT[c] || {}).a || '')}: ${ok ? '<b style="color:#1d6b31;">✅ acertou</b>' : `<b style="color:#b3261e;">❌ errou</b><div style="font-size:.86rem;margin:2px 0 0 8px;">🏠 Para treinar: ${esc(pmTreinar(c))}</div>`}</div>`; }).join('')}
     <div class="muted" style="font-size:.8rem;margin-top:6px;">Veja o seu acerto em cada foco em 🏅 Eu → 🎯 Caderneta SAESE.</div></div>`;
@@ -36014,7 +36015,7 @@ function pmResultadoAluno(a, r){
 function pmCoordHtml(){
   if(state.view!=='coordenador') return ''; const R = PM.coord; const bim = pmBimSel();
   const cab = `<div class="card" data-pm-coord><div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><h3 style="margin:0;">📊 Medição dos focos por turma</h3><div>${pmBimBotoes()} <button class="btn ${R && R.ok ? 'btn-ghost' : 'btn-primary'} btn-sm" style="width:auto;" data-pm="coord">${R && R.ok ? '↻ Atualizar' : '📊 Calcular a medição'}</button></div></div>
-    <p class="muted" style="margin:4px 0 0;font-size:.86rem;">Diagnóstico do início do bimestre × questões 1 e 2 da NP1, com o ganho, e o acerto nas questões ★ das aulas. Cumprimento: exercícios de aula com a questão do foco e NP1 que seguiram a regra (a partir de ${pnpInicio().split('-').reverse().join('/')}). O acerto na NP1 entra na sugestão de ✎ Ajustar.</p>`;
+    <p class="muted" style="margin:4px 0 0;font-size:.86rem;">Sondagem do início do bimestre × questões 1 e 2 da NP1, com o ganho, e o acerto nas questões ★ das aulas. Cumprimento: exercícios de aula com a questão do foco e NP1 que seguiram a regra (a partir de ${pnpInicio().split('-').reverse().join('/')}). O acerto na NP1 entra na sugestão de ✎ Ajustar.</p>`;
   if(!R) return cab + '</div>'; if(R.carregando) return cab + '<p>⏳ Calculando as turmas…</p></div>'; if(R.erro) return cab + `<p style="color:#b3261e;">${esc(R.erro)}</p></div>`;
   const blocos = PRIOR_SERIES.map(s => { const ts = R.turmas.filter(t => priorSerieNome(t.name)===s); if(!ts.length) return '';
     return ['LP', 'MT'].map(area => { const f = priorFocos(s, bim, area).slice(0, 2); if(!f.length) return '';
@@ -36024,7 +36025,7 @@ function pmCoordHtml(){
           <td style="font-size:.78rem;">${C.diag[area] ? `✅ ${C.diag[area].n} resp.` : '—'}</td><td style="font-size:.78rem;">${C.ex ? `${C.exFoco}/${C.ex}` : '—'}</td><td style="font-size:.78rem;">${C.np1 ? `${C.np1ok}/${C.np1}${C.np1exc ? ` · ${C.np1exc} exceção` : ''}` : '—'}</td></tr>`; }).join('');
       return `<div style="margin-top:10px;" data-pm-bloco="${s}-${area}"><b>${s}ª série · ${PM_AREA[area]}</b><div class="table-scroll"><table style="font-size:.8rem;">
         <tr><th rowspan="2">Turma</th>${f.map(c => `<th colspan="4">${priorChip(c, true)}</th>`).join('')}<th colspan="3">Cumprimento</th></tr>
-        <tr>${f.map(() => '<th>Diag.</th><th>Aulas</th><th>NP1</th><th>Ganho</th>').join('')}<th>Diagnóstico</th><th>Exercícios com ★</th><th>NP1 na regra</th></tr>${linhas}</table></div></div>`; }).join(''); }).join('');
+        <tr>${f.map(() => '<th>Sond.</th><th>Aulas</th><th>NP1</th><th>Ganho</th>').join('')}<th>Sondagem</th><th>Exercícios com ★</th><th>NP1 na regra</th></tr>${linhas}</table></div></div>`; }).join(''); }).join('');
   return cab + (blocos || '<p class="muted">Nenhuma turma com série reconhecida.</p>') + '</div>';
 }
 document.addEventListener('click', async ev => {
