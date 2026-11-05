@@ -11976,10 +11976,13 @@ function renderBanco(){
     `;
   }
   let body;
-  if(p.bankLoading){
+  const avisoBanco = p.bankPendente ? `<div class="err" style="background:#fdecea;border:1px solid #d33;padding:10px 12px;border-radius:10px;margin:8px 0;"><strong>⚠️ Há questões que ainda NÃO foram salvas no banco.</strong> ${esc(p.bankMsgErro||'')}<br><button class="btn btn-primary btn-sm" style="margin-top:6px;" data-action="banco-salvar-de-novo">Tentar salvar de novo</button></div>` : '';
+  if(p.bankErro){
+    body = `<div class="err" style="background:#fdecea;border:1px solid #d33;padding:12px 14px;border-radius:10px;"><strong>Não consegui carregar o seu banco de questões.</strong><br>Suas questões NÃO foram apagadas: o app só não conseguiu ler agora (internet fraca ou servidor ocupado). Por segurança ele não grava nada até conseguir ler.<br><button class="btn btn-primary btn-sm" style="margin-top:8px;" data-action="banco-recarregar">Tentar de novo</button></div>`;
+  } else if(p.bankLoading){
     body = `<div class="spinner"></div>`;
   } else if(p.bank.length===0){
-    body = `<div class="empty">Nenhuma questão salva ainda.<br>Crie questões aqui para reutilizar em várias provas.</div>`;
+    body = avisoBanco + `<div class="empty">Nenhuma questão salva ainda.<br>Crie questões aqui para reutilizar em várias provas.</div>`;
   } else {
     const filtro = p.bancoDisciplinaId || '';
     const daDisc = filtro==='__sem' ? p.bank.filter(q=>!bankDisciplinaKey(q)) : filtro ? p.bank.filter(q=>bankDisciplinaKey(q)===filtro) : p.bank;
@@ -11990,7 +11993,7 @@ function renderBanco(){
       && (!bTermos.length || (h => bTermos.every(t => h.includes(t)))(enemOfNorm([q.conteudo, q.assunto, q.descritorSaeb, q.text, (q.options||[]).map(o => o.text).join(' ')].join(' ')))));
     const grupos = bankAgruparPorDisciplina(visiveis);
     const chavesBanco = bankAgruparPorDisciplina(p.bank);
-    body = `
+    body = avisoBanco + `
       <label>Disciplina</label>
       <select data-action="banco-filtro-disciplina" style="max-width:340px;">
         <option value="">Todas as disciplinas (${p.bank.length})</option>
@@ -12124,7 +12127,9 @@ async function enemOfAdicionar(id){
   if(q.imagem){ const img = await planoLerJson(`plano-livro-img:${q.imagem}`, null); if(img) nova.image = img; }
   const d = (p.disciplinas||[]).find(x => enemOfNorm(x.name)===enemOfNorm(ENEM_OF_DISC[q.disciplina]||''));
   stampBankDisciplina(nova, d ? d.id : (p.bancoDisciplinaId && p.bancoDisciplinaId!=='__sem' ? p.bancoDisciplinaId : ''));
-  p.bank.push(nova); await saveBankToStorage(); render();
+  p.bank.push(nova);
+  try{ await saveBankToStorage(); }catch(e){ const i = p.bank.indexOf(nova); if(i>=0) p.bank.splice(i, 1); }
+  render();
 }
 function renderEnemOficial(){
   const e = state.professor.enemOf; const L = ['A','B','C','D','E'];
@@ -21077,24 +21082,117 @@ async function loadAssessmentsList(){
   render();
 }
 
+/* ---------- Banco de questões do professor ----------
+   Antes: o banco inteiro (todas as questões, com imagens) ficava num ÚNICO documento do Firebase, que só aceita 1 MB.
+   Passando disso a gravação falhava sem avisar: a questão aparecia na tela, mas sumia ao atualizar a página.
+   Agora: `question-bank:<id>` guarda só um cabeçalho {partes, v, total}; as questões ficam em partes de até ~600 KB
+   (`question-bank:<id>:p:<v>:<k>`). Lê também o formato antigo (lista inteira num documento).
+   Ao gravar, o app lê o que está no servidor e junta com o que está na tela (não apaga o que foi adicionado em
+   outro aparelho) e só troca o cabeçalho depois de gravar todas as partes. Se a leitura falhar, NÃO grava por cima. */
+const BANCO_PARTE_MAX = 600000, BANCO_DOC_MAX = 950000;
+const bancoChave = id => `question-bank:${id}`;
+// Lê o banco do servidor. Devolve { lista, raw } (raw = texto do cabeçalho, usado para detectar gravação simultânea);
+// lista = null quando o professor ainda não tem banco. Qualquer outra falha LANÇA erro (nunca vira "banco vazio").
+async function bancoLerRemotoCab(id){
+  let raw;
+  try{ raw = (await window.storage.get(bancoChave(id), true)).value; }
+  catch(e){ if(/^not-found/.test(String((e && e.message) || ''))) return { lista:null, raw:null }; throw e; }
+  let cab; try{ cab = JSON.parse(raw); }catch(e){ throw new Error('banco-ilegivel'); }
+  if(Array.isArray(cab)) return { lista: cab, raw };
+  if(!cab || !Number.isFinite(cab.partes)) throw new Error('banco-ilegivel');
+  const out = [];
+  for(let k = 0; k < cab.partes; k++){
+    const r = await window.storage.get(`${bancoChave(id)}:p:${cab.v}:${k}`, true);   // parte faltando = erro
+    const arr = JSON.parse(r.value); if(Array.isArray(arr)) out.push(...arr);
+  }
+  return { lista: out, raw };
+}
+async function bancoLerRemoto(id){ return (await bancoLerRemotoCab(id)).lista; }
+// Grava as partes numa versão nova e só então troca o cabeçalho, numa transação que confere se ninguém
+// gravou no meio do caminho (rawEsperado). Se alguém gravou, desfaz e lança 'banco-conflito' para juntar de novo.
+async function bancoGravarRemoto(id, lista, rawEsperado){
+  const partes = []; let atual = [], tam = 0;
+  lista.forEach(q => {
+    const t = new Blob([JSON.stringify(q)]).size;
+    if(t > BANCO_DOC_MAX) throw new Error('questao-grande');
+    if(atual.length && tam + t > BANCO_PARTE_MAX){ partes.push(atual); atual = []; tam = 0; }
+    atual.push(q); tam += t;
+  });
+  if(atual.length) partes.push(atual);
+  const v = Date.now() + '' + Math.floor(Math.random() * 1000);
+  const apagarVersao = async (ver, n) => { for(let k = 0; k < n; k++){ try{ await window.storage.delete(`${bancoChave(id)}:p:${ver}:${k}`, true); }catch(e){} } };
+  for(let k = 0; k < partes.length; k++) await window.storage.set(`${bancoChave(id)}:p:${v}:${k}`, JSON.stringify(partes[k]), true);
+  const novoCab = JSON.stringify({ partes: partes.length, v, total: lista.length, em: Date.now() });
+  let conflito = false;
+  await window.storage.update(bancoChave(id), atualRaw => {
+    if((atualRaw ?? null) !== (rawEsperado ?? null)){ conflito = true; return undefined; }
+    conflito = false; return novoCab;
+  });
+  if(conflito){ await apagarVersao(v, partes.length); throw new Error('banco-conflito'); }
+  let antigo = null; try{ antigo = rawEsperado ? JSON.parse(rawEsperado) : null; }catch(e){}
+  if(antigo && !Array.isArray(antigo) && antigo.v) await apagarVersao(antigo.v, antigo.partes || 0);   // limpa a versão anterior
+}
+function bancoMensagemErro(e){
+  const t = String((e && (e.code || e.message)) || '');
+  if(/questao-grande/.test(t)) return 'Uma das questões é grande demais (provavelmente por causa da imagem). Use uma imagem menor ou remova a imagem dessa questão.';
+  if(/permission/i.test(t)) return 'Sua conta ainda não está liberada para salvar. Confirme o e-mail, saia e entre de novo no app.';
+  if(/banco-conflito/.test(t)) return 'O banco foi alterado em outro aparelho ao mesmo tempo. Tente salvar de novo.';
+  if(/banco-ilegivel|not-found/.test(t)) return 'Não consegui ler o seu banco no servidor, então não gravei nada por cima para não perder questões. Atualize a página e tente de novo.';
+  return 'Falha de conexão com o servidor. Confira a internet e tente de novo.';
+}
+let bancoFila = Promise.resolve(), bancoSalvando = 0;
+window.addEventListener('beforeunload', e => { if(bancoSalvando > 0){ e.preventDefault(); e.returnValue = ''; } });
 async function loadBank(){
-  const p = state.professor;
-  p.bankLoading = true;
-  try{ const r = await window.storage.get(`question-bank:${p.session.id}`, true); p.bank = JSON.parse(r.value); }
-  catch(e){ p.bank = []; }
-  p.bankLoading = false;
+  const p = state.professor; const id = p.session && p.session.id; if(!id) return;
+  p.bankLoading = true; p.bankErro = false;
+  let remoto = null, falhou = false;
+  for(let i = 0; i < 3; i++){
+    try{ remoto = await bancoLerRemoto(id); falhou = false; break; }
+    catch(e){ falhou = true; await new Promise(r => setTimeout(r, 500 * (i + 1))); }
+  }
+  if(falhou){ p.bankErro = true; p.bankLoading = false; render(); return; }   // não vira "banco vazio": nada é gravado por cima
+  const rem = remoto || [], ids = new Set(rem.map(q => q.id));
+  const extras = (p.bank || []).filter(q => !ids.has(q.id));                   // adicionadas na tela enquanto carregava
+  p.bank = rem.concat(extras); p.bankBase = ids; p.bankLoading = false;
+  if(extras.length){ try{ await saveBankToStorage(); }catch(e){} }
   render();
 }
-async function saveBankToStorage(){
-  const p = state.professor;
-  await window.storage.set(`question-bank:${p.session.id}`, JSON.stringify(p.bank), true);
+function saveBankToStorage(){
+  const p = state.professor; const id = p.session && p.session.id;
+  const rodar = async () => {
+    if(!id) throw new Error('sem-sessao');
+    for(let tentativa = 0; ; tentativa++){
+      const { lista, raw } = await bancoLerRemotoCab(id);                       // se falhar, lança: não sobrescreve o servidor
+      const remoto = lista || [];
+      const base = p.bankBase || new Set(), locais = new Set(p.bank.map(q => q.id));
+      const deFora = remoto.filter(q => !locais.has(q.id) && !base.has(q.id)); // adicionadas em outro aparelho
+      const final = p.bank.concat(deFora);
+      try{ await bancoGravarRemoto(id, final, raw); }
+      catch(e){ if(/banco-conflito/.test(String(e && e.message)) && tentativa < 4) continue; throw e; }
+      // não troca a lista da tela: questões adicionadas enquanto gravava continuam nela (e entram na próxima gravação)
+      const naTela = new Set(p.bank.map(q => q.id));
+      deFora.forEach(q => { if(!naTela.has(q.id)) p.bank.push(q); });
+      p.bankBase = new Set(final.map(q => q.id)); p.bankPendente = false; p.bankMsgErro = ''; p.bankErro = false;
+      return;
+    }
+  };
+  bancoSalvando++;
+  const r = bancoFila.then(rodar).finally(() => { bancoSalvando--; });
+  bancoFila = r.catch(() => {});
+  return r.catch(e => {
+    p.bankPendente = true; p.bankMsgErro = bancoMensagemErro(e);
+    try{ render(); }catch(_){}
+    if(!/permission/i.test(String((e && (e.code || e.message)) || ''))) alert('⚠️ A questão NÃO foi salva no banco.\n\n' + p.bankMsgErro);
+    throw e;
+  });
 }
 async function deleteBankQuestion(qid){
   if(!confirm('Excluir esta questão do banco? Você pode restaurar pela Lixeira em até 30 dias.')) return;
   const p = state.professor;
   const q = p.bank.find(x=>x.id===qid);
   p.bank = p.bank.filter(x=>x.id!==qid);
-  await saveBankToStorage();
+  try{ await saveBankToStorage(); }
+  catch(e){ if(q && !p.bank.some(x=>x.id===q.id)) p.bank.push(q); render(); return; }   // não excluiu no servidor: volta para a lista
   if(q) await moveToTrash('questao-banco', (q.text ? q.text.slice(0,60) : 'Questão'), q);
   render();
 }
@@ -22568,7 +22666,7 @@ function logoutProfessor(){
   // fizer login no mesmo navegador sem recarregar a página, ele veria por um instante os dados
   // do professor anterior — foi o que causava "disciplinas de um professor iguais às de outro".
   p.disciplinas = []; p.disciplinasLoading = true;
-  p.bank = []; p.bankLoading = true;
+  p.bank = []; p.bankLoading = true; p.bankBase = null; p.bankErro = false; p.bankPendente = false; p.bankMsgErro = '';
   p.pesos = {...DEFAULT_PESOS}; p.pesosLoading = true;
   p.painel = null; p.painelDisciplinaFiltro = ''; p.painelTab = 'notas';
   p.finalGrades = null;
@@ -25116,7 +25214,12 @@ async function saveBankQuestion(){
     stampBankDisciplina(q, p.bancoDisciplinaId && p.bancoDisciplinaId!=='__sem' ? p.bancoDisciplinaId : '');
     p.bank.push(q);
   }
-  await saveBankToStorage();
+  try{ await saveBankToStorage(); }
+  catch(e){
+    if(!p.editingBankId){ const i = p.bank.indexOf(q); if(i>=0) p.bank.splice(i, 1); }   // não finge que salvou: o formulário continua aberto
+    errEl.innerHTML = `<p class="err">${esc(p.bankMsgErro || 'Não foi possível salvar.')}</p>`;
+    return;
+  }
   p.newBankQuestion = null;
   p.editingBankId = null;
   render();
@@ -28486,7 +28589,7 @@ function avSlideHtmlBase(d, sl, ctx){
         <div style="display:flex;align-items:center;justify-content:center;height:100%;">${img(f.f)}</div>
         <div class="av-card" style="overflow:hidden;"><b style="color:${C.v}">${escR(f.leg)}</b>
           <ul style="margin:.6em 0 0 1em;padding:0;">${(f.perguntas||[]).map((q,i)=>`<li class="av-pop" style="margin:.35em 0;animation-delay:${.3+i*.25}s;">${escR(q)}</li>`).join('')}</ul>
-          <div class="av-fonte" style="margin-top:.6em;">Fonte: livro didático de ${escR(d.livroNome||'Geografia')} (volume único), p. ${f.p}. Uso pedagógico interno.</div></div></div></div>`;
+          <div class="av-fonte" style="margin-top:.6em;">${f.fonte ? 'Imagem: ' + escR(f.fonte) + '.' : `Fonte: livro didático de ${escR(d.livroNome||'Geografia')} (volume único), p. ${f.p}. Uso pedagógico interno.`}</div></div></div></div>`;
   }
   case 'esquema': {
     const e = d.esquema, k = sl.k, ic = e.icones||[];
@@ -28583,7 +28686,7 @@ function avSlideHtmlBase(d, sl, ctx){
       ${(d.saese && (d.saese.aula||[]).length) ? `<div class="av-saesebox" data-saese-volte style="margin-top:.9em;font-size:.85em;"><b style="color:#00695C;">🎯 Hoje você treinou (SAESE) — marque ✔ no caderno o que já consegue fazer:</b>${saeseListaHtml(d.saese.aula)}</div>` : ''}</div>`;
   case 'dn-ex': { const dn = d.denso; const e0 = dn.explica[sl.k]; const e = (e0.img && (d.figuras||[]).some(x => x.f===e0.img)) ? Object.assign({}, e0, { img:null }) : e0; const rot = `EXPLICAÇÃO ${sl.k+1} DE ${dn.explica.length}`;
     const exBaixo = !!(e.img && e.exemplo); const exHtml = e.exemplo ? `<div class="av-card az av-pop" style="animation-delay:.5s;font-size:.88em;"><div style="font-size:.7em;letter-spacing:.14em;font-weight:700;color:${C.a};">EXEMPLO</div>${escR(e.exemplo)}</div>` : '';
-    const lado = `${e.img ? `<div style="display:flex;justify-content:center;">${img(e.img, 17)}</div>` : ''}<div class="av-card ou av-pop" style="animation-delay:.25s;"><div style="font-size:.6em;letter-spacing:.14em;font-weight:700;color:${C.v};">EM UMA FRASE</div><div style="font-family:Cambria,Caladea,Georgia,serif;font-weight:700;color:${C.v};font-size:1.05em;margin-top:.2em;">${escR(e.frase)}</div></div>${exBaixo ? '' : exHtml}`;
+    const lado = `${e.img ? `<div style="display:flex;flex-direction:column;align-items:center;">${img(e.img, 17)}${e.fonte ? `<div class="av-fonte" style="font-size:.55em;margin-top:.2em;text-align:center;">Imagem: ${escR(e.fonte)}</div>` : ''}</div>` : ''}<div class="av-card ou av-pop" style="animation-delay:.25s;"><div style="font-size:.6em;letter-spacing:.14em;font-weight:700;color:${C.v};">EM UMA FRASE</div><div style="font-family:Cambria,Caladea,Georgia,serif;font-weight:700;color:${C.v};font-size:1.05em;margin-top:.2em;">${escR(e.frase)}</div></div>${exBaixo ? '' : exHtml}`;
     return `<div class="av-in"><div style="font-size:.7em;letter-spacing:.14em;color:${C.a};font-weight:700;">${rot}</div><div class="av-t">${escR(e.titulo)}</div>
       <div style="display:grid;grid-template-columns:1.75fr 1fr;gap:1em;align-items:start;"><div style="display:flex;flex-direction:column;gap:.7em;"><div class="av-card" style="font-size:${exBaixo ? '.98em' : '1.04em'};line-height:1.4;">${escR(e.texto)}</div>${exBaixo ? exHtml : ''}</div><div style="display:flex;flex-direction:column;gap:.7em;">${lado}</div></div></div>`; }
   case 'dn-linha': { const l = d.denso.linha; const ev = l.eventos || [];
@@ -32747,7 +32850,9 @@ document.addEventListener('click', (e) => {
   else if(act==='salvar-liberacao'){ salvarProvaLiberacao(); }
   else if(act==='add-question'){ p.newAssessment.questions.push(freshQuestion(btn.dataset.qtype)); render(); }
   else if(act==='remove-question'){ p.newAssessment.questions = p.newAssessment.questions.filter(q=>q.id!==btn.dataset.qid); render(); }
-  else if(act==='save-to-bank'){ const q = findQuestionRef(btn.dataset.qid); const cp = JSON.parse(JSON.stringify(q)); stampBankDisciplina(cp, p.newAssessment.disciplinaId); p.bank.push(cp); saveBankToStorage(); alert('Questão salva no banco.'); }
+  else if(act==='save-to-bank'){ const q = findQuestionRef(btn.dataset.qid); const cp = JSON.parse(JSON.stringify(q)); stampBankDisciplina(cp, p.newAssessment.disciplinaId); p.bank.push(cp); saveBankToStorage().then(() => alert('Questão salva no banco.')).catch(() => {}); }
+  else if(act==='banco-recarregar'){ loadBank(); }
+  else if(act==='banco-salvar-de-novo'){ saveBankToStorage().then(() => { render(); alert('Banco salvo.'); }).catch(() => {}); }
   else if(act==='open-picker'){ p.pickerOpen = true; p.pickerSelected=[]; render(); }
   else if(act==='close-picker'){ p.pickerOpen = false; render(); }
   else if(act==='toggle-picker'){ const id = btn.dataset.qid; if(p.pickerSelected.includes(id)) p.pickerSelected = p.pickerSelected.filter(x=>x!==id); else p.pickerSelected.push(id); }
@@ -32876,10 +32981,10 @@ document.addEventListener('click', (e) => {
   else if(act==='toggle-ai-result'){ const idx = Number(btn.dataset.idx); if(p.aiGen.selected.includes(idx)) p.aiGen.selected = p.aiGen.selected.filter(x=>x!==idx); else p.aiGen.selected.push(idx); }
   else if(act==='add-ai-selected'){
     p.aiGen.selected.forEach(idx => { const q = p.aiGen.results[idx]; if(q){ stampBankDisciplina(q, (p.bancoDisciplinaId && p.bancoDisciplinaId!=='__sem' ? p.bancoDisciplinaId : '')); p.bank.push(q); } });
-    saveBankToStorage();
+    const salvoAi = saveBankToStorage();
     p.aiGen.open = false; p.aiGen.results = null;
     render();
-    alert('Questões adicionadas ao banco.');
+    salvoAi.then(() => alert('Questões adicionadas ao banco.')).catch(() => {});
   }
   else if(act==='open-paste-import'){ p.pasteImport = { open:true, text:'', loading:false, results:null, selected:[], error:'' }; render(); }
   else if(act==='close-paste-import'){ p.pasteImport.open = false; p.pasteImport.results = null; render(); }
@@ -32887,10 +32992,10 @@ document.addEventListener('click', (e) => {
   else if(act==='toggle-paste-result'){ const idx = Number(btn.dataset.idx); if(p.pasteImport.selected.includes(idx)) p.pasteImport.selected = p.pasteImport.selected.filter(x=>x!==idx); else p.pasteImport.selected.push(idx); }
   else if(act==='add-paste-selected'){
     p.pasteImport.selected.forEach(idx => { const q = p.pasteImport.results[idx]; if(q){ stampBankDisciplina(q, (p.bancoDisciplinaId && p.bancoDisciplinaId!=='__sem' ? p.bancoDisciplinaId : '')); p.bank.push(q); } });
-    saveBankToStorage();
+    const salvoPaste = saveBankToStorage();
     p.pasteImport.open = false; p.pasteImport.results = null;
     render();
-    alert('Questões adicionadas ao banco.');
+    salvoPaste.then(() => alert('Questões adicionadas ao banco.')).catch(() => {});
   }
   else if(act==='open-book-import'){ p.book.open = true; render(); }
   else if(act==='close-book-import'){ p.book = { open:false, fileName:'', pages:[], loading:false, error:'', searchQuery:'', searchResults:null, viewingText:'', extractLoading:false, extractResults:null, extractSelected:[], extractError:'' }; render(); }
@@ -32902,10 +33007,10 @@ document.addEventListener('click', (e) => {
   else if(act==='toggle-book-result'){ const idx = Number(btn.dataset.idx); if(p.book.extractSelected.includes(idx)) p.book.extractSelected = p.book.extractSelected.filter(x=>x!==idx); else p.book.extractSelected.push(idx); }
   else if(act==='add-book-selected'){
     p.book.extractSelected.forEach(idx => { const q = p.book.extractResults[idx]; if(q){ stampBankDisciplina(q, (p.bancoDisciplinaId && p.bancoDisciplinaId!=='__sem' ? p.bancoDisciplinaId : '')); p.bank.push(q); } });
-    saveBankToStorage();
+    const salvoLivro = saveBankToStorage();
     p.book.extractResults = null;
     render();
-    alert('Questões adicionadas ao banco.');
+    salvoLivro.then(() => alert('Questões adicionadas ao banco.')).catch(() => {});
   }
 
   // turmas
@@ -35226,7 +35331,7 @@ async function livqAdicionar(){
   let n = 0, dup = 0;
   escolhidas.forEach(q => { if(ja.has(q.id)){ dup++; return; } p.bank.push(livqParaBanco(q, disc ? disc.id : '')); n++; });
   try{ await saveBankToStorage(); L.msg = `✅ ${n} questão(ões) adicionada(s) ao seu banco${dup ? ` (${dup} já estava(m) lá)` : ''}.`; L.sel = {}; }
-  catch(e){ (p.bank||[]).splice(-n, n); L.msg = 'Não foi possível salvar: o banco ficou grande demais. Adicione menos questões com imagem por vez.'; }
+  catch(e){ (p.bank||[]).splice(-n, n); L.msg = 'Não foi possível salvar: ' + bancoMensagemErro(e); }
   render();
 }
 function livqBloco(){
