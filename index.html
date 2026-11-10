@@ -1366,18 +1366,18 @@ async function segTrocarSenhaCoordenacao(nova){
 async function segSincronizarEquipe(){
   const u = segUsuario(); if(!u || u.email!==SEG_EMAIL_COORD) return;
   const lista = await fetchProfessoresList();
-  const emails = new Set(lista.map(p => (p.email||'').toLowerCase()).filter(Boolean));
+  const emails = new Set(lista.map(p => (p.email||'').trim().toLowerCase()).filter(Boolean));
   const col = db.collection('equipe');
   let atuais = [];
   try{ atuais = (await col.get()).docs.map(d => d.id); }catch(e){}
-  for(const e of emails){ if(!atuais.includes(e)){ const p = lista.find(x => (x.email||'').toLowerCase()===e); await col.doc(e).set({ nome: (p && (p.displayName||p.email)) || e, at: Date.now() }); } }
+  for(const e of emails){ if(!atuais.includes(e)){ const p = lista.find(x => (x.email||'').trim().toLowerCase()===e); await col.doc(e).set({ nome: (p && (p.displayName||p.email)) || e, at: Date.now() }); } }
   for(const e of atuais){ if(!emails.has(e)) await col.doc(e).delete(); }
 }
 // ---------- Professor ----------
 async function segEntrarProfessor(rec, senha){
   SEG.avisoProf = '';
   if(!segAtivo()) return { ok:true };
-  const email = (rec.email||'').toLowerCase();
+  const email = (rec.email||'').trim().toLowerCase();
   const r = await segEntrarComEmail(email, senha);
   if(!r.ok){
     if(r.motivo==='senha-diferente') SEG.avisoProf = 'Sua conta de segurança tem outra senha. Toque em “Receber e-mail para redefinir” abaixo, crie a senha nova pelo link e entre de novo com ela.';
@@ -1474,8 +1474,10 @@ async function segCarregarStatus(){
   const st = segState(); if(st.carregando) return; st.carregando = true; render();
   const lista = await fetchProfessoresList().catch(() => []);
   const linhas = await Promise.all(lista.map(async p => { let s = null; try{ s = JSON.parse((await window.storage.get(`seg-status:${p.id}`, true)).value); }catch(e){} return { nome: p.displayName || p.email, email: p.email, ativo: !!p.activatedAt, s }; }));
+  try{ await segSincronizarEquipe(); }catch(e){}
   let equipe = [];
   try{ equipe = (await db.collection('equipe').get()).docs.map(d => d.id); }catch(e){}
+  linhas.forEach(l => { l.naEquipe = equipe.includes((l.email||'').trim().toLowerCase()); });
   st.status = { linhas, equipe, em: Date.now() };
   st.carregando = false; render();
 }
@@ -1498,7 +1500,7 @@ function renderSegurancaCard(){
       ${passo(/✅/.test(st.teste||''), `Toque em <strong>Testar proteção</strong> para conferir. ${st.teste ? `<div style="margin-top:4px;">${esc(st.teste)}</div>` : ''}`)}
     </ol>
     <details style="margin-top:8px;"><summary style="cursor:pointer; font-size:.88rem;">👩‍🏫 Situação de cada professor</summary>
-      <div style="max-height:260px; overflow:auto; margin-top:6px;">${linhas.map(l => `<div data-seg-prof style="display:flex; justify-content:space-between; gap:8px; font-size:.85rem; border-bottom:1px solid #eee; padding:3px 0;"><span>${esc(l.nome)} <span class="muted">${esc(l.email)}</span></span><span>${l.s ? (l.s.verificado ? '✅ e-mail confirmado' : '⏳ falta clicar no link') : (l.ativo ? '⚪ ainda não entrou nesta versão' : '— não ativou o acesso')}</span></div>`).join('') || '<p class="muted">Nenhum professor cadastrado.</p>'}</div>
+      <div style="max-height:260px; overflow:auto; margin-top:6px;">${linhas.map(l => `<div data-seg-prof style="display:flex; justify-content:space-between; gap:8px; font-size:.85rem; border-bottom:1px solid #eee; padding:3px 0;"><span>${esc(l.nome)} <span class="muted">${esc(l.email)}</span></span><span>${l.naEquipe===false ? '⚠️ fora da lista da equipe — ' : ''}${l.s ? (l.s.verificado ? '✅ e-mail confirmado' : '⏳ falta clicar no link') : (l.ativo ? '⚪ ainda não entrou nesta versão' : '— não ativou o acesso')}</span></div>`).join('') || '<p class="muted">Nenhum professor cadastrado.</p>'}</div>
       <button class="btn btn-ghost btn-sm" data-action="seg-atualizar" style="margin-top:6px;">↻ Atualizar</button>
     </details>
     <div class="row" style="gap:6px; flex-wrap:wrap; margin-top:10px;">
@@ -1509,6 +1511,38 @@ function renderSegurancaCard(){
     ${st.mostrarRegras ? `<textarea readonly data-seg-regras style="width:100%; height:240px; font-family:monospace; font-size:.75rem; margin-top:8px;">${esc(segRegrasTexto(coordOk ? u.uid : ''))}</textarea>` : ''}
     <p class="muted" style="font-size:.8rem; margin:8px 0 0;">O que esta fase ainda não resolve: as respostas das provas e as fichas continuam no aparelho do aluno, e um aluno com conhecimento técnico ainda poderia ler o gabarito. Para fechar isso é preciso a fase 2 (correção feita no servidor do Firebase).</p>
   </div>`;
+}
+/* -------- Por que a gravação falhou? Mostra a causa exata, em português simples (10/11/2026) -------- */
+async function segExplicarFalha(e, chave){
+  const t = String((e && (e.code || '')) + ' ' + (e && e.message || ''));
+  if(/resource-exhausted|quota/i.test(t)) return { tit:'Limite diário gratuito do Firebase atingido', txt:'Hoje o banco já recebeu o máximo de gravações do plano gratuito. Nada foi perdido do que já estava salvo; o limite volta sozinho por volta das 5h da manhã. Avise a coordenação.' };
+  if(/exceeds the maximum|maximum allowed size|too large|invalid-argument/i.test(t)) return { tit:'Conteúdo grande demais para salvar', txt:'Esta avaliação/atividade passou de 1 MB (geralmente por causa de imagens coladas). Diminua ou remova algumas imagens e salve de novo.' };
+  if(/unavailable|offline|network|failed to fetch|deadline/i.test(t)) return { tit:'Sem conexão com o banco', txt:'A internet deste aparelho caiu ou está lenta. Confira o Wi-Fi e tente salvar de novo.' };
+  if(!/permission/i.test(t)) return { tit:'Não foi possível salvar', txt:'Erro: ' + (t.trim() || 'desconhecido') + '. Tire uma foto desta mensagem e envie à coordenação.' };
+  const u = segUsuario();
+  if(!state.professor.session && !(u && u.email===SEG_EMAIL_COORD)) return { tit:'Ação só para professores e coordenação', txt:'Este aparelho não está logado como professor.' };
+  if(!u || u.isAnonymous) return { tit:'Sua conta de segurança não foi ligada', txt:(SEG.avisoProf || 'O app não conseguiu entrar na sua conta de segurança.') + ' Saia do app e entre de novo. Se continuar, avise a coordenação.' };
+  try{ await u.reload(); }catch(x){}
+  segAtualizarPapel();
+  if(!segUsuario().emailVerified) return { tit:'Falta confirmar o seu e-mail', txt:'Abra o e-mail ' + u.email + ' (veja também a caixa de spam), clique no link de confirmação e depois saia e entre de novo no app. Sem isso, o banco não aceita gravar avaliações e atividades.', reenviar:true };
+  let naEquipe = true;
+  try{ naEquipe = (await db.collection('equipe').doc(u.email).get()).exists; }catch(x){}
+  if(!naEquipe) return { tit:'Seu e-mail não está na lista da equipe', txt:'A coordenação precisa abrir o app (painel 🔐 Segurança → Atualizar) para incluir ' + u.email + ' na equipe. Depois saia e entre de novo.' };
+  return { tit:'O banco recusou a gravação', txt:'Seu e-mail está confirmado e na lista da equipe, mas as regras recusaram. Avise a coordenação (painel 🔐 Segurança → Testar proteção). Chave: ' + chave };
+}
+function segMostrarFalha(msg){
+  let el = document.getElementById('seg-falha');
+  if(!el){ el = document.createElement('div'); el.id = 'seg-falha'; document.body.appendChild(el); }
+  el.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:99999;max-width:560px;width:calc(100% - 24px);background:#fffaf0;border:3px solid #6B1F2E;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.3);padding:14px 16px;font-size:.95rem;';
+  el.innerHTML = '<strong style="color:#6B1F2E">⚠️ ' + esc(msg.tit) + '</strong><p style="margin:6px 0 10px">' + esc(msg.txt) + '</p>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    + (msg.reenviar ? '<button class="btn btn-primary btn-sm" data-seg-falha="reenviar">📧 Reenviar o link</button>' : '')
+    + '<button class="btn btn-ghost btn-sm" data-seg-falha="fechar">Fechar</button></div>';
+  el.onclick = ev => {
+    const b = ev.target.closest('[data-seg-falha]'); if(!b) return;
+    if(b.dataset.segFalha==='reenviar'){ segReenviarConfirmacao().then(() => { b.textContent = '✅ Link reenviado'; b.disabled = true; }); }
+    else el.remove();
+  };
 }
 segIniciar();
 
@@ -1523,10 +1557,9 @@ segIniciar();
       await SEG_PRONTO;
       try{ return await b[m](...a); }
       catch(e){
-        if(negado(e) && m!=='get' && m!=='list' && Date.now() - avisoEm > 30000){
+        if(m!=='get' && m!=='list' && Date.now() - avisoEm > 20000){
           avisoEm = Date.now();
-          const pr = state.professor.session;
-          alert(pr ? '🔐 Não foi possível salvar: sua conta ainda não está liberada. Confirme o seu e-mail (link enviado pelo Firebase), saia e entre de novo no app.' : '🔐 Não foi possível salvar: esta ação é só para professores e coordenação.');
+          segExplicarFalha(e, a[0]).then(msg => { if(msg) segMostrarFalha(msg); }).catch(() => {});
         }
         throw e;
       }
@@ -3677,9 +3710,10 @@ async function salvarTarefa(authorName){
     createdAt: Date.now()
   };
   p.tarefas.unshift(tarefa);
+  try{ await saveTarefasToStorage(); }
+  catch(e){ p.tarefas = p.tarefas.filter(x => x !== tarefa); let m = null; try{ m = await segExplicarFalha(e, 'tarefas'); }catch(x){} p.tarefaError = 'Não foi salva. ' + (m ? m.tit + ': ' + m.txt : String(e && e.message || e)); render(); return; }
   p.newTarefaOpen = false;
   p.tarefaError = '';
-  await saveTarefasToStorage();
   render();
   // Normalmente não há entregas ainda numa tarefa recém-criada, mas chamamos mesmo assim
   // por segurança (ex.: tarefa duplicada/reaproveitada) — a função não faz nada se não
@@ -22215,7 +22249,8 @@ async function saveAssessment(){
     prior: pnpNp1Meta(a),
     ...preservar,
   };
-  await window.storage.set(`assessment:${code}`, JSON.stringify(assessment), true);
+  try{ await window.storage.set(`assessment:${code}`, JSON.stringify(assessment), true); }
+  catch(e){ let m = null; try{ m = await segExplicarFalha(e, `assessment:${code}`); }catch(x){} const el = document.getElementById('new-err'); if(el) el.innerHTML = '<p class="err">Não foi salvo. ' + esc(m ? m.tit + ': ' + m.txt : String(e && e.message || e)) + '</p>'; return; }
   try{ await pnpRegistrarUsadas(assessment); }catch(e){}
   const voltarAoPlano = !isEditing && a.origemPlano && a.origemPlano.aula && a.origemPlano.turmaId;
   if(voltarAoPlano){ try{ await planoRegistrarExercicio(a.origemPlano.turmaId, a.origemPlano.aula, code); }catch(e){} }
