@@ -1370,8 +1370,11 @@ async function segSincronizarEquipe(){
   const col = db.collection('equipe');
   let atuais = [];
   try{ atuais = (await col.get()).docs.map(d => d.id); }catch(e){}
-  for(const e of emails){ if(!atuais.includes(e)){ const p = lista.find(x => (x.email||'').trim().toLowerCase()===e); await col.doc(e).set({ nome: (p && (p.displayName||p.email)) || e, at: Date.now() }); } }
-  for(const e of atuais){ if(!emails.has(e)) await col.doc(e).delete(); }
+  SEG.equipeErro = '';
+  try{
+    for(const e of emails){ if(!atuais.includes(e)){ const p = lista.find(x => (x.email||'').trim().toLowerCase()===e); await col.doc(e).set({ nome: (p && (p.displayName||p.email)) || e, at: Date.now() }); } }
+    for(const e of atuais){ if(!emails.has(e)) await col.doc(e).delete(); }
+  }catch(err){ SEG.equipeErro = String((err && (err.code || err.message)) || 'erro'); throw err; }
 }
 // ---------- Professor ----------
 async function segEntrarProfessor(rec, senha){
@@ -1475,6 +1478,7 @@ async function segCarregarStatus(){
   const lista = await fetchProfessoresList().catch(() => []);
   const linhas = await Promise.all(lista.map(async p => { let s = null; try{ s = JSON.parse((await window.storage.get(`seg-status:${p.id}`, true)).value); }catch(e){} return { nome: p.displayName || p.email, email: p.email, ativo: !!p.activatedAt, s }; }));
   try{ await segSincronizarEquipe(); }catch(e){}
+  st.coordUid = (segUsuario() && segUsuario().email===SEG_EMAIL_COORD) ? segUsuario().uid : '';
   let equipe = [];
   try{ equipe = (await db.collection('equipe').get()).docs.map(d => d.id); }catch(e){}
   linhas.forEach(l => { l.naEquipe = equipe.includes((l.email||'').trim().toLowerCase()); });
@@ -1499,6 +1503,8 @@ function renderSegurancaCard(){
       ${passo(/✅/.test(st.teste||''), `Quando todos confirmarem, copie as regras abaixo e cole em <a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank" rel="noopener"><strong>Firestore → Regras</strong></a> → <strong>Publicar</strong>.`)}
       ${passo(/✅/.test(st.teste||''), `Toque em <strong>Testar proteção</strong> para conferir. ${st.teste ? `<div style="margin-top:4px;">${esc(st.teste)}</div>` : ''}`)}
     </ol>
+    ${!coordOk ? `<div data-seg-alerta style="margin-top:10px; padding:10px; border:2px solid #b3261e; border-radius:10px; background:#fff3f2; font-size:.9rem;"><strong>⚠️ A coordenação não está ligada à conta de segurança.</strong> Sem isso, ninguém entra na lista da equipe e os professores não conseguem salvar. Saia e entre de novo como coordenação. ${SEG.coordErro ? esc(SEG.coordErro) : ''}</div>` : ''}
+    ${coordOk && SEG.equipeErro ? `<div data-seg-alerta style="margin-top:10px; padding:10px; border:2px solid #b3261e; border-radius:10px; background:#fff3f2; font-size:.9rem;"><strong>⚠️ O banco não deixou gravar a lista da equipe (${esc(SEG.equipeErro)}).</strong> As regras publicadas no Firebase não reconhecem a conta atual da coordenação, porque o código (UID) colado nelas é diferente do atual: <code>${esc(u.uid)}</code>. Toque em <strong>📋 Copiar regras</strong> aqui embaixo, cole em Firestore → Regras (apague tudo o que estava lá antes), toque em <strong>Publicar</strong>, espere 1 minuto e toque em <strong>↻ Atualizar</strong>.</div>` : ''}
     <details style="margin-top:8px;"><summary style="cursor:pointer; font-size:.88rem;">👩‍🏫 Situação de cada professor</summary>
       <div style="max-height:260px; overflow:auto; margin-top:6px;">${linhas.map(l => `<div data-seg-prof style="display:flex; justify-content:space-between; gap:8px; font-size:.85rem; border-bottom:1px solid #eee; padding:3px 0;"><span>${esc(l.nome)} <span class="muted">${esc(l.email)}</span></span><span>${l.naEquipe===false ? '⚠️ fora da lista da equipe — ' : ''}${l.s ? (l.s.verificado ? '✅ e-mail confirmado' : '⏳ falta clicar no link') : (l.ativo ? '⚪ ainda não entrou nesta versão' : '— não ativou o acesso')}</span></div>`).join('') || '<p class="muted">Nenhum professor cadastrado.</p>'}</div>
       <button class="btn btn-ghost btn-sm" data-action="seg-atualizar" style="margin-top:6px;">↻ Atualizar</button>
@@ -1508,7 +1514,7 @@ function renderSegurancaCard(){
       <button class="btn btn-ghost btn-sm" data-action="seg-ver-regras">${st.mostrarRegras ? 'Esconder regras' : 'Ver regras'}</button>
       <button class="btn btn-ghost btn-sm" data-action="seg-testar">🧪 Testar proteção</button>
     </div>
-    ${st.mostrarRegras ? `<textarea readonly data-seg-regras style="width:100%; height:240px; font-family:monospace; font-size:.75rem; margin-top:8px;">${esc(segRegrasTexto(coordOk ? u.uid : ''))}</textarea>` : ''}
+    ${st.mostrarRegras && !coordOk ? `<p style="color:#b3261e; font-size:.85rem;">Entre de novo como coordenação para ver as regras com o código certo (não copie regras com “COLE_AQUI_O_UID”).</p>` : ''}${st.mostrarRegras && coordOk ? `<textarea readonly data-seg-regras style="width:100%; height:240px; font-family:monospace; font-size:.75rem; margin-top:8px;">${esc(segRegrasTexto(coordOk ? u.uid : ''))}</textarea>` : ''}
     <p class="muted" style="font-size:.8rem; margin:8px 0 0;">O que esta fase ainda não resolve: as respostas das provas e as fichas continuam no aparelho do aluno, e um aluno com conhecimento técnico ainda poderia ler o gabarito. Para fechar isso é preciso a fase 2 (correção feita no servidor do Firebase).</p>
   </div>`;
 }
