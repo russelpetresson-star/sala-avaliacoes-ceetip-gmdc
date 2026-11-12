@@ -1,0 +1,293 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Laboratório · Colisões, quantidade de movimento e impulso — CEETIP</title><style>:root{--v:#6d1a2e;--v2:#8e2a43;--v3:#fbeef1;--d:#c9a227;--d2:#f3e2a6;--d3:#fff7de;--dtx:#8a6a0c;--a:#1f4e79;--a2:#dbe7f3;--ok:#1e7a4c;--ok2:#dff3e8;--no:#b3261e;--no2:#fde4e1;--ink:#1d1d24;--mut:#5b5b66;--line:#6d1a2e22;--paper:#fbf8f3;--card:#fff;--soft:#f4f1ec}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:17px;line-height:1.4;padding-bottom:84px}
+header{background:linear-gradient(100deg,var(--v) 0%,var(--v2) 72%,#a83a55 100%);color:#fff;padding:16px 24px;border-bottom:5px solid var(--d)}
+header .k{font-size:13px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--d2)}
+header h1{margin:4px 0 0;font-size:clamp(22px,3.4vw,34px);line-height:1.1;font-weight:800}
+header h1 em{font-style:normal;color:var(--d)}
+main{max-width:1280px;margin:0 auto;padding:18px 20px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px 18px;box-shadow:0 4px 18px #6d1a2e12}
+.card h2{margin:0 0 10px;font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--v)}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.mut{color:var(--mut)}.small{font-size:14px}
+label.ctl{display:grid;grid-template-columns:78px 1fr 84px;gap:10px;align-items:center;font-weight:700;margin:6px 0}
+label.ctl output{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;color:var(--v)}
+input[type=range]{width:100%;height:36px;accent-color:var(--v);touch-action:pan-y}
+button,.btn,select,input[type=number]{font:inherit}
+button,.btn{border:0;border-radius:12px;padding:12px 18px;min-height:46px;font-weight:800;background:var(--v);color:#fff;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+button.sec,.btn.sec{background:var(--soft);color:var(--v);border:1.5px solid var(--line)}
+button.on{background:var(--d);color:#3d2f00}
+select,input[type=number]{min-height:44px;border-radius:10px;border:1.5px solid var(--line);background:#fff;padding:6px 10px;color:var(--ink)}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.read div{background:var(--soft);border-radius:12px;padding:10px 12px}
+.read b{display:block;font-size:24px;font-variant-numeric:tabular-nums;color:var(--v)}
+.read span{font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.aviso{border-radius:12px;padding:12px 14px;font-weight:700}
+.aviso.ok{background:var(--ok2);color:#0f4a2d}.aviso.no{background:var(--no2);color:#7a1810}.aviso.info{background:var(--d3);color:#4b3a06;border:1.5px solid var(--d2)}
+.missao{border-left:8px solid var(--d);background:var(--d3);border-radius:12px;padding:12px 14px;margin:10px 0}
+.missao b.n{display:inline-flex;width:30px;height:30px;border-radius:50%;background:var(--v);color:#fff;align-items:center;justify-content:center;margin-right:8px}
+.revela{margin-top:8px;background:var(--a2);color:#163a5c;border-radius:10px;padding:10px 12px}
+.revela[hidden]{display:none}
+svg text{font-family:inherit}
+.rod{position:fixed;left:0;right:0;bottom:0;background:#fffffff2;border-top:2px solid var(--d);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.rod .mut{font-size:13px}
+table{border-collapse:collapse;width:100%}th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.hudr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:7px 14px;font-weight:800;font-size:15px;background:#ffffff1f;color:#fff;border:1.5px solid #ffffff40}
+.chip.au{background:var(--d);color:#3d2f00;border-color:var(--d)}
+.chip button{all:unset;cursor:pointer}
+.tabs{max-width:1280px;margin:14px auto 0;padding:0 20px;display:flex;gap:8px}
+.tabs button{background:#fff;color:var(--v);border:2px solid var(--v)}.tabs button.on{background:var(--v);color:#fff}
+.wrap{max-width:1280px;margin:0 auto;padding:14px 20px}
+#jogo{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:940px){#jogo{grid-template-columns:1fr}}
+.palco{background:radial-gradient(120% 90% at 30% 20%,#3a1622 0%,#1d0b12 60%,#140810 100%);border-radius:20px;padding:12px;box-shadow:0 10px 30px #6d1a2e40,inset 0 0 0 2px #c9a22755;position:relative}
+.palco canvas{display:block;width:100%;height:auto;border-radius:12px;touch-action:manipulation;cursor:pointer}
+.inst{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
+.g{background:#ffffff0d;border:1px solid #c9a22740;border-radius:14px;padding:6px 8px 8px;text-align:center;color:#f3e2a6}
+.g svg{width:100%;max-width:200px;height:auto}
+.g .dv{font-size:22px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums}
+.g .lb{font-size:12px;letter-spacing:.04em;font-weight:700;color:#d9c48a}
+.nd{transition:transform .45s cubic-bezier(.3,1.5,.5,1);transform-origin:100px 100px}
+.nota{color:#cbb98a;font-size:13px;margin-top:8px}
+.ctx{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.tag{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:4px 10px;background:var(--a2);color:var(--a)}
+.tag.f{background:var(--v);color:#fff}
+.mis h3{margin:2px 0 6px;font-size:22px;color:var(--v)}
+.obj{display:flex;gap:10px;align-items:flex-start;background:var(--d3);border:2px solid var(--d2);border-radius:14px;padding:12px;margin:10px 0;font-weight:700}
+.obj .ck{flex:0 0 30px;height:30px;border-radius:50%;border:3px solid var(--d);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;transition:all .3s}
+.obj.feito{background:var(--ok2);border-color:#9fd8b8}.obj.feito .ck{background:var(--ok);border-color:var(--ok)}
+.dica{background:var(--a2);color:#163a5c;border-radius:12px;padding:10px 12px;margin-top:8px;animation:in .35s}
+.qz{margin-top:10px;border:2px solid var(--v);border-radius:14px;padding:12px;animation:in .35s}
+.qz p{margin:0 0 8px;font-weight:800}
+.qz button{display:block;width:100%;text-align:left;margin:6px 0;background:#fff;color:var(--ink);border:2px solid var(--line)}
+.qz button.cer{background:var(--ok2);border-color:var(--ok)}.qz button.err{background:var(--no2);border-color:var(--no);animation:tr .4s}
+.fb{margin-top:6px;font-weight:700}
+.tm{font-variant-numeric:tabular-nums;font-weight:800;color:var(--v);font-size:20px}
+.ctlx label.ctl{grid-template-columns:70px 1fr 80px}
+.ctlx label.lk{opacity:.45}
+.ctlx label.lk output::after{content:" 🔒"}
+input[type=range]{height:40px}
+#mapa .topo{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+.barra{height:14px;border-radius:999px;background:var(--soft);overflow:hidden;border:1px solid var(--line)}.barra i{display:block;height:100%;background:linear-gradient(90deg,var(--d),#e9c552);transition:width .6s}
+.fases{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:14px}
+.fc{all:unset;cursor:pointer;background:#fff;border:2px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 14px #6d1a2e12;transition:transform .15s}
+.fc:hover,.fc:focus-visible{transform:translateY(-3px);border-color:var(--d)}
+.fc .n{font-size:13px;font-weight:800;color:var(--dtx);letter-spacing:.08em;text-transform:uppercase}
+.fc b{font-size:18px;color:var(--v)}.fc .es{font-size:22px;letter-spacing:2px;color:#d8d2c6}.fc .es .on{color:var(--d)}
+.fc.prox{border-color:var(--d);box-shadow:0 0 0 4px #c9a22740}
+.fc.livre{background:linear-gradient(135deg,var(--v),var(--v2));color:#fff}.fc.livre b{color:#fff}.fc.livre .n{color:var(--d2)}
+.med{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}.med span{border-radius:12px;padding:8px 12px;font-weight:800;background:var(--soft);color:#9a948a;border:1.5px dashed #cfc8bb}.med span.on{background:var(--d3);color:var(--dtx);border:1.5px solid var(--d)}
+.modal{position:fixed;inset:0;background:#140810cc;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal[hidden]{display:none}
+.mc{background:#fff;border-radius:22px;max-width:520px;width:100%;padding:22px;text-align:center;border-top:8px solid var(--d);animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+.mc h2{margin:0;color:var(--v);font-size:26px}
+.big{font-size:54px;letter-spacing:6px;margin:8px 0}.big span{display:inline-block;color:#ddd5c6}.big span.on{color:var(--d);animation:st .5s both}
+.big span:nth-child(2){animation-delay:.25s}.big span:nth-child(3){animation-delay:.5s}
+.mc .ex{background:var(--a2);color:#163a5c;border-radius:12px;padding:10px 12px;text-align:left;margin:10px 0}
+.mc .row{justify-content:center}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}@keyframes pop{from{transform:scale(.7);opacity:0}}
+@keyframes st{0%{transform:scale(0) rotate(-40deg)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
+@keyframes tr{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+label.ctl select{grid-column:2/4;width:100%}
+.ctl[hidden]{display:none}
+.mut2{color:#d9c48a}
+label.ctl{grid-template-columns:96px 1fr 84px}
+
+</style></head><body>
+<header><div><div class="k">Laboratório · Física · Mecânica · Quantidade de movimento</div><h1><em>Colisões</em>, quantidade de movimento e impulso</h1></div></header>
+<div class="wrap" id="jogo" hidden></div>
+<div class="rod"><a class="btn" id="voltar" href="index.html">‹ Todos os laboratórios</a><span class="mut">Funciona sem internet depois de aberto. As estrelas ficam salvas só neste aparelho. Aulas 58, 61, 62 e 63 (1ª série) e 47 (3ª série).</span></div>
+<script>(function(){
+ var q=new URLSearchParams(location.search),aula=q.get('aula'),t=q.get('t');
+ var back=document.getElementById('voltar');
+ if(back){
+  if(aula&&/^[\w-]+$/.test(aula)){back.href='../aulas/'+aula+'.html'+(t&&/^\d+$/.test(t)?'#t'+t:'');back.firstChild.nodeValue='‹ Voltar à aula';}
+  else{back.href='index.html';back.firstChild.nodeValue='‹ Todos os laboratórios';}
+ }
+ document.querySelectorAll('[data-rev]').forEach(function(b){b.addEventListener('click',function(){
+  var el=document.getElementById(b.dataset.rev);el.hidden=!el.hidden;b.textContent=el.hidden?'Ver resposta':'Esconder resposta';});});
+ window.LAB={q:q,fmt:function(x,d){return x.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d})}};
+})();
+
+(function(){
+var $=function(i){return document.getElementById(i)},G=window.GAME={},cfg,NF,MAXS,best=[],jogo={f:-1,livre:false},som=false,ac=null;
+function bip(f,d,tp,v){if(!som)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();var o=ac.createOscillator(),g=ac.createGain();o.type=tp||'sine';o.frequency.value=f;g.gain.value=v||.08;o.connect(g);g.connect(ac.destination);var t=ac.currentTime;g.gain.exponentialRampToValueAtTime(.0001,t+d);o.start(t);o.stop(t+d)}catch(e){}}
+G.sfx=function(n){if(n==='ok'){bip(660,.15);setTimeout(function(){bip(880,.25)},140)}else if(n==='err')bip(180,.25,'square',.05);else if(n==='boom')bip(90,.35,'sawtooth',.12);else if(n==='clk')bip(1200,.05,'square',.04);else if(n==='geiger')bip(2600+Math.random()*600,.02,'square',.03);else if(n==='fim'){[523,659,784,1046].forEach(function(f,i){setTimeout(function(){bip(f,.2)},i*120)})}};
+G.estr=function(on){var s='';for(var i=0;i<3;i++)s+='<span class="'+(i<on?'on':'')+'">★</span>';return s};
+function tot(){var t=0;for(var i=0;i<NF;i++)t+=best[i]||0;return t}
+function salva(){try{localStorage.setItem(cfg.key,JSON.stringify(best))}catch(e){}}
+function lim(){return[Math.ceil(MAXS/3),Math.ceil(MAXS*2/3),MAXS]}
+function hud(){var t=tot(),l=lim(),M=cfg.medalhas,m=t>=l[2]?M[2]:t>=l[1]?M[1]:t>=l[0]?M[0]:'Sem medalha';
+ $('hS').textContent='★ '+t+'/'+MAXS;$('hM').textContent=m;$('pt').textContent=t+'/'+MAXS+' ★';$('pb').style.width=(t/MAXS*100)+'%';
+ for(var i=0;i<3;i++){$('m'+(i+1)).textContent=M[i]+' · '+l[i]+'★';$('m'+(i+1)).className=t>=l[i]?'on':''}}
+function mapa(){var h='',px=-1,i;for(i=0;i<NF;i++)if(!best[i]){px=i;break}
+ cfg.fases.forEach(function(F,i){h+='<button class="fc'+(i===px?' prox':'')+'" data-f="'+i+'"><span class="n">Fase '+(i+1)+(F.rot?' · '+F.rot:'')+'</span><b>'+F.t+'</b><span class="mut small">'+F.tag+(F.cron?' · ⏱ contra o relógio':'')+'</span><span class="es">'+G.estr(best[i]||0)+'</span></button>'});
+ h+='<button class="fc livre" data-f="L"><span class="n">Sem regras</span><b>🔧 Laboratório livre</b><span class="small">'+cfg.livreDesc+'</span></button>';
+ $('fs').innerHTML=h;$('fs').querySelectorAll('.fc').forEach(function(b){b.onclick=function(){var f=b.dataset.f;f==='L'?G.livre():G.fase(+f)}});hud()}
+function aba(j){$('mapa').hidden=j;$('jogo').hidden=!j;$('tF').classList.toggle('on',!(jogo.livre&&j));$('tL').classList.toggle('on',jogo.livre&&j);if(cfg.onShow)cfg.onShow(j)}
+function emb(n){var a=[],i;for(i=0;i<n;i++)a.push(i);for(i=n-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}return a}
+function missao(){var F=cfg.fases[jogo.f],h='<div class="ctx"><span class="tag f">Fase '+(jogo.f+1)+' de '+NF+'</span><span class="tag">'+F.tag+'</span></div><h3>'+F.t+'</h3><p>'+F.ctx+'</p>';
+ h+='<div class="obj'+(jogo.ok?' feito':'')+'" id="ob"><span class="ck">'+(jogo.ok?'✓':'')+'</span><span>'+F.obj+'</span></div><div class="mut small" id="prog">'+(jogo.prog||'')+'</div>';
+ if(F.cron)h+='<p>Tempo: <span class="tm" id="tm">0 s</span> <span class="mut small">(até '+F.cron[0]+' s: ★★★ · até '+F.cron[1]+' s: ★★)</span></p>';
+ for(var i=0;i<jogo.dic;i++)h+='<div class="dica">💡 '+F.d[i]+'</div>';
+ h+='<div class="row" style="margin-top:10px">'+(jogo.dic<F.d.length&&!jogo.fim?'<button class="sec" id="bd">💡 Dica ('+(F.d.length-jogo.dic)+')</button>':'')+'<button class="sec" id="br">↺ Recomeçar</button><button class="sec" id="bm">Mapa</button></div>';
+ if(jogo.ok&&F.q){h+='<div class="qz" id="qz"><p>⚡ Pergunta relâmpago: '+F.q.p+'</p>';var ord=jogo.ord||(jogo.ord=emb(F.q.o.length));ord.forEach(function(j){h+='<button data-o="'+j+'">'+F.q.o[j]+'</button>'});h+='<div class="fb" id="fbk"></div></div>'}
+ $('mis').innerHTML=h;
+ if($('bd'))$('bd').onclick=function(){jogo.dic++;missao()};$('br').onclick=function(){G.fase(jogo.f)};$('bm').onclick=function(){$('tF').onclick()};
+ if($('qz'))$('qz').querySelectorAll('[data-o]').forEach(function(b){b.onclick=function(){if(jogo.fim)return;var j=+b.dataset.o;
+  if(j===F.q.c){b.classList.add('cer');G.sfx('ok');jogo.fim=true;setTimeout(conclui,650)}else{b.classList.add('err');b.disabled=true;jogo.err++;G.sfx('err');$('fbk').textContent='Ainda não. Olhe de novo o experimento e tente outra.'}}})}
+function conclui(){var F=cfg.fases[jogo.f],e;
+ if(F.cron){var s=(performance.now()-jogo.t0)/1000;e=s<=F.cron[0]?3:s<=F.cron[1]?2:1;e-=jogo.dic}else e=3-jogo.dic-jogo.err-jogo.pen;
+ e=Math.max(1,Math.min(3,e));if(e>(best[jogo.f]||0)){best[jogo.f]=e;salva()}hud();
+ $('moS').innerHTML=G.estr(e);var m=e===3?'Perfeito!':e===2?'Muito bem!':'Concluída! Tente de novo sem dicas para mais estrelas.';
+ if(F.cron)m+=' Tempo: '+Math.round((performance.now()-jogo.t0)/1000)+' s.';
+ if(jogo.pen)m+=' ('+(cfg.penTxt||'−1 ★ por tentativa errada')+')';
+ $('moM').textContent=m;$('moE').innerHTML='<b>Por quê?</b> '+(F.q?F.q.ex:F.fim);
+ $('moT').textContent=cfg.fases.every(function(_,i){return best[i]})?'Jornada completa! 🏆':'Fase concluída!';
+ $('moN').hidden=jogo.f>=NF-1;$('mo').hidden=false;G.sfx('fim');G.confete()}
+G.confete=function(){var c=$('gkc'),x=c.getContext('2d'),W=c.width=innerWidth,H=c.height=innerHeight,cs=['#c9a227','#6d1a2e','#ffffff','#1f4e79','#f3e2a6'],P=[],i,t0=performance.now(),last=t0;
+ if(matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+ for(i=0;i<110;i++)P.push({x:Math.random()*W,y:-20-Math.random()*H*.4,vx:(Math.random()-.5)*90,vy:60+Math.random()*180,c:cs[i%5],r:Math.random()*6});
+ (function f(t){var dt=Math.min(.05,(t-last)/1000);last=t;x.clearRect(0,0,W,H);P.forEach(function(p){p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=dt*5;x.fillStyle=p.c;x.fillRect(p.x,p.y,6,9*Math.abs(Math.cos(p.r)))});if(t-t0<2800)requestAnimationFrame(f);else x.clearRect(0,0,W,H)})(t0)};
+G.fase=function(i){jogo={f:i,livre:false,dic:0,err:0,pen:0,ok:false,fim:false,prog:'',t0:performance.now()};cfg.onStart(i,cfg.fases[i]);missao();aba(true);if(cfg.after)cfg.after()};
+G.livre=function(){jogo={f:-1,livre:true};cfg.onLivre();$('mis').innerHTML=cfg.livre;$('mis').querySelectorAll('[data-rev]').forEach(function(b){b.onclick=function(){var e=$(b.dataset.rev);e.hidden=!e.hidden}});aba(true);if(cfg.after)cfg.after()};
+G.check=function(){if(jogo.f<0||jogo.livre||jogo.ok)return false;var F=cfg.fases[jogo.f];
+ if(F.ok()){jogo.ok=true;G.sfx('ok');if(F.q)missao();else{missao();jogo.fim=true;setTimeout(conclui,700)}return true}return false};
+G.erro=function(){if(jogo.f>=0&&!jogo.livre&&!jogo.ok){jogo.err++;G.sfx('err')}};
+G.pen=function(){if(jogo.f>=0&&!jogo.livre&&!jogo.ok)jogo.pen=1};
+G.prog=function(t){jogo.prog=t;if($('prog'))$('prog').textContent=t};
+G.cur=function(){return jogo.f>=0&&!jogo.livre?cfg.fases[jogo.f]:null};
+G.state=function(){return jogo};G.best=function(){return best};G.estado=function(){return{ok:jogo.ok,fim:jogo.fim}};
+G.tempo=function(){var e=$('tm');if(e&&!jogo.ok)e.textContent=Math.round((performance.now()-jogo.t0)/1000)+' s'};
+// instrumentos de ponteiro (svg 200 × 118)
+G.gauge=function(id,max,un,ticks){var s='<path d="M20,100 A80,80 0 0 1 180,100" fill="none" stroke="#ffffff30" stroke-width="10" stroke-linecap="round"/><path id="'+id+'z" d="M157,44 A80,80 0 0 1 180,100" fill="none" stroke="#b3261e" stroke-width="10" stroke-linecap="round" opacity="0"/>';
+ for(var i=0;i<=ticks;i++){var a=Math.PI*(1-i/ticks),x1=100+Math.cos(a)*68,y1=100-Math.sin(a)*68,x2=100+Math.cos(a)*80,y2=100-Math.sin(a)*80;
+  s+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#f3e2a6" stroke-width="2"/><text id="'+id+'t'+i+'" x="'+(100+Math.cos(a)*54).toFixed(1)+'" y="'+(104-Math.sin(a)*54).toFixed(1)+'" font-size="11" fill="#d9c48a" text-anchor="middle"></text>'}
+ s+='<g class="nd" id="'+id+'n"><line x1="100" y1="100" x2="100" y2="30" stroke="#ff5a3a" stroke-width="4" stroke-linecap="round"/></g><circle cx="100" cy="100" r="8" fill="#c9a227"/><text x="100" y="116" font-size="11" fill="#d9c48a" text-anchor="middle">'+un+'</text>';
+ $(id).innerHTML=s;G.gscale(id,max,ticks)};
+G.gscale=function(id,max,ticks){for(var i=0;i<=ticks;i++){var v=max*i/ticks;$(id+'t'+i).textContent=LAB.fmt(v,v%1?1:0)}$(id).dataset.max=max};
+G.gset=function(id,v){var m=+$(id).dataset.max,f=Math.max(0,Math.min(1.04,v/m));$(id+'n').style.transform='rotate('+(-90+180*f)+'deg)'};
+G.init=function(c){cfg=c;NF=c.fases.length;MAXS=NF*3;
+ try{best=JSON.parse(localStorage.getItem(c.key)||'[]')}catch(e){best=[]}
+ var hd=document.querySelector('header'),hr=document.createElement('div');hr.className='hudr';
+ hr.innerHTML='<span class="chip au" id="hS"></span><span class="chip" id="hM"></span><span class="chip"><button id="som" aria-label="Som">🔇 Som</button></span>';hd.appendChild(hr);
+ var tp=document.createElement('div');
+ tp.innerHTML='<div class="tabs"><button id="tF" class="on">🎮 Fases</button><button id="tL">🔧 Laboratório livre</button></div><div class="wrap" id="mapa"><div class="card"><div class="topo"><div><h2>Sua jornada</h2><div class="barra"><i id="pb" style="width:0"></i></div></div><b id="pt" style="color:var(--v);font-size:20px"></b></div><div class="med"><span id="m1"></span><span id="m2"></span><span id="m3"></span></div></div><div class="fases" id="fs"></div></div>';
+ var j=$('jogo');while(tp.firstChild)j.parentNode.insertBefore(tp.firstChild,j);
+ var md=document.createElement('div');md.innerHTML='<div class="modal" id="mo" hidden><div class="mc" role="dialog" aria-modal="true" aria-labelledby="moT"><h2 id="moT"></h2><div class="big" id="moS"></div><div id="moM" style="font-weight:700"></div><div class="ex" id="moE"></div><div class="row"><button id="moN">Próxima fase ›</button><button class="sec" id="moR">Jogar de novo</button><button class="sec" id="moMa">Mapa</button></div></div></div><canvas id="gkc" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60" aria-hidden="true"></canvas>';
+ while(md.firstChild)document.body.appendChild(md.firstChild);
+ $('moN').onclick=function(){$('mo').hidden=true;G.fase(jogo.f+1)};$('moR').onclick=function(){$('mo').hidden=true;G.fase(jogo.f)};$('moMa').onclick=function(){$('mo').hidden=true;$('tF').onclick()};
+ $('tF').onclick=function(){jogo={f:-1,livre:false};if(cfg.onHide)cfg.onHide();aba(false);mapa()};$('tL').onclick=function(){G.livre()};
+ $('som').onclick=function(){som=!som;this.textContent=som?'🔊 Som':'🔇 Som';G.sfx('clk')};
+ mapa();var mf=LAB.q.get('fase');
+ if(LAB.q.get('livre'))G.livre();else if(mf&&/^\d+$/.test(mf)&&+mf>=1&&+mf<=NF)G.fase(+mf-1)};
+
+// ---------- kit de simulação: layout, controles, laço de desenho (usado pelos laboratórios novos)
+var CT=[],SH=null,EN=null,RD=[],cvx=null,lastCk=0;
+G.f=function(x,d){return LAB.fmt(x,d==null?1:d)};
+G.rr=function(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()};
+G.tx=function(c,s,x,y,col,sz,al,wt){c.fillStyle=col||'#fff';c.font=(wt||700)+' '+(sz||14)+'px system-ui';c.textAlign=al||'left';c.fillText(s,x,y)};
+G.build=function(o){CT=o.controls||[];G.W=o.W||640;G.H=o.H||340;
+ var h='<div class="col"><div class="palco"><canvas id="cv" width="'+G.W*2+'" height="'+G.H*2+'" aria-label="'+(o.aria||'Simulação')+'"></canvas><div class="inst" id="inst"></div>'+(o.nota?'<div class="nota">'+o.nota+'</div>':'')+'</div>'+(o.left||'')+'</div>';
+ h+='<div class="col"><div class="card mis" id="mis"></div><div class="card ctlx"><h2>Controles</h2><div id="ctl"></div></div>'+(o.right||'')+'</div>';
+ $('jogo').innerHTML=h;
+ var c='';CT.forEach(function(k){
+  if(k.type==='sel'){c+='<label class="ctl" id="c_'+k.id+'">'+k.l+'<select id="'+k.id+'">'+k.opts.map(function(p){return'<option value="'+p[0]+'"'+(String(p[0])===String(k.val)?' selected':'')+'>'+p[1]+'</option>'}).join('')+'</select><span></span></label>'}
+  else c+='<label class="ctl" id="c_'+k.id+'">'+k.l+'<input type="range" id="'+k.id+'" min="'+k.min+'" max="'+k.max+'" step="'+k.step+'" value="'+k.val+'"><output id="o_'+k.id+'"></output></label>'});
+ $('ctl').innerHTML=c;
+ $('ctl').addEventListener('input',function(e){var id=e.target.id;outs();if(o.onInput)o.onInput(id);G.check()});
+ outs();cvx=$('cv').getContext('2d');
+ var rs=function(){var cv=$('cv'),w=cv.clientWidth,d=Math.min(2,window.devicePixelRatio||1.5),nw=Math.round(w*d);if(w&&cv.width!==nw){cv.width=nw;cv.height=Math.round(w*G.H/G.W*d)}};
+ G.rs=rs};
+function outs(){CT.forEach(function(k){if(k.type!=='sel'){var e=$('o_'+k.id);if(e)e.textContent=LAB.fmt(+$(k.id).value,k.d==null?0:k.d)+(k.u||'')}})}
+G.v=function(id){var e=$(id),v=e.value;return e.tagName==='SELECT'&&isNaN(+v)?v:+v};
+G.set=function(o){for(var k in o){var e=$(k);if(e)e.value=o[k]}outs()};
+G.lock=function(a){CT.forEach(function(k){var e=$(k.id);e.disabled=a?a.indexOf(k.id)<0:false;$('c_'+k.id).classList.toggle('lk',!!e.disabled)})};
+G.show=function(a){CT.forEach(function(k){$('c_'+k.id).hidden=a?a.indexOf(k.id)<0:false})};
+G.reads=function(a){var el=$('inst');if(RD.length!==a.length){RD=a.map(function(){return[]});el.innerHTML=a.map(function(_,i){return'<div class="g"><div class="lb" id="rl'+i+'"></div><div class="dv" id="rv'+i+'" style="margin-top:8px"></div></div>'}).join('');RD=a.map(function(x){return[null,null]})}
+ a.forEach(function(r,i){if(RD[i][0]!==r[0]){RD[i][0]=r[0];$('rl'+i).textContent=r[0]}if(RD[i][1]!==r[1]){RD[i][1]=r[1];$('rv'+i).innerHTML=r[1]}})};
+G.loop=function(fn){var last=performance.now(),ck=0;
+ (function f(t){var dt=Math.min(.05,(t-last)/1000);last=t;
+  if(!$('jogo').hidden&&cvx){G.rs&&G.rs();var cv=$('cv'),sc=cv.width/G.W;cvx.setTransform(sc,0,0,sc,0,0);cvx.clearRect(0,0,G.W,G.H);
+   cvx.fillStyle='#ffffff0a';for(var x=10;x<G.W;x+=20)for(var y=10;y<G.H;y+=20)cvx.fillRect(x,y,1.4,1.4);
+   fn(cvx,dt,t);ck+=dt;if(ck>.12){ck=0;G.check()}}
+  requestAnimationFrame(f)})(last)};
+})();
+
+(function(){
+GAME.build({W:640,H:340,aria:'Colisões, quantidade de movimento e impulso',nota:'Quantidade de movimento: Q = m·v. Em sistema isolado, ΣQ antes = ΣQ depois. Impulso: I = F·Δt = ΔQ. Colisão perfeitamente elástica conserva também a energia cinética.',controls:[
+ {id:'cena',type:'sel',l:'Situação',opts:[['inel','Carrinhos se grudam'],['elas','Colisão elástica'],['capa','Capacete'],['barr','Barreira de rodovia'],['recuo','Patinadores']],val:'inel'},
+ {id:'m2',l:'Massa m₂',min:1,max:10,step:1,val:1,u:' kg',d:0},
+ {id:'dt',l:'Tempo de impacto',min:2,max:100,step:1,val:10,u:' ms',d:0},
+ {id:'tb',l:'Tempo de impacto',min:100,max:800,step:10,val:200,u:' ms',d:0},
+ {id:'mp',l:'Massa de A',min:40,max:100,step:5,val:100,u:' kg',d:0}]});
+function st(){return{cena:GAME.v('cena'),m2:GAME.v('m2'),dt:GAME.v('dt'),tb:GAME.v('tb'),mp:GAME.v('mp')}}
+function vfI(m2){return 6/(2+m2)}
+function u1E(m2){return(2-m2)/(2+m2)*3}
+function u2E(m2){return 2*2/(2+m2)*3}
+function Fh(dt){return 20/(dt/1000)}
+function Fb(tb){return 20000/(tb/1000)}
+function vA(mp){return 40*3/mp}
+var FASES=[
+{t:'Carrinhos que se grudam',tag:'Mecânica',rot:'conservação de Q',v:{cena:'inel',m2:1},ed:['m2'],
+ ctx:'Um carrinho de 2 kg a 3 m/s bate em outro parado, e os dois ficam grudados. A quantidade de movimento total se conserva: 2·3 = (2 + m₂)·v.',
+ obj:'Escolha m₂ para o conjunto seguir a 1 m/s depois do choque.',prog:function(){return'Velocidade final: '+GAME.f(vfI(GAME.v('m2')),2)+' m/s'},
+ ok:function(){return Math.abs(vfI(GAME.v('m2'))-1)<=0.02},d:['Q antes: 2 · 3 = 6 kg·m/s.','6 = (2 + m₂) · 1, então m₂ = 4 kg.'],
+ q:{p:'No choque em que os corpos ficam juntos (inelástico), o que se conserva?',o:['A quantidade de movimento total, mas não a energia cinética','A energia cinética total','Nenhuma das duas'],c:0,ex:'Em sistema isolado, Q se conserva sempre. A energia cinética diminui: parte vira calor e deformação.'}},
+{t:'Quando o carrinho para',tag:'Mecânica',rot:'choque elástico',v:{cena:'elas',m2:6},ed:['m2'],
+ ctx:'O carrinho de 2 kg a 3 m/s bate de frente, sem perder energia, em outro parado de massa m₂. A velocidade do primeiro depois é (2 − m₂) ÷ (2 + m₂) · 3.',
+ obj:'Escolha m₂ para o 1º carrinho parar completamente depois do choque.',prog:function(){return'Velocidade do 1º depois: '+GAME.f(u1E(GAME.v('m2')),2)+' m/s'},
+ ok:function(){return Math.abs(u1E(GAME.v('m2')))<0.05},d:['O 1º carrinho para quando 2 − m₂ = 0.','m₂ = 2 kg: massas iguais trocam de velocidade.'],
+ q:{p:'No choque elástico frontal entre massas iguais, com uma delas parada…',o:['a que se movia para e a outra sai com a mesma velocidade','as duas param','as duas seguem juntas'],c:0,ex:'Massas iguais trocam de velocidade: é o que se vê no pêndulo de Newton.'}},
+{t:'O capacete e o impulso',tag:'Segurança do Trabalho',rot:'impulso',v:{cena:'capa',dt:10},ed:['dt'],
+ ctx:'A cabeça (4 kg) bate a 5 m/s e para: ΔQ = 20 N·s. A força média é F = ΔQ ÷ Δt. Acima de 1 000 N há risco sério.',
+ obj:'Escolha o tempo de impacto para a força ficar até 1 000 N, sem passar de 60 ms (espessura do capacete).',prog:function(){return'Força média: '+GAME.f(Fh(GAME.v('dt')),0)+' N'},
+ ok:function(){var d=GAME.v('dt');return Fh(d)<=1000&&d<=60},d:['F = 20 ÷ Δt, com Δt em segundos.','Para F ≤ 1 000 N, Δt ≥ 0,02 s = 20 ms.'],
+ q:{p:'O capacete protege porque…',o:['aumenta o tempo de impacto e reduz a força média','diminui a quantidade de movimento da cabeça','aumenta a velocidade da cabeça'],c:0,ex:'O impulso necessário (ΔQ) é o mesmo. Se Δt aumenta, F = ΔQ ÷ Δt diminui.'}},
+{t:'A barreira deformável',tag:'Segurança no trânsito',rot:'impulso em rodovia',v:{cena:'barr',tb:200},ed:['tb'],
+ ctx:'Um carro de 1 000 kg a 72 km/h (20 m/s) bate numa barreira que absorve o impacto. ΔQ = 20 000 N·s. A barreira suporta no máximo 60 kN de força média.',
+ obj:'Escolha o tempo de impacto (de 100 a 600 ms) para a força ficar até 60 kN.',prog:function(){return'Força média: '+GAME.f(Fb(GAME.v('tb'))/1000,0)+' kN'},
+ ok:function(){var t=GAME.v('tb');return Fb(t)<=60000&&t<=600},d:['F = 20 000 ÷ Δt.','Δt ≥ 20 000 ÷ 60 000 ≈ 0,33 s = 333 ms.'],
+ q:{p:'Barreiras que se deformam salvam vidas porque…',o:['alongam o tempo da batida e reduzem a força','tornam o carro mais pesado','aumentam o impulso'],c:0,ex:'A variação da quantidade de movimento é fixa. Alongar o tempo da parada reduz a força média sobre os ocupantes.'}},
+{t:'O recuo dos patinadores',tag:'Mecânica',rot:'ação e reação',v:{cena:'recuo',mp:100},ed:['mp'],
+ ctx:'Dois patinadores parados se empurram. B (40 kg) sai a 3 m/s para a direita. A conservação de Q dá m_A·v_A = 40 · 3.',
+ obj:'Escolha a massa de A para ele recuar a 2 m/s.',prog:function(){return'Velocidade de A: '+GAME.f(vA(GAME.v('mp')),2)+' m/s'},
+ ok:function(){return Math.abs(vA(GAME.v('mp'))-2)<=0.05},d:['Q total antes = 0, então Q_A = −Q_B.','m_A = 120 ÷ 2 = 60 kg.'],
+ q:{p:'Quem tem menos massa, ao empurrar o outro, recua…',o:['com maior velocidade','com menor velocidade','com a mesma velocidade'],c:0,ex:'m_A·v_A = m_B·v_B: velocidade e massa são inversamente proporcionais. Foguetes usam o mesmo princípio.'}}];
+GAME.init({key:'ceetip_lab_colisoes_v1',fases:FASES,medalhas:['🥉 Aprendiz de impactos','🥈 Técnico(a) em colisões','🥇 Mestre do impulso'],livreDesc:'Mude massas e tempos de impacto nas cinco situações.',
+ onStart:function(i,F){GAME.set(F.v);GAME.lock(F.ed);GAME.show(F.ed)},
+ onLivre:function(){GAME.set({cena:'inel',m2:4});GAME.lock(null);GAME.show(['cena','m2','dt','tb','mp'])},
+ livre:'<div class="ctx"><span class="tag f">Laboratório livre</span></div><h3>Choques e impulsos</h3><p>Troque a situação e mude massas e tempos. Compare a velocidade depois do choque elástico e do inelástico com a mesma m₂.</p><div class="obj"><span class="ck">?</span><span>Desafio extra: com m₂ = 2 kg, qual a velocidade final no choque inelástico?</span></div><button class="sec" data-rev="lv">Ver resposta</button><div class="revela" id="lv" hidden>6 ÷ (2 + 2) = 1,5 m/s.</div>'});
+GAME.loop(function(cx,dt,t){var s=st(),T=GAME.tx,R=GAME.rr,c=s.cena;
+ var cart=function(x,w,col,l){cx.fillStyle=col;R(cx,x-w/2,210-34,w,34,6);cx.fill();cx.fillStyle='#222';cx.beginPath();cx.arc(x-w/2+10,212,7,0,7);cx.arc(x+w/2-10,212,7,0,7);cx.fill();T(cx,l,x,196,'#fff',13,'center',800)};
+ var ground=function(){cx.fillStyle='#4a2a1e';cx.fillRect(30,219,580,10)};
+ if(c==='inel'||c==='elas'){var m1=2,m2=s.m2,w1=30+m1*10,w2=30+m2*10,tc=1.2,tt=(t%5),u1,u2;
+  if(c==='inel'){u1=u2=vfI(m2)}else{u1=u1E(m2);u2=u2E(m2)}
+  var xc=300,x1,x2;if(tt<tc){x1=xc-w1/2-(tc-tt)*3*70;x2=xc+w2/2}else{var q=tt-tc;x1=xc-w1/2+q*u1*70;x2=xc+w2/2+q*u2*70;if(c==='inel'){x2=x1+w1/2+w2/2}}
+  ground();cart(x1,w1,'#ff6a3d','2 kg');cart(x2,w2,'#4fb3ff',m2+' kg');
+  var tx=tt<tc?'antes: v₁ = 3 m/s, v₂ = 0':(c==='inel'?'depois: juntos, v = '+GAME.f(u1,2)+' m/s':'depois: v₁ = '+GAME.f(u1,2)+' m/s, v₂ = '+GAME.f(u2,2)+' m/s');T(cx,tx,320,120,'#ffe27a',16,'center',800);
+  var Qa=6,Qd=2*u1+m2*u2,Ea=9,Ed=c==='inel'?0.5*(2+m2)*u1*u1:0.5*2*u1*u1+0.5*m2*u2*u2;
+  R(cx,120,248,400,70,10);cx.fillStyle='#ffffff10';cx.fill();T(cx,'Q antes = '+GAME.f(Qa,1)+' · Q depois = '+GAME.f(Qd,1),320,276,'#fff',14,'center',800);T(cx,'Ec antes = '+GAME.f(Ea,1)+' J · Ec depois = '+GAME.f(Ed,1)+' J',320,300,'#d9c48a',13,'center');
+  GAME.reads([['Q total',GAME.f(Qd,1)+' kg·m/s'],['Velocidade do 1º',GAME.f(u1,2)+' m/s'],['Energia cinética',GAME.f(Ed,1)+' J']]);
+ }else if(c==='capa'||c==='barr'){var F=c==='capa'?Fh(s.dt):Fb(s.tb),lim=c==='capa'?1000:60000,tms=c==='capa'?s.dt:s.tb,mx=c==='capa'?4000:200000;
+  var ph=(t%3)/2.4;cx.fillStyle='#8aa0b8';cx.fillRect(500,120,40,110);if(c==='barr'){cx.fillStyle='#d9a23a';cx.fillRect(500-Math.min(90,tms/8),150,Math.min(90,tms/8),70)}
+  var def=Math.min(60,tms*(c==='capa'?0.8:0.1)),x=Math.min(1,ph)*(500-def-120-40)+120;if(c==='capa'){cx.fillStyle='#ffd23a';cx.beginPath();cx.arc(x+20,190,24,0,7);cx.fill();cx.fillStyle='#d9a23a';cx.fillRect(x-4,172,48,10)}else{cx.fillStyle='#ff6a3d';R(cx,x-20,170,80,40,8);cx.fill();cx.fillStyle='#222';cx.beginPath();cx.arc(x,212,9,0,7);cx.arc(x+50,212,9,0,7);cx.fill()}
+  ground();R(cx,120,248,400,70,10);cx.fillStyle='#ffffff10';cx.fill();var okk=F<=lim;T(cx,GAME.f(c==='capa'?F:F/1000,0)+(c==='capa'?' N':' kN'),320,284,okk?'#7aff9a':'#ff7a7a',26,'center',900);T(cx,'limite: '+(c==='capa'?'1 000 N':'60 kN'),320,306,'#d9c48a',13,'center');
+  cx.fillStyle='#ffffff18';cx.fillRect(40,80,400,14);cx.fillStyle=okk?'#1e9b5c':'#d9543f';cx.fillRect(40,80,400*Math.min(1,F/mx),14);cx.fillStyle='#fff';cx.fillRect(40+400*lim/mx-1,74,3,26);T(cx,'força média',40,70,'#d9c48a',12,'left');
+  GAME.reads([['Impulso ΔQ',c==='capa'?'20 N·s':'20 000 N·s'],['Tempo de impacto',tms+' ms'],['Força média F = ΔQ ÷ Δt',GAME.f(c==='capa'?F:F/1000,0)+(c==='capa'?' N':' kN')]]);
+ }else{var mA=s.mp,v=vA(mA),ph=(t%4);var xb=320+Math.min(ph*40,160)*1,xa=320-Math.min(ph*40*(3/Math.max(v,0.1))*0+ph*v*13.3,160);
+  ground();cx.fillStyle='#ff6a3d';R(cx,xa-22,150,44,60,8);cx.fill();T(cx,'A '+mA+' kg',xa,138,'#fff',13,'center',800);cx.fillStyle='#4fb3ff';R(cx,xb-18,160,36,50,8);cx.fill();T(cx,'B 40 kg',xb,148,'#fff',13,'center',800);
+  R(cx,120,248,400,70,10);cx.fillStyle='#ffffff10';cx.fill();T(cx,'vA = '+GAME.f(v,2)+' m/s · vB = 3 m/s',320,284,Math.abs(v-2)<=0.05?'#7aff9a':'#fff',18,'center',900);T(cx,'mA·vA = mB·vB',320,306,'#d9c48a',13,'center');
+  GAME.reads([['Q de B','120 kg·m/s'],['Q de A',GAME.f(mA*v,0)+' kg·m/s'],['Velocidade de A',GAME.f(v,2)+' m/s']]);
+ }});
+window.LABX={vfI:vfI,u1E:u1E,Fh:Fh,Fb:Fb,vA:vA,FASES:FASES};
+
+})();
+</script></body></html>

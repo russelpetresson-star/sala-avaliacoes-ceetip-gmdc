@@ -1,0 +1,312 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Laboratório · Ondas e som — CEETIP</title><style>:root{--v:#6d1a2e;--v2:#8e2a43;--v3:#fbeef1;--d:#c9a227;--d2:#f3e2a6;--d3:#fff7de;--dtx:#8a6a0c;--a:#1f4e79;--a2:#dbe7f3;--ok:#1e7a4c;--ok2:#dff3e8;--no:#b3261e;--no2:#fde4e1;--ink:#1d1d24;--mut:#5b5b66;--line:#6d1a2e22;--paper:#fbf8f3;--card:#fff;--soft:#f4f1ec}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:17px;line-height:1.4;padding-bottom:84px}
+header{background:linear-gradient(100deg,var(--v) 0%,var(--v2) 72%,#a83a55 100%);color:#fff;padding:16px 24px;border-bottom:5px solid var(--d)}
+header .k{font-size:13px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--d2)}
+header h1{margin:4px 0 0;font-size:clamp(22px,3.4vw,34px);line-height:1.1;font-weight:800}
+header h1 em{font-style:normal;color:var(--d)}
+main{max-width:1280px;margin:0 auto;padding:18px 20px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px 18px;box-shadow:0 4px 18px #6d1a2e12}
+.card h2{margin:0 0 10px;font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--v)}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.mut{color:var(--mut)}.small{font-size:14px}
+label.ctl{display:grid;grid-template-columns:78px 1fr 84px;gap:10px;align-items:center;font-weight:700;margin:6px 0}
+label.ctl output{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;color:var(--v)}
+input[type=range]{width:100%;height:36px;accent-color:var(--v);touch-action:pan-y}
+button,.btn,select,input[type=number]{font:inherit}
+button,.btn{border:0;border-radius:12px;padding:12px 18px;min-height:46px;font-weight:800;background:var(--v);color:#fff;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+button.sec,.btn.sec{background:var(--soft);color:var(--v);border:1.5px solid var(--line)}
+button.on{background:var(--d);color:#3d2f00}
+select,input[type=number]{min-height:44px;border-radius:10px;border:1.5px solid var(--line);background:#fff;padding:6px 10px;color:var(--ink)}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.read div{background:var(--soft);border-radius:12px;padding:10px 12px}
+.read b{display:block;font-size:24px;font-variant-numeric:tabular-nums;color:var(--v)}
+.read span{font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.aviso{border-radius:12px;padding:12px 14px;font-weight:700}
+.aviso.ok{background:var(--ok2);color:#0f4a2d}.aviso.no{background:var(--no2);color:#7a1810}.aviso.info{background:var(--d3);color:#4b3a06;border:1.5px solid var(--d2)}
+.missao{border-left:8px solid var(--d);background:var(--d3);border-radius:12px;padding:12px 14px;margin:10px 0}
+.missao b.n{display:inline-flex;width:30px;height:30px;border-radius:50%;background:var(--v);color:#fff;align-items:center;justify-content:center;margin-right:8px}
+.revela{margin-top:8px;background:var(--a2);color:#163a5c;border-radius:10px;padding:10px 12px}
+.revela[hidden]{display:none}
+svg text{font-family:inherit}
+.rod{position:fixed;left:0;right:0;bottom:0;background:#fffffff2;border-top:2px solid var(--d);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.rod .mut{font-size:13px}
+table{border-collapse:collapse;width:100%}th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.hudr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:7px 14px;font-weight:800;font-size:15px;background:#ffffff1f;color:#fff;border:1.5px solid #ffffff40}
+.chip.au{background:var(--d);color:#3d2f00;border-color:var(--d)}
+.chip button{all:unset;cursor:pointer}
+.tabs{max-width:1280px;margin:14px auto 0;padding:0 20px;display:flex;gap:8px}
+.tabs button{background:#fff;color:var(--v);border:2px solid var(--v)}.tabs button.on{background:var(--v);color:#fff}
+.wrap{max-width:1280px;margin:0 auto;padding:14px 20px}
+#jogo{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:940px){#jogo{grid-template-columns:1fr}}
+.palco{background:radial-gradient(120% 90% at 30% 20%,#3a1622 0%,#1d0b12 60%,#140810 100%);border-radius:20px;padding:12px;box-shadow:0 10px 30px #6d1a2e40,inset 0 0 0 2px #c9a22755;position:relative}
+.palco canvas{display:block;width:100%;height:auto;border-radius:12px;touch-action:manipulation;cursor:pointer}
+.inst{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
+.g{background:#ffffff0d;border:1px solid #c9a22740;border-radius:14px;padding:6px 8px 8px;text-align:center;color:#f3e2a6}
+.g svg{width:100%;max-width:200px;height:auto}
+.g .dv{font-size:22px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums}
+.g .lb{font-size:12px;letter-spacing:.04em;font-weight:700;color:#d9c48a}
+.nd{transition:transform .45s cubic-bezier(.3,1.5,.5,1);transform-origin:100px 100px}
+.nota{color:#cbb98a;font-size:13px;margin-top:8px}
+.ctx{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.tag{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:4px 10px;background:var(--a2);color:var(--a)}
+.tag.f{background:var(--v);color:#fff}
+.mis h3{margin:2px 0 6px;font-size:22px;color:var(--v)}
+.obj{display:flex;gap:10px;align-items:flex-start;background:var(--d3);border:2px solid var(--d2);border-radius:14px;padding:12px;margin:10px 0;font-weight:700}
+.obj .ck{flex:0 0 30px;height:30px;border-radius:50%;border:3px solid var(--d);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;transition:all .3s}
+.obj.feito{background:var(--ok2);border-color:#9fd8b8}.obj.feito .ck{background:var(--ok);border-color:var(--ok)}
+.dica{background:var(--a2);color:#163a5c;border-radius:12px;padding:10px 12px;margin-top:8px;animation:in .35s}
+.qz{margin-top:10px;border:2px solid var(--v);border-radius:14px;padding:12px;animation:in .35s}
+.qz p{margin:0 0 8px;font-weight:800}
+.qz button{display:block;width:100%;text-align:left;margin:6px 0;background:#fff;color:var(--ink);border:2px solid var(--line)}
+.qz button.cer{background:var(--ok2);border-color:var(--ok)}.qz button.err{background:var(--no2);border-color:var(--no);animation:tr .4s}
+.fb{margin-top:6px;font-weight:700}
+.tm{font-variant-numeric:tabular-nums;font-weight:800;color:var(--v);font-size:20px}
+.ctlx label.ctl{grid-template-columns:70px 1fr 80px}
+.ctlx label.lk{opacity:.45}
+.ctlx label.lk output::after{content:" 🔒"}
+input[type=range]{height:40px}
+#mapa .topo{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+.barra{height:14px;border-radius:999px;background:var(--soft);overflow:hidden;border:1px solid var(--line)}.barra i{display:block;height:100%;background:linear-gradient(90deg,var(--d),#e9c552);transition:width .6s}
+.fases{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:14px}
+.fc{all:unset;cursor:pointer;background:#fff;border:2px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 14px #6d1a2e12;transition:transform .15s}
+.fc:hover,.fc:focus-visible{transform:translateY(-3px);border-color:var(--d)}
+.fc .n{font-size:13px;font-weight:800;color:var(--dtx);letter-spacing:.08em;text-transform:uppercase}
+.fc b{font-size:18px;color:var(--v)}.fc .es{font-size:22px;letter-spacing:2px;color:#d8d2c6}.fc .es .on{color:var(--d)}
+.fc.prox{border-color:var(--d);box-shadow:0 0 0 4px #c9a22740}
+.fc.livre{background:linear-gradient(135deg,var(--v),var(--v2));color:#fff}.fc.livre b{color:#fff}.fc.livre .n{color:var(--d2)}
+.med{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}.med span{border-radius:12px;padding:8px 12px;font-weight:800;background:var(--soft);color:#9a948a;border:1.5px dashed #cfc8bb}.med span.on{background:var(--d3);color:var(--dtx);border:1.5px solid var(--d)}
+.modal{position:fixed;inset:0;background:#140810cc;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal[hidden]{display:none}
+.mc{background:#fff;border-radius:22px;max-width:520px;width:100%;padding:22px;text-align:center;border-top:8px solid var(--d);animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+.mc h2{margin:0;color:var(--v);font-size:26px}
+.big{font-size:54px;letter-spacing:6px;margin:8px 0}.big span{display:inline-block;color:#ddd5c6}.big span.on{color:var(--d);animation:st .5s both}
+.big span:nth-child(2){animation-delay:.25s}.big span:nth-child(3){animation-delay:.5s}
+.mc .ex{background:var(--a2);color:#163a5c;border-radius:12px;padding:10px 12px;text-align:left;margin:10px 0}
+.mc .row{justify-content:center}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}@keyframes pop{from{transform:scale(.7);opacity:0}}
+@keyframes st{0%{transform:scale(0) rotate(-40deg)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
+@keyframes tr{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+label.ctl select{grid-column:2/4;width:100%}
+.ctl[hidden]{display:none}
+.mut2{color:#d9c48a}
+label.ctl{grid-template-columns:96px 1fr 84px}
+
+</style></head><body>
+<header><div><div class="k">Laboratório · Física · Ondas · Acústica</div><h1><em>Ondas</em> e som: ouvir para entender</h1></div></header>
+<div class="wrap" id="jogo" hidden></div>
+<div class="rod"><a class="btn" id="voltar" href="index.html">‹ Todos os laboratórios</a><span class="mut">Funciona sem internet depois de aberto. As estrelas ficam salvas só neste aparelho. Aulas 34 a 38 (2ª série) e 55 (3ª série).</span></div>
+<script>(function(){
+ var q=new URLSearchParams(location.search),aula=q.get('aula'),t=q.get('t');
+ var back=document.getElementById('voltar');
+ if(back){
+  if(aula&&/^[\w-]+$/.test(aula)){back.href='../aulas/'+aula+'.html'+(t&&/^\d+$/.test(t)?'#t'+t:'');back.firstChild.nodeValue='‹ Voltar à aula';}
+  else{back.href='index.html';back.firstChild.nodeValue='‹ Todos os laboratórios';}
+ }
+ document.querySelectorAll('[data-rev]').forEach(function(b){b.addEventListener('click',function(){
+  var el=document.getElementById(b.dataset.rev);el.hidden=!el.hidden;b.textContent=el.hidden?'Ver resposta':'Esconder resposta';});});
+ window.LAB={q:q,fmt:function(x,d){return x.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d})}};
+})();
+
+(function(){
+var $=function(i){return document.getElementById(i)},G=window.GAME={},cfg,NF,MAXS,best=[],jogo={f:-1,livre:false},som=false,ac=null;
+function bip(f,d,tp,v){if(!som)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();var o=ac.createOscillator(),g=ac.createGain();o.type=tp||'sine';o.frequency.value=f;g.gain.value=v||.08;o.connect(g);g.connect(ac.destination);var t=ac.currentTime;g.gain.exponentialRampToValueAtTime(.0001,t+d);o.start(t);o.stop(t+d)}catch(e){}}
+G.sfx=function(n){if(n==='ok'){bip(660,.15);setTimeout(function(){bip(880,.25)},140)}else if(n==='err')bip(180,.25,'square',.05);else if(n==='boom')bip(90,.35,'sawtooth',.12);else if(n==='clk')bip(1200,.05,'square',.04);else if(n==='geiger')bip(2600+Math.random()*600,.02,'square',.03);else if(n==='fim'){[523,659,784,1046].forEach(function(f,i){setTimeout(function(){bip(f,.2)},i*120)})}};
+G.estr=function(on){var s='';for(var i=0;i<3;i++)s+='<span class="'+(i<on?'on':'')+'">★</span>';return s};
+function tot(){var t=0;for(var i=0;i<NF;i++)t+=best[i]||0;return t}
+function salva(){try{localStorage.setItem(cfg.key,JSON.stringify(best))}catch(e){}}
+function lim(){return[Math.ceil(MAXS/3),Math.ceil(MAXS*2/3),MAXS]}
+function hud(){var t=tot(),l=lim(),M=cfg.medalhas,m=t>=l[2]?M[2]:t>=l[1]?M[1]:t>=l[0]?M[0]:'Sem medalha';
+ $('hS').textContent='★ '+t+'/'+MAXS;$('hM').textContent=m;$('pt').textContent=t+'/'+MAXS+' ★';$('pb').style.width=(t/MAXS*100)+'%';
+ for(var i=0;i<3;i++){$('m'+(i+1)).textContent=M[i]+' · '+l[i]+'★';$('m'+(i+1)).className=t>=l[i]?'on':''}}
+function mapa(){var h='',px=-1,i;for(i=0;i<NF;i++)if(!best[i]){px=i;break}
+ cfg.fases.forEach(function(F,i){h+='<button class="fc'+(i===px?' prox':'')+'" data-f="'+i+'"><span class="n">Fase '+(i+1)+(F.rot?' · '+F.rot:'')+'</span><b>'+F.t+'</b><span class="mut small">'+F.tag+(F.cron?' · ⏱ contra o relógio':'')+'</span><span class="es">'+G.estr(best[i]||0)+'</span></button>'});
+ h+='<button class="fc livre" data-f="L"><span class="n">Sem regras</span><b>🔧 Laboratório livre</b><span class="small">'+cfg.livreDesc+'</span></button>';
+ $('fs').innerHTML=h;$('fs').querySelectorAll('.fc').forEach(function(b){b.onclick=function(){var f=b.dataset.f;f==='L'?G.livre():G.fase(+f)}});hud()}
+function aba(j){$('mapa').hidden=j;$('jogo').hidden=!j;$('tF').classList.toggle('on',!(jogo.livre&&j));$('tL').classList.toggle('on',jogo.livre&&j);if(cfg.onShow)cfg.onShow(j)}
+function emb(n){var a=[],i;for(i=0;i<n;i++)a.push(i);for(i=n-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}return a}
+function missao(){var F=cfg.fases[jogo.f],h='<div class="ctx"><span class="tag f">Fase '+(jogo.f+1)+' de '+NF+'</span><span class="tag">'+F.tag+'</span></div><h3>'+F.t+'</h3><p>'+F.ctx+'</p>';
+ h+='<div class="obj'+(jogo.ok?' feito':'')+'" id="ob"><span class="ck">'+(jogo.ok?'✓':'')+'</span><span>'+F.obj+'</span></div><div class="mut small" id="prog">'+(jogo.prog||'')+'</div>';
+ if(F.cron)h+='<p>Tempo: <span class="tm" id="tm">0 s</span> <span class="mut small">(até '+F.cron[0]+' s: ★★★ · até '+F.cron[1]+' s: ★★)</span></p>';
+ for(var i=0;i<jogo.dic;i++)h+='<div class="dica">💡 '+F.d[i]+'</div>';
+ h+='<div class="row" style="margin-top:10px">'+(jogo.dic<F.d.length&&!jogo.fim?'<button class="sec" id="bd">💡 Dica ('+(F.d.length-jogo.dic)+')</button>':'')+'<button class="sec" id="br">↺ Recomeçar</button><button class="sec" id="bm">Mapa</button></div>';
+ if(jogo.ok&&F.q){h+='<div class="qz" id="qz"><p>⚡ Pergunta relâmpago: '+F.q.p+'</p>';var ord=jogo.ord||(jogo.ord=emb(F.q.o.length));ord.forEach(function(j){h+='<button data-o="'+j+'">'+F.q.o[j]+'</button>'});h+='<div class="fb" id="fbk"></div></div>'}
+ $('mis').innerHTML=h;
+ if($('bd'))$('bd').onclick=function(){jogo.dic++;missao()};$('br').onclick=function(){G.fase(jogo.f)};$('bm').onclick=function(){$('tF').onclick()};
+ if($('qz'))$('qz').querySelectorAll('[data-o]').forEach(function(b){b.onclick=function(){if(jogo.fim)return;var j=+b.dataset.o;
+  if(j===F.q.c){b.classList.add('cer');G.sfx('ok');jogo.fim=true;setTimeout(conclui,650)}else{b.classList.add('err');b.disabled=true;jogo.err++;G.sfx('err');$('fbk').textContent='Ainda não. Olhe de novo o experimento e tente outra.'}}})}
+function conclui(){var F=cfg.fases[jogo.f],e;
+ if(F.cron){var s=(performance.now()-jogo.t0)/1000;e=s<=F.cron[0]?3:s<=F.cron[1]?2:1;e-=jogo.dic}else e=3-jogo.dic-jogo.err-jogo.pen;
+ e=Math.max(1,Math.min(3,e));if(e>(best[jogo.f]||0)){best[jogo.f]=e;salva()}hud();
+ $('moS').innerHTML=G.estr(e);var m=e===3?'Perfeito!':e===2?'Muito bem!':'Concluída! Tente de novo sem dicas para mais estrelas.';
+ if(F.cron)m+=' Tempo: '+Math.round((performance.now()-jogo.t0)/1000)+' s.';
+ if(jogo.pen)m+=' ('+(cfg.penTxt||'−1 ★ por tentativa errada')+')';
+ $('moM').textContent=m;$('moE').innerHTML='<b>Por quê?</b> '+(F.q?F.q.ex:F.fim);
+ $('moT').textContent=cfg.fases.every(function(_,i){return best[i]})?'Jornada completa! 🏆':'Fase concluída!';
+ $('moN').hidden=jogo.f>=NF-1;$('mo').hidden=false;G.sfx('fim');G.confete()}
+G.confete=function(){var c=$('gkc'),x=c.getContext('2d'),W=c.width=innerWidth,H=c.height=innerHeight,cs=['#c9a227','#6d1a2e','#ffffff','#1f4e79','#f3e2a6'],P=[],i,t0=performance.now(),last=t0;
+ if(matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+ for(i=0;i<110;i++)P.push({x:Math.random()*W,y:-20-Math.random()*H*.4,vx:(Math.random()-.5)*90,vy:60+Math.random()*180,c:cs[i%5],r:Math.random()*6});
+ (function f(t){var dt=Math.min(.05,(t-last)/1000);last=t;x.clearRect(0,0,W,H);P.forEach(function(p){p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=dt*5;x.fillStyle=p.c;x.fillRect(p.x,p.y,6,9*Math.abs(Math.cos(p.r)))});if(t-t0<2800)requestAnimationFrame(f);else x.clearRect(0,0,W,H)})(t0)};
+G.fase=function(i){jogo={f:i,livre:false,dic:0,err:0,pen:0,ok:false,fim:false,prog:'',t0:performance.now()};cfg.onStart(i,cfg.fases[i]);missao();aba(true);if(cfg.after)cfg.after()};
+G.livre=function(){jogo={f:-1,livre:true};cfg.onLivre();$('mis').innerHTML=cfg.livre;$('mis').querySelectorAll('[data-rev]').forEach(function(b){b.onclick=function(){var e=$(b.dataset.rev);e.hidden=!e.hidden}});aba(true);if(cfg.after)cfg.after()};
+G.check=function(){if(jogo.f<0||jogo.livre||jogo.ok)return false;var F=cfg.fases[jogo.f];
+ if(F.ok()){jogo.ok=true;G.sfx('ok');if(F.q)missao();else{missao();jogo.fim=true;setTimeout(conclui,700)}return true}return false};
+G.erro=function(){if(jogo.f>=0&&!jogo.livre&&!jogo.ok){jogo.err++;G.sfx('err')}};
+G.pen=function(){if(jogo.f>=0&&!jogo.livre&&!jogo.ok)jogo.pen=1};
+G.prog=function(t){jogo.prog=t;if($('prog'))$('prog').textContent=t};
+G.cur=function(){return jogo.f>=0&&!jogo.livre?cfg.fases[jogo.f]:null};
+G.state=function(){return jogo};G.best=function(){return best};G.estado=function(){return{ok:jogo.ok,fim:jogo.fim}};
+G.tempo=function(){var e=$('tm');if(e&&!jogo.ok)e.textContent=Math.round((performance.now()-jogo.t0)/1000)+' s'};
+// instrumentos de ponteiro (svg 200 × 118)
+G.gauge=function(id,max,un,ticks){var s='<path d="M20,100 A80,80 0 0 1 180,100" fill="none" stroke="#ffffff30" stroke-width="10" stroke-linecap="round"/><path id="'+id+'z" d="M157,44 A80,80 0 0 1 180,100" fill="none" stroke="#b3261e" stroke-width="10" stroke-linecap="round" opacity="0"/>';
+ for(var i=0;i<=ticks;i++){var a=Math.PI*(1-i/ticks),x1=100+Math.cos(a)*68,y1=100-Math.sin(a)*68,x2=100+Math.cos(a)*80,y2=100-Math.sin(a)*80;
+  s+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#f3e2a6" stroke-width="2"/><text id="'+id+'t'+i+'" x="'+(100+Math.cos(a)*54).toFixed(1)+'" y="'+(104-Math.sin(a)*54).toFixed(1)+'" font-size="11" fill="#d9c48a" text-anchor="middle"></text>'}
+ s+='<g class="nd" id="'+id+'n"><line x1="100" y1="100" x2="100" y2="30" stroke="#ff5a3a" stroke-width="4" stroke-linecap="round"/></g><circle cx="100" cy="100" r="8" fill="#c9a227"/><text x="100" y="116" font-size="11" fill="#d9c48a" text-anchor="middle">'+un+'</text>';
+ $(id).innerHTML=s;G.gscale(id,max,ticks)};
+G.gscale=function(id,max,ticks){for(var i=0;i<=ticks;i++){var v=max*i/ticks;$(id+'t'+i).textContent=LAB.fmt(v,v%1?1:0)}$(id).dataset.max=max};
+G.gset=function(id,v){var m=+$(id).dataset.max,f=Math.max(0,Math.min(1.04,v/m));$(id+'n').style.transform='rotate('+(-90+180*f)+'deg)'};
+G.init=function(c){cfg=c;NF=c.fases.length;MAXS=NF*3;
+ try{best=JSON.parse(localStorage.getItem(c.key)||'[]')}catch(e){best=[]}
+ var hd=document.querySelector('header'),hr=document.createElement('div');hr.className='hudr';
+ hr.innerHTML='<span class="chip au" id="hS"></span><span class="chip" id="hM"></span><span class="chip"><button id="som" aria-label="Som">🔇 Som</button></span>';hd.appendChild(hr);
+ var tp=document.createElement('div');
+ tp.innerHTML='<div class="tabs"><button id="tF" class="on">🎮 Fases</button><button id="tL">🔧 Laboratório livre</button></div><div class="wrap" id="mapa"><div class="card"><div class="topo"><div><h2>Sua jornada</h2><div class="barra"><i id="pb" style="width:0"></i></div></div><b id="pt" style="color:var(--v);font-size:20px"></b></div><div class="med"><span id="m1"></span><span id="m2"></span><span id="m3"></span></div></div><div class="fases" id="fs"></div></div>';
+ var j=$('jogo');while(tp.firstChild)j.parentNode.insertBefore(tp.firstChild,j);
+ var md=document.createElement('div');md.innerHTML='<div class="modal" id="mo" hidden><div class="mc" role="dialog" aria-modal="true" aria-labelledby="moT"><h2 id="moT"></h2><div class="big" id="moS"></div><div id="moM" style="font-weight:700"></div><div class="ex" id="moE"></div><div class="row"><button id="moN">Próxima fase ›</button><button class="sec" id="moR">Jogar de novo</button><button class="sec" id="moMa">Mapa</button></div></div></div><canvas id="gkc" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60" aria-hidden="true"></canvas>';
+ while(md.firstChild)document.body.appendChild(md.firstChild);
+ $('moN').onclick=function(){$('mo').hidden=true;G.fase(jogo.f+1)};$('moR').onclick=function(){$('mo').hidden=true;G.fase(jogo.f)};$('moMa').onclick=function(){$('mo').hidden=true;$('tF').onclick()};
+ $('tF').onclick=function(){jogo={f:-1,livre:false};if(cfg.onHide)cfg.onHide();aba(false);mapa()};$('tL').onclick=function(){G.livre()};
+ $('som').onclick=function(){som=!som;this.textContent=som?'🔊 Som':'🔇 Som';G.sfx('clk')};
+ mapa();var mf=LAB.q.get('fase');
+ if(LAB.q.get('livre'))G.livre();else if(mf&&/^\d+$/.test(mf)&&+mf>=1&&+mf<=NF)G.fase(+mf-1)};
+
+// ---------- kit de simulação: layout, controles, laço de desenho (usado pelos laboratórios novos)
+var CT=[],SH=null,EN=null,RD=[],cvx=null,lastCk=0;
+G.f=function(x,d){return LAB.fmt(x,d==null?1:d)};
+G.rr=function(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()};
+G.tx=function(c,s,x,y,col,sz,al,wt){c.fillStyle=col||'#fff';c.font=(wt||700)+' '+(sz||14)+'px system-ui';c.textAlign=al||'left';c.fillText(s,x,y)};
+G.build=function(o){CT=o.controls||[];G.W=o.W||640;G.H=o.H||340;
+ var h='<div class="col"><div class="palco"><canvas id="cv" width="'+G.W*2+'" height="'+G.H*2+'" aria-label="'+(o.aria||'Simulação')+'"></canvas><div class="inst" id="inst"></div>'+(o.nota?'<div class="nota">'+o.nota+'</div>':'')+'</div>'+(o.left||'')+'</div>';
+ h+='<div class="col"><div class="card mis" id="mis"></div><div class="card ctlx"><h2>Controles</h2><div id="ctl"></div></div>'+(o.right||'')+'</div>';
+ $('jogo').innerHTML=h;
+ var c='';CT.forEach(function(k){
+  if(k.type==='sel'){c+='<label class="ctl" id="c_'+k.id+'">'+k.l+'<select id="'+k.id+'">'+k.opts.map(function(p){return'<option value="'+p[0]+'"'+(String(p[0])===String(k.val)?' selected':'')+'>'+p[1]+'</option>'}).join('')+'</select><span></span></label>'}
+  else c+='<label class="ctl" id="c_'+k.id+'">'+k.l+'<input type="range" id="'+k.id+'" min="'+k.min+'" max="'+k.max+'" step="'+k.step+'" value="'+k.val+'"><output id="o_'+k.id+'"></output></label>'});
+ $('ctl').innerHTML=c;
+ $('ctl').addEventListener('input',function(e){var id=e.target.id;outs();if(o.onInput)o.onInput(id);G.check()});
+ outs();cvx=$('cv').getContext('2d');
+ var rs=function(){var cv=$('cv'),w=cv.clientWidth,d=Math.min(2,window.devicePixelRatio||1.5),nw=Math.round(w*d);if(w&&cv.width!==nw){cv.width=nw;cv.height=Math.round(w*G.H/G.W*d)}};
+ G.rs=rs};
+function outs(){CT.forEach(function(k){if(k.type!=='sel'){var e=$('o_'+k.id);if(e)e.textContent=LAB.fmt(+$(k.id).value,k.d==null?0:k.d)+(k.u||'')}})}
+G.v=function(id){var e=$(id),v=e.value;return e.tagName==='SELECT'&&isNaN(+v)?v:+v};
+G.set=function(o){for(var k in o){var e=$(k);if(e)e.value=o[k]}outs()};
+G.lock=function(a){CT.forEach(function(k){var e=$(k.id);e.disabled=a?a.indexOf(k.id)<0:false;$('c_'+k.id).classList.toggle('lk',!!e.disabled)})};
+G.show=function(a){CT.forEach(function(k){$('c_'+k.id).hidden=a?a.indexOf(k.id)<0:false})};
+G.reads=function(a){var el=$('inst');if(RD.length!==a.length){RD=a.map(function(){return[]});el.innerHTML=a.map(function(_,i){return'<div class="g"><div class="lb" id="rl'+i+'"></div><div class="dv" id="rv'+i+'" style="margin-top:8px"></div></div>'}).join('');RD=a.map(function(x){return[null,null]})}
+ a.forEach(function(r,i){if(RD[i][0]!==r[0]){RD[i][0]=r[0];$('rl'+i).textContent=r[0]}if(RD[i][1]!==r[1]){RD[i][1]=r[1];$('rv'+i).innerHTML=r[1]}})};
+G.loop=function(fn){var last=performance.now(),ck=0;
+ (function f(t){var dt=Math.min(.05,(t-last)/1000);last=t;
+  if(!$('jogo').hidden&&cvx){G.rs&&G.rs();var cv=$('cv'),sc=cv.width/G.W;cvx.setTransform(sc,0,0,sc,0,0);cvx.clearRect(0,0,G.W,G.H);
+   cvx.fillStyle='#ffffff0a';for(var x=10;x<G.W;x+=20)for(var y=10;y<G.H;y+=20)cvx.fillRect(x,y,1.4,1.4);
+   fn(cvx,dt,t);ck+=dt;if(ck>.12){ck=0;G.check()}}
+  requestAnimationFrame(f)})(last)};
+})();
+
+(function(){
+var VS=340;
+GAME.build({W:640,H:340,aria:'Ondas e som',nota:'v = λ · f. No ar, o som viaja a cerca de 340 m/s. Nível sonoro: β = 10·log(I ÷ I₀) dB; dobrar a distância tira cerca de 6 dB. Use fone de ouvido em volume baixo.',
+ left:'<div class="card" style="margin-top:12px;display:flex;gap:12px;align-items:center;flex-wrap:wrap"><button class="sec" id="ouvir" type="button">🔊 Ouvir a onda</button><span style="font-size:.9rem;color:#6b5a4a">O som toca só quando você aperta. Volume baixo.</span></div>',
+ controls:[
+ {id:'cena',type:'sel',l:'Situação',opts:[['onda','Onda no ar'],['bat','Afinação (batimentos)'],['corda','Corda do violão'],['db','Ruído e distância'],['dop','Sirene (Doppler)']],val:'onda'},
+ {id:'f',l:'Frequência',min:100,max:2000,step:10,val:1000,u:' Hz',d:0},
+ {id:'fb',l:'Corda afinada',min:400,max:480,step:1,val:452,u:' Hz',d:0},
+ {id:'fh',l:'Frequência',min:100,max:1000,step:5,val:400,u:' Hz',d:0},
+ {id:'r',l:'Distância',min:1,max:40,step:0.5,val:5,u:' m',d:1},
+ {id:'vs',l:'Velocidade',min:0,max:150,step:1,val:40,u:' km/h',d:0}]});
+function st(){return{cena:GAME.v('cena'),f:GAME.v('f'),fb:GAME.v('fb'),fh:GAME.v('fh'),r:GAME.v('r'),vs:GAME.v('vs')}}
+function lam(f){return VS/f}
+function beta(r){return 110-20*Math.log10(r)}
+function fap(vk){var v=vk/3.6;return 600*VS/(VS-v)}
+function fre(vk){var v=vk/3.6;return 600*VS/(VS+v)}
+function harm(f){var n=Math.round(f/220);return n>=1&&Math.abs(f-n*220)<=5?n:0}
+var AU={ctx:null,o1:null,o2:null,g:null,on:false};
+function somOn(){try{if(!AU.ctx)AU.ctx=new(window.AudioContext||window.webkitAudioContext)();var c=AU.ctx;AU.g=c.createGain();AU.g.gain.value=0;AU.g.connect(c.destination);AU.o1=c.createOscillator();AU.o2=c.createOscillator();AU.o1.connect(AU.g);AU.o2.connect(AU.g);AU.o1.start();AU.o2.start();AU.on=true;if(c.resume)c.resume()}catch(e){AU.on=false}}
+function somOff(){try{if(AU.o1){AU.o1.stop();AU.o2.stop();AU.g.disconnect()}}catch(e){}AU.on=false;var b=document.getElementById('ouvir');if(b)b.textContent='🔊 Ouvir a onda'}
+document.getElementById('ouvir').addEventListener('click',function(){if(AU.on){somOff()}else{somOn();this.textContent='🔇 Parar o som'}});
+function somAtualiza(s,t){if(!AU.on)return;var c=AU.ctx,now=c.currentTime,f1=s.f,f2=0,g=0.07,tp='sine';
+ if(s.cena==='bat'){f1=440;f2=s.fb;g=0.05}else if(s.cena==='corda'){f1=s.fh;tp='triangle'}else if(s.cena==='db'){f1=140;tp='sawtooth';g=Math.min(0.12,0.12*Math.pow(10,(beta(s.r)-110)/20)*3)}else if(s.cena==='dop'){var ph=(t/1000)%3;f1=ph<1.5?fap(s.vs):fre(s.vs);g=0.06*(ph<1.5?0.4+ph/1.5*0.6:1-(ph-1.5)/1.5*0.6)}
+ AU.o1.type=tp;AU.o2.type=tp;AU.o1.frequency.setTargetAtTime(f1,now,0.02);AU.o2.frequency.setTargetAtTime(f2||f1,now,0.02);AU.g.gain.setTargetAtTime(f2?g:g/2,now,0.05)}
+var FASES=[
+{t:'Comprimento de onda no ar',tag:'Eletromecânica',rot:'v = λ · f',v:{cena:'onda',f:1000},ed:['f'],
+ ctx:'Um alto-falante de teste emite um som puro. No ar, o som viaja a 340 m/s. O técnico quer um som com comprimento de onda de 68 cm.',
+ obj:'Ajuste a frequência para o comprimento de onda ficar em 68 cm (±1 cm).',prog:function(){return'λ = '+GAME.f(lam(GAME.v('f'))*100,1)+' cm'},
+ ok:function(){return Math.abs(lam(GAME.v('f'))-0.68)<=0.011},d:['f = v ÷ λ.','f = 340 ÷ 0,68 = 500 Hz.'],
+ q:{p:'Aumentando a frequência do som no mesmo ar, o comprimento de onda…',o:['diminui, porque a velocidade não muda','aumenta','não muda'],c:0,ex:'A velocidade depende do meio. Com v fixa, λ = v ÷ f: frequência maior, comprimento de onda menor.'}},
+{t:'Afinando a corda pelo batimento',tag:'Música na escola',rot:'interferência e batimentos',v:{cena:'bat',fb:452},ed:['fb'],
+ ctx:'O diapasão emite o Lá de 440 Hz. Tocando junto com a corda desafinada, o som "pulsa": são os batimentos, com frequência |f₁ − f₂|. Ligue o som para ouvir!',
+ obj:'Afine a corda até os batimentos sumirem (no máximo 1 batimento por segundo).',prog:function(){return'Batimentos: '+Math.abs(GAME.v('fb')-440)+' por segundo'},
+ ok:function(){return Math.abs(GAME.v('fb')-440)<=1},d:['Os batimentos ficam mais lentos à medida que as frequências se aproximam.','Leve a corda a 440 Hz.'],
+ q:{p:'Um diapasão de 440 Hz e uma corda de 444 Hz tocados juntos produzem…',o:['4 batimentos por segundo','884 batimentos por segundo','nenhum batimento'],c:0,ex:'Os batimentos vêm da interferência das duas ondas e têm frequência igual à diferença: 444 − 440 = 4 Hz.'}},
+{t:'O 3º harmônico do violão',tag:'Música na escola',rot:'ondas estacionárias',v:{cena:'corda',fh:400},ed:['fh'],
+ ctx:'A corda de 65 cm do violão tem frequência fundamental de 220 Hz. Ela vibra em ondas estacionárias quando f = n · 220 Hz (n = 1, 2, 3…).',
+ obj:'Faça a corda vibrar no 3º harmônico (três ventres).',prog:function(){var n=harm(GAME.v('fh'));return n?'Harmônico n = '+n:'Sem onda estacionária'},
+ ok:function(){return harm(GAME.v('fh'))===3},d:['Os harmônicos são múltiplos da fundamental.','3 · 220 = 660 Hz.'],
+ q:{p:'No 3º harmônico, o comprimento de onda na corda de 65 cm é…',o:['2 · 65 ÷ 3 ≈ 43 cm','65 cm','3 · 65 = 195 cm'],c:0,ex:'Numa corda presa nas pontas, λ = 2L ÷ n. Com n = 3, λ = 130 ÷ 3 ≈ 43 cm.'}},
+{t:'Britadeira e protetor auricular',tag:'Segurança do Trabalho',rot:'nível sonoro em dB',v:{cena:'db',r:5},ed:['r'],
+ ctx:'Uma britadeira produz 110 dB a 1 m. Pela NR-15, 85 dB é o limite para 8 horas de trabalho sem proteção. O nível cai 20·log(r) dB com a distância r.',
+ obj:'Encontre uma posição a até 25 m em que o nível fique em no máximo 85 dB.',prog:function(){return'Nível: '+GAME.f(beta(GAME.v('r')),1)+' dB'},
+ ok:function(){var r=GAME.v('r');return beta(r)<=85&&r<=25},d:['110 − 20·log(r) ≤ 85, então log(r) ≥ 1,25.','r ≥ 10^1,25 ≈ 17,8 m.'],
+ q:{p:'Um aumento de 10 dB no nível sonoro significa intensidade…',o:['10 vezes maior','10% maior','2 vezes maior'],c:0,ex:'A escala decibel é logarítmica: +10 dB multiplica a intensidade por 10; +20 dB, por 100.'}},
+{t:'A sirene da ambulância',tag:'Saúde e trânsito',rot:'efeito Doppler',v:{cena:'dop',vs:40},ed:['vs'],
+ ctx:'A sirene emite 600 Hz. Quando a ambulância se aproxima, o som chega mais agudo: f′ = f · v ÷ (v − vₛ). Ligue o som e ouça a mudança ao passar.',
+ obj:'Ajuste a velocidade da ambulância para quem está parado ouvir 650 Hz na aproximação (±5 Hz).',prog:function(){return'Aproximando: '+GAME.f(fap(GAME.v('vs')),0)+' Hz'},
+ ok:function(){return Math.abs(fap(GAME.v('vs'))-650)<=5},d:['vₛ = v · (1 − f ÷ f′) = 340 · (1 − 600 ÷ 650).','vₛ ≈ 26 m/s ≈ 94 km/h.'],
+ q:{p:'Depois que a ambulância passa e se afasta, o som fica…',o:['mais grave que 600 Hz','mais agudo que 600 Hz','igual a 600 Hz'],c:0,ex:'Ao se afastar, as frentes de onda chegam mais espaçadas: f′ = f · v ÷ (v + vₛ) < f.'}}];
+GAME.init({key:'ceetip_lab_ondas_v1',fases:FASES,medalhas:['🥉 Aprendiz de ondas','🥈 Técnico(a) em acústica','🥇 Mestre do som'],livreDesc:'Explore frequência, batimentos, harmônicos, decibéis e Doppler, com som.',
+ onStart:function(i,F){somOff();GAME.set(F.v);GAME.lock(F.ed);GAME.show(F.ed)},
+ onLivre:function(){somOff();GAME.set({cena:'onda',f:440});GAME.lock(null);GAME.show(null)},
+ livre:'<div class="ctx"><span class="tag f">Laboratório livre</span></div><h3>Ouça e meça</h3><p>Troque a situação e aperte “Ouvir”. Qual a menor frequência que você consegue ouvir com o fone? E a maior?</p><div class="obj"><span class="ck">?</span><span>Desafio extra: um sonar emite um pulso que volta do fundo do mar em 0,4 s. Com o som a 1 500 m/s na água, qual a profundidade?</span></div><button class="sec" data-rev="lv">Ver resposta</button><div class="revela" id="lv" hidden>Ida e volta: d = 1 500 · 0,4 ÷ 2 = 300 m.</div>'});
+GAME.loop(function(cx,dt,t){var s=st(),T=GAME.tx,R=GAME.rr,c=s.cena;somAtualiza(s,t);
+ var seta=function(x0,x1,y,l){cx.strokeStyle='#ffe27a';cx.lineWidth=2;cx.beginPath();cx.moveTo(x0,y);cx.lineTo(x1,y);cx.moveTo(x0,y-6);cx.lineTo(x0,y+6);cx.moveTo(x1,y-6);cx.lineTo(x1,y+6);cx.stroke();T(cx,l,(x0+x1)/2,y-8,'#ffe27a',13,'center',800)};
+ if(c==='onda'){var L=lam(s.f),px=L*200;cx.fillStyle='#c9a227';R(cx,20,110,26,60,6);cx.fill();
+  for(var x=50;x<620;x+=3){var ph=(x-50)/px*6.2832-t/1000*6.2832*1.2,a=(Math.sin(ph)+1)/2;cx.fillStyle='rgba(79,179,255,'+(0.08+a*0.6)+')';cx.fillRect(x,95,2,90)}
+  cx.strokeStyle='#ff6a3d';cx.lineWidth=2.5;cx.beginPath();for(var x=50;x<620;x+=2){var y=240-Math.sin((x-50)/px*6.2832-t/1000*7.54)*28;x>50?cx.lineTo(x,y):cx.moveTo(x,y)}cx.stroke();
+  var x0=50+((t/1000*1.2*px)%px);if(x0+px<615)seta(x0,x0+px,292,'λ = '+GAME.f(L*100,1)+' cm');T(cx,'compressões e rarefações do ar',335,86,'#d9c48a',12,'center');T(cx,'escala: 1 m = 200 px',610,320,'#a89a74',11,'right');
+  GAME.reads([['Frequência f',s.f+' Hz'],['Comprimento de onda λ',GAME.f(L*100,1)+' cm'],['Período T',GAME.f(1000/s.f,2)+' ms']]);
+ }else if(c==='bat'){var df=Math.abs(s.fb-440),W=560;T(cx,'diapasão 440 Hz + corda '+s.fb+' Hz (2 segundos de som)',40,40,'#d9c48a',13);
+  cx.beginPath();for(var x=0;x<=W;x+=1){var tt=x/W*2,e=Math.abs(Math.cos(Math.PI*df*tt));var y=e*70;x?cx.lineTo(40+x,170-y):cx.moveTo(40+x,170-y)}for(var x=W;x>=0;x-=1){var tt=x/W*2,e=Math.abs(Math.cos(Math.PI*df*tt));cx.lineTo(40+x,170+e*70)}cx.closePath();cx.fillStyle='#4fb3ff55';cx.fill();
+  cx.strokeStyle='#4fb3ff';cx.lineWidth=1;cx.beginPath();for(var x=0;x<=W;x+=0.5){var tt=x/W*2,e=Math.cos(Math.PI*df*tt),y=e*70*Math.sin(x*1.3);x?cx.lineTo(40+x,170+y):cx.moveTo(40+x,170+y)}cx.stroke();
+  var pl=(t/1000)%2;cx.fillStyle='#fff';cx.fillRect(40+pl/2*W,92,2,156);T(cx,'0 s',40,262,'#a89a74',11,'center');T(cx,'1 s',40+W/2,262,'#a89a74',11,'center');T(cx,'2 s',40+W,262,'#a89a74',11,'center');
+  R(cx,180,276,280,48,10);cx.fillStyle='#ffffff10';cx.fill();T(cx,df<=1?'afinada!':df+' batimentos por segundo',320,306,df<=1?'#7aff9a':'#ffe27a',18,'center',900);
+  GAME.reads([['Diapasão','440 Hz'],['Corda',s.fb+' Hz'],['Batimentos',df+' Hz']]);
+ }else if(c==='corda'){var n=harm(s.fh),x0=60,x1=580,y=160;cx.fillStyle='#8a6a4a';cx.fillRect(x0-14,y-40,14,80);cx.fillRect(x1,y-40,14,80);
+  cx.strokeStyle=n?'#ffe27a':'#e8e8e8';cx.lineWidth=3;cx.beginPath();for(var x=x0;x<=x1;x+=2){var u=(x-x0)/(x1-x0),yy=n?Math.sin(n*Math.PI*u)*55*Math.cos(t/1000*9):Math.sin(u*Math.PI*7.3+t/90)*3*Math.sin(u*Math.PI);x>x0?cx.lineTo(x,y+yy):cx.moveTo(x,y+yy)}cx.stroke();
+  if(n){cx.globalAlpha=.25;cx.beginPath();for(var x=x0;x<=x1;x+=2){var u=(x-x0)/(x1-x0);x>x0?cx.lineTo(x,y-Math.sin(n*Math.PI*u)*55):cx.moveTo(x,y-Math.sin(n*Math.PI*u)*55)}cx.stroke();cx.globalAlpha=1;for(var k=0;k<=n;k++){cx.fillStyle='#ff6a3d';cx.beginPath();cx.arc(x0+(x1-x0)*k/n,y,5,0,7);cx.fill()}T(cx,'nós em vermelho',x1,y+80,'#ff9a6a',12,'right')}
+  T(cx,'L = 65 cm',320,y+100,'#d9c48a',13,'center');R(cx,200,270,240,50,10);cx.fillStyle='#ffffff10';cx.fill();T(cx,n?n+'º harmônico':'sem ressonância',320,302,n===3?'#7aff9a':n?'#ffe27a':'#ff9a9a',18,'center',900);
+  GAME.reads([['Frequência',s.fh+' Hz'],['Harmônico n',n?String(n):'—'],['λ na corda',n?GAME.f(130/n,1)+' cm':'—']]);
+ }else if(c==='db'){var b=beta(s.r),sx=60,sc=13,wx=sx+s.r*sc;cx.fillStyle='#4a2a1e';cx.fillRect(30,230,580,14);
+  for(var k=0;k<6;k++){var rr=((t/1000*60+k*40)%240);cx.strokeStyle='rgba(255,226,122,'+(0.5-rr/500)+')';cx.lineWidth=2;cx.beginPath();cx.arc(sx,200,rr,-1.2,1.2);cx.stroke()}
+  cx.fillStyle='#ff6a3d';cx.fillRect(sx-14,170,28,60);T(cx,'110 dB a 1 m',sx,160,'#ffe27a',11,'center',800);
+  cx.fillStyle=b<=85?'#35c9a2':'#d9543f';cx.beginPath();cx.arc(wx,180,10,0,7);cx.fill();cx.fillRect(wx-6,190,12,40);T(cx,GAME.f(s.r,1)+' m',wx,262,'#fff',12,'center',800);
+  R(cx,420,40,190,90,10);cx.fillStyle='#ffffff10';cx.fill();T(cx,GAME.f(b,1)+' dB',515,86,b<=85?'#7aff9a':'#ff7a7a',28,'center',900);T(cx,'limite 8 h (NR-15): 85 dB',515,112,'#d9c48a',12,'center');
+  GAME.reads([['Distância',GAME.f(s.r,1)+' m'],['Nível sonoro',GAME.f(b,1)+' dB'],['Intensidade relativa','1/'+GAME.f(s.r*s.r,0)+' da de 1 m']]);
+ }else{var v=s.vs/3.6,ph=(t/1000)%3,ax=40+ph/3*560,lx=470;cx.fillStyle='#4a2a1e';cx.fillRect(30,230,580,12);
+  for(var k=0;k<14;k++){var te=k*0.2,age=ph-te;if(age<0)continue;var ex=40+te/3*560,rr=age*(560/3)*Math.max(1.4,3.6-s.vs/50);cx.strokeStyle='rgba(79,179,255,'+Math.max(0,0.6-age/2)+')';cx.lineWidth=1.5;cx.beginPath();cx.arc(ex,190,rr,0,7);cx.stroke()}
+  cx.fillStyle='#fff';R(cx,ax-26,170,52,30,6);cx.fill();cx.fillStyle='#d9543f';cx.fillRect(ax-4,174,8,22);cx.fillRect(ax-11,181,22,8);cx.fillStyle=Math.floor(t/150)%2?'#ff4a4a':'#4a7aff';cx.fillRect(ax-8,163,16,7);
+  cx.fillStyle='#35c9a2';cx.beginPath();cx.arc(lx,120,9,0,7);cx.fill();cx.fillRect(lx-5,129,10,30);T(cx,'ouvinte',lx,104,'#d9c48a',12,'center');T(cx,'(compressão das frentes exagerada no desenho)',610,322,'#a89a74',11,'right');
+  var fa=fap(s.vs),fr=fre(s.vs);R(cx,40,40,240,70,10);cx.fillStyle='#ffffff10';cx.fill();T(cx,'aproximando: '+GAME.f(fa,0)+' Hz',56,68,ax<lx?'#fff':'#a89a74',15,'left',800);T(cx,'afastando: '+GAME.f(fr,0)+' Hz',56,94,ax>=lx?'#fff':'#a89a74',15,'left',800);
+  GAME.reads([['Velocidade da fonte',GAME.f(v,1)+' m/s'],['Ouvido ao aproximar',GAME.f(fa,0)+' Hz'],['Ouvido ao afastar',GAME.f(fr,0)+' Hz']]);
+ }});
+window.LABX={lam:lam,beta:beta,fap:fap,harm:harm,FASES:FASES};
+
+})();
+</script></body></html>
