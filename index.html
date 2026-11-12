@@ -1307,6 +1307,7 @@ async function segIniciar(){
   if(!segDisponivel()){ SEG.pronto = true; SEG_PRONTO_RES(); return; }
   try{
     SEG.auth = firebase.auth();
+    try{ SEG.auth.languageCode = 'pt'; }catch(e){}
     await new Promise(res => { const des = SEG.auth.onAuthStateChanged(() => { des(); res(); }); setTimeout(res, 4000); });
     if(!SEG.auth.currentUser){
       try{ await SEG.auth.signInAnonymously(); }catch(e){ SEG.anonimoErro = (e && e.code) || 'erro'; }
@@ -1326,7 +1327,7 @@ async function segEntrarComEmail(email, senha){
   if(!SEG.auth || !segAtivo()) return { ok:false, motivo:'sem-auth' };
   const tentativas = [segSenhaFirebase(senha), senha];
   const u = segUsuario();
-  if(u && !u.isAnonymous && u.email===email){ try{ await u.reload(); }catch(e){} segAtualizarPapel(); return { ok:true, user: segUsuario() }; }
+  if(u && !u.isAnonymous && u.email===email){ try{ await u.reload(); }catch(e){} if(segUsuario().emailVerified){ try{ await segUsuario().getIdToken(true); }catch(e){} } segAtualizarPapel(); return { ok:true, user: segUsuario() }; }
   for(const s of tentativas){
     try{ const cred = await SEG.auth.signInWithEmailAndPassword(email, s); segAtualizarPapel(); return { ok:true, user: cred.user }; }
     catch(e){ if(e && e.code==='auth/too-many-requests') return { ok:false, motivo:'muitas-tentativas' }; }
@@ -1390,18 +1391,19 @@ async function segEntrarProfessor(rec, senha){
   }
   const u = segUsuario();
   try{ await u.reload(); }catch(e){}
+  if(segUsuario().emailVerified){ try{ await segUsuario().getIdToken(true); }catch(e){} }
   segAtualizarPapel();
   if(!segUsuario().emailVerified){
     const ult = Number(localStorage.getItem('seg-verif-' + email) || 0);
-    if(r.nova || Date.now() - ult > 6*3600*1000){ try{ await segUsuario().sendEmailVerification(); localStorage.setItem('seg-verif-' + email, String(Date.now())); }catch(e){} }
-    SEG.avisoProf = `📧 Confirme seu e-mail: enviamos um link para ${email}. Abra o e-mail (veja também o spam), clique no link e depois saia e entre de novo no app. Sem isso, em breve você não vai conseguir salvar nada.`;
+    if(r.nova || Date.now() - ult > 48*3600*1000){ try{ await segEnviarConfirmacao(segUsuario()); localStorage.setItem('seg-verif-' + email, String(Date.now())); }catch(e){} }
+    SEG.avisoProf = `📧 Confirme seu e-mail: enviamos um link para ${email}. Abra o e-mail (veja também o spam e a aba Promoções) e clique no link MAIS RECENTE. Depois volte para cá: o app confere sozinho em alguns segundos. Sem isso, o banco não aceita salvar provas e atividades.`;
   }
   try{ await window.storage.set(`seg-status:${rec.id}`, JSON.stringify({ email, uid: segUsuario().uid, verificado: !!segUsuario().emailVerified, at: Date.now() }), true); }catch(e){}
   return { ok:true };
 }
 async function segReenviarConfirmacao(){
   const u = segUsuario(); if(!u || u.isAnonymous) return;
-  try{ await u.sendEmailVerification(); SEG.avisoProf = `📧 Enviamos outro link para ${u.email}. Depois de clicar nele, saia e entre de novo.`; }catch(e){ SEG.avisoProf = 'Não consegui reenviar agora (' + ((e && e.code)||'erro') + '). Tente daqui a alguns minutos.'; }
+  try{ await segEnviarConfirmacao(u); localStorage.setItem('seg-verif-' + u.email, String(Date.now())); SEG.avisoProf = `📧 Enviamos outro link para ${u.email}. Use só este link (o mais recente). Depois de clicar, volte para cá: o app confere sozinho.`; }catch(e){ SEG.avisoProf = 'Não consegui reenviar agora (' + ((e && e.code)||'erro') + '). Tente daqui a alguns minutos.'; }
   render();
 }
 async function segRedefinirSenha(email){
@@ -1409,13 +1411,66 @@ async function segRedefinirSenha(email){
   try{ await SEG.auth.sendPasswordResetEmail(email); SEG.avisoProf = `📧 Enviamos um link para ${email} para criar a senha nova. Depois entre no app com a senha nova.`; }catch(e){ SEG.avisoProf = 'Não consegui enviar o e-mail (' + ((e && e.code)||'erro') + ').'; }
   render();
 }
+// ---------- Confirmação de e-mail sem sair e entrar (12/11/2026) ----------
+function segAcaoEmail(){ return { url: location.origin + location.pathname, handleCodeInApp: false }; }
+async function segEnviarConfirmacao(u){
+  try{ await u.sendEmailVerification(segAcaoEmail()); }
+  catch(e){ if(e && /continue-uri|unauthorized|domain|invalid-continue/i.test(String(e.code || e.message || ''))) await u.sendEmailVerification(); else throw e; }
+}
+function segToast(txt){
+  if(typeof calToast === 'function'){ try{ calToast(txt); return; }catch(e){} }
+  const el = document.createElement('div'); el.textContent = txt;
+  el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#6b1f2e;color:#fff;padding:12px 18px;border-radius:12px;z-index:99999;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:90vw;';
+  document.body.appendChild(el); setTimeout(() => el.remove(), 5000);
+}
+let SEG_CHECANDO = false, SEG_ULT_CHECK = 0;
+// Confere no Firebase se o professor já clicou no link; se sim, renova o crachá, grava o status e avisa.
+async function segChecarConfirmacao(forcar){
+  const u = segUsuario(); const ses = state.professor && state.professor.session;
+  if(!u || u.isAnonymous || u.email===SEG_EMAIL_COORD || !ses || ses.viaCoord) return null;
+  if(String(ses.email||'').trim().toLowerCase() !== String(u.email||'').toLowerCase()) return null;
+  if(SEG_CHECANDO || (!forcar && Date.now() - SEG_ULT_CHECK < 15000)) return null;
+  SEG_CHECANDO = true; SEG_ULT_CHECK = Date.now();
+  try{
+    const antes = SEG.papel;
+    try{ await u.reload(); }catch(e){}
+    const cur = segUsuario(); if(!cur) return null;
+    const ok = !!cur.emailVerified;
+    if(ok){ try{ await cur.getIdToken(true); }catch(e){} }
+    segAtualizarPapel();
+    const chave = `seg-status:${ses.id}`;
+    let reg = null; try{ reg = JSON.parse((await window.storage.get(chave, true)).value); }catch(e){}
+    if(!reg || !!reg.verificado !== ok || reg.uid !== cur.uid || Date.now() - (reg.at||0) > 6*3600*1000){
+      try{ await window.storage.set(chave, JSON.stringify({ email: cur.email, uid: cur.uid, verificado: ok, at: Date.now() }), true); }catch(e){}
+    }
+    if(ok && (antes==='professor-pendente' || (reg && !reg.verificado))){
+      SEG.avisoProf = '';
+      segToast('✅ E-mail confirmado! Você já pode salvar provas e atividades.');
+      render();
+    }
+    if(!ok && !SEG.avisoProf){ SEG.avisoProf = `📧 Falta confirmar o seu e-mail (${cur.email}). Abra o e-mail que enviamos (veja também o spam), clique no link MAIS RECENTE e volte para cá: o app confere sozinho. Sem isso, o banco não aceita salvar provas e atividades.`; render(); }
+    return ok;
+  } finally { SEG_CHECANDO = false; }
+}
+async function segJaConfirmei(){
+  SEG.avisoProf = '⏳ Conferindo…'; render();
+  const ok = await segChecarConfirmacao(true);
+  if(ok) return;
+  const u = segUsuario();
+  SEG.avisoProf = `Ainda não aparece confirmado para ${u ? u.email : 'o seu e-mail'}. Confira: (1) o link é o do e-mail MAIS RECENTE (os anteriores deixam de valer); (2) ao clicar, abriu uma página dizendo que o e-mail foi verificado; (3) o e-mail é o mesmo que você usa para entrar no app. Se o link disser “expirado” ou “já usado”, toque em “Reenviar o link”.`;
+  render();
+}
+// Confere sozinho: ao voltar para a aba e a cada 20 s enquanto falta confirmar
+document.addEventListener('visibilitychange', () => { if(!document.hidden && SEG.papel==='professor-pendente') segChecarConfirmacao(true); });
+window.addEventListener('focus', () => { if(SEG.papel==='professor-pendente') segChecarConfirmacao(false); });
+setInterval(() => { if(!document.hidden && SEG.papel==='professor-pendente' && state.view==='professor') segChecarConfirmacao(false); }, 20000);
 function segAvisoProfHtml(){
   if(!SEG.avisoProf) return '';
   const u = segUsuario();
   return `<div class="card" data-seg-aviso style="border:2px solid #C9A227; background:#fffaf0;">
     <strong>🔐 Segurança da sua conta</strong><p style="margin:6px 0;">${esc(SEG.avisoProf)}</p>
     <div class="row" style="gap:6px; flex-wrap:wrap;">
-      ${u && !u.isAnonymous && !u.emailVerified ? '<button class="btn btn-ghost btn-sm" data-action="seg-reenviar">📧 Reenviar o link</button>' : ''}
+      ${u && !u.isAnonymous && !u.emailVerified ? '<button class="btn btn-primary btn-sm" data-action="seg-ja-confirmei">✅ Já cliquei no link</button><button class="btn btn-ghost btn-sm" data-action="seg-reenviar">📧 Reenviar o link</button>' : ''}
       ${SEG.avisoProf.includes('outra senha') && state.professor.loginEmail ? `<button class="btn btn-ghost btn-sm" data-action="seg-redefinir" data-email="${esc(state.professor.loginEmail)}">📧 Receber e-mail para redefinir</button>` : ''}
     </div></div>`;
 }
@@ -1499,14 +1554,14 @@ function renderSegurancaCard(){
     <ol style="padding-left:18px; font-size:.9rem; margin:0;">
       ${passo(authOk && !SEG.anonimoErro, `No <a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/providers" target="_blank" rel="noopener">console do Firebase</a> → <strong>Authentication</strong> → <strong>Método de login</strong>, ative <strong>Anônimo</strong> e <strong>E-mail/senha</strong>. ${SEG.anonimoErro ? `<span style="color:#b3261e;">(ainda desligado: ${esc(SEG.anonimoErro)})</span>` : ''}`)}
       ${passo(coordOk, `Saia e entre de novo na coordenação. ${coordOk ? `Código da coordenação (UID): <code data-seg-uid>${esc(u.uid)}</code>` : ''} ${SEG.coordErro ? `<span style="color:#b3261e;">${esc(SEG.coordErro)}</span>` : ''}`)}
-      ${passo(linhas.length && confirmados===linhas.filter(l => l.ativo).length && confirmados>0, `Cada professor entra uma vez no app e clica no link que chega no e-mail dele. <strong>${confirmados} de ${linhas.filter(l => l.ativo).length}</strong> professor(es) ativo(s) já confirmaram.`)}
+      ${passo(linhas.length && confirmados===linhas.filter(l => l.ativo).length && confirmados>0, `Cada professor entra no app e clica no link que chega no e-mail dele. O status muda aqui quando ele volta a abrir o app (até 20 s depois); toque em ↻ Atualizar. <strong>${confirmados} de ${linhas.filter(l => l.ativo).length}</strong> professor(es) ativo(s) já confirmaram.`)}
       ${passo(/✅/.test(st.teste||''), `Quando todos confirmarem, copie as regras abaixo e cole em <a href="https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/rules" target="_blank" rel="noopener"><strong>Firestore → Regras</strong></a> → <strong>Publicar</strong>.`)}
       ${passo(/✅/.test(st.teste||''), `Toque em <strong>Testar proteção</strong> para conferir. ${st.teste ? `<div style="margin-top:4px;">${esc(st.teste)}</div>` : ''}`)}
     </ol>
     ${!coordOk ? `<div data-seg-alerta style="margin-top:10px; padding:10px; border:2px solid #b3261e; border-radius:10px; background:#fff3f2; font-size:.9rem;"><strong>⚠️ A coordenação não está ligada à conta de segurança.</strong> Sem isso, ninguém entra na lista da equipe e os professores não conseguem salvar. Saia e entre de novo como coordenação. ${SEG.coordErro ? esc(SEG.coordErro) : ''}</div>` : ''}
     ${coordOk && SEG.equipeErro ? `<div data-seg-alerta style="margin-top:10px; padding:10px; border:2px solid #b3261e; border-radius:10px; background:#fff3f2; font-size:.9rem;"><strong>⚠️ O banco não deixou gravar a lista da equipe (${esc(SEG.equipeErro)}).</strong> As regras publicadas no Firebase não reconhecem a conta atual da coordenação, porque o código (UID) colado nelas é diferente do atual: <code>${esc(u.uid)}</code>. Toque em <strong>📋 Copiar regras</strong> aqui embaixo, cole em Firestore → Regras (apague tudo o que estava lá antes), toque em <strong>Publicar</strong>, espere 1 minuto e toque em <strong>↻ Atualizar</strong>.</div>` : ''}
     <details style="margin-top:8px;"><summary style="cursor:pointer; font-size:.88rem;">👩‍🏫 Situação de cada professor</summary>
-      <div style="max-height:260px; overflow:auto; margin-top:6px;">${linhas.map(l => `<div data-seg-prof style="display:flex; justify-content:space-between; gap:8px; font-size:.85rem; border-bottom:1px solid #eee; padding:3px 0;"><span>${esc(l.nome)} <span class="muted">${esc(l.email)}</span></span><span>${l.naEquipe===false ? '⚠️ fora da lista da equipe — ' : ''}${l.s ? (l.s.verificado ? '✅ e-mail confirmado' : '⏳ falta clicar no link') : (l.ativo ? '⚪ ainda não entrou nesta versão' : '— não ativou o acesso')}</span></div>`).join('') || '<p class="muted">Nenhum professor cadastrado.</p>'}</div>
+      <div style="max-height:260px; overflow:auto; margin-top:6px;">${linhas.map(l => `<div data-seg-prof style="display:flex; justify-content:space-between; gap:8px; font-size:.85rem; border-bottom:1px solid #eee; padding:3px 0;"><span>${esc(l.nome)} <span class="muted">${esc(l.email)}</span></span><span>${l.naEquipe===false ? '⚠️ fora da lista da equipe — ' : ''}${l.s ? (l.s.verificado ? '✅ e-mail confirmado' : '⏳ falta clicar no link') + (l.s.at ? ' <span class="muted" style="font-size:.75rem;">(conferido ' + new Date(l.s.at).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) + ')</span>' : '') : (l.ativo ? '⚪ ainda não entrou nesta versão' : '— não ativou o acesso')}</span></div>`).join('') || '<p class="muted">Nenhum professor cadastrado.</p>'}</div>
       <button class="btn btn-ghost btn-sm" data-action="seg-atualizar" style="margin-top:6px;">↻ Atualizar</button>
     </details>
     <div class="row" style="gap:6px; flex-wrap:wrap; margin-top:10px;">
@@ -1530,10 +1585,12 @@ async function segExplicarFalha(e, chave){
   if(!u || u.isAnonymous) return { tit:'Sua conta de segurança não foi ligada', txt:(SEG.avisoProf || 'O app não conseguiu entrar na sua conta de segurança.') + ' Saia do app e entre de novo. Se continuar, avise a coordenação.' };
   try{ await u.reload(); }catch(x){}
   segAtualizarPapel();
-  if(!segUsuario().emailVerified) return { tit:'Falta confirmar o seu e-mail', txt:'Abra o e-mail ' + u.email + ' (veja também a caixa de spam), clique no link de confirmação e depois saia e entre de novo no app. Sem isso, o banco não aceita gravar avaliações e atividades.', reenviar:true };
+  if(!segUsuario().emailVerified) return { tit:'Falta confirmar o seu e-mail', txt:'Abra o e-mail ' + u.email + ' (veja também a caixa de spam), clique no link MAIS RECENTE e volte para cá; o app confere sozinho e você pode salvar de novo. Sem isso, o banco não aceita gravar avaliações e atividades.', reenviar:true };
   let naEquipe = true;
   try{ naEquipe = (await db.collection('equipe').doc(u.email).get()).exists; }catch(x){}
   if(!naEquipe) return { tit:'Seu e-mail não está na lista da equipe', txt:'A coordenação precisa abrir o app (painel 🔐 Segurança → Atualizar) para incluir ' + u.email + ' na equipe. Depois saia e entre de novo.' };
+  let renovou = false; try{ await segUsuario().getIdToken(true); renovou = true; segChecarConfirmacao(true); }catch(x){}
+  if(renovou) return { tit:'Sua conta foi atualizada agora', txt:'Seu e-mail está confirmado e o app acabou de atualizar o seu acesso. Toque em salvar de novo. Se recusar outra vez, avise a coordenação (painel 🔐 Segurança → Testar proteção). Chave: ' + chave };
   return { tit:'O banco recusou a gravação', txt:'Seu e-mail está confirmado e na lista da equipe, mas as regras recusaram. Avise a coordenação (painel 🔐 Segurança → Testar proteção). Chave: ' + chave };
 }
 function segMostrarFalha(msg){
@@ -22365,6 +22422,7 @@ async function restaurarSessao(){
       state.view = 'professor';
       salvarSessaoLocal({ role:'professor', id: rec.id });
       render(); resetIdleLogoutTimer();
+      segChecarConfirmacao(true);
       registerProfessorLogin(rec.id);
       handlePostLoginRedirect();
     } else if(s.role==='aluno'){
@@ -32520,6 +32578,7 @@ document.addEventListener('click', (e) => {
   else if(act==='download-backup'){ downloadFullBackup(btn, btn.dataset.modo); }
   else if(act==='backup-restaurar'){ backupRestaurar(); }
   else if(act==='seg-reenviar'){ segReenviarConfirmacao(); }
+  else if(act==='seg-ja-confirmei'){ segJaConfirmei(); }
   else if(act==='seg-redefinir'){ segRedefinirSenha(btn.dataset.email); }
   else if(act==='seg-atualizar'){ segState().status = null; segCarregarStatus(); }
   else if(act==='seg-ver-regras'){ const st = segState(); st.mostrarRegras = !st.mostrarRegras; render(); }
