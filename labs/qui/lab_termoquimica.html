@@ -266,7 +266,7 @@ var FASES=[
  obj:'Ajuste a entrada de ar para obter combustão completa (890 kJ/mol).',prog:function(){var c=calc(st());return'Energia: '+GAME.f(c.E,0)+' kJ/mol · completa: '+GAME.f(c.f*100,0)+'%'},
  ok:function(){return calc(st()).f>=0.99},d:['Combustão completa libera 890 kJ/mol; incompleta, só 607.','Acima de 90% de entrada de ar, a combustão é completa.'],
  q:{p:'Por que a combustão incompleta é perigosa em ambientes fechados?',o:['forma monóxido de carbono, gás tóxico','libera mais energia','forma só vapor de água'],c:0,ex:'O CO se liga à hemoglobina e impede o transporte de oxigênio.'}}];
-GAME.init({key:'ceetip_lab_termo_v1',fases:FASES,medalhas:['🥉 Aprendiz de energia','🥈 Técnico(a) em termoquímica','🥇 Mestre da energia'],livreDesc:'Troque a situação e mude entalpias, massa, equações, energias de ligação e ar.',
+GAME.init({key:'ceetip_lab_termoq_v1',fases:FASES,medalhas:['🥉 Aprendiz de energia','🥈 Técnico(a) em termoquímica','🥇 Mestre da energia'],livreDesc:'Troque a situação e mude entalpias, massa, equações, energias de ligação e ar.',
  onStart:function(i,F){GAME.set(F.v);GAME.lock(F.ed);GAME.show(F.ed)},
  onLivre:function(){GAME.set({cena:'dia',Hp:150,al:'castanha',m:10,a:'1',b:'1',x:380,ar:60});GAME.lock(null);GAME.show(['cena','Hp','al','m','a','b','x','ar'])},
  livre:'<div class="ctx"><span class="tag f">Laboratório livre</span></div><h3>Energia das reações</h3><p>Troque a situação e mude os valores. Qual alimento tem mais energia por grama? Quando uma reação passa de exotérmica a endotérmica?</p><div class="obj"><span class="ck"></span><span>Sem regras: explore à vontade.</span></div>'});
