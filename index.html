@@ -569,7 +569,8 @@
   .type-pick{ display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
   body.screenshot-shield #root{ visibility:hidden; }
   body.screenshot-shield::before{ content:'📵 Captura de tela não é permitida durante a prova.'; position:fixed; inset:0; z-index:99999; display:flex; align-items:center; justify-content:center; text-align:center; padding:24px; font-size:1.2rem; font-weight:700; background:#3d0f1c; color:#fff; }
-  .exam-lock, .exam-lock *{ -webkit-user-select:none; -moz-user-select:none; user-select:none; }
+  .exam-lock, .exam-lock *{ -webkit-user-select:none; -moz-user-select:none; user-select:none; -webkit-touch-callout:none; }
+  .exam-lock img{ pointer-events:none; -webkit-user-drag:none; }
   .exam-sticky-header{ position:sticky; top:0; background:var(--paper); z-index:5; padding-bottom:8px; margin:-26px -26px 0; padding:26px 26px 8px; border-bottom:1px solid var(--paper-line); }
   .exam-lock textarea, .exam-lock input{ user-select:text; -webkit-user-select:text; }
 
@@ -1627,6 +1628,51 @@ segIniciar();
         throw e;
       }
     };
+  });
+})();
+// ---------- Prova segura (13/11/2026) ----------
+// Listas que vários aparelhos gravam ao mesmo tempo: respostas de uma prova e pedidos de liberação.
+// Cada gravação vira uma transação que junta o que outro aparelho gravou depois da nossa leitura.
+// O que este aparelho já tinha visto e tirou da lista (ex.: professor apagou uma resposta) continua fora.
+(function provaListasSeguras(){
+  const b = window.storage;
+  if(typeof b.update !== 'function') return;
+  const VISTOS = new Map();
+  const nk = n => String(n||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+  const regra = k => {
+    if(String(k).startsWith('responses:')) return { id: r => 'n:' + nk(r && r.studentName) };
+    if(k==='unlock-requests') return { id: r => 'i:' + (r && r.id), juntar: (loc, srv) => {
+      ['released','finalizar','finalizada','destravada'].forEach(f => { if(srv[f] && !loc[f]) loc[f] = srv[f]; });
+      ['releasedAt','finalizarAt'].forEach(f => { if(srv[f] && !loc[f]) loc[f] = srv[f]; });
+      if((srv.pinErros||0) > (loc.pinErros||0)) loc.pinErros = srv.pinErros;
+      return loc; } };
+    return null;
+  };
+  // guarda o que foi lido (id → texto do item) para saber o que este aparelho mudou e o que só repassou
+  const lembrar = (k, txt) => { const R = regra(k); if(!R || txt==null) return; let arr; try{ arr = JSON.parse(txt); }catch(e){ return; } if(Array.isArray(arr)) VISTOS.set(k, new Map(arr.map(x => [R.id(x), JSON.stringify(x)]))); };
+  window.storage = Object.assign({}, b, {
+    async get(k, sh){ const r = await b.get(k, sh); try{ lembrar(k, r && r.value); }catch(e){} return r; },
+    async list(pre, sh){ const r = await b.list(pre, sh); try{ Object.entries((r && r.values)||{}).forEach(([k, v]) => lembrar(k, v)); }catch(e){} return r; },
+    async set(k, v, sh){
+      const R = regra(k); let local = null;
+      if(R){ try{ local = JSON.parse(v); }catch(e){ local = null; } }
+      if(!R || !Array.isArray(local)) return b.set(k, v, sh);
+      const vistos = VISTOS.get(k) || new Map();
+      let final = v;
+      await b.update(k, atual => {
+        let srv = []; try{ srv = atual ? JSON.parse(atual) : []; }catch(e){ srv = []; }
+        if(!Array.isArray(srv)) srv = [];
+        const porId = new Map(srv.map(x => [R.id(x), x])), meus = new Set(local.map(R.id));
+        // item que este aparelho não mudou desde a leitura: vale a versão do servidor (mudança de outro aparelho)
+        const saida = local.map(x => { const id = R.id(x), sv = porId.get(id); if(!sv) return x;
+          if(vistos.has(id) && vistos.get(id)===JSON.stringify(x)) return sv;
+          return R.juntar ? R.juntar(Object.assign({}, x), sv) : x; });
+        srv.forEach(x => { const id = R.id(x); if(!meus.has(id) && !vistos.has(id)){ saida.push(x); meus.add(id); } });
+        final = JSON.stringify(saida); return final;
+      });
+      lembrar(k, final);
+      return { key:k, value:final, shared: !!sh };
+    }
   });
 })();
 // Muda uma turma só (transação no documento dela). mexer(turma) devolve false para não gravar.
@@ -3213,7 +3259,7 @@ async function liberarResultadoAgora(code){
   const a = p.assessments.find(x=>x.code===code);
   if(!a) return;
   if(!confirm(`Liberar agora o resultado e o gabarito de "${a.title}" para os alunos?`)) return;
-  const nova = {...a, resultRelease:{mode:'imediato', releaseAt:''}, updatedAt:Date.now()};
+  const nova = {...a, resultRelease:{mode:'imediato', releaseAt:''}, gabaritoLiberado:true, updatedAt:Date.now()};
   try{
     await window.storage.set(`assessment:${code}`, JSON.stringify(nova), true);
     const idx = p.assessments.findIndex(x=>x.code===code);
@@ -14947,7 +14993,8 @@ function renderPesos(){
       <h3 style="margin-top:26px;">Segurança da prova (tela cheia)</h3>
       <p class="muted">A prova do aluno sempre abre em tela cheia. Se ele sair da tela cheia durante a prova, ela trava. A liberação pode ser feita de duas formas: pelo professor no painel "Liberações", de qualquer dispositivo, ou digitando este PIN direto na tela do aluno.</p>
       <label>PIN de liberação</label>
-      <input type="text" id="pin-liberacao-input" inputmode="numeric" maxlength="6" value="${esc(p.pin)}" style="max-width:160px;">
+      ${p.pin ? '' : '<p class="err" data-pin-faltando>⚠️ O PIN ainda não foi definido: enquanto isso, a liberação só funciona pelo painel "Liberações".</p>'}
+      <input type="password" id="pin-liberacao-input" inputmode="numeric" maxlength="6" value="${esc(p.pin)}" placeholder="4 a 6 números" autocomplete="off" style="max-width:160px;">
       <button class="btn btn-primary btn-sm" data-action="save-pin" style="margin-top:10px;">Salvar PIN</button>
     </div>
   `;
@@ -14977,6 +15024,8 @@ function renderLiberacoes(){
         <div>
           <strong>${esc(r.studentName)}</strong>${redeSelo(r.ip, r.ipChecado)}<br>
           <span class="muted">${esc(r.assessmentTitle)} · bloqueado há ${minutesAgo(r.lockedAt)}${r.count>1?' · '+r.count+'x':''}</span>
+          ${r.motivo==='reabriu' ? `<br><span style="font-size:.82rem; color:#b3261e;">🔄 Fechou ou recarregou a prova e abriu de novo${r.reaberturas>1?' ('+r.reaberturas+'x)':''}</span>` : ''}
+          ${r.pinErros ? `<br><span style="font-size:.82rem; color:#b3261e;">🔢 PIN errado ${r.pinErros}x no aparelho do aluno${r.pinErros>=3?' — o PIN foi desligado: libere por aqui':''}</span>` : ''}
         </div>
         ${r.finalizar
           ? '<span class="muted" style="font-size:.82rem;">⏳ Finalizando — aguardando o aluno enviar</span>'
@@ -20899,9 +20948,9 @@ function renderStudentDashboard(){
 function renderExamLocked(){
   const al = state.aluno;
   return `
-    <div class="card">
+    <div class="card" data-prova-bloqueada>
       <h2 class="center">Prova bloqueada</h2>
-      <p class="center">Você saiu da tela da prova (trocou de tela cheia, de janela ou de aplicativo). A prova fica bloqueada até o professor liberar.</p>
+      <p class="center">${al.reaberturas ? 'Você fechou ou recarregou a prova e abriu de novo. Suas respostas foram guardadas, mas' : 'Você saiu da tela da prova (trocou de tela cheia, de janela ou de aplicativo).'} A prova fica bloqueada até o professor liberar.</p>
       ${al.fullscreenExits>1 ? `<p class="center muted">Isso já aconteceu ${al.fullscreenExits}x nesta prova.</p>` : ''}
       <div class="spinner"></div>
       <p class="center muted" style="font-size:.85rem;">Aguardando o professor liberar pelo painel dele...</p>
@@ -21009,6 +21058,9 @@ function renderNome(){
     <div class="card">
       <h2>${esc(al.assessment.title)}</h2>
       ${nameField}
+      ${(al.turma && !al.manualName && al.nomeSenhaPara) ? `<label style="margin-top:10px;">Senha de ${esc(((al.turma.students||[]).find(s=>s.id===al.nomeSenhaPara)||{}).name||'')}</label>
+      <input type="password" id="name-senha-input" autocomplete="off" placeholder="A mesma senha da matrícula">
+      <p class="muted" style="font-size:.82rem;">Este aluno tem conta no app: para fazer a prova no nome dele, digite a senha dele.</p>` : ''}
       ${al.error ? `<p class="err">${esc(al.error)}</p>` : ''}
       <button class="btn btn-primary btn-block" style="margin-top:16px;" data-action="confirm-name">Começar</button>
     </div>
@@ -21063,7 +21115,7 @@ function renderResponder(){
       </div>
     `).join('');
   return `
-    <div class="card ${a.securityEnabled!==false ? 'exam-lock' : ''}">
+    <div class="card ${a.securityEnabled!==false ? 'exam-lock' : ''}" ${a.securityEnabled!==false ? 'translate="no"' : ''}>
       <div class="exam-sticky-header">
         <h2 style="margin-bottom:2px;">${esc(a.title)}</h2>
         <p class="muted" style="margin:0; font-size:.85rem;">${a.disciplinaName ? esc(a.disciplinaName)+' · ' : ''}código ${esc(a.code)} · Respondendo como ${esc(al.name)}</p>
@@ -21090,7 +21142,7 @@ function renderResponderTimed(){
   const mm = String(Math.floor(remainingSec/60)).padStart(2,'0');
   const ss = String(remainingSec%60).padStart(2,'0');
   return `
-    <div class="card ${a.securityEnabled!==false ? 'exam-lock' : ''}">
+    <div class="card ${a.securityEnabled!==false ? 'exam-lock' : ''}" ${a.securityEnabled!==false ? 'translate="no"' : ''}>
       <div class="exam-sticky-header">
         <h2 style="margin-bottom:2px;">${esc(a.title)}</h2>
         <p class="muted" style="margin:0; font-size:.85rem;">${a.disciplinaName ? esc(a.disciplinaName)+' · ' : ''}código ${esc(a.code)} · Respondendo como ${esc(al.name)}</p>
@@ -21118,10 +21170,29 @@ function renderResponderTimed(){
   `;
 }
 
+// Avaliação e recuperação: enquanto a prova está aberta, quem terminou vê só a nota (sem a correção por questão),
+// para não ditar o gabarito aos colegas. Libera quando a prova encerra, no horário programado ou no "Liberar resultado".
+function provaDetalhesOcultos(a, r){
+  if(!a || !(a.instrumento==='avaliacao' || a.instrumento==='recuperacao')) return false;
+  if(a.gabaritoLiberado) return false;
+  if(a.resultRelease && a.resultRelease.mode==='agendado') return false;
+  if(assessmentWindowStatus(a)==='depois') return false;
+  if(a.endAt) return true;
+  const d = new Date((r && r.submittedAt) || Date.now());
+  return new Date().toDateString()===d.toDateString();
+}
 function renderResultadoAluno(){
   const r = state.aluno.result;
   const a = state.aluno.assessment;
   const max = a.questions.reduce((s,q)=>s+q.points,0);
+  if(provaDetalhesOcultos(a, r)) return `
+    <div class="card" data-resultado-resumido>
+      <h2 class="center">${esc(a.title)}</h2>
+      <div class="score-big">${r.total} / ${max}</div>
+      <p class="score-sub">Resultado de ${esc(r.studentName)}</p>
+      <p class="center muted">✅ Sua prova foi enviada. A correção de cada questão aparece aqui quando a prova terminar para todos${a.endAt ? ' (' + esc(formatDateTime(a.endAt)) + ')' : ''}.</p>
+      ${backButtonHtml('Responder outra avaliação')}
+    </div>`;
   const details = a.questions.map((q,idx) => {
     const d = r.details.find(x=>x.questionId===q.id);
     const answer = r.answers[q.id];
@@ -21879,15 +21950,16 @@ async function savePesos(){
 async function loadPin(){
   const p = state.professor;
   p.pinLoading = true;
-  try{ const r = await window.storage.get('pin-liberacao', true); p.pin = r.value || '1234'; }
-  catch(e){ p.pin = '1234'; }
+  try{ const r = await window.storage.get('pin-liberacao', true); p.pin = r.value || ''; }
+  catch(e){ p.pin = ''; }
   p.pinLoading = false;
   render();
 }
 async function savePin(){
   const p = state.professor;
   const val = document.getElementById('pin-liberacao-input').value.trim();
-  if(!val){ alert('Defina um PIN.'); return; }
+  if(!/^\d{4,6}$/.test(val)){ alert('O PIN precisa ter de 4 a 6 números.'); return; }
+  if(['1234','4321','0000','1111','2222','123456','654321','000000','111111','1212','2580'].includes(val)){ alert('Esse PIN é fácil de adivinhar. Escolha outro (os alunos tentam 1234, 0000…).'); return; }
   p.pin = val;
   await window.storage.set('pin-liberacao', val, true);
   render();
@@ -22290,7 +22362,7 @@ async function saveAssessment(){
   // Campos especiais (Plano do Livro, recuperação personalizada, tarefa importada) não aparecem no formulário:
   // ao editar, são mantidos; ao criar pelo Plano do Livro, vêm do próprio rascunho.
   const preservar = {};
-  if(existingAssessment) ['valeNota','origemPlano','somenteAlunos','somenteAlunosNomes','importadoTarefa','tarefaId','priorDiag','priorRetomada'].forEach(k => { if(existingAssessment[k]!==undefined) preservar[k] = existingAssessment[k]; });
+  if(existingAssessment) ['gabaritoLiberado','valeNota','origemPlano','somenteAlunos','somenteAlunosNomes','importadoTarefa','tarefaId','priorDiag','priorRetomada'].forEach(k => { if(existingAssessment[k]!==undefined) preservar[k] = existingAssessment[k]; });
   if(!isEditing && a.valeNota===false) preservar.valeNota = false;
   if(!isEditing && a.origemPlano) preservar.origemPlano = a.origemPlano;
   const tituloFinal = a.tituloFixo || (existingAssessment && existingAssessment.origemPlano ? existingAssessment.title : computeAssessmentTitle(a));
@@ -23044,7 +23116,7 @@ window.addEventListener('focus', () => { disarmAwayTimer(); registrarVoltaProva(
 // 2) Se o aluno sair da prova (tela apagou, notificação, trocou de app) e VOLTAR dentro da tolerância
 //    definida pela coordenação, a prova não é bloqueada: ele só toca em "Voltar para a prova".
 //    A saída fica registrada para o professor. Passou do tempo, ou saiu vezes demais = bloqueio, como antes.
-const MAX_SAIDAS_TOLERADAS = 5;
+const MAX_SAIDAS_TOLERADAS = 3;
 let telaAcesaLock = null, saidaProvaEm = null, saidaProvaTimer = null;
 async function manterTelaAcesa(){
   try{
@@ -23121,6 +23193,8 @@ async function registerUnlockRequest(){
     list.push(entry);
   }
   if(al.meuIpChecado){ entry.ip = al.meuIp||null; entry.ipChecado = true; }
+  entry.motivo = al.motivoBloqueio || 'saiu'; al.motivoBloqueio = null;
+  if(al.reaberturas) entry.reaberturas = al.reaberturas;
   al.unlockRequestId = entry.id;
   try{ await window.storage.set('unlock-requests', JSON.stringify(list), true); }catch(e){}
 }
@@ -31870,6 +31944,7 @@ async function startExamFlow(){
     existing = responses.find(resp => mesmoNomeAluno(resp.studentName, al.name)) || null;
   }catch(e){}
   if(existing){
+    provaRascunhoApagar(a.code, al.name);
     al.result = existing;
     al.stage = resultReleased(a) ? 'resultado' : 'enviado';
     render();
@@ -31920,20 +31995,70 @@ async function startExamFlow(){
   }
   await window.storage.set(lockKey, JSON.stringify({startedAt: lockEhMeu && lock.startedAt ? lock.startedAt : now, sessionId: MY_SESSION_ID, deviceId: MY_DEVICE_ID, device: deviceLabel(), ip: al.meuIp||null, ipChecado: !!al.meuIpChecado}), true);
   al.lockKey = lockKey;
-  al.answers = {};
-  al.tabSwitchCount = 0;
-  al.saidasToleradas = 0; al.reentradaTolerada = false; saidaProvaEm = null;
-  al.examLocked = false;
-  al.fullscreenExits = 0;
-  al.screenshotAttempts = 0;
-  al.shuffledQuestions = shuffleForStudent(a.questions);
-  al.responderIdx = 0;
-  al.questionTimers = {};
-  const firstQ = getResponderQuestions(al)[0];
-  if(firstQ) al.questionTimers[firstQ.id] = Date.now();
+  const rasc = provaRascunhoLer(a.code, al.name);
+  const jaComecou = !!(lockEhMeu && lock && lock.startedAt);
+  al.reentradaTolerada = false; saidaProvaEm = null;
+  al.examLocked = false; al.pendingFullscreenReentry = false;
+  if(rasc){
+    al.answers = rasc.answers || {};
+    al.shuffledQuestions = Array.isArray(rasc.shuffled) && rasc.shuffled.length ? rasc.shuffled : shuffleForStudent(a.questions);
+    al.responderIdx = rasc.idx || 0; al.questionTimers = rasc.timers || {};
+    al.tabSwitchCount = rasc.tab || 0; al.fullscreenExits = rasc.fs || 0; al.screenshotAttempts = rasc.shots || 0;
+    al.saidasToleradas = rasc.saidas || 0; al.pinErros = rasc.pinErros || 0; al.reaberturas = (rasc.reab || 0);
+  } else {
+    al.answers = {};
+    al.tabSwitchCount = 0;
+    al.saidasToleradas = 0;
+    al.fullscreenExits = 0;
+    al.screenshotAttempts = 0;
+    al.pinErros = 0; al.reaberturas = 0;
+    al.shuffledQuestions = shuffleForStudent(a.questions);
+    al.responderIdx = 0;
+    al.questionTimers = {};
+    const firstQ = getResponderQuestions(al)[0];
+    if(firstQ) al.questionTimers[firstQ.id] = Date.now();
+  }
   al.stage = 'responder';
+  // Prova já começada neste aparelho (recarregou, fechou o navegador ou saiu pelo menu): volta bloqueada,
+  // a não ser que o professor tenha liberado depois da última vez em que a prova estava aberta.
+  if(al.assessment.securityEnabled!==false && (rasc || jaComecou)){
+    const ult = await provaUltimoBloqueio(a.code, al.name);
+    const liberadoDepois = !!(rasc && ult && ult.released && !ult.finalizada && (ult.releasedAt||0) > (rasc.savedAt||0));
+    if(!liberadoDepois){
+      al.reaberturas = (al.reaberturas||0) + 1;
+      al.motivoBloqueio = 'reabriu';
+      lockExamForSecurity();
+      provaRascunhoGuardar();
+      return;
+    }
+    al.pendingFullscreenReentry = true;
+  }
   render();
+  provaRascunhoGuardar();
   if(isTimedResponder(a)) startResponderTick();
+}
+function provaRascunhoChave(code, nome){ return 'prova-rascunho:' + code + ':' + slugifyName(nome); }
+function provaRascunhoLer(code, nome){ try{ const d = JSON.parse(localStorage.getItem(provaRascunhoChave(code, nome)) || 'null'); return d && d.code===code ? d : null; }catch(e){ return null; } }
+function provaRascunhoApagar(code, nome){ try{ localStorage.removeItem(provaRascunhoChave(code, nome)); }catch(e){} }
+let provaRascunhoUlt = '';
+function provaRascunhoGuardar(){
+  const al = state.aluno, a = al.assessment;
+  if(state.view!=='aluno' || al.stage!=='responder' || !a || !a.code || !al.name) return;
+  const d = { code:a.code, nome:al.name, answers:al.answers||{}, shuffled:al.shuffledQuestions||null, idx:al.responderIdx||0, timers:al.questionTimers||{},
+    tab:al.tabSwitchCount||0, fs:al.fullscreenExits||0, shots:al.screenshotAttempts||0, saidas:al.saidasToleradas||0, pinErros:al.pinErros||0, reab:al.reaberturas||0 };
+  const txt = JSON.stringify(d); if(txt===provaRascunhoUlt) return; provaRascunhoUlt = txt;
+  try{ localStorage.setItem(provaRascunhoChave(a.code, al.name), JSON.stringify(Object.assign(d, { savedAt: Date.now() }))); }catch(e){}
+}
+setInterval(provaRascunhoGuardar, 1500);
+window.addEventListener('pagehide', provaRascunhoGuardar);
+document.addEventListener('visibilitychange', () => { if(document.hidden) provaRascunhoGuardar(); });
+document.addEventListener('change', () => setTimeout(provaRascunhoGuardar, 0), true);
+document.addEventListener('input', () => setTimeout(provaRascunhoGuardar, 0), true);
+window.addEventListener('beforeunload', e => { if(isExamActive() && !state.aluno.examLocked){ provaRascunhoGuardar(); e.preventDefault(); e.returnValue = ''; } });
+async function provaUltimoBloqueio(code, nome){
+  let list = [];
+  try{ list = JSON.parse((await window.storage.get('unlock-requests', true)).value) || []; }catch(e){}
+  return list.filter(x => x.code===code && x.tipo!=='trava' && mesmoNomeAluno(x.studentName, nome)).sort((x, y) => (y.lockedAt||0) - (x.lockedAt||0))[0] || null;
 }
 
 async function confirmName(){
@@ -31943,6 +32068,18 @@ async function confirmName(){
     const sid = sel.value;
     const student = al.turma.students.find(s=>s.id===sid);
     if(!student){ al.error = 'Selecione seu nome na lista.'; render(); return; }
+    const logadoComo = al.studentLoggedIn && al.matriculaStudentId===student.id;
+    if(student.passwordHash && !logadoComo){
+      const inp = document.getElementById('name-senha-input');
+      if(al.nomeSenhaPara!==student.id || !inp){ al.nomeSenhaPara = student.id; al.name = student.name; al.error = ''; render(); return; }
+      const trava = await checkLoginLock('aluno', student.id);
+      if(trava.locked){ al.error = loginLockMessage(trava.minutos); render(); return; }
+      const senha = inp.value;
+      const certo = student.passwordSalt ? (await hashTextSalted(senha, student.passwordSalt))===student.passwordHash : (await hashText(senha))===student.passwordHash;
+      if(!certo){ await registerLoginFailure('aluno', student.id); al.error = 'Senha incorreta. Use a senha com que você entra no app (matrícula).'; render(); return; }
+      await clearLoginFailures('aluno', student.id);
+    }
+    al.nomeSenhaPara = null;
     al.name = student.name;
   } else {
     const nameInput = document.getElementById('name-input').value.trim();
@@ -32281,8 +32418,10 @@ async function unlockExam(){
   const al = state.aluno;
   const input = document.getElementById('unlock-pin-input');
   const val = input.value.trim();
-  let correctPin = '1234';
-  try{ const r = await window.storage.get('pin-liberacao', true); correctPin = r.value || '1234'; }catch(e){}
+  let correctPin = '';
+  try{ const r = await window.storage.get('pin-liberacao', true); correctPin = String(r.value || '').trim(); }catch(e){}
+  if(!correctPin){ al.error = 'O PIN de liberação ainda não foi definido pela escola. Peça ao professor para liberar pelo painel "Liberações".'; render(); return; }
+  if((al.pinErros||0) >= 3){ al.error = 'O PIN foi digitado errado 3 vezes. Agora só o professor pode liberar, pelo painel "Liberações".'; render(); return; }
   if(val && val === correctPin){
     al.examLocked = false;
     al.error = '';
@@ -32291,8 +32430,11 @@ async function unlockExam(){
     if(al.unlockRequestId){ markRequestReleased(al.unlockRequestId); }
     render();
   } else {
-    al.error = 'PIN incorreto. Peça ao professor aplicador.';
-    render();
+    al.pinErros = (al.pinErros||0) + 1;
+    al.error = al.pinErros >= 3 ? 'PIN errado 3 vezes. Agora só o professor pode liberar, pelo painel "Liberações".' : `PIN incorreto (${al.pinErros} de 3). Peça ao professor aplicador.`;
+    if(input) input.value = '';
+    render(); provaRascunhoGuardar();
+    if(al.unlockRequestId){ try{ await window.storage.update('unlock-requests', raw => { let l = []; try{ l = JSON.parse(raw)||[]; }catch(e){} const x = l.find(y => y.id===al.unlockRequestId); if(!x) return undefined; x.pinErros = al.pinErros; return JSON.stringify(l); }); }catch(e){} }
   }
 }
 
@@ -32380,6 +32522,10 @@ async function submitAnswers(forcado){
   let salvouOk = true;
   if(!jaGravado){
     salvouOk = await salvarRespostasComRetentativas(a.code, [...existing, result], 4);
+    if(salvouOk){
+      const conf = await fetchRespostasComRetentativas(a.code, 3);
+      if(conf.ok && !conf.list.some(r => r.studentName===result.studentName)) salvouOk = await salvarRespostasComRetentativas(a.code, [...conf.list, result], 3);
+    }
   }
   if(!salvouOk){
     al.stage = 'responder';
@@ -32388,6 +32534,7 @@ async function submitAnswers(forcado){
     return;
   }
   if(al.lockKey){ try{ await window.storage.delete(al.lockKey, true); }catch(e){} }
+  provaRascunhoApagar(a.code, al.name);
   stopUnlockPolling();
   disarmAwayTimer();
   stopResponderTick();
