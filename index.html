@@ -878,7 +878,7 @@ function infoI(html, rotulo){
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 pagina inicial</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 pagina inicial tablet</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -38242,6 +38242,25 @@ body.vis-landing .wrap > *:not(#root){ display:none !important; }
 body.vis-landing #root{ margin:0 !important; }
 body.vis-landing .lp-rodape{ padding-bottom:calc(36px + env(safe-area-inset-bottom)); }
 @media (min-width: 640px){ .lp-entrar{ max-width:600px; } }
+/* página inicial no tablet em pé: título, texto e botões maiores; conteúdo mais para baixo */
+@media (min-width: 700px) and (orientation: portrait){
+  .lp-hero{ padding:max(32px, env(safe-area-inset-top)) 56px 40px; }
+  .lp-logo{ width:68px; height:68px; } .lp-escola{ font-size:1.25rem; } .lp-escola small{ font-size:.9rem; }
+  .lp-conteudo{ max-width:680px; padding-bottom:6vh; margin-top:auto; }
+  .lp-curso-atual{ font-size:1.05rem; margin-bottom:14px; }
+  .lp-tit{ font-size:clamp(4rem, 10vw, 5.6rem) !important; }
+  .lp-sub{ font-size:1.4rem; max-width:none; margin-bottom:32px; }
+  .lp-entrar{ max-width:680px; gap:14px; }
+  .lp-btn{ min-height:84px; padding:18px 20px; border-radius:22px; }
+  .lp-btn-ic{ flex-basis:52px; height:52px; border-radius:15px; } .lp-btn-ic .vis-ic{ width:24px; height:24px; }
+  .lp-btn-t b{ font-size:1.25rem; } .lp-btn-t small{ font-size:.92rem; }
+  .lp-outros{ margin-top:24px; gap:10px; } .lp-outros > span{ font-size:.85rem; }
+  .lp-chip{ font-size:1rem; padding:11px 18px; }
+  .lp-descer{ font-size:.95rem; margin-top:8px; }
+  .lp-cursos-cab h2{ font-size:2.6rem !important; } .lp-cursos-cab p{ font-size:1.1rem; }
+  .lp-grade{ grid-template-columns:repeat(2, minmax(0,1fr)); gap:18px; max-width:720px; }
+  .lp-card{ aspect-ratio: 4 / 3; } .lp-card-txt{ padding:18px; } .lp-card-txt h3{ font-size:1.35rem !important; } .lp-card-txt p{ font-size:.95rem; }
+}
 
 </style>
 <script>
