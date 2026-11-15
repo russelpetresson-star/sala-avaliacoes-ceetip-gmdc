@@ -880,7 +880,7 @@ function infoI(html, rotulo){
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-14 limpeza 2</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-14 desenho</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -11508,6 +11508,7 @@ function renderProfessorInicio(){
   return `
     ${renderGreetingHeader(p.session.displayName, '')}
     ${segAvisoProfHtml()}
+    ${typeof renderProfAtalhos==='function' ? renderProfAtalhos() : ''}
     ${pnFaixaProf()}
     ${renderInicioAulasCard()}
     ${priorCardProf()}
@@ -20925,12 +20926,13 @@ function renderAlunoMuralAvisosBlock(){
 // Aba "Início": visão geral — recomendações, temporada/gamificação, ranking, trilha e avisos.
 function renderAlunoInicioBlock(){
   const blocos = [
+    typeof renderAlunoHeroProva==='function' ? renderAlunoHeroProva() : '',
+    typeof renderAlunoNumeros==='function' ? renderAlunoNumeros() : renderAlunoRankingTrilhaBlock(),
     renderAlunoPrazoBlock(),
     renderAlunoRevisaoRapidaBlock(),
     renderAlunoRecomendacoesBlock(),
     renderAlunoMuralAvisosBlock(),
     priorCardAluno(),
-    typeof renderAlunoJornadaMini==='function' ? renderAlunoJornadaMini() : renderAlunoRankingTrilhaBlock(),
     avAlunoDesafioBlock(),
     renderAlunoTemporadaBlock(),
     renderAlunoTrilhaIndividualBlock(),
@@ -21146,20 +21148,20 @@ function renderQuestionField(q, al){
     return `<div data-q-mapa style="background:#f7f3ea; border-radius:8px; padding:10px 12px; font-size:.92rem;">📒 <strong>Não precisa escrever nada aqui.</strong> Esta questão é o seu mapa mental no caderno: o professor dá o visto (completo = ${q.points} pts, incompleto = metade).</div>`;
   }
   if(q.type==='mc'){
-    return q.options.map(o => `
-      <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;margin:6px 0;">
+    return q.options.map((o, oi) => `
+      <label class="alt-opcao" style="font-weight:400;text-transform:none;">
         <input type="radio" name="ans-${q.id}" data-action="answer-mc" data-qid="${q.id}" value="${o.id}" ${al.answers[q.id]===o.id?'checked':''}>
-        ${esc(o.text)}
+        <span class="alt-letra" aria-hidden="true">${'ABCDEFGHIJ'[oi] || (oi+1)}</span><span class="alt-txt">${esc(o.text)}</span>
       </label>
     `).join('');
   }
   if(q.type==='vf'){
     return `
-      <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;margin:6px 0;">
-        <input type="radio" name="ans-${q.id}" data-action="answer-vf" data-qid="${q.id}" value="true" ${al.answers[q.id]===true?'checked':''}> Verdadeiro
+      <label class="alt-opcao" style="font-weight:400;text-transform:none;">
+        <input type="radio" name="ans-${q.id}" data-action="answer-vf" data-qid="${q.id}" value="true" ${al.answers[q.id]===true?'checked':''}><span class="alt-letra" aria-hidden="true">V</span><span class="alt-txt">Verdadeiro</span>
       </label>
-      <label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;margin:6px 0;">
-        <input type="radio" name="ans-${q.id}" data-action="answer-vf" data-qid="${q.id}" value="false" ${al.answers[q.id]===false?'checked':''}> Falso
+      <label class="alt-opcao" style="font-weight:400;text-transform:none;">
+        <input type="radio" name="ans-${q.id}" data-action="answer-vf" data-qid="${q.id}" value="false" ${al.answers[q.id]===false?'checked':''}><span class="alt-letra" aria-hidden="true">F</span><span class="alt-txt">Falso</span>
       </label>
     `;
   }
@@ -21212,6 +21214,7 @@ function renderResponderTimed(){
         <h2 style="margin-bottom:2px;">${esc(a.title)}</h2>
         <p class="muted" style="margin:0; font-size:.85rem;">${a.disciplinaName ? esc(a.disciplinaName)+' · ' : ''}código ${esc(a.code)} · Respondendo como ${esc(al.name)}</p>
         <p class="muted" style="margin:4px 0 0; font-size:.85rem; font-weight:700;">Questão ${idx+1} de ${questionsList.length}${minMsPerQuestion(a)>0 ? infoI(`Leia com calma: é preciso ficar ao menos ${fmtMinutos(a.minMinutesPerQuestion!=null?a.minMinutesPerQuestion:MIN_MINUTES_DEFAULT)} em cada questão antes de avançar.`) : ''}</p>
+        <div class="prova-barras" aria-hidden="true">${questionsList.map((qq, k) => `<span class="${k===idx ? 'atual' : (al.answers[qq.id]!=null && al.answers[qq.id]!=='') ? 'feita' : ''}"></span>`).join('')}</div>
       </div>
       <div style="margin-top:14px;">
         <div class="q-card">
@@ -28318,7 +28321,8 @@ function renderAlunoEstudarBlock(){
 function renderAlunoPrazoBlock(){
   const al = state.aluno;
   const agora = Date.now(), dia = 86400000;
-  const urg = (al.dashboardPendentes||[]).filter(p => p.assessment.endAt && !p.aguardandoLiberacao && p.status!=='antes')
+  const _heroP = (al.dashboardPendentes||[]).find(x => x.status==='aberta');
+  const urg = (al.dashboardPendentes||[]).filter(p => p !== _heroP && p.assessment.endAt && !p.aguardandoLiberacao && p.status!=='antes')
     .map(p => ({ p, fim: new Date(p.assessment.endAt).getTime() }))
     .filter(x => x.fim > agora && x.fim - agora <= 3*dia)
     .sort((a,b) => a.fim - b.fim);
@@ -35547,7 +35551,7 @@ function pnMiniaturas(){
 // faixa do professor na tela Hoje
 function pnFaixaProf(){
   if(!state.professor.session) return ''; pnCss(); const L = PN.prof && PN.prof.chave===pnChave('prof') ? PN.prof : null; const r = pnLerResumo('prof'); const e = pnEnemProf();
-  if(!r && !e && !(L && L.carregando)) return `<div class="pn-faixa-mini" data-pn-faixa><span>📊 Média, frequência e acerto ENEM das suas turmas</span><button class="pn-btn ouro" data-pn="abrir|prof|minhas">📺 Meu painel</button></div>`;
+  if(!r && !e && !(L && L.carregando)) return `<div class="pn-faixa-mini" data-pn-faixa><span>Média, frequência e acerto ENEM das suas turmas</span><button class="pn-btn ouro" data-pn="abrir|prof|minhas">📺 Meu painel</button></div>`;
   const k = (rot, val, cor) => `<div class="pn-card"><div class="pn-k-r" style="font-size:10.5px;">${rot}</div><div class="pn-k-v" style="${cor ? `color:${cor};text-shadow:0 0 14px ${cor}88;` : ''}">${val}</div></div>`;
   return `<div class="pn pn-faixa" data-pn-faixa>
     ${k('Média das minhas turmas' + (r && r.parcial ? ' (parcial)' : ''), r && r.media!=null ? fmt1(r.media) : '—', r && r.media!=null && r.media<5 ? '#FF5C8A' : '#F5C542')}
@@ -37636,7 +37640,8 @@ html body{ font-family: var(--fonte-ui); padding: 20px 20px 60px; }
 html body .btn, html body .sidebar-item, html body .nav-aba, html body input, html body select, html body textarea, html body button{ font-family: var(--fonte-ui); }
 html body h2{ font-family: var(--fonte-ui); font-weight: 800; letter-spacing: -0.3px; font-size: 1.55rem; }
 html body h3{ font-family: var(--fonte-ui); font-weight: 800; }
-html body header h1{ font-family: var(--fonte-ui); font-weight: 800; letter-spacing: -0.8px; }
+/* logo “Sala de Avaliações”: mantém a letra de giz (Caveat) do app */
+html body header h1{ font-family: 'Caveat', cursive; font-weight: 700; letter-spacing: .5px; }
 
 /* ---------- moldura ---------- */
 html body .wrap.wide{ max-width: 1380px; }
@@ -37687,7 +37692,7 @@ html body .sidebar-item.active{ background:#fff; color: var(--board-dark); box-s
 .sidebar-brand img{ width:34px; height:34px; border-radius:10px; background:#fff; padding:3px; flex:0 0 auto; object-fit:contain; }
 .sidebar-brand .nav-label{ display:flex; flex-direction:column; color:#fff; line-height:1.15; white-space:nowrap; }
 .sidebar-brand .nav-label b{ font-size:.95rem; font-weight:800; }
-.sidebar-brand .nav-label small{ font-size:.72rem; color:#e9d3d9; }
+.sidebar-brand .nav-label small{ font-family:'Caveat', cursive; font-size:1.05rem; font-weight:700; color:#f3e3e8; line-height:1; }
 @media (min-width: 1100px){
   /* computador: menu sempre aberto, com os nomes */
   html body .app-sidebar{ width: 232px; top: 16px; }
@@ -37868,6 +37873,86 @@ html body .greeting-header button[data-action="goto-avatar-edit"]{ flex:0 0 auto
   .pl-mat-btn small{ display:none; }
 }
 
+/* ===== Correções do celular (14/11/2026, fotos do Russel) ===== */
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){
+  /* nada pode passar da largura da tela */
+  html body .app-main{ min-width:0; overflow-wrap:anywhere; }
+  html body .row{ min-width:0; }
+  /* grupos de botões dentro de uma linha: quebram em vez de empurrar a tela para o lado */
+  html body .app-main .row > .row{ flex:1 1 100% !important; flex-wrap:wrap !important; max-width:100%; }
+  html body .app-main .row > .row > .btn{ flex:1 1 auto; }
+  html body .list-item > .row{ flex-wrap:wrap; }
+  html body .student-chip{ flex-wrap:wrap; gap:6px; }
+  html body .student-chip > span{ flex:1 1 100%; }
+  /* Todas as aulas: o nome da aula usa a linha toda; selos e ícones descem para a linha de baixo */
+  html body .pl-item{ flex-wrap:wrap; row-gap:4px; align-items:flex-start; }
+  html body .pl-item-n{ flex:0 0 30px; }
+  html body .pl-item-t{ flex:1 1 calc(100% - 44px); }
+  html body .pl-item-t + *{ margin-left:40px; }
+  html body .pl-item > .pl-item-seta{ margin-left:auto; }
+  html body .pl-bim > summary{ line-height:1.35; }
+}
+
+/* ===== Fiel ao desenho (14/11/2026) ===== */
+.vis-ic{ display:block; flex:0 0 auto; }
+html body .sidebar-item .icon{ display:flex; align-items:center; justify-content:center; }
+html body .sidebar-toggle .vis-ic{ color:#fff; }
+/* saudações sem faixa: texto limpo, como no desenho */
+html body .app-main .greeting-header, html body .app-topbar .greeting-header{ background:none; color: var(--ink); padding:4px 2px; border-radius:0; margin-bottom:12px; overflow:visible; }
+html body .greeting-header::before, html body .greeting-header::after{ display:none; }
+html body .greeting-header h2{ color: var(--ink); font-size:1.6rem; }
+html body .greeting-header p{ color: var(--ink-soft); }
+html body .app-topbar:has(.greeting-header){ background:none; border:none; padding:0; }
+html body .greeting-header .tb-menu-btn{ background: var(--surface); border-color: var(--paper-line); color: var(--ink); }
+html body .greeting-header button[data-action="goto-avatar-edit"]{ background:none !important; box-shadow:0 0 0 2px var(--surface), 0 0 0 4px var(--board); }
+html body .greeting-header .btn-ghost{ background: var(--surface) !important; color: var(--ink) !important; border:1px solid var(--paper-line) !important; }
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){
+  html body .greeting-header h2{ font-size:1.3rem; }
+}
+/* prova liberada em destaque */
+.hero-prova{ background: var(--board) !important; color:#fff; border:none !important; display:flex; flex-direction:column; gap:10px; }
+.hero-prova h2{ color:#fff !important; margin:0; font-size:1.45rem; line-height:1.2; }
+.hero-prova p{ margin:0; color:#f0d6dd; }
+.hero-selo{ align-self:flex-start; background:#f2c14e; color:#3d2c00; font-size:.74rem; font-weight:800; letter-spacing:.3px; padding:5px 10px; border-radius:999px; }
+.hero-btn{ min-height:54px; border:none; border-radius:14px; background:#fff; color: var(--board-dark); font-size:1.05rem; font-weight:800; cursor:pointer; font-family:inherit; }
+.hero-prova-calma{ background: var(--surface) !important; color: var(--ink); border:1px solid var(--paper-line) !important; }
+.hero-prova-calma h2{ color: var(--ink) !important; } .hero-prova-calma p{ color: var(--ink-soft); }
+.hero-prova-calma .hero-selo{ background: var(--tint-gold); color:#6b4a00; }
+/* três números */
+.num-tiles{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; margin-bottom:16px; }
+.num-tile{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; text-align:left; border:none; border-radius:18px; padding:14px; cursor:pointer; font-family:inherit; }
+.num-tile b{ font-size:1.5rem; font-weight:800; line-height:1.1; }
+.num-tile span{ font-size:.78rem; font-weight:700; line-height:1.25; }
+.num-tile.t-ouro{ background: var(--tint-gold); color:#6b4a00; } .num-tile.t-turq{ background: var(--tint-teal); color:#0f524d; } .num-tile.t-coral{ background: var(--tint-coral); color:#8f2a0b; }
+:root[data-theme="dark"] .num-tile.t-ouro{ color:#f2c14e; } :root[data-theme="dark"] .num-tile.t-turq{ color:#9be3d9; } :root[data-theme="dark"] .num-tile.t-coral{ color:#ffb59c; }
+/* atalhos do professor */
+.atalhos-prof{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; margin-bottom:16px; }
+.atalho{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; min-height:72px; border:none; border-radius:16px; font-family:inherit; font-size:.8rem; font-weight:800; cursor:pointer; }
+.atalho.t0{ background: var(--tint-vinho); color: var(--board); } .atalho.t1{ background: var(--tint-gold); color:#6b4a00; } .atalho.t2{ background: var(--tint-teal); color:#0f524d; } .atalho.t3{ background: var(--tint-coral); color:#8f2a0b; }
+:root[data-theme="dark"] .atalho{ color: var(--ink) !important; }
+@media (min-width: 1100px){ .atalhos-prof{ max-width:560px; } }
+/* prova: alternativas em cartões grandes */
+.alt-opcao{ position:relative; display:flex !important; align-items:center; gap:14px; margin:8px 0 !important; padding:10px 14px; min-height:56px; border:1px solid var(--paper-line); border-radius:14px; background: var(--surface); cursor:pointer; font-size:1rem; color: var(--ink); }
+.alt-opcao input{ position:absolute; opacity:0; width:1px; height:1px; }
+.alt-letra{ flex:0 0 36px; height:36px; border-radius:18px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:.9rem; background: var(--body-bg); color: var(--ink-soft); }
+.alt-txt{ flex:1 1 auto; min-width:0; font-weight:600; }
+.alt-opcao:hover{ border-color:#d5dbe6; }
+.alt-opcao:has(input:checked){ border:2px solid var(--board); background: var(--tint-vinho); padding:9px 13px; }
+.alt-opcao:has(input:checked) .alt-letra{ background: var(--board); color:#fff; }
+.alt-opcao:has(input:focus-visible){ outline:3px solid rgba(107,29,51,.35); outline-offset:2px; }
+.prova-barras{ display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0, 1fr); gap:4px; margin-top:10px; }
+.prova-barras span{ height:6px; border-radius:3px; background: var(--paper-line); }
+.prova-barras span.feita{ background:#1a7f78; } .prova-barras span.atual{ background: var(--board); }
+html body .row:has(> [data-action="responder-anterior"]){ position:sticky; bottom:0; z-index:5; background: var(--surface); padding:10px 0 4px; border-top:1px solid var(--paper-line); }
+html body .row:has(> [data-action="responder-anterior"]) > [data-action="submit-answers"], html body .row:has(> [data-action="responder-anterior"]) > [data-action="responder-proxima"]{ flex:2 1 160px; min-height:52px; }
+.hero-prova{ margin-bottom:12px; }
+.atalhos-prof{ grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); }
+html body [data-action="responder-anterior"]{ white-space:nowrap; flex:0 1 auto !important; }
+.pl-acao-ic .vis-ic{ width:26px; height:26px; }
+html body .row:has(> [data-action="responder-anterior"]) > [data-action="submit-answers"], html body .row:has(> [data-action="responder-anterior"]) > [data-action="responder-proxima"]{ flex:1 1 0 !important; min-width:0; }
+html body [data-action="responder-anterior"]{ flex:0 0 auto !important; padding-left:14px; padding-right:14px; }
+.pl-mat-btn{ text-align:left; }
+
 </style>
 <script>
 // ===== Visual 2026 (14/11/2026) =====
@@ -37985,7 +38070,7 @@ function plMateriaisHtml(aula, abasHtml){
   if(!abasHtml) return '';
   const ab = plMateriaisAberto();
   const tem = ['Roteiro'].concat((aula.exercicios_livro||[]).length || aula.tarefa ? ['livro'] : [], ['vídeos', 'biblioteca']).join(', ');
-  return `<div class="pl-mat" data-pl-mat-bloco><button type="button" class="pl-mat-btn" data-pl-mat aria-expanded="${ab}"><span>📖 Roteiro, livro e materiais <small>${ab ? '' : esc(tem)}</small></span><span class="seta" aria-hidden="true">▾</span></button>${ab ? abasHtml : ''}</div>`;
+  return `<div class="pl-mat" data-pl-mat-bloco><button type="button" class="pl-mat-btn" data-pl-mat aria-expanded="${ab}">${visSvg('open', 20)}<span style="flex:1 1 auto;">Roteiro, livro e materiais <small>${ab ? '' : esc(tem)}</small></span><span class="seta" aria-hidden="true">▾</span></button>${ab ? abasHtml : ''}</div>`;
 }
 document.addEventListener('click', function(ev){
   const t = ev.target && ev.target.closest && ev.target.closest('[data-pl-etq], [data-pl-mat]');
@@ -38018,6 +38103,117 @@ function renderAlunoJornadaMini(){
     </div>
   </div>`;
 }
+
+// ===== Fiel ao desenho (14/11/2026): ícones de contorno, títulos sem emoji, Início do aluno, prova =====
+const VIS_ICON = {
+  home: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z',
+  users: 'M16 19v-1a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v1M5 7a4 4 0 1 0 8 0a4 4 0 1 0 -8 0M22 19v-1a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+  file: 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 13h6M9 17h6',
+  tool: 'M3 7h18v13H3zM8 7V4h8v3M3 12h18',
+  set: 'M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M13 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M7 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M15 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0',
+  book: 'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5',
+  chat: 'M21 12a8 8 0 0 1-12 7l-5 1 1-4a8 8 0 1 1 16-4z',
+  user: 'M8 8a4 4 0 1 0 8 0a4 4 0 1 0 -8 0M4 21a8 8 0 0 1 16 0',
+  chart: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+  board: 'M3 4h18v12H3zM12 16v4M8 20h8',
+  cap: 'M2 9l10-5 10 5-10 5zM6 11v5c3 2 9 2 12 0v-5',
+  open: 'M2 5h7a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H2zM22 5h-7a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h8z',
+  menu: 'M4 6h16M4 12h16M4 18h16',
+  wheel: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M12 3v9l6 6',
+  game: 'M6 9h12a4 4 0 0 1 0 8h-1l-2-2H9l-2 2H6a4 4 0 0 1 0-8zM8 12v2M7 13h2M16 12.5v.5M18 13.5v.5',
+  check: 'M4 12l5 5L20 6',
+};
+const VIS_SEC = { hoje:'home', inicio:'home', painel:'home', turmas:'users', aval:'file', provas:'file', ferr:'tool', ajustes:'set', config:'set',
+  estudar:'book', escola:'chat', eu:'user', paineis:'chart', profs:'board', alunos:'cap', aulas:'open' };
+function visSvg(nome, tam){ const d = VIS_ICON[nome]; if(!d) return ''; return `<svg class="vis-ic" width="${tam||22}" height="${tam||22}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"></path></svg>`; }
+(function(){
+  if(typeof renderSidebar === 'function' && !renderSidebar.__vis3){
+    const orig = renderSidebar;
+    renderSidebar = function(items){
+      const args = Array.from(arguments);
+      args[0] = (items || []).map(it => it && it._sec && VIS_SEC[it._sec] ? Object.assign({}, it, { icon: visSvg(VIS_SEC[it._sec]) }) : it);
+      return orig.apply(this, args).replace(/(<button class="sidebar-toggle"[^>]*>)☰/, '$1' + visSvg('menu'));
+    };
+    renderSidebar.__vis2026 = true; renderSidebar.__vis3 = true;
+  }
+  // abas de cada seção sem emoji (o texto basta)
+  if(typeof navAbasHtml === 'function' && !navAbasHtml.__vis3){
+    const o2 = navAbasHtml;
+    navAbasHtml = function(){ return o2.apply(this, arguments).replace(/(<(?:button|span) class="nav-aba[^"]*"[^>]*>)\s*(?:[\p{Extended_Pictographic}←-⇿][️‍\p{Extended_Pictographic}]*\s*)+/gu, '$1'); };
+    navAbasHtml.__vis3 = true;
+  }
+})();
+// títulos dos cartões sem emoji na frente (avisos ⚠️ e textos continuam como estão)
+const VIS_EMOJI_INI = /^\s*(?:[\p{Extended_Pictographic}][️‍\p{Extended_Pictographic}\p{Emoji_Modifier}]*\s*)+/u;
+function visTitulosSemEmoji(){
+  document.querySelectorAll('.app-main .card > h2, .app-main .card > h3, .app-main .card > strong:first-child, .app-main .card > .row:first-child > strong, .app-main .card > .row:first-child > div > strong, .app-main .card > div:first-child > strong:first-child, .app-main .pl-grupo-cab strong, .app-main .tr-faixa-cab strong').forEach(el => {
+    if(el.dataset.semEmoji) return;
+    const tx = el.firstChild;
+    if(tx && tx.nodeType === 3 && VIS_EMOJI_INI.test(tx.nodeValue) && !/^\s*⚠/.test(tx.nodeValue)){ tx.nodeValue = tx.nodeValue.replace(VIS_EMOJI_INI, ''); el.dataset.semEmoji = '1'; }
+  });
+}
+(function(){
+  if(typeof renderInterno === 'function' && !renderInterno.__vis3){
+    const orig = renderInterno;
+    renderInterno = function(){ const r = orig.apply(this, arguments); try{ visTitulosSemEmoji(); }catch(e){} return r; };
+    renderInterno.__vis2 = true; renderInterno.__vis3 = true;
+  }
+})();
+
+// Início do aluno, como no desenho: prova liberada em destaque e três números
+function renderAlunoHeroProva(){
+  const al = state.aluno;
+  const pend = al.dashboardPendentes || [];
+  const ab = pend.find(p => p.status==='aberta');
+  if(ab){
+    const a = ab.assessment; const nq = (a.questions||[]).filter(q => !q.annulled).length;
+    const ate = a.endAt ? ' · ATÉ ' + new Date(a.endAt).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : '';
+    return `<div class="card hero-prova" data-hero-prova>
+      <span class="hero-selo">${ab.aguardandoLiberacao ? 'AGUARDANDO O PROFESSOR LIBERAR' : 'LIBERADA AGORA' + ate}</span>
+      <h2>${esc(a.title)}</h2>
+      <p>${nq ? nq + ' questões' : ''}${a.professorName ? ' · ' + esc(a.professorName) : ''}</p>
+      ${ab.aguardandoLiberacao ? '' : `<button class="hero-btn" data-action="dashboard-start-exam" data-code="${esc(a.code)}">Começar a prova</button>`}
+      ${al.error && al.code===a.code ? `<p class="err" style="margin:8px 0 0;">${esc(al.error)}</p>` : ''}
+    </div>`;
+  }
+  const prox = pend.filter(p => p.status!=='aberta' && p.assessment.startAt).sort((x, y) => new Date(x.assessment.startAt) - new Date(y.assessment.startAt))[0];
+  if(prox) return `<div class="card hero-prova hero-prova-calma" data-hero-prova><span class="hero-selo">PRÓXIMA PROVA</span><h2>${esc(prox.assessment.title)}</h2><p>abre em ${esc(formatDateTime(prox.assessment.startAt))}</p></div>`;
+  return '';
+}
+function renderAlunoNumeros(){
+  const al = state.aluno;
+  if(!al.turma || !al.turma.students) return '';
+  const me = al.turma.students.find(s => s.id===al.matriculaStudentId); if(!me) return '';
+  ensureStudentGamification(me);
+  const streak = computeStudentStreak(me.loginLog); const conq = computeConquistas(me); const feitas = conq.filter(c => c.achieved).length;
+  const ranking = [...al.turma.students].map(s => ensureStudentGamification(s)).sort((a, b) => b.fichas - a.fichas);
+  const pos = ranking.findIndex(s => s.id===al.matriculaStudentId) + 1;
+  return `<div class="num-tiles" data-num-tiles>
+    <button class="num-tile t-ouro" data-action="aluno-sub-view" data-sub="conquistas"><b>${me.fichas}</b><span>fichas · ${pos}º na turma</span></button>
+    <button class="num-tile t-turq" data-action="aluno-sub-view" data-sub="conquistas"><b>${streak.atual} dia${streak.atual===1?'':'s'}</b><span>estudando seguido</span></button>
+    <button class="num-tile t-coral" data-action="aluno-sub-view" data-sub="conquistas"><b>${feitas}</b><span>medalhas</span></button>
+  </div>`;
+}
+// Hoje do professor: atalhos com ícones de contorno (como no desenho)
+function renderProfAtalhos(){
+  const at = [['Enquete', 'chart', 'enquete'], ['Roleta', 'wheel', 'roleta'], ['Jogos', 'game', 'jogos'], ['Chamada', 'check', 'chamada']]
+    .filter(([, , sub]) => typeof subAtivo !== 'function' || subAtivo('professor', sub));
+  if(!at.length) return '';
+  return `<div class="atalhos-prof" data-atalhos-prof>${at.map(([rot, ic, sub], i) => `<button class="atalho t${i}" data-action="sub-view" data-sub="${sub}">${visSvg(ic, 22)}<span>${rot}</span></button>`).join('')}</div>`;
+}
+// ícones de contorno nos botões grandes da aula e no botão de materiais
+function visIconesAula(){
+  const mapa = { 'plano-aula-viva':'board', 'plano-apresentar':'board', 'plano-aplicar-exercicio':'file', 'plano-marcar-dada':'check', 'plano-desmarcar-dada':'check' };
+  document.querySelectorAll('.pl-acao').forEach(b => {
+    const ic = b.querySelector('.pl-acao-ic'); if(!ic || ic.dataset.vis) return;
+    const nome = mapa[b.getAttribute('data-action')] || (b.hasAttribute('data-pl-ex-aplicado') ? 'file' : '');
+    if(nome){ ic.innerHTML = visSvg(nome, 26); ic.dataset.vis = '1'; }
+  });
+}
+(function(){
+  const orig = renderInterno;
+  renderInterno = function(){ const r = orig.apply(this, arguments); try{ visIconesAula(); }catch(e){} return r; };
+})();
 
 </script>
 <!-- <<< VISUAL 2026 -->
