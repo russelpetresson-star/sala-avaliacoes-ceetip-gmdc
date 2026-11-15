@@ -878,7 +878,7 @@ function infoI(html, rotulo){
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 premium</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 pagina inicial</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -38166,6 +38166,83 @@ html body .app-main input[type="date"], html body .app-main input[type="time"], 
 /* banner da campanha (carrossel): só no computador e no tablet deitado */
 @media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){ html body .campanha-carousel{ display:none !important; } }
 
+/* ===== Página inicial premium (15/11/2026) ===== */
+body.vis-landing .letterhead{ display:none !important; }
+body.vis-landing .wrap{ max-width:none !important; padding:0 !important; margin:0 !important; }
+body.vis-landing{ background:#120a0d !important; }
+body.vis-landing #root{ padding:0 !important; margin:0 !important; max-width:none !important; }
+/* capa */
+.lp-hero{ position:relative; min-height:100svh; min-height:100vh; display:flex; flex-direction:column; justify-content:space-between; color:#fff; overflow:hidden; isolation:isolate; padding:max(20px, env(safe-area-inset-top)) clamp(20px, 5vw, 64px) 28px; }
+@supports (min-height:100svh){ .lp-hero{ min-height:100svh; } }
+.lp-fotos{ position:absolute; inset:0; z-index:-2; }
+.lp-foto{ position:absolute; inset:-4%; background-size:cover; background-position:center; opacity:0; animation: lpTroca calc(var(--lp-n) * 5s) infinite; animation-delay: calc(var(--i) * 5s - 0.01s); }
+.lp-foto:first-child{ opacity:1; }
+@keyframes lpTroca{ 0%{ opacity:0; transform:scale(1.10); } 3%{ opacity:1; } 12.5%{ opacity:1; } 16%{ opacity:0; transform:scale(1); } 100%{ opacity:0; transform:scale(1); } }
+.lp-foto-ic{ position:absolute; right:6%; bottom:20%; color:rgba(255,255,255,.08); }
+.lp-veu{ position:absolute; inset:0; z-index:-1; background: radial-gradient(120% 70% at 20% 100%, rgba(74,20,36,.96) 0%, rgba(74,20,36,.70) 40%, rgba(18,10,13,.25) 75%), linear-gradient(180deg, rgba(18,10,13,.55) 0%, rgba(18,10,13,0) 30%); }
+.lp-topo{ display:flex; align-items:center; gap:12px; }
+.lp-logo{ width:52px; height:52px; border-radius:50%; background:#fff; padding:3px; box-shadow:0 6px 20px rgba(0,0,0,.35); }
+.lp-escola{ font-weight:800; letter-spacing:.14em; font-size:1rem; line-height:1.2; display:flex; flex-direction:column; }
+.lp-escola small{ font-weight:500; letter-spacing:.02em; font-size:.74rem; opacity:.82; }
+.lp-conteudo{ max-width:620px; padding-bottom:10px; }
+.lp-curso-atual{ display:flex; align-items:center; gap:8px; font-size:.82rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#f2c14e; margin-bottom:10px; min-height:1.3em; }
+.lp-curso-nomes{ position:relative; display:inline-block; min-width:16ch; height:1.3em; }
+.lp-curso-nomes > span{ position:absolute; left:0; top:0; white-space:nowrap; opacity:0; animation: lpNome calc(var(--lp-n) * 5s) infinite; animation-delay: calc(var(--i) * 5s - 0.01s); }
+.lp-curso-nomes > span:first-child{ opacity:1; }
+@keyframes lpNome{ 0%{ opacity:0; transform:translateY(8px); } 3%{ opacity:1; transform:none; } 12.5%{ opacity:1; } 15%{ opacity:0; transform:translateY(-6px); } 100%{ opacity:0; } }
+.lp-tit{ font-family: var(--fonte-ui, 'Plus Jakarta Sans', system-ui, sans-serif) !important; font-size:clamp(2.4rem, 9vw, 4.6rem) !important; font-weight:800 !important; line-height:1.0 !important; letter-spacing:-.03em; margin:0 0 12px !important; color:#fff !important; text-shadow:0 4px 30px rgba(0,0,0,.35); }
+.lp-sub{ font-size:clamp(1rem, 3.6vw, 1.2rem); opacity:.92; margin:0 0 24px; max-width:32ch; line-height:1.4; color:#fff; }
+.lp-entrar{ display:grid; gap:10px; grid-template-columns:1fr; max-width:460px; }
+@media (min-width: 640px){ .lp-entrar{ grid-template-columns:1fr 1fr; } }
+.lp-btn{ display:flex; align-items:center; gap:12px; text-align:left; border:0; border-radius:18px; padding:14px 16px; font:inherit; cursor:pointer; transition: transform .15s, box-shadow .15s; min-height:64px; }
+.lp-btn:hover{ transform: translateY(-2px); } .lp-btn:active{ transform: scale(.98); }
+.lp-btn-ic{ flex:0 0 40px; height:40px; border-radius:12px; display:grid; place-items:center; }
+.lp-btn-t{ flex:1 1 auto; display:flex; flex-direction:column; line-height:1.2; }
+.lp-btn-t b{ font-size:1.02rem; } .lp-btn-t small{ font-size:.76rem; opacity:.75; margin-top:2px; }
+.lp-btn-seta{ font-size:1.6rem; line-height:1; opacity:.6; }
+.lp-ouro{ background:#f2c14e; color:#2a1208; box-shadow:0 10px 30px rgba(242,193,78,.35); } .lp-ouro .lp-btn-ic{ background:rgba(74,20,36,.12); color:#4a1424; }
+.lp-branco{ background:rgba(255,255,255,.96); color:#4a1424; box-shadow:0 10px 30px rgba(0,0,0,.25); } .lp-branco .lp-btn-ic{ background:#f6e8ec; color:#6b1d33; }
+.lp-outros{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:18px; }
+.lp-outros > span{ font-size:.74rem; text-transform:uppercase; letter-spacing:.08em; opacity:.7; width:100%; }
+.lp-chip{ display:inline-flex; align-items:center; gap:6px; font:inherit; font-size:.86rem; font-weight:600; color:#fff; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.28); border-radius:999px; padding:8px 14px; cursor:pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.lp-chip:hover{ background:rgba(255,255,255,.2); }
+.lp-descer{ align-self:center; color:#fff; text-decoration:none; font-size:.8rem; font-weight:700; letter-spacing:.06em; opacity:.8; display:flex; flex-direction:column; align-items:center; gap:2px; margin-top:16px; }
+.lp-descer span{ font-size:1.3rem; animation: lpPula 1.8s ease-in-out infinite; }
+@keyframes lpPula{ 0%,100%{ transform:none; } 50%{ transform:translateY(5px); } }
+/* cursos */
+.lp-cursos{ background:#f4f6fb; padding:56px clamp(16px, 5vw, 64px) 40px; color:#172036; }
+.lp-cursos-cab{ max-width:720px; margin:0 auto 26px; text-align:center; }
+.lp-eyebrow{ display:inline-block; font-size:.74rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#6b1d33; background:#f6e8ec; border-radius:999px; padding:5px 12px; }
+.lp-cursos-cab h2{ font-size:clamp(1.6rem, 6vw, 2.3rem) !important; font-weight:800 !important; margin:12px 0 6px !important; letter-spacing:-.02em; color:#172036 !important; }
+.lp-cursos-cab p{ color:#5b6478; margin:0; }
+.lp-grade{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; max-width:1180px; margin:0 auto; }
+@media (min-width: 760px){ .lp-grade{ grid-template-columns:repeat(4, minmax(0,1fr)); gap:18px; } }
+.lp-card{ position:relative; border-radius:20px; overflow:hidden; aspect-ratio: 3 / 4; background:#4a1424; box-shadow:0 10px 30px rgba(23,32,54,.12); }
+.lp-card-foto{ position:absolute; inset:0; background-size:cover; background-position:center; transition: transform .6s ease; }
+.lp-card:hover .lp-card-foto{ transform: scale(1.06); }
+.lp-card-foto .lp-foto-ic{ right:12px; bottom:auto; top:12px; color:rgba(255,255,255,.12); }
+.lp-card::after{ content:''; position:absolute; inset:0; background: linear-gradient(180deg, rgba(18,10,13,0) 40%, rgba(18,10,13,.86) 100%); }
+.lp-card-txt{ position:absolute; left:0; right:0; bottom:0; padding:14px; z-index:1; color:#fff; }
+.lp-card-txt h3{ font-size:clamp(.98rem, 3.6vw, 1.15rem) !important; font-weight:800 !important; margin:0 0 3px !important; line-height:1.15; color:#fff !important; }
+.lp-card-txt p{ font-size:.78rem; margin:0; opacity:.85; line-height:1.3; }
+/* rodapé */
+.lp-rodape{ background:#f4f6fb; display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:10px; padding:4px 16px calc(28px + env(safe-area-inset-bottom)); }
+.lp-creditos{ width:100%; text-align:center; font-size:.7rem; color:#8a92a6; margin:0 0 6px; }
+/* modo escuro */
+html[data-theme="dark"] .lp-cursos, html[data-theme="dark"] .lp-rodape{ background:#14161c; color:#e8eaf0; }
+html[data-theme="dark"] .lp-cursos-cab h2{ color:#f1f2f6 !important; } html[data-theme="dark"] .lp-cursos-cab p{ color:#a3aabb; }
+html[data-theme="dark"] .lp-eyebrow{ background:rgba(242,193,78,.12); color:#f2c14e; }
+@media (prefers-reduced-motion: reduce){ .lp-foto, .lp-curso-nomes > span{ animation:none; } .lp-foto:not(:first-child), .lp-curso-nomes > span:not(:first-child){ display:none; } .lp-descer span{ animation:none; } }
+body.vis-landing .wrap > header, body.vis-landing .disclaimer-details{ display:none !important; }
+body.vis-landing #root{ background:none !important; border:0 !important; box-shadow:none !important; border-radius:0 !important; }
+.lp-foto:not(.sem-foto) .lp-foto-ic, .lp-card-foto .lp-foto-ic{ display:none; }
+.lp-rodape .btn{ display:inline-flex !important; align-items:center; gap:6px; white-space:nowrap; }
+body.vis-landing{ padding:0 !important; margin:0 !important; }
+body.vis-landing .wrap > *:not(#root){ display:none !important; }
+body.vis-landing #root{ margin:0 !important; }
+body.vis-landing .lp-rodape{ padding-bottom:calc(36px + env(safe-area-inset-bottom)); }
+@media (min-width: 640px){ .lp-entrar{ max-width:600px; } }
+
 </style>
 <script>
 // ===== Visual 2026 (14/11/2026) =====
@@ -38889,6 +38966,75 @@ if(typeof renderInterno === 'function' && !renderInterno.__visPadrao){
   const orig = renderInterno;
   renderInterno = function(){ const r = orig.apply(this, arguments); [visAbasMais, visAjudaCampos, visDicas, visTopoCoord].forEach(f => { try{ f(); }catch(e){} }); return r; };
   Object.assign(renderInterno, { __vis2: true, __vis3: true, __visRec: true, __visIc: true, __visAg: true, __visChips: true, __visEntra: true, __visPadrao: true });
+}
+
+// ===== Página inicial premium (15/11/2026): capa com os cursos + entrada =====
+// Fotos em img/cursos/<id>.jpg no site. Sem a foto, o cartão mostra um fundo em degradê com o ícone do curso.
+const VIS_CURSOS = [
+  { id: 'petroleo-gas', nome: 'Petróleo e Gás', linha: 'Do poço à refinaria', cor: ['#3a1220', '#8a3a1e'], ic: 'M12 3c3 4 5 6.5 5 9a5 5 0 0 1-10 0c0-2.5 2-5 5-9zM9.5 13.5a2.5 2.5 0 0 0 2.5 2.5' },
+  { id: 'eletromecanica', nome: 'Eletromecânica', linha: 'Máquinas, motores e manutenção', cor: ['#1f2a44', '#6b1d33'], ic: 'M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1L7 17M17 7l2.1-2.1' },
+  { id: 'enfermagem', nome: 'Enfermagem', linha: 'Cuidado e saúde', cor: ['#14524d', '#1a7f78'], ic: 'M9 3h6v6h6v6h-6v6H9v-6H3V9h6z' },
+  { id: 'edificacoes', nome: 'Edificações', linha: 'Projetos e obras', cor: ['#4a3a14', '#a8792a'], ic: 'M4 21V7l8-4 8 4v14M9 21v-5h6v5M8 10h.01M12 10h.01M16 10h.01M8 13h.01M16 13h.01M3 21h18' },
+  { id: 'automacao', nome: 'Automação Industrial', linha: 'Robôs, sensores e CLPs', cor: ['#122a3f', '#245f8a'], ic: 'M6 6h12v12H6zM9 9h6v6H9zM9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4' },
+  { id: 'logistica', nome: 'Logística', linha: 'Estoques, armazéns e transporte', cor: ['#3b2a10', '#c08a2b'], ic: 'M2 7h12v9H2zM14 10h4l3 3v3h-7zM4 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M15 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0' },
+  { id: 'cuidador-idosos', nome: 'Cuidador de Idosos', linha: 'Bem-estar da pessoa idosa', cor: ['#4a1424', '#b0476a'], ic: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z' },
+  { id: 'seguranca-trabalho', nome: 'Segurança do Trabalho', linha: 'Prevenção e proteção', cor: ['#3d2a08', '#d29a1e'], ic: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4' }
+];
+const VIS_PASTA_CURSOS = 'img/cursos/'; // fotos: work/cursos/CREDITOS.md
+const VIS_CREDITOS = ['Zbynek Burival', 'Isis França', 'Etactics Inc', 'Danny Lau', 'Simon Kadula', 'CHUTTERSNAP', 'Junior Reis', 'Ümit Yıldırım'];
+function visCursoIc(c, tam){ return `<svg class="lp-ic" viewBox="0 0 24 24" width="${tam}" height="${tam}" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${c.ic}"/></svg>`; }
+function visCursoFundo(c){ return `background-image: url('${VIS_PASTA_CURSOS}${c.id}.jpg'), linear-gradient(135deg, ${c.cor[0]}, ${c.cor[1]});`; }
+if(typeof renderLanding === 'function' && !renderLanding.__visLp){
+  const origLp = renderLanding;
+  renderLanding = function(){
+    if(state.ui && state.ui.showPrivacy){ document.body.classList.remove('vis-landing'); return origLp.apply(this, arguments); }
+    // o aviso de dados guardados no aparelho continua acessível pelo botão "Aviso de Privacidade" do rodapé
+    document.body.classList.add('vis-landing');
+    const lg = document.querySelector('.letterhead img.school-logo-sm'); const logo = lg ? lg.getAttribute('src') : '';
+    const n = VIS_CURSOS.length;
+    const entrar = (role, txt, sub, cls, ic) => `<button class="lp-btn ${cls}" data-action="goto-landing-role" data-role="${role}"><span class="lp-btn-ic">${visSvg(ic, 20)}</span><span class="lp-btn-t"><b>${txt}</b><small>${sub}</small></span><span class="lp-btn-seta" aria-hidden="true">›</span></button>`;
+    return `
+    <section class="lp-hero" style="--lp-n:${n}">
+      <div class="lp-fotos" aria-hidden="true">${VIS_CURSOS.map((c, i) => `<div class="lp-foto" style="--i:${i}; ${visCursoFundo(c)}"><span class="lp-foto-ic">${visCursoIc(c, 220)}</span></div>`).join('')}</div>
+      <div class="lp-veu" aria-hidden="true"></div>
+      <div class="lp-topo">
+        ${logo ? `<img class="lp-logo" src="${logo}" alt="Brasão do CEETIP">` : ''}
+        <div class="lp-escola">CEETIP<small>Gov. Marcelo Déda Chagas · Carmópolis/SE</small></div>
+      </div>
+      <div class="lp-conteudo">
+        <div class="lp-curso-atual" aria-hidden="true"><span class="lp-curso-rot">Curso técnico em</span><span class="lp-curso-nomes">${VIS_CURSOS.map((c, i) => `<span style="--i:${i}">${esc(c.nome)}</span>`).join('')}</span></div>
+        <h1 class="lp-tit">Sala de Avaliações</h1>
+        <p class="lp-sub">Aulas, provas e notas do CEETIP num só lugar.</p>
+        <div class="lp-entrar">
+          ${entrar('professor', 'Sou professor', 'Aulas, avaliações e turmas', 'lp-ouro', 'cap')}
+          ${entrar('aluno', 'Sou aluno', 'Provas, notas e conquistas', 'lp-branco', 'book')}
+        </div>
+        <div class="lp-outros"><span>Outros acessos</span>
+          <button class="lp-chip" data-action="goto-landing-role" data-role="coordenador">${visSvg('board', 16)}Coordenação</button>
+          <button class="lp-chip" data-action="goto-landing-role" data-role="freqmonitor">${visSvg('check', 16)}Frequência</button>
+          <button class="lp-chip" data-action="goto-landing-role" data-role="biblioteca">${visSvg('book', 16)}Biblioteca</button>
+        </div>
+      </div>
+      <a class="lp-descer" href="#lp-cursos" aria-label="Ver os cursos">Nossos cursos <span aria-hidden="true">⌄</span></a>
+    </section>
+    <section class="lp-cursos" id="lp-cursos">
+      <div class="lp-cursos-cab"><span class="lp-eyebrow">Matrículas 2027</span><h2>Nossos cursos técnicos</h2><p>Ensino médio em tempo integral com formação profissional.</p></div>
+      <div class="lp-grade">${VIS_CURSOS.map(c => `<article class="lp-card"><div class="lp-card-foto" style="${visCursoFundo(c)}"><span class="lp-foto-ic">${visCursoIc(c, 72)}</span></div><div class="lp-card-txt"><h3>${esc(c.nome)}</h3><p>${esc(c.linha)}</p></div></article>`).join('')}</div>
+    </section>
+    <footer class="lp-rodape">
+      <p class="lp-creditos">Fotos dos cursos: Unsplash (${VIS_CREDITOS.join(', ')}).</p>
+      <button class="btn btn-ghost btn-sm" data-action="open-privacy-notice" style="flex:0 0 auto;width:auto;">${visSvg('lock', 16)} Aviso de Privacidade</button>
+      ${typeof renderThemeToggleBtn === 'function' ? renderThemeToggleBtn('flex:0 0 auto;width:auto;') : ''}
+    </footer>`;
+  };
+  renderLanding.__visLp = true;
+  // a primeira tela pode ter sido desenhada antes desta camada carregar: desenha de novo com a capa nova
+  try{ if(state.view === 'landing' && document.getElementById('root')) render(); }catch(e){}
+}
+if(typeof renderInterno === 'function' && !renderInterno.__visLp){
+  const orig = renderInterno;
+  renderInterno = function(){ if(state.view !== 'landing') document.body.classList.remove('vis-landing'); return orig.apply(this, arguments); };
+  Object.assign(renderInterno, orig, { __visLp: true });
 }
 
 </script>

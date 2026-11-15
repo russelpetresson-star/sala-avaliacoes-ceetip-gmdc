@@ -22,7 +22,8 @@ self.addEventListener('fetch', e => {
   const r = e.request; if (r.method !== 'GET') return;
   const u = new URL(r.url); if (u.origin !== self.location.origin) return;
   const pagina = r.mode === 'navigate';
-  if (!pagina && !FIXOS.some(f => u.pathname.endsWith(f.slice(1)))) return;
+  const foto = /\/img\/cursos\/[^/]+\.jpg$/.test(u.pathname);   // fotos da página inicial: guardadas para abrir sem internet
+  if (!pagina && !foto && !FIXOS.some(f => u.pathname.endsWith(f.slice(1)))) return;
   const chave = pagina ? new Request(u.origin + u.pathname) : r;
   e.respondWith((async () => {
     const cache = await caches.open(CACHE); const guardada = await cache.match(chave); const copia = guardada && pagina ? guardada.clone() : null;
