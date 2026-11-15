@@ -880,7 +880,7 @@ function infoI(html, rotulo){
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-14 desenho</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 padrão em todas as telas</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -15351,7 +15351,7 @@ function renderCoordDashboard(){
   `).join('');
 
   return `
-    ${renderGreetingHeader('Coordenação', 'Visão geral da escola em tempo real.')}
+    ${renderGreetingHeader('Coordenação', '')}
     <div class="stat-row">
       ${renderStatTile('🏫', s.totalTurmas, 'Turmas', 'vinho')}
       ${renderStatTile('🧑‍🎓', s.totalAlunos, 'Alunos cadastrados', 'teal')}
@@ -37876,7 +37876,7 @@ html body .greeting-header button[data-action="goto-avatar-edit"]{ flex:0 0 auto
 /* ===== Correções do celular (14/11/2026, fotos do Russel) ===== */
 @media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){
   /* nada pode passar da largura da tela */
-  html body .app-main{ min-width:0; overflow-wrap:anywhere; }
+  html body .app-main{ min-width:0; overflow-wrap:break-word; }
   html body .row{ min-width:0; }
   /* grupos de botões dentro de uma linha: quebram em vez de empurrar a tela para o lado */
   html body .app-main .row > .row{ flex:1 1 100% !important; flex-wrap:wrap !important; max-width:100%; }
@@ -37952,6 +37952,15 @@ html body [data-action="responder-anterior"]{ white-space:nowrap; flex:0 1 auto 
 html body .row:has(> [data-action="responder-anterior"]) > [data-action="submit-answers"], html body .row:has(> [data-action="responder-anterior"]) > [data-action="responder-proxima"]{ flex:1 1 0 !important; min-width:0; }
 html body [data-action="responder-anterior"]{ flex:0 0 auto !important; padding-left:14px; padding-right:14px; }
 .pl-mat-btn{ text-align:left; }
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){
+  /* tabelas largas rolam dentro do cartão, sem empurrar a tela */
+  html body .app-main table{ display:block; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  html body .app-main .list-item .row, html body .app-main .list-item > div:last-child{ flex-wrap:wrap !important; }
+}
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){
+  html body .app-main .row[style*="flex:0 0 auto"]{ flex:1 1 100% !important; flex-wrap:wrap !important; max-width:100%; }
+}
+html body .app-main .greeting-header p{ display:none; }
 
 </style>
 <script>
@@ -38146,7 +38155,7 @@ function visSvg(nome, tam){ const d = VIS_ICON[nome]; if(!d) return ''; return `
 // títulos dos cartões sem emoji na frente (avisos ⚠️ e textos continuam como estão)
 const VIS_EMOJI_INI = /^\s*(?:[\p{Extended_Pictographic}][️‍\p{Extended_Pictographic}\p{Emoji_Modifier}]*\s*)+/u;
 function visTitulosSemEmoji(){
-  document.querySelectorAll('.app-main .card > h2, .app-main .card > h3, .app-main .card > strong:first-child, .app-main .card > .row:first-child > strong, .app-main .card > .row:first-child > div > strong, .app-main .card > div:first-child > strong:first-child, .app-main .pl-grupo-cab strong, .app-main .tr-faixa-cab strong').forEach(el => {
+  document.querySelectorAll('.app-main .card h2, .app-main .card h3, .app-main .card > strong:first-child, .app-main .card > .row:first-child > strong, .app-main .card > .row:first-child > div > strong, .app-main .card > div:first-child > strong:first-child, .app-main .pl-grupo-cab strong, .app-main .tr-faixa-cab strong').forEach(el => {
     if(el.dataset.semEmoji) return;
     const tx = el.firstChild;
     if(tx && tx.nodeType === 3 && VIS_EMOJI_INI.test(tx.nodeValue) && !/^\s*⚠/.test(tx.nodeValue)){ tx.nodeValue = tx.nodeValue.replace(VIS_EMOJI_INI, ''); el.dataset.semEmoji = '1'; }
@@ -38213,6 +38222,44 @@ function visIconesAula(){
 (function(){
   const orig = renderInterno;
   renderInterno = function(){ const r = orig.apply(this, arguments); try{ visIconesAula(); }catch(e){} return r; };
+})();
+
+// ===== Todas as telas no padrão (15/11/2026) =====
+// Regra: título + no máximo uma linha à vista. Parágrafo de explicação logo abaixo de um título vai para o ⓘ.
+// Ficam à vista: avisos (⚠️ 🔒 ✅ ❌), situações (“Nenhum…”, “Ainda não…”), textos com botão, link, campo ou imagem,
+// instruções de quem vai responder algo (cartões com alternativas) e telas de prova/apresentação.
+const VIS_INFO_FICA = /^\s*(⚠|❗|‼|🔒|✅|❌|⛔|🚫|Nenhum|Nenhuma|Você ainda|Ainda não|Sem |Carregando|Aguard|Leia|Objetivo)/u;
+function visExplicacoesParaInfo(){
+  if(typeof infoI !== 'function') return;
+  document.querySelectorAll('.app-main .card').forEach(card => {
+    if(card.dataset.infoFeito || card.classList.contains('pl-hero') || card.closest('.exam-lock, [data-av-tela], .pn-tela') || card.querySelector('input[type="radio"]')) return;
+    card.dataset.infoFeito = '1';
+    card.querySelectorAll('h2, h3').forEach(h => {
+      if(h.querySelector('.info-i') || h.closest('.greeting-header')) return;
+      // o parágrafo vem logo depois do título, ou logo depois da linha que contém o título
+      // o título pode estar numa linha com um botão ao lado: aí o parágrafo vem depois da linha
+      const ehTxt = el => el && (el.tagName === 'P' || (el.tagName === 'DIV' && (el.classList.contains('muted') || /font-size:\s*\.(7|8)/.test(el.getAttribute('style') || ''))));
+      let ancora = h;
+      if(!ehTxt(h.nextElementSibling) && h.parentElement !== card && ehTxt(h.parentElement.nextElementSibling)) ancora = h.parentElement;
+      const pegos = [];
+      let el = ancora.nextElementSibling;
+      while(el && pegos.length < 2){
+        if(!ehTxt(el)) break;
+        const t = (el.textContent || '').trim();
+        if(t.length < 70 || VIS_INFO_FICA.test(t) || el.querySelector('a, button, input, select, textarea, label, img, canvas, details, .err, .ok')
+           || el.classList.contains('err') || el.classList.contains('ok') || el.hasAttribute('data-ao-vivo')) break;
+        pegos.push(el); el = el.nextElementSibling;
+      }
+      if(!pegos.length) return;
+      const html = pegos.map(p => `<p>${p.innerHTML}</p>`).join('');
+      pegos.forEach(p => p.remove());
+      h.insertAdjacentHTML('beforeend', infoI(html));
+    });
+  });
+}
+(function(){
+  const orig = renderInterno;
+  renderInterno = function(){ const r = orig.apply(this, arguments); try{ visExplicacoesParaInfo(); }catch(e){} return r; };
 })();
 
 </script>
