@@ -820,6 +820,15 @@
   .bib-link{ color:var(--board-light,#5c1a2b); text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:2px; }
   .bib-sug ul{ margin:6px 0 8px 18px; padding:0; font-size:.85rem; }
 </style>
+<!-- >>> VIS-CARREGANDO -->
+<style id="vis-carregando">
+html:not(.vis-pronto), html:not(.vis-pronto) body{ background:#4a1424 !important; }
+html:not(.vis-pronto) body > *{ visibility:hidden !important; }
+html:not(.vis-pronto) body::after{ content:''; position:fixed; left:50%; top:50%; width:46px; height:46px; margin:-23px 0 0 -23px; border:4px solid rgba(255,255,255,.22); border-top-color:#f2c14e; border-radius:50%; animation:visGira .8s linear infinite; }
+@keyframes visGira{ to{ transform:rotate(360deg); } }
+</style>
+<script>setTimeout(function(){ document.documentElement.classList.add('vis-pronto'); }, 8000);</script>
+<!-- <<< VIS-CARREGANDO -->
 <!-- >>> INFO-I -->
 <script>
 // ===== Botão ⓘ (14/11/2026) =====
@@ -878,7 +887,7 @@ function infoI(html, rotulo){
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 telas de entrada</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 notas info</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -1758,7 +1767,7 @@ document.addEventListener('DOMContentLoaded', () => { if(navigator.onLine===fals
     const iconSrc = logoImg ? logoImg.src : null;
     if(!iconSrc) return;
     const manifest = {
-      name: 'Sala de Avaliações - CEETIP',
+      name: 'Sala de Avaliações - CEETIP Gov. Marcelo Déda Chagas',
       short_name: 'Sala de Avaliações',
       start_url: location.pathname + location.search,
       scope: location.pathname,
@@ -2697,7 +2706,7 @@ function renderPrivacyNotice(){
       <p class="muted" style="font-size:.9rem;">Este sistema é de uso interno do CEETIP (Centro Estadual de Educação Profissional Governador Marcelo Déda Chagas) e trata dados pessoais de estudantes, professores e da coordenação exclusivamente para fins pedagógicos e administrativos, nos termos da Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018).</p>
       <p class="muted" style="font-size:.9rem;"><strong>Dados tratados:</strong> nome e matrícula de alunos, respostas e notas de avaliações, e dados de acesso (login) de professores e da coordenação.</p>
       <p class="muted" style="font-size:.9rem;"><strong>Finalidade:</strong> aplicação e correção de avaliações, acompanhamento pedagógico e gestão escolar.</p>
-      <p class="muted" style="font-size:.9rem;"><strong>Responsável:</strong> a coordenação do CEETIP, como responsável pelo tratamento dos dados neste sistema.</p>
+      <p class="muted" style="font-size:.9rem;"><strong>Responsável:</strong> a coordenação do CEETIP Gov. Marcelo Déda Chagas, como responsável pelo tratamento dos dados neste sistema.</p>
       <p class="muted" style="font-size:.9rem;"><strong>Direitos:</strong> alunos, pais/responsáveis e professores podem solicitar à coordenação da escola informações sobre os dados armazenados, bem como a correção ou exclusão, conforme a LGPD.</p>
       <p class="muted" style="font-size:.85rem;">Este é um resumo informativo e não substitui a política de privacidade oficial da SEDUC/DRE04, quando existente.</p>
     </div>
@@ -13318,7 +13327,7 @@ function renderFinalGradesTable(){
   const editMode = !!fg.editMode;
   return `
     <div class="row" style="justify-content:space-between; align-items:center;">
-      <p class="muted" style="margin-top:10px;">NP1 é o Simulado/Avaliação (${pesos.avaliacao} pts). NP2 não é uma nota separada — é a soma de Diagnóstica (${pesos.diagnostica}) + Exercícios (${pesos.exercicios}) + Autoavaliação (${pesos.autoavaliacao}). Nota Final = NP1 + NP2. Se o aluno fizer a Recuperação Paralela, vale a maior nota entre a recuperação e a NP1 (a recuperação nunca diminui a nota). A Autoavaliação é calculada automaticamente por engajamento: 40% fichas, 30% frequência de login, 30% entrega de exercícios de fixação. Se a coordenação ativar a opção em "Avaliação Socioemocional", ela passa a vir da nota socioemocional do período (💛).</p>
+      <p class="muted" style="margin-top:10px; font-size:.86rem;" data-nota-calculo>Nota final = NP1 + NP2 ${infoI(`<p><b>NP1</b> é o Simulado/Avaliação (${pesos.avaliacao} pts).</p><p><b>NP2</b> não é uma nota separada: é a soma de Diagnóstica (${pesos.diagnostica}) + Exercícios (${pesos.exercicios}) + Autoavaliação (${pesos.autoavaliacao}).</p><p><b>Recuperação Paralela:</b> vale a maior nota entre a recuperação e a NP1 (a recuperação nunca diminui a nota).</p><p><b>Autoavaliação:</b> calculada sozinha pelo engajamento — 40% fichas, 30% frequência de login, 30% entrega de exercícios de fixação. Se a coordenação ativar a opção em "Avaliação Socioemocional", ela passa a vir da nota socioemocional do período (💛).</p>`, 'Como a nota é calculada')}</p>
       <div class="row" style="flex:0 0 auto; gap:8px;">
         ${editMode ? `
           <button class="btn btn-ghost btn-sm" data-action="cancel-edit-final-grades">Cancelar</button>
@@ -27822,7 +27831,7 @@ function saeseCadernetaImprimir(turmaId){
   const alunos = ((turma && turma.students)||[]).slice().sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
   const cods = priorCodsImpressao(turma);
   const folha = st => { const x = (d.alunoS||{})[st.id] || {};
-    return `<section class="folha"><h1>🎯 Minha caderneta SAESE</h1><div class="sub">${esc(st.name)} · Turma ${esc(turma ? turma.name : '')} · CEETIP</div>
+    return `<section class="folha"><h1>🎯 Minha caderneta SAESE</h1><div class="sub">${esc(st.name)} · Turma ${esc(turma ? turma.name : '')} · CEETIP Gov. Marcelo Déda Chagas</div>
     <p class="inst">Marque com ✔ como você está em cada descritor ao fim de cada bimestre. A coluna “No app” mostra seu acerto nas questões já respondidas.</p>
     <table><tr><th>Descritor</th><th>Eu consigo...</th><th>No app</th><th>1º bim</th><th>2º bim</th><th>3º bim</th><th>4º bim</th></tr>
     ${cods.map(c => { const v = x[c] && x[c][1] ? Math.round(x[c][0]/x[c][1]*100) + '%' : '—';
@@ -28183,7 +28192,7 @@ function saeseDevolutivaImprimir(turmaId){
     const tem = Object.keys(x).filter(c => x[c][1] >= 2);
     const bem = tem.filter(c => pc(c) >= 70).sort((a,b) => pc(b) - pc(a)).slice(0, 4);
     const treinar = tem.filter(c => pc(c) < 60).sort((a,b) => pc(a) - pc(b)).slice(0, 3);
-    return `<section class="folha"><h1>Devolutiva do ${saeseBimAtual()}º bimestre</h1><div class="sub">${esc(st.name)} · Turma ${esc(turma ? turma.name : '')} · CEETIP — leitura e matemática treinadas nas aulas</div>
+    return `<section class="folha"><h1>Devolutiva do ${saeseBimAtual()}º bimestre</h1><div class="sub">${esc(st.name)} · Turma ${esc(turma ? turma.name : '')} · CEETIP Gov. Marcelo Déda Chagas — leitura e matemática treinadas nas aulas</div>
       ${!tem.length ? '<p>Ainda não há questões suficientes respondidas para esta devolutiva.</p>' : `
       <h2>💪 Em que você avançou</h2>${bem.length ? `<ul>${bem.map(c => `<li><b>${c}</b> — ${esc(SAESE_CAT[c].a)} (${pc(c)}% de acerto)</li>`).join('')}</ul>` : '<p>Continue treinando: ainda não há descritores com 70% ou mais.</p>'}
       <h2>📌 O que ainda precisa treinar</h2>${treinar.length ? `<ul>${treinar.map(c => `<li><b>${c}</b> — ${esc(SAESE_CAT[c].a)} (${pc(c)}%)<div class="casa">🏠 Para fazer em casa: ${esc(SAESE_CASA[c]||'')}</div></li>`).join('')}</ul>` : '<p>Nenhum descritor abaixo de 60%. Ótimo trabalho!</p>'}`}
@@ -33912,10 +33921,10 @@ document.addEventListener('keydown', (e) => {
    - 3 faltas na semana: 3 ou mais faltas de segunda até o dia; avisa uma vez por semana.
    - Se as duas regras baterem no mesmo dia, vai só o aviso de 3 faltas. */
 var AVP_TEXTOS_PADRAO = {
-  entrada:  'CEETIP: {aluno} entrou na escola hoje às {hora}. ✅ No horário.',
-  atrasado: 'CEETIP: {aluno} entrou na escola hoje às {hora}, com atraso. ⏰ A entrada é às {entrada}.',
-  dois:     'CEETIP – Atenção: {aluno} faltou nos dias {data1} e {data2}. Se estiver doente, envie à escola o atestado médico ou a declaração de comparecimento.',
-  tres:     'CEETIP – Aviso importante: {aluno} faltou 3 dias nesta semana e pode entrar em risco de reprovação por falta. Procure a coordenação.'
+  entrada:  'CEETIP Gov. Marcelo Déda Chagas: {aluno} entrou na escola hoje às {hora}. ✅ No horário.',
+  atrasado: 'CEETIP Gov. Marcelo Déda Chagas: {aluno} entrou na escola hoje às {hora}, com atraso. ⏰ A entrada é às {entrada}.',
+  dois:     'CEETIP Gov. Marcelo Déda Chagas – Atenção: {aluno} faltou nos dias {data1} e {data2}. Se estiver doente, envie à escola o atestado médico ou a declaração de comparecimento.',
+  tres:     'CEETIP Gov. Marcelo Déda Chagas – Aviso importante: {aluno} faltou 3 dias nesta semana e pode entrar em risco de reprovação por falta. Procure a coordenação.'
 };
 var AVP_TIPOS = { entrada:'Entrada no horário', atrasado:'Entrada com atraso', dois:'2 faltas seguidas', tres:'3 faltas na semana' };
 
@@ -34155,10 +34164,10 @@ function renderAvisosPais(){
 function avpTermoHtml(){
   const st = avpState(); const turmas = (state.professor.turmas||[]).filter(t => !st.turmaId || t.id===st.turmaId);
   const num = st.dados && st.dados.status && st.dados.status.numero ? String(st.dados.status.numero) : '______________________';
-  const um = (nome, turma) => `<div class="termo"><h3>CEETIP — Autorização para avisos por WhatsApp</h3>
-    <p>Eu, ____________________________________________, responsável pelo(a) estudante <b>${esc(nome||'____________________________')}</b>${turma ? `, da turma <b>${esc(turma)}</b>` : ''}, autorizo o CEETIP a enviar, pelo WhatsApp, avisos sobre a entrada do(a) estudante na escola (com o horário e se chegou atrasado) e sobre faltas.</p>
+  const um = (nome, turma) => `<div class="termo"><h3>CEETIP Gov. Marcelo Déda Chagas — Autorização para avisos por WhatsApp</h3>
+    <p>Eu, ____________________________________________, responsável pelo(a) estudante <b>${esc(nome||'____________________________')}</b>${turma ? `, da turma <b>${esc(turma)}</b>` : ''}, autorizo o CEETIP Gov. Marcelo Déda Chagas a enviar, pelo WhatsApp, avisos sobre a entrada do(a) estudante na escola (com o horário e se chegou atrasado) e sobre faltas.</p>
     <p>Telefone (WhatsApp) para os avisos: ( ____ ) _______________________</p>
-    <p>Peço que salvem no celular o número da escola: <b>${esc(num)}</b> (CEETIP – avisos). Os dados serão usados só para esses avisos (Lei Geral de Proteção de Dados, Lei 13.709/2018). A autorização pode ser cancelada a qualquer momento na coordenação.</p>
+    <p>Peço que salvem no celular o número da escola: <b>${esc(num)}</b> (CEETIP Gov. Marcelo Déda Chagas – avisos). Os dados serão usados só para esses avisos (Lei Geral de Proteção de Dados, Lei 13.709/2018). A autorização pode ser cancelada a qualquer momento na coordenação.</p>
     <p style="margin-top:22px;">Carmópolis/SE, ____/____/________ &nbsp;&nbsp; Assinatura: _________________________________</p></div>`;
   const corpo = turmas.length ? turmas.flatMap(t => (t.students||[]).slice().sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')).map(s => um(s.name, t.name))).join('') || um('', '') : um('', '');
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Termo de autorização – avisos por WhatsApp</title>
@@ -34511,8 +34520,8 @@ function rkImprimir(){
   const porTurma = Object.values(grupos).sort((a, b) => a.nome.localeCompare(b.nome, 'pt', { numeric:true })).map(g => { const ls = g.ls.filter(l => ['alto','medio','baixo'].includes(l.risco)).sort(ordenarPorRisco);
     return `<div class="pg"><h2>${esc(g.nome)} — alunos em risco (${ls.length})</h2><table><tr><th>Aluno</th><th>Nível</th><th>Componentes</th><th>Freq.</th><th>Média</th></tr>${ls.map(l => `<tr><td>${esc(l.nome)}</td><td>${RISCO_INFO[l.risco].label}${l.reprovFalta ? ' (falta)' : ''}</td><td>${l.total}: ${l.comps.map(c => esc(c.nome)).join(', ')}</td><td>${l.freq && l.freq.pct!=null ? l.freq.pct + '%' : '—'}</td><td>${fmt1(l.mediaGlobal)}</td></tr>`).join('') || '<tr><td colspan="5">Nenhum aluno em risco.</td></tr>'}</table></div>`; }).join('');
   const w = window.open('', '_blank'); if(!w) return;
-  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Risco acadêmico — CEETIP</title><style>body{font-family:Arial,sans-serif;font-size:10.5pt;color:#222;margin:12mm;} h1{color:#6B1F2E;font-size:16pt;} h2{color:#6B1F2E;font-size:13pt;} table{border-collapse:collapse;width:100%;} th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;} th{background:#f3e6e9;} .pg{page-break-before:always;}</style></head><body>
-    <h1>CEETIP — Risco acadêmico</h1><p>${esc(k.unidade==='__ano' ? 'Notas: acumulado do ano' : 'Notas: ' + k.unidade)} · gerado em ${new Date().toLocaleString('pt-BR')}</p>
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Risco acadêmico — CEETIP Gov. Marcelo Déda Chagas</title><style>body{font-family:Arial,sans-serif;font-size:10.5pt;color:#222;margin:12mm;} h1{color:#6B1F2E;font-size:16pt;} h2{color:#6B1F2E;font-size:13pt;} table{border-collapse:collapse;width:100%;} th,td{border:1px solid #ccc;padding:4px 6px;text-align:left;} th{background:#f3e6e9;} .pg{page-break-before:always;}</style></head><body>
+    <h1>CEETIP Gov. Marcelo Déda Chagas — Risco acadêmico</h1><p>${esc(k.unidade==='__ano' ? 'Notas: acumulado do ano' : 'Notas: ' + k.unidade)} · gerado em ${new Date().toLocaleString('pt-BR')}</p>
     <p>Regra: área com média ≥ 5 aprova todas as disciplinas dela; área abaixo de 5 → cada disciplina abaixo de 5 conta; técnica abaixo de 5 conta; frequência abaixo de 75% = reprovação por falta. 0 fora · 1–2 baixo · 3 médio · 4+ alto. Meta: até ${META_REPROVACAO_PCT}% por turma.</p>
     <table><tr><th>Turma</th><th>Com notas</th><th>Alto</th><th>Médio</th><th>Baixo</th><th>Fora</th><th>Por falta</th><th>Em risco</th></tr>${resumo}</table>${porTurma}<script>setTimeout(function(){window.print();},400);<\/script></body></html>`);
   w.document.close();
@@ -35029,7 +35038,7 @@ document.addEventListener('click', ev => { const el = ev.target.closest('[data-f
 
 /* ---------------- PAINÉIS NEON + MODO APRESENTAÇÃO (nov/2026) ----------------
    Coordenação → 📊 Painéis: ⚠️ Risco acadêmico · 📊 Desempenho · 🧭 Análise por área · 📘 Planejado × Dado × Aprendido.
-   Cada aba mostra o painel no estilo neon (cores do CEETIP) e o botão 📺 Apresentar abre a tela cheia:
+   Cada aba mostra o painel no estilo neon (cores do CEETIP Gov. Marcelo Déda Chagas) e o botão 📺 Apresentar abre a tela cheia:
    ← → trocam de painel, Esc sai, os cliques filtram (turma, nível, área, disciplina, célula).
    Professor → Hoje (faixa com os números) e Minhas turmas → Notas e desempenho → 📺 Meu painel:
    só as turmas e a disciplina dele; no risco, só a MÉDIA da área dele (não aparecem as notas dos outros componentes).
@@ -35300,7 +35309,7 @@ function pnFiltrosAtivos(D){
   return fs.length ? `<div class="pn-filtros">${fs.map(([k, r]) => `<span class="pn-filtro" data-pn="tira|${k}">${pnEsc(r)} ✕</span>`).join('')}${fs.length>1 ? `<span class="pn-filtro" data-pn="limpar" style="background:transparent;">Limpar tudo</span>` : ''}</div>` : '';
 }
 function pnRodape(D, papel){ const n = pnState(); const telas = PN_TELAS[papel]; const i = telas.findIndex(x => x[0]===n.tela);
-  return `<div class="pn-rod"><span>CEETIP · ${D ? 'calculado às ' + new Date(D.em).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : ''} · média anual = média simples das unidades</span>${n.aberto ? `<span class="pn-dots">${telas.map((t, j) => `<span class="${j===i ? 'on' : ''}" data-pn="tela|${t[0]}" title="${pnEsc(t[1])}"></span>`).join('')}</span><span>← → trocam o painel · Esc sai</span>` : '<span>Toque nos gráficos para filtrar</span>'}</div>`; }
+  return `<div class="pn-rod"><span>CEETIP Gov. Marcelo Déda Chagas · ${D ? 'calculado às ' + new Date(D.em).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' }) : ''} · média anual = média simples das unidades</span>${n.aberto ? `<span class="pn-dots">${telas.map((t, j) => `<span class="${j===i ? 'on' : ''}" data-pn="tela|${t[0]}" title="${pnEsc(t[1])}"></span>`).join('')}</span><span>← → trocam o painel · Esc sai</span>` : '<span>Toque nos gráficos para filtrar</span>'}</div>`; }
 
 /* ---------- 1 · Risco acadêmico ---------- */
 function pnTelaRisco(D){
@@ -35485,7 +35494,7 @@ function pnPagina(papel, tela){
   if(!L.D) return `${pnCab(papel, tela, tit, sub0, null, { semUnidade:true })}${L.erro ? `<div class="pn-vazio" style="color:#FF9DB8;">${pnEsc(L.erro)} <button class="pn-btn" data-pn="atualizar">Tentar de novo</button></div>` : `<div class="pn-vazio"><div class="pn-spin"></div>${pnEsc(L.prog || 'Calculando…')}</div>`}`;
   const D = L.D; const ehPma = tela==='pma' || tela==='aprend'; let ls = null;
   if(ehPma){ ls = pnPmaLinhas(D, pnBimDe(n.unidade)); if(ls==null) pnPmaGarantir(D); }
-  const sub = `CEETIP · ${new Date().getFullYear()} · ${ehPma ? (n.unidade==='__ano' ? 'Ano até hoje' : UNIDADES.indexOf(n.unidade) + 1 + 'º bimestre') : n.unidade==='__ano' ? 'Acumulado do ano' : n.unidade} · ${sub0}`;
+  const sub = `CEETIP Gov. Marcelo Déda Chagas · ${new Date().getFullYear()} · ${ehPma ? (n.unidade==='__ano' ? 'Ano até hoje' : UNIDADES.indexOf(n.unidade) + 1 + 'º bimestre') : n.unidade==='__ano' ? 'Acumulado do ano' : n.unidade} · ${sub0}`;
   let corpo = '';
   try{ corpo = tela==='risco' ? pnTelaRisco(D) : tela==='desemp' || tela==='minhas' ? (tela==='minhas' ? pnTelaMinhas(D) : pnTelaDesemp(D)) : tela==='area' ? pnTelaArea(D) : tela==='pma' ? pnTelaPma(D, ls) : tela==='aprend' ? pnTelaAprend(D, ls) : tela==='riscoprof' ? pnTelaRiscoProf(D) : ''; }
   catch(e){ console.error(e); corpo = `<div class="pn-vazio" style="color:#FF9DB8;">Não consegui montar este painel: ${pnEsc(e.message||e)}</div>`; }
@@ -35929,14 +35938,14 @@ async function priorUsarComoMetas(s, b){
 function priorCartazSecao(s, b){
   const P = priorDe(s, b) || {}; const foco = c => `<div class="fc ${c.startsWith('MT') ? 'mt' : 'lp'}"><div class="cod">${c}</div><div class="eu">Eu consigo ${esc(((SAESE_CAT[c] || {}).a || '').replace(/^./, x => x.toLowerCase()))}</div><div class="casa">Como treinar: ${esc(SAESE_CASA[c] || KIT_SUG[c] || '')}</div></div>`;
   const comp = a => ((P[a] || {}).c || []).map(c => `<span class="cp ${a.toLowerCase()}">${c}</span> ${esc((SAESE_CAT[c] || {}).a || '')}`).join(' · ');
-  return `<section class="folha"><div class="topo"><div><div class="esc">CEETIP · Avaliação Somativa de Sergipe (SAESE)</div><h1>Descritores do ${b}º bimestre</h1></div><div class="serie">${s}ª série</div></div>
+  return `<section class="folha"><div class="topo"><div><div class="esc">CEETIP Gov. Marcelo Déda Chagas · Avaliação Somativa de Sergipe (SAESE)</div><h1>Descritores do ${b}º bimestre</h1></div><div class="serie">${s}ª série</div></div>
     <h2 class="lp">Língua Portuguesa — leitura</h2><div class="grade">${((P.LP || {}).f || []).map(foco).join('')}</div>${comp('LP') ? `<p class="comp"><b>Também neste bimestre:</b> ${comp('LP')}</p>` : ''}
     <h2 class="mt">Matemática</h2><div class="grade">${((P.MT || {}).f || []).map(foco).join('')}</div>${comp('MT') ? `<p class="comp"><b>Também neste bimestre:</b> ${comp('MT')}</p>` : ''}
     <div class="rod"><b>Em todos os bimestres:</b> ${PRIOR_DADOS.transv.map(c => `<span class="cp mt">${c}</span> ${esc((SAESE_CAT[c] || {}).a || '')}`).join(' · ')}${P.obs ? `<br>${esc(P.obs)}` : ''}<br>Todas as disciplinas treinam estes descritores nas aulas. Nos slides e nas questões eles aparecem com ★ e com o código.</div></section>`;
 }
 function priorMuralSecao(b){
   const linha = s => { const P = priorDe(s, b) || {}; return `<tr><td class="s">${s}ª</td>${['LP', 'MT'].map(a => `<td>${((P[a] || {}).f || []).map(c => `<div><span class="cp ${a.toLowerCase()}">${c}</span> ${esc((SAESE_CAT[c] || {}).a || '')}</div>`).join('')}${((P[a] || {}).c || []).length ? `<div class="pq">+ ${(P[a].c).join(', ')}</div>` : ''}</td>`).join('')}</tr>`; };
-  return `<section class="folha"><div class="topo"><div><div class="esc">CEETIP · Sala dos professores</div><h1>Descritores do ${b}º bimestre — todas as séries</h1></div></div>
+  return `<section class="folha"><div class="topo"><div><div class="esc">CEETIP Gov. Marcelo Déda Chagas · Sala dos professores</div><h1>Descritores do ${b}º bimestre — todas as séries</h1></div></div>
     <table class="mural"><tr><th>Série</th><th class="lp">Língua Portuguesa (Humanas e Linguagens)</th><th class="mt">Matemática (Matemática e Ciências da Natureza)</th></tr>${PRIOR_SERIES.map(linha).join('')}</table>
     <div class="rod"><b>Rotina:</b> 5 min para apresentar o descritor do dia · 10 min de atividade no formato da prova · 5 min de correção comentada · um item com o código em cada exercício. <b>Sempre:</b> ${PRIOR_DADOS.transv.join(' e ')} (tabelas e gráficos).<br>Repriorização ao fim do bimestre: peso da frequência × (1 − acerto).</div></section>`;
 }
@@ -38295,6 +38304,10 @@ html[data-theme="dark"] body.vis-entrada #root > .card label{ color:#e8eaf0 !imp
 html[data-theme="dark"] body.vis-entrada #root > .card input:not([type=checkbox]):not([type=radio]), html[data-theme="dark"] body.vis-entrada #root > .card select{ background:#262a33 !important; border-color:#363b47 !important; color:#f1f2f6 !important; }
 @media (min-width: 700px){ body.vis-entrada #root{ justify-content:center; } .en-topo{ flex:0 0 auto; } .en-ola{ margin-top:12vh; } }
 body.vis-entrada #root > .card input:not([type=checkbox]):not([type=radio]), body.vis-entrada #root > .card select{ width:100% !important; max-width:none !important; box-sizing:border-box; }
+/* nome da escola completo: quebra em duas linhas sem espaçamento largo */
+.lp-escola, .en-marca > span{ letter-spacing:.02em !important; max-width:24ch; }
+.lp-escola{ font-size:1.02rem; } .en-marca > span{ font-size:.92rem; }
+html body .sidebar-brand .nav-label{ white-space:normal !important; min-width:0; } html body .sidebar-brand b{ white-space:normal !important; line-height:1.15; letter-spacing:.01em; font-size:.82rem; }
 
 </style>
 <script>
@@ -38310,7 +38323,7 @@ body.vis-entrada #root > .card input:not([type=checkbox]):not([type=radio]), bod
     renderSidebar = function(){
       const html = orig.apply(this, arguments);
       const logo = visLogo();
-      const marca = `<div class="sidebar-brand">${logo ? `<img src="${logo}" alt="">` : ''}<span class="nav-label"><b>CEETIP</b><small>Sala de Avaliações</small></span></div>`;
+      const marca = `<div class="sidebar-brand">${logo ? `<img src="${logo}" alt="">` : ''}<span class="nav-label"><b>CEETIP Gov. Marcelo Déda Chagas</b><small>Sala de Avaliações</small></span></div>`;
       return html.replace(/(<nav class="app-sidebar[^"]*">)/, '$1' + marca);
     };
     renderSidebar.__vis2026 = true;
@@ -39051,13 +39064,13 @@ if(typeof renderLanding === 'function' && !renderLanding.__visLp){
       <div class="lp-fotos" aria-hidden="true">${VIS_CURSOS.map((c, i) => `<div class="lp-foto" style="--i:${i}; ${visCursoFundo(c)}"><span class="lp-foto-ic">${visCursoIc(c, 220)}</span></div>`).join('')}</div>
       <div class="lp-veu" aria-hidden="true"></div>
       <div class="lp-topo">
-        ${logo ? `<img class="lp-logo" src="${logo}" alt="Brasão do CEETIP">` : ''}
-        <div class="lp-escola">CEETIP<small>Gov. Marcelo Déda Chagas · Carmópolis/SE</small></div>
+        ${logo ? `<img class="lp-logo" src="${logo}" alt="Brasão do CEETIP Gov. Marcelo Déda Chagas">` : ''}
+        <div class="lp-escola">CEETIP Gov. Marcelo Déda Chagas<small>Carmópolis/SE</small></div>
       </div>
       <div class="lp-conteudo">
         <div class="lp-curso-atual" aria-hidden="true"><span class="lp-curso-rot">Curso técnico em</span><span class="lp-curso-nomes">${VIS_CURSOS.map((c, i) => `<span style="--i:${i}">${esc(c.nome)}</span>`).join('')}</span></div>
         <h1 class="lp-tit">Sala de Avaliações</h1>
-        <p class="lp-sub">Aulas, provas e notas do CEETIP num só lugar.</p>
+        <p class="lp-sub">Aulas, provas e notas do CEETIP Gov. Marcelo Déda Chagas num só lugar.</p>
         <div class="lp-entrar">
           ${entrar('professor', 'Sou professor', 'Aulas, avaliações e turmas', 'lp-ouro', 'cap')}
           ${entrar('aluno', 'Sou aluno', 'Provas, notas e conquistas', 'lp-branco', 'book')}
@@ -39119,7 +39132,7 @@ function visTelaEntrada(){
   const lg = document.querySelector('.letterhead img.school-logo-sm'); const logo = lg ? lg.getAttribute('src') : '';
   const voltar = root.querySelector(':scope > .voltar-landing');
   const topo = document.createElement('div'); topo.className = 'en-topo';
-  topo.innerHTML = `<div class="en-marca">${logo ? `<img src="${logo}" alt="Brasão do CEETIP">` : ''}<span>CEETIP<small>Sala de Avaliações</small></span></div>
+  topo.innerHTML = `<div class="en-marca">${logo ? `<img src="${logo}" alt="Brasão do CEETIP Gov. Marcelo Déda Chagas">` : ''}<span>CEETIP Gov. Marcelo Déda Chagas<small>Sala de Avaliações</small></span></div>
     <div class="en-ola"><h1>${esc(cfg.ola)}</h1><p>${esc(cfg.sub)}</p></div>`;
   if(voltar){ voltar.classList.add('en-voltar'); voltar.setAttribute('aria-label', 'Voltar para a página inicial'); voltar.innerHTML = `${visSvg('back', 18)}<span>Início</span>`; topo.querySelector('.en-marca').appendChild(voltar); }
   root.insertBefore(topo, root.firstChild);
@@ -39130,6 +39143,9 @@ if(typeof renderInterno === 'function' && !renderInterno.__visEntrada){
   Object.assign(renderInterno, orig, { __visEntrada: true });
 }
 try{ visTelaEntrada(); }catch(e){}
+
+// ===== Fim da camada: mostra a tela (a "tela de carregando" do <head> esconde o visual antigo até aqui) =====
+(function(){ const pronto = () => document.documentElement.classList.add('vis-pronto'); try{ requestAnimationFrame(() => requestAnimationFrame(pronto)); }catch(e){ pronto(); } setTimeout(pronto, 600); })();
 
 </script>
 <!-- <<< VISUAL 2026 -->
