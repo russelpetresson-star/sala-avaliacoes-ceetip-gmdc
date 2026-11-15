@@ -4,7 +4,8 @@
    Todo o resto (Firebase, Google, imagens de fora) passa direto, sem guardar nada. */
 const CACHE = 'sala-ceetip-v1';
 const FIXOS = ['./manifest.webmanifest', './icone-192.png', './icone-512.png', './icone-192-maskable.png', './icone-512-maskable.png', './apple-touch-icon.png'];
-self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then(c => c.addAll(FIXOS)).catch(() => {})); });
+// './' = a própria página: já abre sem internet desde a 1ª visita
+self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then(c => Promise.all([c.addAll(FIXOS), c.add('./').catch(() => {})])).catch(() => {})); });
 self.addEventListener('activate', e => { e.waitUntil((async () => {
   for (const k of await caches.keys()) if (k !== CACHE) await caches.delete(k);
   await self.clients.claim(); })()); });
@@ -22,7 +23,10 @@ self.addEventListener('fetch', e => {
   const r = e.request; if (r.method !== 'GET') return;
   const u = new URL(r.url); if (u.origin !== self.location.origin) return;
   const pagina = r.mode === 'navigate';
-  const foto = /\/img\/cursos\/[^/]+\.jpg$/.test(u.pathname);   // fotos da página inicial: guardadas para abrir sem internet
+  const foto = /\/img\/cursos\/[^/]+\.jpg$/.test(u.pathname) || /\/labs\/labs_dados\.json$/.test(u.pathname);
+  // partes do app (nome muda a cada versão): se já está guardada, usa direto, sem baixar de novo
+  if (/\/partes\/[^/]+\.js$/.test(u.pathname)) { e.respondWith((async () => { const c = await caches.open(CACHE); const g = await c.match(r);
+    if (g) return g; const resp = await fetch(r); if (resp && resp.ok) await c.put(r, resp.clone()); return resp; })()); return; }   // fotos da página inicial: guardadas para abrir sem internet
   if (!pagina && !foto && !FIXOS.some(f => u.pathname.endsWith(f.slice(1)))) return;
   const chave = pagina ? new Request(u.origin + u.pathname) : r;
   e.respondWith((async () => {
