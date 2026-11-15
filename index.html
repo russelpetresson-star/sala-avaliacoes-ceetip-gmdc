@@ -878,7 +878,7 @@ function infoI(html, rotulo){
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 pagina inicial tablet</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 telas de entrada</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -38262,6 +38262,40 @@ body.vis-landing .lp-rodape{ padding-bottom:calc(36px + env(safe-area-inset-bott
   .lp-card{ aspect-ratio: 4 / 3; } .lp-card-txt{ padding:18px; } .lp-card-txt h3{ font-size:1.35rem !important; } .lp-card-txt p{ font-size:.95rem; }
 }
 
+/* ===== Telas de entrada (login) ===== */
+body.vis-entrada{ padding:0 !important; margin:0 !important; background:#120a0d !important; }
+body.vis-entrada::before{ content:''; position:fixed; inset:0; z-index:-2; background-image: var(--en-foto), linear-gradient(135deg, #3a1220, #6b1d33); background-size:cover; background-position:center; }
+body.vis-entrada::after{ content:''; position:fixed; inset:0; z-index:-1; background: linear-gradient(180deg, rgba(18,10,13,.55) 0%, rgba(74,20,36,.55) 40%, rgba(74,20,36,.92) 100%); }
+body.vis-entrada .letterhead, body.vis-entrada .wrap > header, body.vis-entrada .wrap > *:not(#root):not(.disclaimer-details){ display:none !important; }
+body.vis-entrada .wrap{ max-width:none !important; padding:0 !important; margin:0 !important; background:none !important; }
+body.vis-entrada #root{ min-height:100svh; min-height:100vh; display:flex; flex-direction:column; max-width:520px; margin:0 auto !important; padding:max(18px, env(safe-area-inset-top)) 16px 16px !important; background:none !important; box-shadow:none !important; border:0 !important; }
+@supports (min-height:100svh){ body.vis-entrada #root{ min-height:100svh; } }
+.en-topo{ color:#fff; display:flex; flex-direction:column; flex:1 0 auto; }
+.en-marca{ display:flex; align-items:center; gap:10px; }
+.en-marca img{ width:44px; height:44px; border-radius:50%; background:#fff; padding:3px; box-shadow:0 6px 18px rgba(0,0,0,.3); }
+.en-marca > span{ font-weight:800; letter-spacing:.14em; font-size:.95rem; display:flex; flex-direction:column; line-height:1.15; }
+.en-marca > span small{ font-weight:500; letter-spacing:.02em; font-size:.74rem; opacity:.85; }
+html body .en-voltar{ margin-left:auto !important; width:auto !important; display:inline-flex !important; align-items:center; gap:6px; color:#fff !important; background:rgba(255,255,255,.14) !important; border:1px solid rgba(255,255,255,.3) !important; border-radius:999px !important; padding:8px 14px !important; font-weight:700; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.en-ola{ margin-top:auto; padding:28px 4px 18px; }
+.en-ola h1{ font-family: var(--fonte-ui, 'Plus Jakarta Sans', system-ui, sans-serif) !important; font-size:clamp(2rem, 8.5vw, 2.8rem) !important; font-weight:800 !important; letter-spacing:-.02em; line-height:1.05 !important; margin:0 0 6px !important; color:#fff !important; text-shadow:0 4px 24px rgba(0,0,0,.35); }
+.en-ola p{ margin:0; font-size:1rem; opacity:.9; color:#fff; }
+body.vis-entrada #root > .card{ border-radius:26px !important; padding:24px 20px 22px !important; box-shadow:0 20px 50px rgba(0,0,0,.35) !important; border:0 !important; margin:0 0 10px !important; flex:0 0 auto; background:#fff !important; }
+body.vis-entrada #root > .card h2{ font-size:1.35rem !important; margin:0 0 6px !important; }
+body.vis-entrada #root > .card input:not([type=checkbox]):not([type=radio]), body.vis-entrada #root > .card select{ min-height:52px; border-radius:14px !important; font-size:1.02rem !important; padding:12px 14px !important; background:#f4f6fb !important; border:1.5px solid #e2e6ef !important; }
+body.vis-entrada #root > .card input:focus, body.vis-entrada #root > .card select:focus{ border-color:#6b1d33 !important; background:#fff !important; outline:none; box-shadow:0 0 0 4px rgba(107,29,51,.12) !important; }
+body.vis-entrada #root > .card label{ text-transform:none !important; letter-spacing:0 !important; font-weight:700 !important; font-size:.88rem !important; color:#172036 !important; margin-top:14px !important; }
+body.vis-entrada #root > .card .btn-primary{ min-height:54px; border-radius:16px !important; font-size:1.05rem !important; font-weight:800 !important; box-shadow:0 10px 24px rgba(107,29,51,.28); }
+body.vis-entrada #root > .card .btn-ghost.btn-block{ min-height:50px; border-radius:16px !important; }
+body.vis-entrada .disclaimer-details{ display:block !important; max-width:520px; margin:0 auto !important; padding:0 16px calc(18px + env(safe-area-inset-bottom)); }
+body.vis-entrada .disclaimer-details summary{ color:rgba(255,255,255,.75) !important; opacity:1 !important; }
+body.vis-entrada .disclaimer-details[open]{ background:rgba(255,255,255,.95); border-radius:16px; padding:12px 16px; color:#172036; }
+body.vis-entrada .disclaimer-details[open] summary{ color:#5b6478 !important; }
+html[data-theme="dark"] body.vis-entrada #root > .card{ background:#1b1e26 !important; }
+html[data-theme="dark"] body.vis-entrada #root > .card label{ color:#e8eaf0 !important; }
+html[data-theme="dark"] body.vis-entrada #root > .card input:not([type=checkbox]):not([type=radio]), html[data-theme="dark"] body.vis-entrada #root > .card select{ background:#262a33 !important; border-color:#363b47 !important; color:#f1f2f6 !important; }
+@media (min-width: 700px){ body.vis-entrada #root{ justify-content:center; } .en-topo{ flex:0 0 auto; } .en-ola{ margin-top:12vh; } }
+body.vis-entrada #root > .card input:not([type=checkbox]):not([type=radio]), body.vis-entrada #root > .card select{ width:100% !important; max-width:none !important; box-sizing:border-box; }
+
 </style>
 <script>
 // ===== Visual 2026 (14/11/2026) =====
@@ -39055,6 +39089,47 @@ if(typeof renderInterno === 'function' && !renderInterno.__visLp){
   renderInterno = function(){ if(state.view !== 'landing') document.body.classList.remove('vis-landing'); return orig.apply(this, arguments); };
   Object.assign(renderInterno, orig, { __visLp: true });
 }
+
+// ===== Telas de entrada (login) no padrão da página inicial (15/11/2026) =====
+// Foto do curso ao fundo, marca da escola no alto e o formulário num cartão branco embaixo (no celular, como uma "gaveta").
+const VIS_ENTRADA = {
+  professor:   { foto: 'eletromecanica', ola: 'Olá, professor(a)', sub: 'Aulas, avaliações e turmas' },
+  aluno:       { foto: 'petroleo-gas',   ola: 'Olá, estudante',    sub: 'Provas, notas e conquistas' },
+  coordenador: { foto: 'logistica',      ola: 'Coordenação',       sub: 'Visão geral da escola' },
+  freqmonitor: { foto: 'automacao',      ola: 'Frequência',        sub: 'Leitura da carteirinha' },
+  biblioteca:  { foto: 'edificacoes',    ola: 'Biblioteca',        sub: 'Catalogação e empréstimos' }
+};
+const VIS_ENTRADA_ALUNO = ['entrada', 'matricula-login', 'code', 'nome', 'fechada'];
+function visEhEntrada(){
+  const v = state.view;
+  if(v === 'professor') return !state.professor.session;
+  if(v === 'coordenador') return !state.coordenador.session;
+  if(v === 'freqmonitor') return !(state.freqMonitor && state.freqMonitor.session);
+  if(v === 'biblioteca') return !(state.biblioteca && state.biblioteca.session);
+  if(v === 'aluno') return VIS_ENTRADA_ALUNO.includes(state.aluno.stage);
+  return false;
+}
+function visTelaEntrada(){
+  const sim = !!(state.view !== 'landing' && !(state.ui && state.ui.showPrivacy) && visEhEntrada());
+  document.body.classList.toggle('vis-entrada', sim);
+  const root = document.getElementById('root'); if(!sim || !root) return;
+  const cfg = VIS_ENTRADA[state.view] || VIS_ENTRADA.aluno;
+  document.body.style.setProperty('--en-foto', `url('${VIS_PASTA_CURSOS}${cfg.foto}.jpg')`);
+  if(root.querySelector(':scope > .en-topo')) return;
+  const lg = document.querySelector('.letterhead img.school-logo-sm'); const logo = lg ? lg.getAttribute('src') : '';
+  const voltar = root.querySelector(':scope > .voltar-landing');
+  const topo = document.createElement('div'); topo.className = 'en-topo';
+  topo.innerHTML = `<div class="en-marca">${logo ? `<img src="${logo}" alt="Brasão do CEETIP">` : ''}<span>CEETIP<small>Sala de Avaliações</small></span></div>
+    <div class="en-ola"><h1>${esc(cfg.ola)}</h1><p>${esc(cfg.sub)}</p></div>`;
+  if(voltar){ voltar.classList.add('en-voltar'); voltar.setAttribute('aria-label', 'Voltar para a página inicial'); voltar.innerHTML = `${visSvg('back', 18)}<span>Início</span>`; topo.querySelector('.en-marca').appendChild(voltar); }
+  root.insertBefore(topo, root.firstChild);
+}
+if(typeof renderInterno === 'function' && !renderInterno.__visEntrada){
+  const orig = renderInterno;
+  renderInterno = function(){ const r = orig.apply(this, arguments); try{ visTelaEntrada(); }catch(e){} return r; };
+  Object.assign(renderInterno, orig, { __visEntrada: true });
+}
+try{ visTelaEntrada(); }catch(e){}
 
 </script>
 <!-- <<< VISUAL 2026 -->
