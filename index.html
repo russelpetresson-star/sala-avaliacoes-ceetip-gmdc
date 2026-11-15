@@ -11,7 +11,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" id="apple-touch-icon-link">
 <link rel="icon" id="favicon-link">
-<link rel="manifest" id="pwa-manifest-link">
+<link rel="manifest" id="pwa-manifest-link" href="./manifest.webmanifest">
 <script>
   // Aplica o tema salvo (ou a preferência do sistema) antes da página pintar,
   // pra não piscar claro-depois-escuro no carregamento.
@@ -878,7 +878,7 @@ function infoI(html, rotulo){
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 itens finais</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 premium</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -1773,7 +1773,7 @@ document.addEventListener('DOMContentLoaded', () => { if(navigator.onLine===fals
     const blob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
     const manifestUrl = URL.createObjectURL(blob);
     const manifestLink = document.getElementById('pwa-manifest-link');
-    if(manifestLink) manifestLink.href = manifestUrl;
+    if(manifestLink && !manifestLink.getAttribute('href')) manifestLink.href = manifestUrl;
     const appleIcon = document.getElementById('apple-touch-icon-link');
     if(appleIcon) appleIcon.href = iconSrc;
     const favicon = document.getElementById('favicon-link');
@@ -3118,8 +3118,8 @@ function renderProfessor(){
     </div>
     ${p.session.viaCoord ? `
     <div data-via-coord="1" style="background:#5b1a2c; color:#fff; border-radius:8px; padding:10px 14px; margin-bottom:12px; display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap;">
-      <span>👁 <strong>Modo coordenação:</strong> você está no painel de <strong>${esc(p.session.displayName)}</strong>. O que fizer aqui fica gravado como se fosse do professor.</span>
-      <button class="btn btn-ghost btn-sm" data-action="coord-voltar-coordenacao" style="background:#fff;">↩ Voltar à coordenação</button>
+      <span>👁 Vendo como <strong>${esc(p.session.displayName)}</strong>${infoI('Modo coordenação: o que você fizer aqui fica gravado como se fosse do professor.')}</span>
+      <button class="btn btn-ghost btn-sm" data-action="coord-voltar-coordenacao" style="background:#fff;width:auto;">↩ Voltar</button>
     </div>` : ''}
     ${p.subview==='inicio' ? renderCarrosselCampanha(muralSlidesComConquistas(p.campanhaItens||[], !p.campanhaItensLoading)) : ''}
     ${(p.session.coordNote && !p.session.coordNoteDismissed) ? `
@@ -12362,7 +12362,7 @@ function renderEnemOficial(){
       <div class="row" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
         <span class="q-tag">ENEM ${q.ano} · questão ${q.numero} · ${esc(ENEM_OF_DISC[q.disciplina]||q.disciplina)}${q.habilidade ? ' · ' + esc(q.habilidade) : ''}</span>
         <span>${q.imagem ? '<span class="muted" style="font-size:.8rem;">🖼️ com imagem</span> ' : ''}<button class="btn btn-ghost btn-sm" data-action="enem-of-ver" data-id="${esc(q.id)}">${aberto ? 'Fechar' : 'Ver questão'}</button>
-        ${ja ? '<span class="pill" style="background:#E9F6EC;color:#1d6b31;">✓ no seu banco</span>' : `<button class="btn btn-primary btn-sm" data-action="enem-of-add" data-id="${esc(q.id)}">+ Adicionar ao meu banco</button>`}</span>
+        ${ja ? '<span class="pill" style="background:#E9F6EC;color:#1d6b31;">✓ no seu banco</span>' : `<button class="btn btn-primary btn-sm" data-action="enem-of-add" data-id="${esc(q.id)}">+ Meu banco</button>`}</span>
       </div>
       ${q.tema ? `<div style="margin-top:4px;font-size:.88rem;color:var(--wine,#7a1f2b);">🏷️ <b>${esc(q.tema)}</b>${q.assunto ? ' — ' + esc(q.assunto) : ''}</div>` : ''}
       <div style="margin-top:6px;${aberto ? 'white-space:pre-line;' : ''}">${aberto ? esc(q.texto) : esc((q.texto || q.comando).slice(0, 220)) + ((q.texto||'').length > 220 ? '…' : '')}</div>
@@ -14272,16 +14272,16 @@ function renderProfessorPainel(){
   const tabs = [
     { id:'notas', label:'📝 Lançar notas' },
     { id:'meupainel', label:'📺 Meu painel' },
-    { id:'focos', label:'⭐ Descritores do bimestre' },
+    { id:'focos', label:'⭐ Descritores' },
     { id:'conteudo', label:'🎯 Conteúdo & SAEB' },
     { id:'enem', label:'📝 ENEM' },
-    { id:'pma', label:'🧭 Planejado × Dado × Aprendido' },
+    { id:'pma', label:'🧭 Planejado × Aprendido' },
     { id:'meumes', label:'🙋 Meu mês' },
   ];
   const activeTab = tabs.some(t=>t.id===p.painelTab) ? p.painelTab : 'notas';
 
   const tabsBar = `
-    <div class="row" style="gap:8px; flex-wrap:wrap; margin:14px 0 4px;">
+    <div class="row painel-abas" style="gap:8px; flex-wrap:wrap; margin:14px 0 4px;">
       ${tabs.map(t => `
         <button class="btn btn-sm ${activeTab===t.id?'btn-primary':'btn-ghost'}" data-action="painel-tab" data-tab="${t.id}">${t.label}</button>
       `).join('')}
@@ -14290,13 +14290,12 @@ function renderProfessorPainel(){
 
   const disciplinaFiltroAtual = p.painelDisciplinaFiltro ? p.disciplinas.find(d=>d.id===p.painelDisciplinaFiltro) : null;
   const disciplinaBar = `
-    <div class="row" style="align-items:center; gap:10px; margin:2px 0 14px;">
+    <div class="row notas-disc" style="align-items:center; gap:10px; margin:10px 0 14px;">
       <label style="margin:0; flex:0 0 auto;">Disciplina</label>
       <select id="painel-disciplina-select" style="max-width:280px;">
         <option value="">Todas as disciplinas</option>
         ${p.disciplinas.map(d => `<option value="${d.id}" ${p.painelDisciplinaFiltro===d.id?'selected':''}>${esc(d.name)}</option>`).join('')}
       </select>
-      <span class="muted" style="font-size:.8rem;">${activeTab==='notas' ? 'Escolha uma disciplina pra lançar notas — cada disciplina tem seus próprios instrumentos.' : 'Filtra o que aparece nesta aba. "Todas" mostra tudo o que você leciona junto.'}</span>
     </div>
   `;
 
@@ -14307,15 +14306,14 @@ function renderProfessorPainel(){
   let tabContent = '';
   if(activeTab==='notas'){
     if(!disciplinaFiltroAtual){
-      tabContent = `<p class="muted">Selecione uma disciplina acima pra lançar ou consultar as notas por instrumento avaliativo. Como um professor pode lecionar mais de uma disciplina na mesma turma, as notas são sempre lançadas disciplina por disciplina, pra não misturar os instrumentos de uma com os da outra.</p>`;
+      tabContent = `<p class="muted">Escolha a disciplina para lançar as notas.</p>`;
     } else {
       tabContent = `
-        <p class="muted">Notas de <strong>${esc(disciplinaFiltroAtual.name)}</strong> por instrumento avaliativo, turma e unidade. Provas e gabaritos lançados no app (ou lidos por leitura ótica) entram automaticamente; o que foi aplicado presencialmente sem passar pelo app você lança manualmente abaixo.</p>
-        <div class="row" style="align-items:flex-end;">
+        <div class="row notas-filtros" style="align-items:flex-end;">
           <div>
             <label>Turma</label>
             <select id="painel-turma-select">
-              <option value="">— selecione a turma —</option>
+              <option value="">Escolha</option>
               ${turmasDaDisciplina.map(t=>`<option value="${t.id}" ${fg && fg.turmaId===t.id?'selected':''}>${esc(t.name)}</option>`).join('')}
             </select>
           </div>
@@ -14397,13 +14395,9 @@ function renderProfessorPainel(){
 
   return `
     <div class="card">
-      <div class="row" style="align-items:center; justify-content:space-between;">
-        <h2>Meu Painel</h2>
-        <button class="btn btn-ghost btn-sm" data-action="refresh-professor-painel">Atualizar</button>
-      </div>
-      <div class="row" style="align-items:center; justify-content:space-between; background:var(--accent-yellow-bg,#fdf3e8); border:1px solid var(--yellow-dark); border-radius:8px; padding:8px 12px; margin:10px 0;">
-        <span style="font-size:.85rem;">🗒️ Precisa lançar uma prova integrada em papel (várias disciplinas no mesmo cartão)? É no <strong>Gabarito Avulso</strong>.</span>
-        <button class="btn btn-primary btn-sm" data-action="sub-view" data-sub="avulso" style="flex:0 0 auto;">Ir para Gabarito Avulso</button>
+      <div class="row" style="align-items:center; justify-content:space-between;" data-painel-topo>
+        <h2>Notas e desempenho${infoI('<p>Provas e gabaritos feitos no app (ou lidos por leitura ótica) entram nas notas sozinhos. O que foi aplicado em papel, fora do app, você lança à mão na tabela.</p><p>Cada disciplina tem os seus próprios instrumentos, por isso as notas são lançadas uma disciplina de cada vez.</p><p>Prova integrada em papel (várias disciplinas no mesmo cartão)? Use o <b>Gabarito Avulso</b>, em Avaliações.</p>', 'Como funcionam as notas')}</h2>
+        <button class="btn btn-ghost btn-sm" data-action="refresh-professor-painel" style="width:auto;">Atualizar</button>
       </div>
       ${tabsBar}
       ${disciplinaBar}
@@ -36419,9 +36413,9 @@ function pmCardProf(){
     return { t, area, ls, st, alerta: ls.some(l => l.alerta) }; }));
   const sem = itens.filter(x => !x.st); const alertas = itens.filter(x => x.alerta);
   return `<div class="card inicio-card" data-pm-card style="border-left:4px solid #C9A227;"><div class="row" style="justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;"><strong>📊 Medição dos focos · ${bim}º bimestre</strong><button class="btn btn-ghost btn-sm" style="width:auto;" data-pm="abrir">Ver a medição</button></div>
-    ${sem.length ? `<div style="font-size:.86rem;margin-top:4px;" data-pm-sem>📋 Falta a sondagem do bimestre em: <b>${sem.map(x => `${esc(x.t.name)} (${x.area})`).join(', ')}</b>.</div>` : '<div style="font-size:.86rem;margin-top:4px;color:#1d6b31;">📋 Sondagem do bimestre feita em todas as suas turmas.</div>'}
+    ${sem.length ? `<div style="font-size:.86rem;margin-top:4px;" data-pm-sem>📋 Falta a sondagem do bimestre em <b>${sem.length} de ${itens.length}</b> (turma e área marcadas abaixo).</div>` : '<div style="font-size:.86rem;margin-top:4px;color:#1d6b31;">📋 Sondagem do bimestre feita em todas as suas turmas.</div>'}
     ${alertas.length ? `<div style="font-size:.86rem;margin-top:4px;color:#b3261e;font-weight:700;" data-pm-alertas>⚠ Abaixo de 50% nas aulas: ${alertas.map(x => `${esc(x.t.name)} (${x.ls.filter(l => l.alerta).map(l => l.c).join(', ')})`).join('; ')}</div>` : ''}
-    <div style="font-size:.82rem;margin-top:4px;">${itens.map(x => `${esc(x.t.name)} ${x.ls.map(l => `${priorChip(l.c)}${pmPct(l.np1)!=null ? `NP1 ${pmPct(l.np1)}%` : pmPct(l.aula)!=null ? `aulas ${pmPct(l.aula)}%` : pmPct(l.diag)!=null ? `sond. ${pmPct(l.diag)}%` : '—'}`).join(' ')}`).join(' · ')}</div></div>`;
+    <div class="pm-tab">${itens.map(x => `<div class="pm-lin"><b>${esc(x.t.name)}</b><span class="pm-ar">${esc(x.area)}</span>${x.ls.map(l => `<span class="pm-v">${priorChip(l.c)}${pmPct(l.np1)!=null ? `NP1 ${pmPct(l.np1)}%` : pmPct(l.aula)!=null ? `aulas ${pmPct(l.aula)}%` : pmPct(l.diag)!=null ? `sond. ${pmPct(l.diag)}%` : ''}</span>`).join('')}${x.st ? '' : '<span class="pm-sem">sem sondagem</span>'}</div>`).join('')}</div></div>`;
 }
 // ---------- aluno ----------
 function pmAlunoDados(){ const al = state.aluno; const out = {};
@@ -38025,6 +38019,153 @@ html body .pill{ letter-spacing:normal; }
   html body .app-main .row > div > select, html body .app-main .row > select{ min-width: min(128px, 100%); max-width: 100%; }
 }
 
+/* ===== Telas do professor mais simples (15/11/2026) ===== */
+/* barra de baixo: nome curto no celular/tablet em pé */
+.lb-c{ display:none; }
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){ .lb-l{ display:none; } .lb-c{ display:inline; } }
+/* abas do alto: todas à vista (quebram linha), sem rolar para o lado */
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){
+  html body .nav-abas{ flex-wrap:wrap !important; overflow:visible !important; gap:6px !important; margin-left:0 !important; margin-right:0 !important; padding-left:0 !important; padding-right:0 !important; }
+  html body .nav-aba{ padding:6px 12px; font-size:.82rem; }
+}
+/* Hoje: "Mais para hoje" em lista que abre ao tocar */
+.rec-grupo-tit{ font-size:.74rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color: var(--muted,#5b6478); margin:20px 4px 8px; }
+.rec-cab{ display:flex; align-items:center; gap:10px; width:100%; background:none; border:0; padding:0; margin:0 0 10px; font:inherit; color:inherit; text-align:left; cursor:pointer; min-height:44px; }
+.rec-cab .rec-ic{ flex:0 0 32px; height:32px; border-radius:10px; background:#f6e8ec; color:#6b1d33; display:grid; place-items:center; }
+.rec-cab .rec-tit{ flex:1 1 auto; min-width:0; font-weight:700; font-size:.96rem; line-height:1.25; }
+.rec-cab .rec-seta{ flex:0 0 auto; font-size:1.25rem; color: var(--muted,#5b6478); line-height:1; transition: transform .15s; }
+.rec:not(.rec-fechado):not(.rec-direto) .rec-seta{ transform: rotate(180deg); }
+.rec-pill{ flex:0 0 auto; font-size:.7rem; font-weight:700; border-radius:999px; padding:3px 8px; white-space:nowrap; }
+.rec-pill.ouro{ background:#fff6dc; color:#8a6200; } .rec-pill.coral{ background:#fde9e3; color:#b3401f; }
+html body .app-main .rec{ border-left:1px solid var(--paper-line,#e6e9f0) !important; }
+html body .app-main .rec.rec-fechado{ padding:6px 14px !important; margin:0 0 8px !important; min-height:0; background: var(--surface,#fff) !important; display:block !important; }
+html body .app-main .rec.rec-fechado > :not(.rec-cab){ display:none !important; }
+.rec.rec-fechado .rec-cab{ margin:0; }
+.rec:not(.rec-fechado) .rec-tit-orig{ display:none !important; }
+:root[data-theme="dark"] .rec-cab .rec-ic{ background: rgba(255,255,255,.08); color:#f2c14e; }
+:root[data-theme="dark"] .rec-pill.ouro{ background:#3a3220; color:#f2c14e; } :root[data-theme="dark"] .rec-pill.coral{ background:#3d2520; color:#ff9b7f; }
+/* aulas de hoje no celular: uma linha por turma, toque abre a aula */
+[data-inicio-aulas] [data-inicio-turma]{ cursor:pointer; }
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){
+  html body [data-inicio-aulas] [data-inicio-turma]{ padding:10px 34px 10px 14px !important; position:relative; }
+  html body [data-inicio-turma] > .row:last-child{ display:none !important; }
+  html body [data-inicio-turma] > div[style*="fbf3df"]{ background:none !important; padding:0 !important; margin-top:2px !important; }
+  html body [data-inicio-turma] > div[style*="fbf3df"] > div:first-child{ display:none; }
+  html body [data-inicio-turma] > div[style*="fbf3df"] > div:nth-child(2){ font-weight:600; font-size:.88rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  html body [data-inicio-turma] > .row:first-of-type span{ font-size:.72rem !important; }
+  html body [data-inicio-turma]::after{ content:'›'; position:absolute; right:14px; top:50%; transform:translateY(-50%); font-size:1.5rem; color: var(--muted,#5b6478); }
+}
+/* Medição dos focos: uma linha por turma */
+.pm-tab{ margin-top:8px; display:flex; flex-direction:column; gap:4px; font-size:.82rem; }
+.pm-lin{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; padding:5px 0; border-top:1px solid var(--paper-line,#eef0f5); }
+.pm-lin > b{ flex:0 0 46px; } .pm-lin .pm-ar{ flex:0 0 26px; color: var(--muted,#5b6478); font-weight:700; font-size:.74rem; }
+.pm-lin .pm-v{ display:inline-flex; align-items:center; gap:4px; margin-right:6px; white-space:nowrap; }
+.pm-lin .pm-sem{ font-size:.7rem; font-weight:700; color:#8a6200; background:#fff6dc; border-radius:999px; padding:1px 7px; }
+/* Notas: só as escolhas, sem textos longos */
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){
+  html body .painel-abas{ display:grid !important; grid-template-columns:1fr 1fr; gap:6px !important; }
+  html body .painel-abas .btn{ width:100%; margin:0; text-align:left; justify-content:flex-start; white-space:normal; font-size:.82rem; padding:9px 10px; min-height:40px; line-height:1.2; }
+  html body .notas-disc{ flex-wrap:wrap; gap:4px !important; } html body .notas-disc label{ width:100%; }
+  html body .notas-disc select{ max-width:none !important; width:100%; }
+  html body .notas-filtros{ display:grid !important; grid-template-columns:1fr 1fr; gap:8px; align-items:end; }
+  html body .notas-filtros > div{ min-width:0; } html body .notas-filtros select{ width:100%; min-width:0 !important; }
+  html body .notas-filtros > .btn{ grid-column:1 / -1; width:100%; }
+  /* banco do ENEM: botões embaixo, lado a lado */
+  html body [data-enem-of] > .row:first-child{ flex-direction:column; align-items:flex-start !important; }
+  html body [data-enem-of] > .row:first-child > span:last-child{ display:flex; gap:6px; flex-wrap:wrap; width:100%; align-items:center; }
+  html body [data-enem-of] > .row:first-child > span:last-child .btn{ flex:1 1 auto; width:auto; }
+  /* modo coordenação: faixa curta */
+  html body [data-via-coord]{ padding:8px 12px !important; font-size:.88rem; }
+}
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){
+  html body .app-main .row[data-painel-topo]{ flex-wrap:nowrap; gap:8px; }
+  html body [data-painel-topo] h2{ flex:1 1 auto; min-width:0; font-size:1.25rem; }
+  html body [data-painel-topo] .btn{ flex:0 0 auto; padding:6px 10px; font-size:.8rem; }
+  html body [data-inicio-turma] > .row:first-of-type span{ white-space:nowrap; }
+}
+
+/* ===== Premium (15/11/2026) ===== */
+/* 1) ícone de contorno no lugar do emoji em botões e abas */
+.btn-ic{ display:inline-flex; align-items:center; justify-content:center; margin-right:6px; vertical-align:-3px; flex:0 0 auto; }
+.btn-ic .vis-ic{ width:16px; height:16px; }
+.so-ic .btn-ic{ margin-right:0; }
+html body .btn .btn-ic{ margin-right:7px; }
+.num-tile .btn-ic{ margin:0 0 4px; }
+html body .stat-row{ display:grid !important; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; }
+html body .stat-tile.vis-stat{ display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:12px 14px; min-height:0; }
+.vis-stat-ic{ width:30px; height:30px; border-radius:9px; display:grid; place-items:center; background:rgba(255,255,255,.7); color:#6b1d33; margin-bottom:4px; }
+.vis-stat-v{ font-family: var(--fonte-ui); font-style:normal; font-size:1.5rem; font-weight:800; line-height:1.1; }
+.vis-stat-r{ font-size:.74rem; font-weight:600; color: var(--muted,#5b6478); line-height:1.2; }
+:root[data-theme="dark"] .vis-stat-ic{ background: rgba(255,255,255,.08); color:#f2c14e; }
+/* 2) Agora / Próxima */
+.ag-selo{ display:inline-block; font-size:.7rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; border-radius:999px; padding:3px 9px; margin:0 0 6px; }
+.ag-selo.agora{ background:#6b1d33; color:#fff; } .ag-selo.prox{ background:#fff6dc; color:#8a6200; }
+.ag-selo.hoje{ background:#e0f3f1; color:#145f5a; } .ag-selo.feita{ background:#eef0f5; color:#5b6478; }
+html body [data-inicio-turma].ag-agora{ border:2px solid #6b1d33 !important; box-shadow:0 6px 20px rgba(107,29,51,.12); }
+html body [data-inicio-turma].ag-feita{ opacity:.72; }
+html body [data-inicio-turma].ag-oculta{ display:none !important; }
+.ag-mais{ grid-column:1 / -1; width:100%; background:none; border:1px dashed var(--paper-line,#d5dbe6); border-radius:14px; padding:11px; font:inherit; font-weight:700; font-size:.88rem; color:#6b1d33; cursor:pointer; }
+:root[data-theme="dark"] .ag-selo.agora{ background:#d7708a; color:#1a1416; } :root[data-theme="dark"] .ag-selo.prox{ background:#3a3220; color:#f2c14e; }
+:root[data-theme="dark"] .ag-selo.hoje{ background:#1d3533; color:#7fd3cb; } :root[data-theme="dark"] .ag-mais{ color:#f2c14e; }
+html[data-theme="dark"] body [data-inicio-turma].ag-agora{ border-color:#d7708a !important; }
+html body [data-inicio-aulas] > .row:first-of-type{ flex-wrap:nowrap; gap:8px; }
+html body [data-inicio-aulas] > .row:first-of-type .btn{ width:auto; flex:0 0 auto; padding:6px 12px; font-size:.8rem; }
+/* 3) chips no lugar das listas de escolha curtas */
+html body select.vis-sel-oculto{ position:absolute !important; width:1px !important; height:1px !important; opacity:0 !important; pointer-events:none !important; overflow:hidden; clip:rect(0 0 0 0); margin:0 !important; padding:0 !important; border:0 !important; }
+.vis-chips{ display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.vis-chip{ font:inherit; font-size:.88rem; font-weight:600; border:1px solid #d5dbe6; background: var(--surface,#fff); color: var(--ink,#172036); border-radius:999px; padding:8px 14px; min-height:38px; cursor:pointer; transition: background .12s, color .12s, border-color .12s; }
+.vis-chips.curtos .vis-chip{ min-width:48px; text-align:center; }
+.vis-chip[aria-pressed="true"]{ background:#6b1d33; border-color:#6b1d33; color:#fff; }
+.vis-chip:active{ transform: scale(.97); }
+:root[data-theme="dark"] .vis-chip{ border-color: var(--paper-line); }
+:root[data-theme="dark"] .vis-chip[aria-pressed="true"]{ background:#d7708a; border-color:#d7708a; color:#1a1416; }
+html body .app-main .row > .vis-chips-pai{ flex:1 1 100%; min-width:0; }
+html body .notas-filtros{ display:grid !important; grid-template-columns:1fr; gap:12px; align-items:stretch; }
+html body .notas-filtros > .btn{ width:100%; }
+html body .notas-disc{ flex-wrap:wrap; } html body .notas-disc label{ width:100%; }
+/* 4) carregando: formato da tela em cinza (no lugar da rodinha) + entrada suave entre telas */
+@keyframes visBrilho{ from{ background-position: 100% 0; } to{ background-position: -100% 0; } }
+html body .app-main .spinner:not(.btn .spinner){ width:100%; max-width:520px; height:76px; margin:14px 0; border:0; border-radius:0; animation: visBrilho 1.3s linear infinite;
+  background: linear-gradient(90deg, #e9ecf3 25%, #f5f6fa 50%, #e9ecf3 75%); background-size: 200% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) 0 0/100% 14px no-repeat, linear-gradient(#000 0 0) 0 30px/82% 14px no-repeat, linear-gradient(#000 0 0) 0 60px/58% 14px no-repeat;
+          mask: linear-gradient(#000 0 0) 0 0/100% 14px no-repeat, linear-gradient(#000 0 0) 0 30px/82% 14px no-repeat, linear-gradient(#000 0 0) 0 60px/58% 14px no-repeat; }
+:root[data-theme="dark"] .app-main .spinner:not(.btn .spinner){ background: linear-gradient(90deg, #262a33 25%, #31353f 50%, #262a33 75%); background-size: 200% 100%; }
+@keyframes visEntra{ from{ opacity:0; transform: translateY(6px); } to{ opacity:1; transform:none; } }
+.app-main.vis-entra{ animation: visEntra .22s ease-out; }
+html body .btn:active, html body .rec-cab:active, html body [data-inicio-turma]:active{ transform: scale(.985); }
+@media (prefers-reduced-motion: reduce){ .app-main.vis-entra{ animation:none; } html body .app-main .spinner{ animation:none; } }
+/* 5) telas antigas no padrão */
+html body .nav-aba.vis-aba-oculta{ display:none !important; }
+html body .nav-aba.vis-aba-mais{ border-style:dashed; font-weight:800; color:#6b1d33; }
+html[data-theme="dark"] body .nav-aba.vis-aba-mais{ color:#f2c14e; }
+html body .vis-ajuda-movida{ display:none !important; }
+.vis-dica{ border:1px solid var(--paper-line,#e6e9f0); border-radius:14px; padding:10px 14px; margin:10px 0; background: var(--surface,#fff); }
+.vis-dica > summary{ cursor:pointer; font-weight:700; font-size:.9rem; list-style:none; display:flex; align-items:center; gap:6px; color:#8a6200; }
+.vis-dica > summary::-webkit-details-marker{ display:none; }
+.vis-dica > summary::after{ content:'⌄'; margin-left:auto; color: var(--muted,#5b6478); }
+.vis-dica[open] > summary::after{ transform: rotate(180deg); }
+.vis-dica-corpo{ font-size:.86rem; margin-top:8px; color: var(--ink); }
+:root[data-theme="dark"] .vis-dica > summary{ color:#f2c14e; }
+/* campos de arquivo e de data com a cara do app */
+html body .app-main input[type="file"]{ font:inherit; font-size:.84rem; color: var(--muted,#5b6478); max-width:100%; }
+html body .app-main input[type="file"]::file-selector-button{ font:inherit; font-weight:700; font-size:.84rem; border:1px solid #6b1d33; background:#fff; color:#6b1d33; border-radius:999px; padding:8px 14px; margin-right:10px; cursor:pointer; }
+html[data-theme="dark"] body .app-main input[type="file"]::file-selector-button{ background:transparent; border-color:#d7708a; color:#d7708a; }
+html body .app-main input[type="date"], html body .app-main input[type="time"], html body .app-main input[type="datetime-local"]{ min-height:42px; border-radius:12px; padding:8px 10px; font:inherit; font-size:.9rem; }
+/* seletor de turmas/disciplinas das aulas: quebra linha no celular (sem rolar para o lado) */
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){
+  html body .pl-turmas{ flex-wrap:wrap !important; overflow:visible !important; }
+  html body [data-plano-cab] > .row:first-child{ align-items:flex-start !important; }
+}
+/* 6) aviso de nova versão */
+#vis-nova-versao{ position:fixed; left:50%; transform:translateX(-50%); bottom:calc(84px + env(safe-area-inset-bottom)); z-index:9999; display:flex; align-items:center; gap:12px; background:#172036; color:#fff; border-radius:999px; padding:8px 8px 8px 18px; box-shadow:0 10px 30px rgba(0,0,0,.25); font-size:.88rem; max-width:calc(100% - 24px); }
+#vis-nova-versao button{ font:inherit; font-weight:800; border:0; border-radius:999px; background:#f2c14e; color:#172036; padding:8px 14px; cursor:pointer; }
+@media (min-width: 1100px){ #vis-nova-versao{ bottom:24px; } }
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){
+  html[data-theme="dark"] body [data-inicio-turma] > div[style*="fbf3df"], html[data-theme="dark"] body [data-inicio-turma] > div[style*="fbf3df"] *{ color: var(--ink) !important; background:none !important; }
+}
+/* banner da campanha (carrossel): só no computador e no tablet deitado */
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){ html body .campanha-carousel{ display:none !important; } }
+
 </style>
 <script>
 // ===== Visual 2026 (14/11/2026) =====
@@ -38406,10 +38547,16 @@ document.addEventListener('keydown', ev => { if(ev.key === 'Escape') visFecharMa
 
 // Topo do professor e da coordenação no celular: a saudação sobe para a faixa do topo (não sobra faixa vazia)
 function visSaudacaoNoTopo(){
-  const tb = document.querySelector('.app-topbar'); const g = document.querySelector('.app-main .greeting-header h2');
-  if(!tb || !g || tb.querySelector('.greeting-header') || tb.querySelector('.tb-saud')) return;
+  // Início: a saudação. Nas outras telas: o nome da seção (para a pessoa saber onde está).
+  const tb = document.querySelector('.app-topbar'); if(!tb || tb.querySelector('.greeting-header') || tb.querySelector('.tb-saud')) return;
+  const sub = state.view === 'professor' ? state.professor.subview : state.view === 'aluno' ? state.aluno.subview : state.view === 'coordenador' ? state.coordenador.subview : '';
+  const g = document.querySelector('.app-main .greeting-header h2'); const ehInicio = sub === 'inicio';
+  let txt = '';
+  if(ehInicio && g) txt = g.textContent;
+  else { const at = document.querySelector('.app-sidebar .sidebar-item.active .lb-l') || document.querySelector('.app-sidebar .sidebar-item.active .nav-label'); txt = at ? at.textContent : (g ? g.textContent : ''); }
+  txt = (txt || '').replace(/\s+/g, ' ').trim(); if(!txt) return;
   const linha = tb.querySelector(':scope > .row') || tb.firstElementChild; if(!linha) return;
-  const sp = document.createElement('strong'); sp.className = 'tb-saud'; sp.textContent = g.textContent.replace(/\s+/g, ' ').trim();
+  const sp = document.createElement('strong'); sp.className = 'tb-saud' + (ehInicio ? '' : ' tb-tela'); sp.textContent = txt; tb.classList.add('tb-com-titulo');
   const prim = linha.firstElementChild; if(prim && prim.nextSibling) linha.insertBefore(sp, prim.nextSibling); else linha.appendChild(sp);
 }
 (function(){
@@ -38435,7 +38582,335 @@ function visMarcas(){
   try{ visMarcas(); }catch(e){}
 })();
 
+// ===== Hoje do professor mais limpo (15/11/2026) =====
+// O essencial fica à vista (atalhos, aulas de hoje, avisos que pedem ação). O resto vira uma lista
+// "Mais para hoje": cada item é uma linha; tocar abre ali mesmo (ou vai direto, se só tem um botão).
+const VIS_REC_ABERTOS = new Set();
+const VIS_REC_ICONE = [['[data-pn-faixa]', 'chart'], ['[data-prior-prof]', 'star'], ['[data-pm-card]', 'chart'], ['[data-labs-prof]', 'tool'], ['[data-kit-hoje]', 'check'], ['.accent-yellow', 'book'], ['.accent-teal', 'file']];
+const VIS_REC_FICA = '.greeting-header, .atalhos-prof, [data-inicio-aulas], .ess-barra, .accent-red, [data-seg-aviso], [data-cal-semana], [data-cal-auto], [data-plano-lembretes], [data-via-coord], .nav-abas, .rec-grupo-tit';
+function visRecTitulo(card){
+  if(card.matches('[data-pn-faixa]')) return { txt: 'Meu painel', el: null };
+  const el = card.querySelector('h2, h3, strong, b'); if(!el) return null;
+  const c = el.cloneNode(true); c.querySelectorAll('.info-i').forEach(x => x.remove());
+  const txt = (c.textContent || '').replace(/^[^\p{L}\p{N}]+/u, '').replace(/\s+/g, ' ').trim();
+  return txt ? { txt, el } : null;
+}
+function visRecolherInicio(){
+  const main = document.querySelector('.app-main');
+  if(!main || state.view !== 'professor' || state.professor.subview !== 'inicio' || state.professor.profileEditorOpen) return;
+  const alvos = [...main.children].filter(el => !el.dataset.recFeito && el.matches('.card, [data-pn-faixa]') && !el.matches(VIS_REC_FICA));
+  let primeiro = null;
+  alvos.forEach(card => {
+    const t = visRecTitulo(card); if(!t) return;
+    card.dataset.recFeito = '1';
+    const acoes = [...new Set([...card.querySelectorAll('button:not(.info-i), a[href], [data-action], [data-pn]')].map(a => a.closest('button, a') || a))].filter(a => !a.classList.contains('info-i'));
+    const direto = acoes.length === 1 && !card.querySelector('input, select, textarea');
+    const ic = (VIS_REC_ICONE.find(([sel]) => card.matches(sel)) || [0, 'info'])[1];
+    let resumo = '';
+    if(card.querySelector('[data-pm-alertas]')) resumo = '<span class="rec-pill coral">abaixo de 50%</span>';
+    else if(card.querySelector('[data-pm-sem]')) resumo = '<span class="rec-pill ouro">falta sondagem</span>';
+    const cab = document.createElement('button'); cab.type = 'button'; cab.className = 'rec-cab';
+    cab.innerHTML = `<span class="rec-ic">${visSvg(ic, 18)}</span><span class="rec-tit">${esc(t.txt)}</span>${resumo}<span class="rec-seta" aria-hidden="true">${direto ? '›' : '⌄'}</span>`;
+    card.classList.add('rec');
+    if(direto){ cab.dataset.recAlvo = '1'; card.classList.add('rec-fechado', 'rec-direto'); }
+    else {
+      const aberto = VIS_REC_ABERTOS.has(t.txt);
+      cab.dataset.recChave = t.txt; cab.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+      if(!aberto) card.classList.add('rec-fechado');
+      if(t.el) t.el.classList.add('rec-tit-orig');
+    }
+    card.insertBefore(cab, card.firstChild);
+    if(!primeiro) primeiro = card;
+  });
+  if(primeiro && !main.querySelector('.rec-grupo-tit')){
+    // a lista vai para baixo das aulas de hoje (antes do "Modo essencial", se houver)
+    const fim = main.querySelector(':scope > .ess-barra'); const h = document.createElement('div'); h.className = 'rec-grupo-tit'; h.textContent = 'Mais para hoje';
+    [h, ...main.querySelectorAll(':scope > .rec')].forEach(el => main.insertBefore(el, fim));
+  }
+}
+document.addEventListener('click', ev => {
+  const cab = ev.target && ev.target.closest ? ev.target.closest('.rec-cab') : null; if(!cab) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const card = cab.parentElement;
+  if(cab.dataset.recAlvo){ const alvo = [...card.querySelectorAll('button, a[href]')].find(a => !a.classList.contains('rec-cab') && !a.classList.contains('info-i')); if(alvo) alvo.click(); return; }
+  const k = cab.dataset.recChave, abrir = card.classList.contains('rec-fechado');
+  card.classList.toggle('rec-fechado', !abrir); cab.setAttribute('aria-expanded', abrir ? 'true' : 'false');
+  if(abrir) VIS_REC_ABERTOS.add(k); else VIS_REC_ABERTOS.delete(k);
+}, true);
+// nomes curtos na barra de baixo do celular ("Minhas turmas" → "Turmas")
+const VIS_ROTULO_CURTO = { 'Minhas turmas': 'Turmas', 'Avaliações e notas': 'Avaliações', 'Turmas e frequência': 'Turmas', 'Provas e notas': 'Provas', 'Aulas e comunicação': 'Aulas', 'Configurações': 'Config.', 'Professores': 'Profs.' };
+if(typeof renderSidebar === 'function' && !renderSidebar.__visCurto){
+  const orig = renderSidebar;
+  renderSidebar = function(){
+    const html = orig.apply(this, arguments);
+    return html.replace(/<span class="nav-label">([^<]+)<\/span>/g, (m, l) => { const c = VIS_ROTULO_CURTO[l.trim()]; return c ? `<span class="nav-label"><span class="lb-l">${l}</span><span class="lb-c">${c}</span></span>` : m; });
+  };
+  renderSidebar.__visCurto = true; renderSidebar.__vis2026 = true;
+}
+if(typeof renderInterno === 'function' && !renderInterno.__visRec){
+  const orig = renderInterno;
+  renderInterno = function(){ const r = orig.apply(this, arguments); try{ visRecolherInicio(); }catch(e){} return r; };
+  renderInterno.__vis2 = true; renderInterno.__vis3 = true; renderInterno.__visRec = true;
+}
+// aulas de hoje: tocar no cartão da turma (fora de botões e campos) abre a aula — no celular o botão some e fica só a linha
+document.addEventListener('click', ev => {
+  const c = ev.target && ev.target.closest ? ev.target.closest('[data-inicio-aulas] [data-inicio-turma]') : null; if(!c) return;
+  if(ev.target.closest('button, a, input, select, textarea, label, summary, details, [data-cal-replan], .info-i')) return;
+  const b = c.querySelector('[data-action="inicio-abrir-plano"]'); if(b) b.click();
+});
+
+// ===== Premium (15/11/2026) — 1) emojis de botões e abas viram ícones de contorno =====
+Object.assign(VIS_ICON, {
+  target: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M7 12a5 5 0 1 0 10 0a5 5 0 1 0 -10 0M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0',
+  compass: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M16.2 7.8l-2.1 6.3l-6.3 2.1l2.1-6.3z',
+  refresh: 'M20 11a8 8 0 0 0-14.8-4.2L4 9M4 4v5h5M4 13a8 8 0 0 0 14.8 4.2L20 15M20 20v-5h-5',
+  download: 'M12 4v11M7 10l5 5 5-5M5 20h14', upload: 'M12 20V9M7 14l5-5 5 5M5 4h14',
+  printer: 'M7 9V3h10v6M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M7 14h10v7H7z',
+  cast: 'M3 5h18v12H3zM8 21h8M12 17v4', plus: 'M12 5v14M5 12h14',
+  search: 'M4 11a7 7 0 1 0 14 0a7 7 0 1 0 -14 0M20 20l-4-4', calendar: 'M4 6h16v15H4zM4 10h16M8 3v4M16 3v4',
+  flask: 'M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3M7 15h10',
+  clipboard: 'M9 3h6v3H9zM9 4.5H6a1 1 0 0 0-1 1V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5.5a1 1 0 0 0-1-1h-3M9 12h6M9 16h4',
+  pencil: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4', eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0',
+  lock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4', unlock: 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 7.5-2',
+  send: 'M22 2L11 13M22 2l-7 20-4-9-9-4z', play: 'M7 4l13 8-13 8z',
+  image: 'M3 5h18v14H3zM6.5 10a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0 -3 0M21 16l-5-5-9 9', copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
+  x: 'M6 6l12 12M18 6L6 18', back: 'M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3', mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
+  bell: 'M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0',
+  link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+  save: 'M5 3h11l3 3v15H5zM8 3v5h7M8 21v-7h8v7', list: 'M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01',
+  award: 'M6 9a6 6 0 1 0 12 0a6 6 0 1 0 -12 0M8.5 14L7 22l5-3 5 3-1.5-8', clock: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M12 7v5l3 2',
+  mic: 'M9 4a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0zM5 11a7 7 0 0 0 14 0M12 18v3', video: 'M3 6h12v12H3zM15 10l6-3v10l-6-3',
+  map: 'M9 4L3 6v14l6-2 6 2 6-2V4l-6 2zM9 4v14M15 6v14', folder: 'M3 6h6l2 2h10v11H3z',
+  key: 'M3 15a4 4 0 1 0 8 0a4 4 0 1 0 -8 0M10 12l10-10M16 6l3 3', filter: 'M3 5h18l-7 8v6l-4 2v-8z',
+  bulb: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z',
+  heart: 'M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z',
+  trophy: 'M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 21h6M10 17h4v4h-4z',
+  globe: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
+  bus: 'M5 4h14v13H5zM5 11h14M8 17v3M16 17v3', megaphone: 'M3 10v4h4l6 4V6l-6 4zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11',
+  phone: 'M7 2h10v20H7zM11 18h2'
+});
+const VIS_EMOJI_ICONE = (() => {
+  const g = {
+    pencil: '📝✏✍📐📏🖊🖋', file: '📄📃🗒📑📜', cast: '📺🖥💻📡📽', star: '⭐🌟💫', target: '🎯', compass: '🧭',
+    user: '🙋👤🧑👩👨🙂😀😊', users: '👥👪🫂', chart: '📊📈📉', refresh: '🔄🔁♻🔃', download: '⬇📥', upload: '⬆📤',
+    printer: '🖨', play: '▶⏯', check: '✅✔☑🪪', book: '📖📘📗📙📚📕📓📔', flask: '🧪🔬⚗🧫🧬', game: '🎮🕹🧩🃏', wheel: '🎲🎡🎰',
+    cpu: '🤖🧠', clipboard: '📋', trash: '🗑', plus: '➕', search: '🔍🔎', calendar: '📅🗓📆', set: '⚙🔧🛠🔩', trophy: '🏆',
+    award: '🏅🎖🥇🥈🥉', chat: '💬🗨🗯', eye: '👁👀', lock: '🔒🔐', unlock: '🔓', mail: '📨✉📧📩', image: '🖼📷📸🎨',
+    link: '🔗📎', save: '💾', clock: '⏰⏱⏳⌛🕘🕐⏲', mic: '🎤🎙🔊📻', video: '🎬🎥📹🎞', map: '🗺🌋🏔', folder: '📁📂🗂🗃',
+    key: '🔑🗝', bulb: '💡', heart: '❤💛💚💙💜🧡🤝', globe: '🌎🌍🌏🌐', bus: '🚌🚍', megaphone: '📢📣', cap: '🎓🏫',
+    bell: '🔔', sparkle: '✨🌱🎉🎊', send: '🚀📲', phone: '📱☎📞', back: '↩↪', x: '❌✖⛔🚫', info: 'ℹ❓❔', filter: '🔽'
+  };
+  const m = new Map(); for(const [ic, s] of Object.entries(g)) for(const ch of s) m.set(ch, ic); return m;
+})();
+const VIS_EMOJI_BTN = /^\s*((?:\p{Extended_Pictographic}|\p{Regional_Indicator})(?:️|⃣|\p{Emoji_Modifier}|‍(?:\p{Extended_Pictographic}|\p{Emoji_Presentation}))*️?)\s*/u;
+const VIS_SEM_ICONE = '.av-slide, .av-tela, [data-av-tela], .jg, .jgc, .jg-tela, .pn, .pn-tela, .exam-lock, .alt-opcao, .tour-card, #info-balao, .rec-cab, .info-i, [data-sem-icone]';
+function visEmojiParaIcone(raiz){
+  const els = (raiz || document).querySelectorAll('.app-main .btn, .app-main button, .app-main [role="button"], .app-main .nav-aba, .app-main .num-tile, .app-topbar .btn, .app-topbar button, #nav-mais-folha button');
+  els.forEach(el => {
+    if(el.dataset.visIc || el.closest(VIS_SEM_ICONE)) return; el.dataset.visIc = '1';
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: n => n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP });
+    const n = w.nextNode(); if(!n) return;
+    const mt = n.nodeValue.match(VIS_EMOJI_BTN); if(!mt) return;
+    const resto = n.nodeValue.slice(mt[0].length);
+    const ch = [...mt[1]][0]; const ic = VIS_EMOJI_ICONE.get(ch);
+    if(!resto.trim() && !n.nextSibling && n.parentNode === el && !ic) return;   // botão que é só um emoji desconhecido: deixa
+    n.nodeValue = resto; if(!el.textContent.trim()) el.classList.add('so-ic');
+    if(ic){ const sp = document.createElement('span'); sp.className = 'btn-ic'; sp.innerHTML = visSvg(ic, 16); n.parentNode.insertBefore(sp, n); if(!resto.trim() && !el.getAttribute('aria-label')) el.setAttribute('aria-label', el.title || ic); }
+  });
+}
+// números (Avaliações, coordenação): cartão compacto com ícone de contorno, número grande sem itálico
+if(typeof renderStatTile === 'function' && !renderStatTile.__vis){
+  renderStatTile = function(icon, value, label, tint){
+    const ic = VIS_EMOJI_ICONE.get([...String(icon || '')][0]) || 'chart';
+    return `<div class="stat-tile vis-stat tint-${tint || 'vinho'}"><span class="vis-stat-ic">${visSvg(ic, 18)}</span><b class="vis-stat-v">${value}</b><span class="vis-stat-r">${esc(label)}</span></div>`;
+  };
+  renderStatTile.__vis = true;
+}
+if(typeof renderInterno === 'function' && !renderInterno.__visIc){
+  const orig = renderInterno;
+  renderInterno = function(){ const r = orig.apply(this, arguments); try{ visEmojiParaIcone(); }catch(e){} return r; };
+  renderInterno.__vis2 = true; renderInterno.__vis3 = true; renderInterno.__visRec = true; renderInterno.__visIc = true;
+}
+
+// ===== Premium — 2) Hoje: "Agora" e "Próxima" pelo horário; as outras turmas ficam recolhidas =====
+let VIS_AG_TODAS = false;
+function visAgoraProxima(){
+  const card = document.querySelector('.app-main [data-inicio-aulas]'); if(!card || card.dataset.agFeito) return; card.dataset.agFeito = '1';
+  const linhas = [...card.querySelectorAll('[data-inicio-turma]')]; if(!linhas.length) return;
+  const cont = linhas[0].parentElement;
+  let itens = []; try{ if(typeof calAgendaItens === 'function' && typeof calHoje === 'function') itens = calAgendaItens(calHoje()) || []; }catch(e){ itens = []; }
+  const agora = (() => { const d = new Date(); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); })();
+  const porTid = {}; itens.forEach(it => { if(!porTid[it.tid]) porTid[it.tid] = it; });
+  let hoje = [], resto = [];
+  if(itens.length){
+    linhas.forEach(l => (porTid[l.getAttribute('data-inicio-turma')] ? hoje : resto).push(l));
+    hoje.sort((a, b) => (porTid[a.getAttribute('data-inicio-turma')].ini || '').localeCompare(porTid[b.getAttribute('data-inicio-turma')].ini || ''));
+    const iAgora = hoje.findIndex(l => { const it = porTid[l.getAttribute('data-inicio-turma')]; return it.ini && it.fim && it.ini <= agora && agora < it.fim; });
+    const iProx = hoje.findIndex(l => { const it = porTid[l.getAttribute('data-inicio-turma')]; return it.ini && it.ini > agora; });
+    hoje.forEach((l, i) => { const it = porTid[l.getAttribute('data-inicio-turma')];
+      const tipo = i === iAgora ? 'agora' : i === iProx ? 'prox' : (it.fim && it.fim <= agora ? 'feita' : 'hoje');
+      const rot = { agora: 'Agora', prox: 'Próxima', feita: 'Já passou', hoje: 'Hoje' }[tipo];
+      l.classList.add('ag-' + tipo);
+      const selo = document.createElement('span'); selo.className = 'ag-selo ' + tipo; selo.textContent = `${rot}${it.ini ? ' · ' + it.ini : ''}`;
+      l.insertBefore(selo, l.firstChild); });
+    const ag = card.querySelector('[data-cal-agenda]'); if(ag && hoje.length) ag.classList.add('so-largo');
+  } else {
+    hoje = linhas.slice(0, 3); resto = linhas.slice(3);
+  }
+  [...hoje, ...resto].forEach(l => cont.appendChild(l));
+  if(resto.length && hoje.length){
+    resto.forEach(l => l.classList.toggle('ag-oculta', !VIS_AG_TODAS));
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ag-mais'; b.dataset.agMais = '1';
+    const rot = itens.length ? `${resto.length} turma${resto.length > 1 ? 's' : ''} sem aula hoje` : `Mais ${resto.length} turma${resto.length > 1 ? 's' : ''}`;
+    b.innerHTML = VIS_AG_TODAS ? `Mostrar menos <span aria-hidden="true">⌃</span>` : `${rot} <span aria-hidden="true">⌄</span>`;
+    cont.appendChild(b);
+  }
+}
+document.addEventListener('click', ev => {
+  const b = ev.target && ev.target.closest ? ev.target.closest('[data-ag-mais]') : null; if(!b) return;
+  ev.preventDefault(); ev.stopPropagation(); VIS_AG_TODAS = !VIS_AG_TODAS;
+  const card = b.closest('[data-inicio-aulas]'); if(card){ delete card.dataset.agFeito; card.querySelectorAll('.ag-selo').forEach(x => x.remove()); b.remove(); visAgoraProxima(); }
+}, true);
+if(typeof renderInterno === 'function' && !renderInterno.__visAg){
+  const orig = renderInterno;
+  renderInterno = function(){ const r = orig.apply(this, arguments); try{ visAgoraProxima(); }catch(e){} return r; };
+  Object.assign(renderInterno, { __vis2: true, __vis3: true, __visRec: true, __visIc: true, __visAg: true });
+}
+
+// ===== Premium — 3) listas de escolha curtas viram botões de toque (chips) =====
+// A lista original continua na tela (escondida): o botão só escolhe nela e avisa o app, então nada do resto muda.
+const VIS_CHIPS = {
+  'painel-turma-select': { auto: ['final-unidade-select', 'calc-final-grades'] },
+  'final-unidade-select': { curto: true, auto: ['painel-turma-select', 'calc-final-grades'] },
+  'coord-notas-turma-select': { auto: ['coord-notas-unidade-select', 'coord-calc-notas'] },
+  'coord-notas-unidade-select': { curto: true, auto: ['coord-notas-turma-select', 'coord-calc-notas'] },
+  'painel-disciplina-select': { vazio: true },
+  'chamada-turma-select': {}, 'freq-painel-turma-select': {}, 'monitoria-turma-select': {}, 'boletim-unidade-select': { curto: true },
+  'roleta-turma-select': {}, 'duelo-turma-select': {}, 'quiz-turma-select': {}, 'enquete-turma-select': {}, 'slides-turma-select': {},
+  'conquistas-turma-select': {}, 'portfolio-turma-select': {}, 'diario-filtro-turma-select': {}
+};
+function visChipRotulo(txt, cfg){ const t = txt.replace(/^[^\p{L}\p{N}]+/u, '').trim(); return cfg.curto ? t.replace(/\s*Unidade$/i, '').replace(/^Unidade\s*/i, '') : t; }
+function visChipsAplicar(){
+  Object.entries(VIS_CHIPS).forEach(([id, cfg]) => {
+    document.querySelectorAll(`select[id="${id}"]`).forEach(sel => {
+      if(sel.dataset.visChips || sel.closest(VIS_SEM_ICONE)) return;
+      const ops = [...sel.options].filter(o => cfg.vazio || o.value !== ''); if(ops.length < 2 || ops.length > 14) return;
+      sel.dataset.visChips = '1'; sel.classList.add('vis-sel-oculto'); sel.setAttribute('tabindex', '-1'); sel.setAttribute('aria-hidden', 'true');
+      const g = document.createElement('div'); g.className = 'vis-chips' + (cfg.curto ? ' curtos' : ''); g.setAttribute('role', 'group');
+      const lab = sel.parentElement && sel.parentElement.querySelector('label'); if(lab) g.setAttribute('aria-label', lab.textContent.trim());
+      g.innerHTML = ops.map(o => `<button type="button" class="vis-chip" data-vis-chip="${esc(o.value)}" aria-pressed="${sel.value === o.value && (o.value !== '' || cfg.vazio) ? 'true' : 'false'}">${esc(visChipRotulo(o.textContent, cfg) || o.textContent)}</button>`).join('');
+      g.dataset.visChipsDe = id; if(sel.parentElement) sel.parentElement.classList.add("vis-chips-pai"); sel.insertAdjacentElement('afterend', g);
+    });
+  });
+}
+document.addEventListener('click', ev => {
+  const b = ev.target && ev.target.closest ? ev.target.closest('.vis-chip') : null; if(!b) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const g = b.parentElement, id = g.dataset.visChipsDe, sel = g.previousElementSibling; if(!sel || sel.tagName !== 'SELECT') return;
+  sel.value = b.dataset.visChip; g.querySelectorAll('.vis-chip').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+  sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true }));
+  const cfg = VIS_CHIPS[id] || {};
+  if(cfg.auto){ const par = document.getElementById(cfg.auto[0]); const acao = document.querySelector(`[data-action="${cfg.auto[1]}"]`);
+    if(par && par.value && acao && sel.isConnected) acao.click(); }
+}, true);
+if(typeof renderInterno === 'function' && !renderInterno.__visChips){
+  const orig = renderInterno;
+  renderInterno = function(){ const r = orig.apply(this, arguments); try{ visChipsAplicar(); }catch(e){} return r; };
+  Object.assign(renderInterno, { __vis2: true, __vis3: true, __visRec: true, __visIc: true, __visAg: true, __visChips: true });
+}
+
+// ===== Premium — 4) entrada suave quando a pessoa troca de tela (só na troca, não a cada redesenho) =====
+let VIS_TELA_ANTES = '';
+function visEntrada(){
+  const m = document.querySelector('.app-main'); if(!m) return;
+  const k = state.view + '|' + (state.view === 'professor' ? state.professor.subview : state.view === 'aluno' ? state.aluno.subview : state.view === 'coordenador' ? state.coordenador.subview : '');
+  if(k === VIS_TELA_ANTES) return; const primeira = !VIS_TELA_ANTES; VIS_TELA_ANTES = k; if(primeira) return;
+  m.classList.remove('vis-entra'); void m.offsetWidth; m.classList.add('vis-entra'); setTimeout(() => m.classList.remove('vis-entra'), 400);
+}
+if(typeof renderInterno === 'function' && !renderInterno.__visEntra){
+  const orig = renderInterno;
+  renderInterno = function(){ const r = orig.apply(this, arguments); try{ visEntrada(); }catch(e){} return r; };
+  Object.assign(renderInterno, { __vis2: true, __vis3: true, __visRec: true, __visIc: true, __visAg: true, __visChips: true, __visEntra: true });
+}
+
+// ===== Premium — 5) telas antigas no padrão =====
+// a) seções com muitas abas (celular): mostra 5 + a aberta e um botão "+N" (nada fica escondido sem aviso)
+let VIS_ABAS_TODAS = false;
+function visAbasMais(){
+  if(!window.matchMedia || !matchMedia('(max-width: 680px), (max-width: 1099px) and (orientation: portrait)').matches) return;
+  document.querySelectorAll('.app-main [data-nav-abas]').forEach(n => {
+    if(n.dataset.visMais) return; n.dataset.visMais = '1';
+    const abas = [...n.querySelectorAll('.nav-aba')]; if(abas.length <= 7) return;
+    const ocultas = abas.filter((a, i) => i >= 5 && !a.classList.contains('ativa'));
+    ocultas.forEach(a => a.classList.toggle('vis-aba-oculta', !VIS_ABAS_TODAS));
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'nav-aba vis-aba-mais'; b.dataset.visAbasMais = '1';
+    b.textContent = VIS_ABAS_TODAS ? 'Menos' : `+${ocultas.length}`; b.setAttribute('aria-label', VIS_ABAS_TODAS ? 'Mostrar menos abas' : `Mostrar mais ${ocultas.length} abas`);
+    const ult = abas[abas.length - 1]; ult.insertAdjacentElement('afterend', b);
+  });
+}
+document.addEventListener('click', ev => {
+  const b = ev.target && ev.target.closest ? ev.target.closest('[data-vis-abas-mais]') : null; if(!b) return;
+  ev.preventDefault(); ev.stopPropagation(); VIS_ABAS_TODAS = !VIS_ABAS_TODAS;
+  const n = b.closest('[data-nav-abas]'); b.remove(); if(n){ delete n.dataset.visMais; n.querySelectorAll('.vis-aba-oculta').forEach(a => a.classList.remove('vis-aba-oculta')); visAbasMais(); }
+}, true);
+// b) texto de ajuda comprido logo depois de um campo vai para o ⓘ do rótulo do campo
+function visAjudaCampos(){
+  if(typeof infoI !== 'function') return;
+  document.querySelectorAll('.app-main p.muted, .app-main div.muted, .app-main small').forEach(el => {
+    if(el.dataset.visAj || el.closest(VIS_SEM_ICONE + ', .pl-hero, details')) return; el.dataset.visAj = '1';
+    const t = (el.textContent || '').trim(); if(t.length < 110 || VIS_INFO_FICA.test(t) || el.querySelector('a, button, input, select, textarea, img')) return;
+    const ant = el.previousElementSibling; if(!ant) return;
+    const campo = ant.matches('input, select, textarea, .vis-chips') ? ant : ant.querySelector(':scope > input, :scope > select, :scope > textarea');
+    if(!campo) return;
+    let lab = null; for(let p = ant.previousElementSibling; p && !lab; p = p.previousElementSibling){ if(p.tagName === 'LABEL') lab = p; else if(p.matches('input, select, textarea, p, h2, h3, h4, .row')) break; }
+    if(!lab && ant.tagName !== 'LABEL'){ const l2 = ant.querySelector(':scope > label'); if(l2) lab = l2; }
+    if(!lab || lab.querySelector('.info-i')) return;
+    lab.insertAdjacentHTML('beforeend', ' ' + infoI(`<p>${el.innerHTML}</p>`, 'Ajuda deste campo')); el.classList.add('vis-ajuda-movida');
+  });
+}
+// c) caixas de dica ("💡 Bom saber", "💡 Dica") viram uma linha que abre
+function visDicas(){
+  document.querySelectorAll('.app-main div[style*="background"], .app-main .q-card').forEach(el => {
+    if(el.dataset.visDica || el.closest(VIS_SEM_ICONE + ', details, .rec')) return; el.dataset.visDica = '1';
+    const t = (el.textContent || '').trim(); if(!/^💡/u.test(t) || t.length < 140 || el.querySelector('button, input, select, textarea')) return;
+    const d = document.createElement('details'); d.className = 'vis-dica';
+    const tit = (t.match(/^💡\s*([^:.\n]{2,30})[:.]/u) || [])[1] || 'Dicas';
+    d.innerHTML = `<summary><span class="btn-ic">${visSvg('bulb', 16)}</span>${esc(tit.trim())}</summary>`;
+    const corpo = document.createElement('div'); corpo.className = 'vis-dica-corpo'; corpo.innerHTML = el.innerHTML; d.appendChild(corpo);
+    el.replaceWith(d);
+  });
+}
+// d) coordenação no celular: o título da tela no topo substitui "Painel do coordenador"
+function visTopoCoord(){
+  const tb = document.querySelector('.app-topbar.tb-com-titulo'); if(!tb || state.view !== 'coordenador') return;
+  tb.querySelectorAll('span.muted').forEach(sp => { if(/Painel do coordenador/.test(sp.textContent)) sp.classList.add('so-largo'); });
+}
+if(typeof renderInterno === 'function' && !renderInterno.__visPadrao){
+  const orig = renderInterno;
+  renderInterno = function(){ const r = orig.apply(this, arguments); [visAbasMais, visAjudaCampos, visDicas, visTopoCoord].forEach(f => { try{ f(); }catch(e){} }); return r; };
+  Object.assign(renderInterno, { __vis2: true, __vis3: true, __visRec: true, __visIc: true, __visAg: true, __visChips: true, __visEntra: true, __visPadrao: true });
+}
+
 </script>
 <!-- <<< VISUAL 2026 -->
+<!-- >>> PWA -->
+<script>
+// ===== Premium — 6) app instalável que abre na hora (só no site, com https) =====
+(function(){
+  if(!('serviceWorker' in navigator) || !(location.protocol === 'https:' || location.hostname === 'localhost')) return;
+  const perguntar = () => { const c = navigator.serviceWorker.controller; const t = document.getElementById('build-tag'); if(c && t) c.postMessage({ tipo: 'qual-versao', minha: t.textContent, pagina: location.pathname }); };
+  window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').catch(() => {}); setTimeout(perguntar, 1500); setTimeout(perguntar, 8000); });
+  try{ navigator.serviceWorker.startMessages(); }catch(e){}
+  navigator.serviceWorker.addEventListener('message', ev => {
+    if(!ev.data || ev.data.tipo !== 'nova-versao' || document.getElementById('vis-nova-versao')) return;
+    const d = document.createElement('div'); d.id = 'vis-nova-versao'; d.setAttribute('role', 'status');
+    d.innerHTML = '<span>Nova versão do app pronta.</span><button type="button">Atualizar</button>';
+    d.querySelector('button').addEventListener('click', () => location.reload());
+    document.body.appendChild(d);
+  });
+})();
+
+</script>
+<!-- <<< PWA -->
 </body>
 </html>
