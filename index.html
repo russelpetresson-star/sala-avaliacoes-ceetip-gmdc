@@ -887,7 +887,7 @@ function infoI(html, rotulo){
 <!-- Selo de versão: mude este texto (e o número) toda vez que enviar um novo arquivo.
      Ajuda a confirmar, com uma olhada, se o site publicado é realmente a versão mais recente
      (útil quando o GitHub Pages ou o navegador insistem em mostrar uma cópia em cache). -->
-<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 notas info</div>
+<div id="build-tag" style="position:fixed; bottom:3px; right:6px; font-size:.62rem; color:#c9c3b6; z-index:2; pointer-events:none; font-family:monospace;">build 2026-11-15 avaliacao 2</div>
 <div id="conn-banner" class="conn-banner" style="display:none;"></div>
 <div id="tour-overlay-root"></div>
 <div id="pwa-install-root"></div>
@@ -12239,9 +12239,8 @@ function renderBanco(){
         <button class="btn btn-ghost btn-sm" data-action="new-bank-question" data-qtype="dissertativa">+ Dissertativa</button>
       </div>
       <hr style="margin:16px 0; border:none; border-top:1px solid var(--paper-line);">
-      <h3 style="margin:0 0 8px;">🤖 Criar questões com IA</h3>
-      <p class="muted" style="font-size:.85rem;">A IA gera as questões pra você revisar antes de adicionar ao banco — sempre confira o gabarito.</p>
-      <p class="muted" style="font-size:.8rem;">Essa IA usa uma chave compartilhada por toda a escola, com limite baixo — se der erro de "limite excedido" com frequência, <a href="#" data-action="open-professor-profile">cadastre sua própria chave gratuita em Meu perfil</a> (leva 1 minuto).</p>
+      <h3 style="margin:0 0 8px;">🤖 Criar questões com IA${infoI('<p>A IA gera as questões pra você revisar antes de adicionar ao banco: sempre confira o gabarito.</p><p>Ela usa uma chave compartilhada por toda a escola, com limite baixo. Se der erro de "limite excedido" com frequência, cadastre sua própria chave gratuita em <b>Meu perfil</b> (leva 1 minuto).</p>', 'Sobre a IA')}</h3>
+      <p class="muted" style="font-size:.85rem;">Deu "limite excedido"? <a href="#" data-action="open-professor-profile">Use sua chave gratuita</a>.</p>
       <div class="type-pick">
         <button class="btn btn-ghost btn-sm" data-action="open-ai-gen">🤖 Gerar por tema</button>
         <button class="btn btn-ghost btn-sm" data-action="open-book-import">📖 Importar de um PDF (livro/lista)</button>
@@ -23016,11 +23015,10 @@ function renderRedeEscolaConfig(){
   const ips = cfg.ips || [];
   return `
     <div class="card" data-rede-config="1">
-      <h3 style="margin-top:0;">📶 Aviso de rede da escola <span class="muted" style="font-size:.8rem; font-weight:400;">(opcional)</span></h3>
+      <h3 style="margin-top:0;">📶 Aviso de rede da escola <span class="muted" style="font-size:.8rem; font-weight:400;">(opcional)</span>${infoI('<p>É só um aviso para o professor: <b>nunca bloqueia a prova</b> e não usa GPS.</p><p>O app compara o endereço de internet (IP) do aparelho com os IPs da escola cadastrados aqui.</p><p>Aluno usando os dados móveis do celular dentro da escola também aparece como "fora da rede".</p><p>O IP da escola pode mudar de vez em quando: se começar a aparecer "fora" para todos, cadastre o IP de novo.</p>', 'Como funciona o aviso de rede')}</h3>
       <label style="display:flex; gap:8px; align-items:center; font-weight:400; text-transform:none;">
         <input type="checkbox" data-action="rede-toggle" ${cfg.ativo?'checked':''} style="width:auto;"> Mostrar aqui se o aparelho do aluno está fora da rede (Wi-Fi) da escola
       </label>
-      <p class="muted" style="font-size:.82rem;">É só um aviso para o professor: <strong>nunca bloqueia a prova</strong> e não usa GPS. O app compara o endereço de internet (IP) do aparelho com os IPs da escola cadastrados abaixo. Aluno usando os dados móveis do celular dentro da escola também aparece como "fora da rede", e o IP da escola pode mudar de vez em quando — se começar a aparecer "fora" para todos, cadastre o IP de novo.</p>
       <p style="margin:8px 0 4px;"><strong>IPs da escola:</strong> ${ips.length ? ips.map(ip => `<span class="pill" style="margin:2px;">${esc(ip)} <a href="#" data-action="rede-remover-ip" data-ip="${esc(ip)}" title="Remover" style="text-decoration:none;">✕</a></span>`).join(' ') : '<span class="muted">nenhum cadastrado</span>'}</p>
       <div class="row" style="gap:6px; flex-wrap:wrap; align-items:center;">
         <button class="btn btn-ghost btn-sm" data-action="rede-usar-ip">📍 Usar o IP desta rede (estou no Wi-Fi da escola)</button>
@@ -25729,8 +25727,8 @@ function renderAlunoSocioBlock(){
   const qs = SOCIO_SERIES[serie];
   return `
     <div class="card">
-      <h2>💛 Avaliação Socioemocional</h2>
-      <p class="muted">Leia cada situação e escolha a alternativa que mais se parece com o que <strong>você realmente faria</strong>. Não há resposta "certa" para agradar: seja sincero(a), pois o relatório é para o seu autoconhecimento. Só você e a coordenação da escola veem o resultado.</p>
+      <h2>💛 Avaliação Socioemocional${infoI('<p>Leia cada situação e escolha a alternativa que mais se parece com o que <b>você realmente faria</b>.</p><p>Não há resposta "certa" para agradar: seja sincero(a), pois o relatório é para o seu autoconhecimento.</p><p>Só você e a coordenação da escola veem o resultado.</p>', 'Como responder')}</h2>
+      <p class="muted">Responda com sinceridade: só você e a coordenação veem.</p>
       ${unidadeSel}
     </div>
     ${qs.map((q,i) => `
@@ -38309,6 +38307,64 @@ body.vis-entrada #root > .card input:not([type=checkbox]):not([type=radio]), bod
 .lp-escola{ font-size:1.02rem; } .en-marca > span{ font-size:.92rem; }
 html body .sidebar-brand .nav-label{ white-space:normal !important; min-width:0; } html body .sidebar-brand b{ white-space:normal !important; line-height:1.15; letter-spacing:.01em; font-size:.82rem; }
 
+/* ===== Avaliação 2 (15/11/2026) ===== */
+/* 1) privacidade: some do pé das telas do app; abre como gaveta pelo menu ⋯ */
+body.vis-logado .disclaimer-details{ display:none !important; }
+body.vis-priv-aberta .disclaimer-details{ display:block !important; position:fixed; left:12px; right:12px; bottom:calc(12px + env(safe-area-inset-bottom)); z-index:9998; max-width:520px; margin:0 auto !important; background:#fff; color:#172036; border-radius:20px; padding:18px 44px 18px 18px !important; box-shadow:0 20px 60px rgba(0,0,0,.35); text-align:left; }
+body.vis-priv-aberta .disclaimer-details summary{ font-weight:800; font-size:1rem !important; color:#6b1d33 !important; opacity:1 !important; pointer-events:none; }
+body.vis-priv-aberta .disclaimer-details p{ font-size:.92rem; line-height:1.45; margin:8px 0 0; }
+.vis-priv-fechar{ display:none; } body.vis-priv-aberta .vis-priv-fechar{ display:grid; place-items:center; position:absolute; top:10px; right:10px; width:32px; height:32px; border-radius:50%; border:1px solid #d5dbe6; background:#fff; font-size:1.2rem; line-height:1; cursor:pointer; color:#172036; }
+html[data-theme="dark"] body.vis-priv-aberta .disclaimer-details{ background:#1b1e26; color:#e8eaf0; } html[data-theme="dark"] body.vis-priv-aberta .disclaimer-details summary{ color:#f2c14e !important; }
+/* 2) telas vazias */
+.vis-vazio{ display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; padding:22px 12px 10px; }
+.vis-vazio-ic{ width:64px; height:64px; border-radius:20px; display:grid; place-items:center; background:#f6e8ec; color:#6b1d33; }
+.vis-vazio-ic .vis-ic{ width:30px; height:30px; }
+.vis-vazio-t{ margin:0 !important; font-size:.95rem !important; font-weight:600; color:#3b4356 !important; max-width:34ch; line-height:1.4; }
+.vis-vazio-acao{ width:auto !important; margin-top:4px !important; }
+html[data-theme="dark"] .vis-vazio-ic{ background:rgba(255,255,255,.07); color:#f2c14e; } html[data-theme="dark"] .vis-vazio-t{ color:#d4d8e2 !important; }
+/* 3) aluno: topo compacto fora do Início */
+.tb-aluno-tit{ display:none; }
+.app-topbar.tb-aluno-compacto .greeting-header h2, .app-topbar.tb-aluno-compacto .greeting-header h2 + p{ display:none !important; }
+.app-topbar.tb-aluno-compacto .tb-aluno-tit{ display:block; font-size:1.05rem; font-weight:800; color:inherit; }
+.app-topbar.tb-aluno-compacto .greeting-header button[data-action="goto-avatar-edit"] img, .app-topbar.tb-aluno-compacto .greeting-header button[data-action="goto-avatar-edit"] > *{ width:34px !important; height:34px !important; font-size:1rem !important; }
+.app-topbar.tb-aluno-compacto .greeting-header{ padding-top:8px !important; padding-bottom:8px !important; }
+/* 5) letras maiores e mais contraste no celular/tablet em pé */
+@media (max-width: 680px), (max-width: 1099px) and (orientation: portrait){
+  html body .app-main .muted, html body .app-main p.muted, html body .app-main small.muted{ color:#4f586b !important; }
+  html body .app-main .muted[style*="font-size:.7"], html body .app-main .muted[style*="font-size: .7"], html body .app-main [style*="font-size:.72rem"], html body .app-main [style*="font-size:.7rem"]{ font-size:.8rem !important; }
+  html body .app-main table{ font-size:.86rem !important; } html body .app-main th{ font-size:.74rem !important; } html body .app-main td{ padding-top:9px !important; padding-bottom:9px !important; }
+  html body .app-main .pill, html body .app-main .pl-etq, html body .app-main [class*="desc-chip"], html body .app-main [class*="cad-desc"]{ font-size:.78rem !important; }
+  html body .app-main span[style*="font-size:.62"], html body .app-main span[style*="font-size:.65"], html body .app-main span[style*="font-size:.66"], html body .app-main span[style*="font-size:.68"], html body .app-main b[style*="font-size:.62"], html body .app-main b[style*="font-size:.65"]{ font-size:.76rem !important; }
+}
+html[data-theme="dark"] body .app-main .muted{ color:#b3b9c7 !important; }
+/* 6) painel claro (a pessoa escolhe Claro ou Neon) */
+.pn.pn-claro{ background:#fff !important; color:#172036 !important; border:1px solid #e6e9f0; box-shadow:0 8px 24px rgba(23,32,54,.06); }
+.pn.pn-claro.pn-ov{ background:#f4f6fb !important; }
+.pn.pn-claro h2, .pn.pn-claro h3, .pn.pn-claro .pn-ct{ color:#172036 !important; }
+.pn.pn-claro .pn-tit{ color:#172036; } .pn.pn-claro .pn-tit b{ color:#6b1d33; text-shadow:none; }
+.pn.pn-claro .pn-sub, .pn.pn-claro .pn-k-r, .pn.pn-claro .pn-k-s, .pn.pn-claro .pn-cs, .pn.pn-claro .pn-rod, .pn.pn-claro .pn-vazio, .pn.pn-claro th{ color:#5b6478 !important; }
+.pn.pn-claro .pn-seg{ background:#f4f6fb; border-color:#e2e6ef; } .pn.pn-claro .pn-seg button{ color:#4f586b; } .pn.pn-claro .pn-seg button.on{ background:#6b1d33; color:#fff; box-shadow:none; }
+.pn.pn-claro .pn-btn{ color:#172036; background:#fff; border-color:#d5dbe6; } .pn.pn-claro .pn-btn.ouro{ background:#f2c14e; color:#2a1208; border-color:#f2c14e; box-shadow:none; }
+.pn.pn-claro select{ background:#fff !important; color:#172036 !important; border-color:#d5dbe6 !important; }
+.pn.pn-claro .pn-card{ background:#fff !important; border:1px solid #e6e9f0 !important; box-shadow:0 4px 14px rgba(23,32,54,.05) !important; }
+.pn.pn-claro .pn-k-v{ color:#172036; }
+.pn.pn-claro th, .pn.pn-claro td{ border-bottom-color:#eef0f5 !important; } .pn.pn-claro td{ color:#172036 !important; }
+.pn.pn-claro .pn-lista tr:nth-child(even) td{ background:#f8f9fc !important; }
+.pn.pn-claro .pn-item{ border-bottom-color:#eef0f5; }
+.pn.pn-claro .pn-parcial{ color:#8a6200; border-color:#e3b34c; background:#fff6dc; box-shadow:none; }
+.pn.pn-claro .pn-filtro{ background:#fde9e3; border-color:#f3b4a2; color:#b3401f; }
+.pn.pn-claro .pn-dots span{ background:#d5dbe6; } .pn.pn-claro .pn-dots span.on{ background:#6b1d33; box-shadow:none; }
+.pn.pn-claro svg text{ fill:#4f586b !important; } .pn.pn-claro svg line[stroke^="rgba(255"], .pn.pn-claro svg path[stroke^="rgba(255"]{ stroke:#e2e6ef !important; }
+.pn.pn-claro .pn-heat td.on{ outline-color:#6b1d33; box-shadow:none; }
+.vis-pn-tema{ margin-left:auto; } .vis-pn-tema button{ padding:6px 12px !important; }
+html[data-theme="dark"] .pn.pn-claro{ background:#1b1e26 !important; color:#e8eaf0 !important; border-color:#2b2f3a; }
+html[data-theme="dark"] .pn.pn-claro .pn-card{ background:#22262f !important; border-color:#2f3440 !important; } html[data-theme="dark"] .pn.pn-claro h2, html[data-theme="dark"] .pn.pn-claro h3, html[data-theme="dark"] .pn.pn-claro .pn-ct, html[data-theme="dark"] .pn.pn-claro .pn-tit, html[data-theme="dark"] .pn.pn-claro .pn-k-v, html[data-theme="dark"] .pn.pn-claro td{ color:#e8eaf0 !important; }
+html[data-theme="dark"] .pn.pn-claro .pn-tit b{ color:#f2c14e; } html[data-theme="dark"] .pn.pn-claro svg text{ fill:#b3b9c7 !important; }
+.pn.pn-claro [style*="color:#6EC1FF"], .pn.pn-claro [style*="color: #6EC1FF"]{ color:#1f6fb2 !important; }
+.pn.pn-claro [style*="color:#F5C542"], .pn.pn-claro [style*="color: #F5C542"]{ color:#9a6f00 !important; }
+.pn.pn-claro [style*="color:#F5A35C"], .pn.pn-claro [style*="color: #F5A35C"]{ color:#c2620f !important; }
+.pn.pn-claro [style*="color:#FF5C8A"], .pn.pn-claro [style*="color: #FF5C8A"]{ color:#d1335f !important; }
+
 </style>
 <script>
 // ===== Visual 2026 (14/11/2026) =====
@@ -39146,6 +39202,106 @@ try{ visTelaEntrada(); }catch(e){}
 
 // ===== Fim da camada: mostra a tela (a "tela de carregando" do <head> esconde o visual antigo até aqui) =====
 (function(){ const pronto = () => document.documentElement.classList.add('vis-pronto'); try{ requestAnimationFrame(() => requestAnimationFrame(pronto)); }catch(e){ pronto(); } setTimeout(pronto, 600); })();
+
+// ===== Avaliação 2 (15/11/2026) =====
+// 1) "Sobre a privacidade dos dados": fora do pé das telas; fica no menu ⋯ (abre como gaveta)
+function visPrivacidadeNoMenu(){
+  const ac = document.querySelector('.app-topbar .tb-acoes'); if(!ac || ac.querySelector('[data-vis-priv]')) return;
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn-ghost btn-sm'; b.dataset.visPriv = '1';
+  b.innerHTML = `<span class="btn-ic">${visSvg('lock', 16)}</span>Privacidade dos dados`;
+  ac.appendChild(b);
+}
+document.addEventListener('click', ev => {
+  const t = ev.target && ev.target.closest ? ev.target : null; if(!t) return;
+  if(t.closest('[data-vis-priv]')){ ev.preventDefault(); ev.stopPropagation(); const d = document.querySelector('.disclaimer-details'); if(d){ d.open = true; document.body.classList.add('vis-priv-aberta'); } const m = document.querySelector('.tb-acoes.tb-aberta'); if(m) m.classList.remove('tb-aberta'); return; }
+  if(document.body.classList.contains('vis-priv-aberta') && (t.closest('.vis-priv-fechar') || !t.closest('.disclaimer-details'))){ document.body.classList.remove('vis-priv-aberta'); const d = document.querySelector('.disclaimer-details'); if(d) d.open = false; }
+}, true);
+(function(){ const d = document.querySelector('.disclaimer-details'); if(d && !d.querySelector('.vis-priv-fechar')){ const x = document.createElement('button'); x.type = 'button'; x.className = 'vis-priv-fechar'; x.setAttribute('aria-label', 'Fechar'); x.textContent = '×'; d.appendChild(x); } })();
+
+// 2) telas vazias: ícone grande + frase; se a tela tem uma ação ("+ Nova…", "Fazer uma pergunta"), um botão que faz o mesmo
+const VIS_VAZIO_IC = [[/prova|avalia/i, 'file'], [/tarefa|entreg/i, 'check'], [/mapa/i, 'map'], [/material|livro|empr[eé]st|biblioteca/i, 'book'], [/cronograma|agendad|aula/i, 'calendar'], [/slide|apresenta/i, 'cast'], [/pergunta|d[uú]vida|mensag/i, 'chat'], [/revis|colega|monitor/i, 'users'], [/realidade/i, 'cpu'], [/libera|bloquead/i, 'lock'], [/turma|aluno/i, 'users'], [/conquista|medalha/i, 'award'], [/portf/i, 'folder'], [/frequ|chamada/i, 'calendar']];
+const VIS_VAZIO_RE = /^\s*(Nenhum|Nenhuma|Você ainda não|Ainda não há|Ainda não tem|Sem nenhum|Nada por aqui)/i;
+function visVazios(){
+  document.querySelectorAll('.app-main .card p, .app-main .card > div.muted, .app-main .card > div.center').forEach(el => {
+    if(el.dataset.visVazio || el.closest(VIS_SEM_ICONE + ', .vis-vazio, .rec, table, .alt-opcao')) return; el.dataset.visVazio = '1';
+    const t = (el.textContent || '').trim(); if(!VIS_VAZIO_RE.test(t) || t.length > 200 || el.querySelector('a, button, input, select, img')) return;
+    const card = el.closest('.card'); const outros = [...card.children].filter(c => c !== el && !c.matches('h2, h3, .info-i, .rec-cab') && (c.textContent || '').trim());
+    if(outros.length > 2) return;   // vazio de verdade: só o título e esta frase (ou quase)
+    const ic = (VIS_VAZIO_IC.find(([re]) => re.test(t) || re.test((card.querySelector('h2, h3') || {}).textContent || '')) || [0, 'sparkle'])[1];
+    const box = document.createElement('div'); box.className = 'vis-vazio';
+    box.innerHTML = `<span class="vis-vazio-ic">${visSvg(ic, 30)}</span><p class="vis-vazio-t"></p>`;
+    box.querySelector('.vis-vazio-t').textContent = t;
+    // ação da própria tela (botão "+ Nova…" / "Fazer…" / "Criar…") vira um atalho no vazio
+    const acao = [...document.querySelectorAll('.app-main button.btn-primary, .app-main button[data-action]')].find(b => !b.closest('.vis-vazio, .nav-abas, .vis-chips, .rec-cab') && /^\s*(\+|Nova|Novo|Fazer|Criar|Enviar|Cadastrar)/.test((b.textContent || '').replace(/\s+/g, ' ').trim()) && b.offsetParent);
+    if(acao){ const bt = document.createElement('button'); bt.type = 'button'; bt.className = 'btn btn-primary btn-sm vis-vazio-acao'; bt.textContent = acao.textContent.replace(/\s+/g, ' ').trim(); bt.addEventListener('click', e => { e.preventDefault(); acao.click(); }); box.appendChild(bt); }
+    else if(state.view === 'aluno' && (state.aluno.subview || 'inicio') !== 'inicio'){ const bt = document.createElement('button'); bt.type = 'button'; bt.className = 'btn btn-ghost btn-sm vis-vazio-acao'; bt.textContent = 'Voltar ao Início'; bt.addEventListener('click', e => { e.preventDefault(); state.aluno.subview = 'inicio'; render(); window.scrollTo(0, 0); }); box.appendChild(bt); }
+    el.replaceWith(box);
+  });
+}
+
+// 3a) aluno: saudação grande só no Início; nas outras telas o topo mostra o nome da seção
+function visAlunoTopo(){
+  const tb = document.querySelector('.app-topbar'); if(!tb) return;
+  const ehAluno = state.view === 'aluno' && state.aluno.stage === 'dashboard';
+  const sub = ehAluno ? (state.aluno.subview || 'inicio') : '';
+  const compacto = ehAluno && sub !== 'inicio';
+  tb.classList.toggle('tb-aluno-compacto', compacto);
+  if(!compacto || tb.querySelector('.tb-aluno-tit')) return;
+  const at = document.querySelector('.app-sidebar .sidebar-item.active .lb-l') || document.querySelector('.app-sidebar .sidebar-item.active .nav-label');
+  const nome = (at ? at.textContent : '').replace(/\s+/g, ' ').trim(); if(!nome) return;
+  const gh = tb.querySelector('.greeting-header h2'); if(!gh) return;
+  const sp = document.createElement('strong'); sp.className = 'tb-aluno-tit'; sp.textContent = nome; gh.parentElement.insertBefore(sp, gh);
+}
+// 3b) abas do alto: o que não cabe numa linha vai para "+N" (no celular e tablet em pé)
+function visAbasUmaLinha(){
+  if(!window.matchMedia || !matchMedia('(max-width: 680px), (max-width: 1099px) and (orientation: portrait)').matches) return;
+  document.querySelectorAll('.app-main [data-nav-abas]').forEach(n => {
+    n.querySelectorAll('.vis-aba-mais').forEach(b => b.remove());
+    if(VIS_ABAS_TODAS){ n.querySelectorAll('.vis-aba-oculta').forEach(a => a.classList.remove('vis-aba-oculta')); const m = document.createElement('button'); m.type = 'button'; m.className = 'nav-aba vis-aba-mais'; m.dataset.visAbasMais = '1'; m.textContent = 'Menos'; n.appendChild(m); return; }
+    const abas = [...n.querySelectorAll('.nav-aba')]; abas.forEach(a => a.classList.remove('vis-aba-oculta'));
+    if(abas.length < 2) return;
+    const linha1 = abas[0].offsetTop; if(abas.every(a => a.offsetTop === linha1)) return;
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'nav-aba vis-aba-mais'; b.dataset.visAbasMais = '1'; n.appendChild(b);
+    const ocultas = [];
+    const atualiza = () => { b.textContent = `+${ocultas.length}`; b.setAttribute('aria-label', `Mostrar mais ${ocultas.length} abas`); };
+    for(let i = abas.length - 1; i >= 0; i--){
+      atualiza(); if(b.offsetTop === linha1 && abas.filter(a => !a.classList.contains('vis-aba-oculta')).every(a => a.offsetTop === linha1)) break;
+      if(abas[i].classList.contains('ativa')) continue;
+      abas[i].classList.add('vis-aba-oculta'); ocultas.push(abas[i]);
+    }
+    atualiza();
+  });
+}
+// troca a regra antiga (5 abas + "+N") pela medida real da linha
+if(typeof visAbasMais === 'function'){ visAbasMais = function(){ visAbasUmaLinha(); }; }
+
+// 6) painéis: o usuário escolhe Claro ou Neon (guardado neste aparelho). Padrão: claro no celular/tablet em pé, neon no computador.
+function visPnTema(){ let v = null; try{ v = localStorage.getItem('pn-visual'); }catch(e){} if(v === 'claro' || v === 'neon') return v; return (window.matchMedia && matchMedia('(max-width: 680px), (max-width: 1099px) and (orientation: portrait)').matches) ? 'claro' : 'neon'; }
+function visPnAplicar(){
+  const tema = visPnTema();
+  document.querySelectorAll('.pn').forEach(pn => {
+    pn.classList.toggle('pn-claro', tema === 'claro');
+    const h = pn.querySelector(':scope > .pn-h .pn-ctl') || pn.querySelector(':scope > .pn-h'); if(!h || h.querySelector('[data-vis-pn-tema]')) return;
+    const seg = document.createElement('div'); seg.className = 'pn-seg vis-pn-tema'; seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Visual do painel');
+    seg.innerHTML = `<button type="button" data-vis-pn-tema="claro" class="${tema === 'claro' ? 'on' : ''}">Claro</button><button type="button" data-vis-pn-tema="neon" class="${tema === 'neon' ? 'on' : ''}">Neon</button>`;
+    h.appendChild(seg);
+  });
+}
+document.addEventListener('click', ev => {
+  const b = ev.target && ev.target.closest ? ev.target.closest('[data-vis-pn-tema]') : null; if(!b) return;
+  ev.preventDefault(); ev.stopPropagation();
+  try{ localStorage.setItem('pn-visual', b.dataset.visPnTema); }catch(e){}
+  document.querySelectorAll('[data-vis-pn-tema]').forEach(x => x.classList.toggle('on', x.dataset.visPnTema === b.dataset.visPnTema));
+  document.querySelectorAll('.pn').forEach(pn => pn.classList.toggle('pn-claro', b.dataset.visPnTema === 'claro'));
+}, true);
+// os painéis às vezes se desenham sozinhos (sem passar pelo render geral): observa e aplica
+try{ new MutationObserver(() => { if(document.querySelector('.pn:not([data-vis-pn])')){ document.querySelectorAll('.pn').forEach(p => p.dataset.visPn = '1'); visPnAplicar(); } }).observe(document.body, { childList: true, subtree: true }); }catch(e){}
+
+if(typeof renderInterno === 'function' && !renderInterno.__visAval2){
+  const orig = renderInterno;
+  renderInterno = function(){ const r = orig.apply(this, arguments); [visPrivacidadeNoMenu, visVazios, visAlunoTopo, visAbasUmaLinha, visPnAplicar].forEach(f => { try{ f(); }catch(e){} }); return r; };
+  Object.assign(renderInterno, orig, { __visAval2: true });
+}
 
 </script>
 <!-- <<< VISUAL 2026 -->
