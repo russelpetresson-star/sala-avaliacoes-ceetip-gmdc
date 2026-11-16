@@ -43,3 +43,10 @@ self.addEventListener('fetch', e => {
     return (await rede) || new Response('<h1>Sem internet</h1><p>Abra o app uma vez com internet para ele funcionar sem conexão.</p>', { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   })());
 });
+
+// tocar num aviso do app: volta para a janela aberta (ou abre o app)
+self.addEventListener('notificationclick', e => { e.notification.close(); e.waitUntil((async () => {
+  const lista = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  for (const c of lista) { if ('focus' in c) return c.focus(); }
+  if (self.clients.openWindow) return self.clients.openWindow((e.notification.data && e.notification.data.url) || './');
+})()); });
