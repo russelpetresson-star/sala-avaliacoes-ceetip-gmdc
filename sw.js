@@ -50,3 +50,9 @@ self.addEventListener('notificationclick', e => { e.notification.close(); e.wait
   for (const c of lista) { if ('focus' in c) return c.focus(); }
   if (self.clients.openWindow) return self.clients.openWindow((e.notification.data && e.notification.data.url) || './');
 })()); });
+
+// aviso enviado pelo robô da escola (chega mesmo com o app fechado)
+self.addEventListener('push', e => {
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (x) { d = { corpo: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.titulo || 'Sala de Avaliações', { body: d.corpo || '', tag: d.tag || undefined, icon: 'icone-192.png', badge: 'icone-192.png', data: { url: d.url || './' } }));
+});
