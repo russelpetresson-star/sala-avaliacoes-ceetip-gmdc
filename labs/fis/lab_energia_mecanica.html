@@ -1,0 +1,311 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Laboratório · Energia mecânica, atrito e potência — CEETIP</title><style>:root{--v:#6d1a2e;--v2:#8e2a43;--v3:#fbeef1;--d:#c9a227;--d2:#f3e2a6;--d3:#fff7de;--dtx:#8a6a0c;--a:#1f4e79;--a2:#dbe7f3;--ok:#1e7a4c;--ok2:#dff3e8;--no:#b3261e;--no2:#fde4e1;--ink:#1d1d24;--mut:#5b5b66;--line:#6d1a2e22;--paper:#fbf8f3;--card:#fff;--soft:#f4f1ec}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:17px;line-height:1.4;padding-bottom:84px}
+header{background:linear-gradient(100deg,var(--v) 0%,var(--v2) 72%,#a83a55 100%);color:#fff;padding:16px 24px;border-bottom:5px solid var(--d)}
+header .k{font-size:13px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--d2)}
+header h1{margin:4px 0 0;font-size:clamp(22px,3.4vw,34px);line-height:1.1;font-weight:800}
+header h1 em{font-style:normal;color:var(--d)}
+main{max-width:1280px;margin:0 auto;padding:18px 20px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px 18px;box-shadow:0 4px 18px #6d1a2e12}
+.card h2{margin:0 0 10px;font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--v)}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.mut{color:var(--mut)}.small{font-size:14px}
+label.ctl{display:grid;grid-template-columns:78px 1fr 84px;gap:10px;align-items:center;font-weight:700;margin:6px 0}
+label.ctl output{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;color:var(--v)}
+input[type=range]{width:100%;height:36px;accent-color:var(--v);touch-action:pan-y}
+button,.btn,select,input[type=number]{font:inherit}
+button,.btn{border:0;border-radius:12px;padding:12px 18px;min-height:46px;font-weight:800;background:var(--v);color:#fff;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+button.sec,.btn.sec{background:var(--soft);color:var(--v);border:1.5px solid var(--line)}
+button.on{background:var(--d);color:#3d2f00}
+select,input[type=number]{min-height:44px;border-radius:10px;border:1.5px solid var(--line);background:#fff;padding:6px 10px;color:var(--ink)}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.read div{background:var(--soft);border-radius:12px;padding:10px 12px}
+.read b{display:block;font-size:24px;font-variant-numeric:tabular-nums;color:var(--v)}
+.read span{font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.aviso{border-radius:12px;padding:12px 14px;font-weight:700}
+.aviso.ok{background:var(--ok2);color:#0f4a2d}.aviso.no{background:var(--no2);color:#7a1810}.aviso.info{background:var(--d3);color:#4b3a06;border:1.5px solid var(--d2)}
+.missao{border-left:8px solid var(--d);background:var(--d3);border-radius:12px;padding:12px 14px;margin:10px 0}
+.missao b.n{display:inline-flex;width:30px;height:30px;border-radius:50%;background:var(--v);color:#fff;align-items:center;justify-content:center;margin-right:8px}
+.revela{margin-top:8px;background:var(--a2);color:#163a5c;border-radius:10px;padding:10px 12px}
+.revela[hidden]{display:none}
+svg text{font-family:inherit}
+.rod{position:fixed;left:0;right:0;bottom:0;background:#fffffff2;border-top:2px solid var(--d);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.rod .mut{font-size:13px}
+table{border-collapse:collapse;width:100%}th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.hudr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:7px 14px;font-weight:800;font-size:15px;background:#ffffff1f;color:#fff;border:1.5px solid #ffffff40}
+.chip.au{background:var(--d);color:#3d2f00;border-color:var(--d)}
+.chip button{all:unset;cursor:pointer}
+.tabs{max-width:1280px;margin:14px auto 0;padding:0 20px;display:flex;gap:8px}
+.tabs button{background:#fff;color:var(--v);border:2px solid var(--v)}.tabs button.on{background:var(--v);color:#fff}
+.wrap{max-width:1280px;margin:0 auto;padding:14px 20px}
+#jogo{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:940px){#jogo{grid-template-columns:1fr}}
+.palco{background:radial-gradient(120% 90% at 30% 20%,#3a1622 0%,#1d0b12 60%,#140810 100%);border-radius:20px;padding:12px;box-shadow:0 10px 30px #6d1a2e40,inset 0 0 0 2px #c9a22755;position:relative}
+.palco canvas{display:block;width:100%;height:auto;border-radius:12px;touch-action:manipulation;cursor:pointer}
+.inst{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
+.g{background:#ffffff0d;border:1px solid #c9a22740;border-radius:14px;padding:6px 8px 8px;text-align:center;color:#f3e2a6}
+.g svg{width:100%;max-width:200px;height:auto}
+.g .dv{font-size:22px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums}
+.g .lb{font-size:12px;letter-spacing:.04em;font-weight:700;color:#d9c48a}
+.nd{transition:transform .45s cubic-bezier(.3,1.5,.5,1);transform-origin:100px 100px}
+.nota{color:#cbb98a;font-size:13px;margin-top:8px}
+.ctx{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.tag{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:4px 10px;background:var(--a2);color:var(--a)}
+.tag.f{background:var(--v);color:#fff}
+.mis h3{margin:2px 0 6px;font-size:22px;color:var(--v)}
+.obj{display:flex;gap:10px;align-items:flex-start;background:var(--d3);border:2px solid var(--d2);border-radius:14px;padding:12px;margin:10px 0;font-weight:700}
+.obj .ck{flex:0 0 30px;height:30px;border-radius:50%;border:3px solid var(--d);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;transition:all .3s}
+.obj.feito{background:var(--ok2);border-color:#9fd8b8}.obj.feito .ck{background:var(--ok);border-color:var(--ok)}
+.dica{background:var(--a2);color:#163a5c;border-radius:12px;padding:10px 12px;margin-top:8px;animation:in .35s}
+.qz{margin-top:10px;border:2px solid var(--v);border-radius:14px;padding:12px;animation:in .35s}
+.qz p{margin:0 0 8px;font-weight:800}
+.qz button{display:block;width:100%;text-align:left;margin:6px 0;background:#fff;color:var(--ink);border:2px solid var(--line)}
+.qz button.cer{background:var(--ok2);border-color:var(--ok)}.qz button.err{background:var(--no2);border-color:var(--no);animation:tr .4s}
+.fb{margin-top:6px;font-weight:700}
+.tm{font-variant-numeric:tabular-nums;font-weight:800;color:var(--v);font-size:20px}
+.ctlx label.ctl{grid-template-columns:70px 1fr 80px}
+.ctlx label.lk{opacity:.45}
+.ctlx label.lk output::after{content:" 🔒"}
+input[type=range]{height:40px}
+#mapa .topo{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+.barra{height:14px;border-radius:999px;background:var(--soft);overflow:hidden;border:1px solid var(--line)}.barra i{display:block;height:100%;background:linear-gradient(90deg,var(--d),#e9c552);transition:width .6s}
+.fases{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:14px}
+.fc{all:unset;cursor:pointer;background:#fff;border:2px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 14px #6d1a2e12;transition:transform .15s}
+.fc:hover,.fc:focus-visible{transform:translateY(-3px);border-color:var(--d)}
+.fc .n{font-size:13px;font-weight:800;color:var(--dtx);letter-spacing:.08em;text-transform:uppercase}
+.fc b{font-size:18px;color:var(--v)}.fc .es{font-size:22px;letter-spacing:2px;color:#d8d2c6}.fc .es .on{color:var(--d)}
+.fc.prox{border-color:var(--d);box-shadow:0 0 0 4px #c9a22740}
+.fc.livre{background:linear-gradient(135deg,var(--v),var(--v2));color:#fff}.fc.livre b{color:#fff}.fc.livre .n{color:var(--d2)}
+.med{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}.med span{border-radius:12px;padding:8px 12px;font-weight:800;background:var(--soft);color:#9a948a;border:1.5px dashed #cfc8bb}.med span.on{background:var(--d3);color:var(--dtx);border:1.5px solid var(--d)}
+.modal{position:fixed;inset:0;background:#140810cc;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal[hidden]{display:none}
+.mc{background:#fff;border-radius:22px;max-width:520px;width:100%;padding:22px;text-align:center;border-top:8px solid var(--d);animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+.mc h2{margin:0;color:var(--v);font-size:26px}
+.big{font-size:54px;letter-spacing:6px;margin:8px 0}.big span{display:inline-block;color:#ddd5c6}.big span.on{color:var(--d);animation:st .5s both}
+.big span:nth-child(2){animation-delay:.25s}.big span:nth-child(3){animation-delay:.5s}
+.mc .ex{background:var(--a2);color:#163a5c;border-radius:12px;padding:10px 12px;text-align:left;margin:10px 0}
+.mc .row{justify-content:center}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}@keyframes pop{from{transform:scale(.7);opacity:0}}
+@keyframes st{0%{transform:scale(0) rotate(-40deg)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
+@keyframes tr{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+label.ctl select{grid-column:2/4;width:100%}
+.ctl[hidden]{display:none}
+.mut2{color:#d9c48a}
+label.ctl{grid-template-columns:96px 1fr 84px}
+
+</style></head><body>
+<header><div><div class="k">Laboratório · Física · Mecânica · Energia</div><h1>Energia <em>mecânica</em>: conservação, atrito e potência</h1></div></header>
+<div class="wrap" id="jogo" hidden></div>
+<div class="rod"><a class="btn" id="voltar" href="index.html">‹ Todos os laboratórios</a><span class="mut">Funciona sem internet depois de aberto. As estrelas ficam salvas só neste aparelho. Aulas 51 a 57 (1ª série) e 45 e 46 (3ª série).</span></div>
+<script>(function(){
+ var q=new URLSearchParams(location.search),aula=q.get('aula'),t=q.get('t');
+ var back=document.getElementById('voltar');
+ if(back){
+  if(aula&&/^[\w-]+$/.test(aula)){back.href='../aulas/'+aula+'.html'+(t&&/^\d+$/.test(t)?'#t'+t:'');back.firstChild.nodeValue='‹ Voltar à aula';}
+  else{back.href='index.html';back.firstChild.nodeValue='‹ Todos os laboratórios';}
+ }
+ document.querySelectorAll('[data-rev]').forEach(function(b){b.addEventListener('click',function(){
+  var el=document.getElementById(b.dataset.rev);el.hidden=!el.hidden;b.textContent=el.hidden?'Ver resposta':'Esconder resposta';});});
+ window.LAB={q:q,fmt:function(x,d){return x.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d})}};
+})();
+
+(function(){
+var $=function(i){return document.getElementById(i)},G=window.GAME={},cfg,NF,MAXS,best=[],jogo={f:-1,livre:false},som=false,ac=null;
+function bip(f,d,tp,v){if(!som)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();var o=ac.createOscillator(),g=ac.createGain();o.type=tp||'sine';o.frequency.value=f;g.gain.value=v||.08;o.connect(g);g.connect(ac.destination);var t=ac.currentTime;g.gain.exponentialRampToValueAtTime(.0001,t+d);o.start(t);o.stop(t+d)}catch(e){}}
+G.sfx=function(n){if(n==='ok'){bip(660,.15);setTimeout(function(){bip(880,.25)},140)}else if(n==='err')bip(180,.25,'square',.05);else if(n==='boom')bip(90,.35,'sawtooth',.12);else if(n==='clk')bip(1200,.05,'square',.04);else if(n==='geiger')bip(2600+Math.random()*600,.02,'square',.03);else if(n==='fim'){[523,659,784,1046].forEach(function(f,i){setTimeout(function(){bip(f,.2)},i*120)})}};
+G.estr=function(on){var s='';for(var i=0;i<3;i++)s+='<span class="'+(i<on?'on':'')+'">★</span>';return s};
+function tot(){var t=0;for(var i=0;i<NF;i++)t+=best[i]||0;return t}
+function salva(){try{localStorage.setItem(cfg.key,JSON.stringify(best))}catch(e){}}
+function lim(){return[Math.ceil(MAXS/3),Math.ceil(MAXS*2/3),MAXS]}
+function hud(){var t=tot(),l=lim(),M=cfg.medalhas,m=t>=l[2]?M[2]:t>=l[1]?M[1]:t>=l[0]?M[0]:'Sem medalha';
+ $('hS').textContent='★ '+t+'/'+MAXS;$('hM').textContent=m;$('pt').textContent=t+'/'+MAXS+' ★';$('pb').style.width=(t/MAXS*100)+'%';
+ for(var i=0;i<3;i++){$('m'+(i+1)).textContent=M[i]+' · '+l[i]+'★';$('m'+(i+1)).className=t>=l[i]?'on':''}}
+function mapa(){var h='',px=-1,i;for(i=0;i<NF;i++)if(!best[i]){px=i;break}
+ cfg.fases.forEach(function(F,i){h+='<button class="fc'+(i===px?' prox':'')+'" data-f="'+i+'"><span class="n">Fase '+(i+1)+(F.rot?' · '+F.rot:'')+'</span><b>'+F.t+'</b><span class="mut small">'+F.tag+(F.cron?' · ⏱ contra o relógio':'')+'</span><span class="es">'+G.estr(best[i]||0)+'</span></button>'});
+ h+='<button class="fc livre" data-f="L"><span class="n">Sem regras</span><b>🔧 Laboratório livre</b><span class="small">'+cfg.livreDesc+'</span></button>';
+ $('fs').innerHTML=h;$('fs').querySelectorAll('.fc').forEach(function(b){b.onclick=function(){var f=b.dataset.f;f==='L'?G.livre():G.fase(+f)}});hud()}
+function aba(j){$('mapa').hidden=j;$('jogo').hidden=!j;$('tF').classList.toggle('on',!(jogo.livre&&j));$('tL').classList.toggle('on',jogo.livre&&j);if(cfg.onShow)cfg.onShow(j)}
+function emb(n){var a=[],i;for(i=0;i<n;i++)a.push(i);for(i=n-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}return a}
+function missao(){var F=cfg.fases[jogo.f],h='<div class="ctx"><span class="tag f">Fase '+(jogo.f+1)+' de '+NF+'</span><span class="tag">'+F.tag+'</span></div><h3>'+F.t+'</h3><p>'+F.ctx+'</p>';
+ h+='<div class="obj'+(jogo.ok?' feito':'')+'" id="ob"><span class="ck">'+(jogo.ok?'✓':'')+'</span><span>'+F.obj+'</span></div><div class="mut small" id="prog">'+(jogo.prog||'')+'</div>';
+ if(F.cron)h+='<p>Tempo: <span class="tm" id="tm">0 s</span> <span class="mut small">(até '+F.cron[0]+' s: ★★★ · até '+F.cron[1]+' s: ★★)</span></p>';
+ for(var i=0;i<jogo.dic;i++)h+='<div class="dica">💡 '+F.d[i]+'</div>';
+ h+='<div class="row" style="margin-top:10px">'+(jogo.dic<F.d.length&&!jogo.fim?'<button class="sec" id="bd">💡 Dica ('+(F.d.length-jogo.dic)+')</button>':'')+'<button class="sec" id="br">↺ Recomeçar</button><button class="sec" id="bm">Mapa</button></div>';
+ if(jogo.ok&&F.q){h+='<div class="qz" id="qz"><p>⚡ Pergunta relâmpago: '+F.q.p+'</p>';var ord=jogo.ord||(jogo.ord=emb(F.q.o.length));ord.forEach(function(j){h+='<button data-o="'+j+'">'+F.q.o[j]+'</button>'});h+='<div class="fb" id="fbk"></div></div>'}
+ $('mis').innerHTML=h;
+ if($('bd'))$('bd').onclick=function(){jogo.dic++;missao()};$('br').onclick=function(){G.fase(jogo.f)};$('bm').onclick=function(){$('tF').onclick()};
+ if($('qz'))$('qz').querySelectorAll('[data-o]').forEach(function(b){b.onclick=function(){if(jogo.fim)return;var j=+b.dataset.o;
+  if(j===F.q.c){b.classList.add('cer');G.sfx('ok');jogo.fim=true;setTimeout(conclui,650)}else{b.classList.add('err');b.disabled=true;jogo.err++;G.sfx('err');$('fbk').textContent='Ainda não. Olhe de novo o experimento e tente outra.'}}})}
+function conclui(){var F=cfg.fases[jogo.f],e;
+ if(F.cron){var s=(performance.now()-jogo.t0)/1000;e=s<=F.cron[0]?3:s<=F.cron[1]?2:1;e-=jogo.dic}else e=3-jogo.dic-jogo.err-jogo.pen;
+ e=Math.max(1,Math.min(3,e));if(e>(best[jogo.f]||0)){best[jogo.f]=e;salva()}hud();
+ $('moS').innerHTML=G.estr(e);var m=e===3?'Perfeito!':e===2?'Muito bem!':'Concluída! Tente de novo sem dicas para mais estrelas.';
+ if(F.cron)m+=' Tempo: '+Math.round((performance.now()-jogo.t0)/1000)+' s.';
+ if(jogo.pen)m+=' ('+(cfg.penTxt||'−1 ★ por tentativa errada')+')';
+ $('moM').textContent=m;$('moE').innerHTML='<b>Por quê?</b> '+(F.q?F.q.ex:F.fim);
+ $('moT').textContent=cfg.fases.every(function(_,i){return best[i]})?'Jornada completa! 🏆':'Fase concluída!';
+ $('moN').hidden=jogo.f>=NF-1;$('mo').hidden=false;G.sfx('fim');G.confete()}
+G.confete=function(){var c=$('gkc'),x=c.getContext('2d'),W=c.width=innerWidth,H=c.height=innerHeight,cs=['#c9a227','#6d1a2e','#ffffff','#1f4e79','#f3e2a6'],P=[],i,t0=performance.now(),last=t0;
+ if(matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+ for(i=0;i<110;i++)P.push({x:Math.random()*W,y:-20-Math.random()*H*.4,vx:(Math.random()-.5)*90,vy:60+Math.random()*180,c:cs[i%5],r:Math.random()*6});
+ (function f(t){var dt=Math.min(.05,(t-last)/1000);last=t;x.clearRect(0,0,W,H);P.forEach(function(p){p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=dt*5;x.fillStyle=p.c;x.fillRect(p.x,p.y,6,9*Math.abs(Math.cos(p.r)))});if(t-t0<2800)requestAnimationFrame(f);else x.clearRect(0,0,W,H)})(t0)};
+G.fase=function(i){jogo={f:i,livre:false,dic:0,err:0,pen:0,ok:false,fim:false,prog:'',t0:performance.now()};cfg.onStart(i,cfg.fases[i]);missao();aba(true);if(cfg.after)cfg.after()};
+G.livre=function(){jogo={f:-1,livre:true};cfg.onLivre();$('mis').innerHTML=cfg.livre;$('mis').querySelectorAll('[data-rev]').forEach(function(b){b.onclick=function(){var e=$(b.dataset.rev);e.hidden=!e.hidden}});aba(true);if(cfg.after)cfg.after()};
+G.check=function(){if(jogo.f<0||jogo.livre||jogo.ok)return false;var F=cfg.fases[jogo.f];
+ if(F.ok()){jogo.ok=true;G.sfx('ok');if(F.q)missao();else{missao();jogo.fim=true;setTimeout(conclui,700)}return true}return false};
+G.erro=function(){if(jogo.f>=0&&!jogo.livre&&!jogo.ok){jogo.err++;G.sfx('err')}};
+G.pen=function(){if(jogo.f>=0&&!jogo.livre&&!jogo.ok)jogo.pen=1};
+G.prog=function(t){jogo.prog=t;if($('prog'))$('prog').textContent=t};
+G.cur=function(){return jogo.f>=0&&!jogo.livre?cfg.fases[jogo.f]:null};
+G.state=function(){return jogo};G.best=function(){return best};G.estado=function(){return{ok:jogo.ok,fim:jogo.fim}};
+G.tempo=function(){var e=$('tm');if(e&&!jogo.ok)e.textContent=Math.round((performance.now()-jogo.t0)/1000)+' s'};
+// instrumentos de ponteiro (svg 200 × 118)
+G.gauge=function(id,max,un,ticks){var s='<path d="M20,100 A80,80 0 0 1 180,100" fill="none" stroke="#ffffff30" stroke-width="10" stroke-linecap="round"/><path id="'+id+'z" d="M157,44 A80,80 0 0 1 180,100" fill="none" stroke="#b3261e" stroke-width="10" stroke-linecap="round" opacity="0"/>';
+ for(var i=0;i<=ticks;i++){var a=Math.PI*(1-i/ticks),x1=100+Math.cos(a)*68,y1=100-Math.sin(a)*68,x2=100+Math.cos(a)*80,y2=100-Math.sin(a)*80;
+  s+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#f3e2a6" stroke-width="2"/><text id="'+id+'t'+i+'" x="'+(100+Math.cos(a)*54).toFixed(1)+'" y="'+(104-Math.sin(a)*54).toFixed(1)+'" font-size="11" fill="#d9c48a" text-anchor="middle"></text>'}
+ s+='<g class="nd" id="'+id+'n"><line x1="100" y1="100" x2="100" y2="30" stroke="#ff5a3a" stroke-width="4" stroke-linecap="round"/></g><circle cx="100" cy="100" r="8" fill="#c9a227"/><text x="100" y="116" font-size="11" fill="#d9c48a" text-anchor="middle">'+un+'</text>';
+ $(id).innerHTML=s;G.gscale(id,max,ticks)};
+G.gscale=function(id,max,ticks){for(var i=0;i<=ticks;i++){var v=max*i/ticks;$(id+'t'+i).textContent=LAB.fmt(v,v%1?1:0)}$(id).dataset.max=max};
+G.gset=function(id,v){var m=+$(id).dataset.max,f=Math.max(0,Math.min(1.04,v/m));$(id+'n').style.transform='rotate('+(-90+180*f)+'deg)'};
+G.init=function(c){cfg=c;NF=c.fases.length;MAXS=NF*3;
+ try{best=JSON.parse(localStorage.getItem(c.key)||'[]')}catch(e){best=[]}
+ var hd=document.querySelector('header'),hr=document.createElement('div');hr.className='hudr';
+ hr.innerHTML='<span class="chip au" id="hS"></span><span class="chip" id="hM"></span><span class="chip"><button id="som" aria-label="Som">🔇 Som</button></span>';hd.appendChild(hr);
+ var tp=document.createElement('div');
+ tp.innerHTML='<div class="tabs"><button id="tF" class="on">🎮 Fases</button><button id="tL">🔧 Laboratório livre</button></div><div class="wrap" id="mapa"><div class="card"><div class="topo"><div><h2>Sua jornada</h2><div class="barra"><i id="pb" style="width:0"></i></div></div><b id="pt" style="color:var(--v);font-size:20px"></b></div><div class="med"><span id="m1"></span><span id="m2"></span><span id="m3"></span></div></div><div class="fases" id="fs"></div></div>';
+ var j=$('jogo');while(tp.firstChild)j.parentNode.insertBefore(tp.firstChild,j);
+ var md=document.createElement('div');md.innerHTML='<div class="modal" id="mo" hidden><div class="mc" role="dialog" aria-modal="true" aria-labelledby="moT"><h2 id="moT"></h2><div class="big" id="moS"></div><div id="moM" style="font-weight:700"></div><div class="ex" id="moE"></div><div class="row"><button id="moN">Próxima fase ›</button><button class="sec" id="moR">Jogar de novo</button><button class="sec" id="moMa">Mapa</button></div></div></div><canvas id="gkc" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60" aria-hidden="true"></canvas>';
+ while(md.firstChild)document.body.appendChild(md.firstChild);
+ $('moN').onclick=function(){$('mo').hidden=true;G.fase(jogo.f+1)};$('moR').onclick=function(){$('mo').hidden=true;G.fase(jogo.f)};$('moMa').onclick=function(){$('mo').hidden=true;$('tF').onclick()};
+ $('tF').onclick=function(){jogo={f:-1,livre:false};if(cfg.onHide)cfg.onHide();aba(false);mapa()};$('tL').onclick=function(){G.livre()};
+ $('som').onclick=function(){som=!som;this.textContent=som?'🔊 Som':'🔇 Som';G.sfx('clk')};
+ mapa();var mf=LAB.q.get('fase');
+ if(LAB.q.get('livre'))G.livre();else if(mf&&/^\d+$/.test(mf)&&+mf>=1&&+mf<=NF)G.fase(+mf-1)};
+
+// ---------- kit de simulação: layout, controles, laço de desenho (usado pelos laboratórios novos)
+var CT=[],SH=null,EN=null,RD=[],cvx=null,lastCk=0;
+G.f=function(x,d){return LAB.fmt(x,d==null?1:d)};
+G.rr=function(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()};
+G.tx=function(c,s,x,y,col,sz,al,wt){c.fillStyle=col||'#fff';c.font=(wt||700)+' '+(sz||14)+'px system-ui';c.textAlign=al||'left';c.fillText(s,x,y)};
+G.build=function(o){CT=o.controls||[];G.W=o.W||640;G.H=o.H||340;
+ var h='<div class="col"><div class="palco"><canvas id="cv" width="'+G.W*2+'" height="'+G.H*2+'" aria-label="'+(o.aria||'Simulação')+'"></canvas><div class="inst" id="inst"></div>'+(o.nota?'<div class="nota">'+o.nota+'</div>':'')+'</div>'+(o.left||'')+'</div>';
+ h+='<div class="col"><div class="card mis" id="mis"></div><div class="card ctlx"><h2>Controles</h2><div id="ctl"></div></div>'+(o.right||'')+'</div>';
+ $('jogo').innerHTML=h;
+ var c='';CT.forEach(function(k){
+  if(k.type==='sel'){c+='<label class="ctl" id="c_'+k.id+'">'+k.l+'<select id="'+k.id+'">'+k.opts.map(function(p){return'<option value="'+p[0]+'"'+(String(p[0])===String(k.val)?' selected':'')+'>'+p[1]+'</option>'}).join('')+'</select><span></span></label>'}
+  else c+='<label class="ctl" id="c_'+k.id+'">'+k.l+'<input type="range" id="'+k.id+'" min="'+k.min+'" max="'+k.max+'" step="'+k.step+'" value="'+k.val+'"><output id="o_'+k.id+'"></output></label>'});
+ $('ctl').innerHTML=c;
+ $('ctl').addEventListener('input',function(e){var id=e.target.id;outs();if(o.onInput)o.onInput(id);G.check()});
+ outs();cvx=$('cv').getContext('2d');
+ var rs=function(){var cv=$('cv'),w=cv.clientWidth,d=Math.min(2,window.devicePixelRatio||1.5),nw=Math.round(w*d);if(w&&cv.width!==nw){cv.width=nw;cv.height=Math.round(w*G.H/G.W*d)}};
+ G.rs=rs};
+function outs(){CT.forEach(function(k){if(k.type!=='sel'){var e=$('o_'+k.id);if(e)e.textContent=LAB.fmt(+$(k.id).value,k.d==null?0:k.d)+(k.u||'')}})}
+G.v=function(id){var e=$(id),v=e.value;return e.tagName==='SELECT'&&isNaN(+v)?v:+v};
+G.set=function(o){for(var k in o){var e=$(k);if(e)e.value=o[k]}outs()};
+G.lock=function(a){CT.forEach(function(k){var e=$(k.id);e.disabled=a?a.indexOf(k.id)<0:false;$('c_'+k.id).classList.toggle('lk',!!e.disabled)})};
+G.show=function(a){CT.forEach(function(k){$('c_'+k.id).hidden=a?a.indexOf(k.id)<0:false})};
+G.reads=function(a){var el=$('inst');if(RD.length!==a.length){RD=a.map(function(){return[]});el.innerHTML=a.map(function(_,i){return'<div class="g"><div class="lb" id="rl'+i+'"></div><div class="dv" id="rv'+i+'" style="margin-top:8px"></div></div>'}).join('');RD=a.map(function(x){return[null,null]})}
+ a.forEach(function(r,i){if(RD[i][0]!==r[0]){RD[i][0]=r[0];$('rl'+i).textContent=r[0]}if(RD[i][1]!==r[1]){RD[i][1]=r[1];$('rv'+i).innerHTML=r[1]}})};
+G.loop=function(fn){var last=performance.now(),ck=0;
+ (function f(t){var dt=Math.min(.05,(t-last)/1000);last=t;
+  if(!$('jogo').hidden&&cvx){G.rs&&G.rs();var cv=$('cv'),sc=cv.width/G.W;cvx.setTransform(sc,0,0,sc,0,0);cvx.clearRect(0,0,G.W,G.H);
+   cvx.fillStyle='#ffffff0a';for(var x=10;x<G.W;x+=20)for(var y=10;y<G.H;y+=20)cvx.fillRect(x,y,1.4,1.4);
+   fn(cvx,dt,t);ck+=dt;if(ck>.12){ck=0;G.check()}}
+  requestAnimationFrame(f)})(last)};
+})();
+
+(function(){
+var G=10,K=200,MM=0.5;
+GAME.build({W:640,H:340,aria:'Conservação da energia mecânica',nota:'Sem atrito: Ec + Ep = constante, ou seja, mv²/2 + mgh = constante. Com g = 10 m/s². O atrito transforma energia mecânica em calor.',controls:[
+ {id:'cena',type:'sel',l:'Situação',opts:[['pista','Montanha-russa'],['guincho','Guincho'],['mola','Mola e bloco']],val:'pista'},
+ {id:'h0',l:'Altura inicial',min:2,max:25,step:0.5,val:5,u:' m',d:1},
+ {id:'mu',l:'Atrito μ',min:0,max:0.3,step:0.01,val:0,u:'',d:2},
+ {id:'t',l:'Tempo de subida',min:10,max:60,step:1,val:40,u:' s',d:0},
+ {id:'x',l:'Compressão x',min:1,max:30,step:0.5,val:5,u:' cm',d:1}]});
+var AN=[[0,5],[20,0],[40,8],[55,1]];
+function hf(x,h0){var A=AN.slice();A[0]=[0,h0];for(var i=0;i<3;i++)if(x<=A[i+1][0]||i==2){var t=Math.min(1,Math.max(0,(x-A[i][0])/(A[i+1][0]-A[i][0]))),c=(1-Math.cos(Math.PI*t))/2;return A[i][1]+(A[i+1][1]-A[i][1])*c}}
+function hd(x,h0){var e=.01;return(hf(x+e,h0)-hf(x-e,h0))/(2*e)}
+function pass(h0,mu){return G*(h0-8)-mu*G*40>0}
+function vb(h0,mu){return Math.sqrt(Math.max(0,2*G*(h0-mu*20)))}
+function eta(t){return 20/t}
+function vm(x){return x/100*Math.sqrt(K/MM)}
+var S={x:0,v:0,w:0,key:'',tt:0};
+function reset(){S.x=0;S.v=0;S.w=0;S.tt=0}
+function st(){return{h0:GAME.v('h0'),mu:GAME.v('mu'),t:GAME.v('t'),x:GAME.v('x'),cena:GAME.v('cena')}}
+var FASES=[
+{t:'O vagão passa pelo morro?',tag:'Parque de diversões',rot:'conservação',v:{cena:'pista',h0:5,mu:0},ed:['h0'],
+ ctx:'Na montanha-russa, o vagão parte do repouso no alto e precisa passar pelo segundo morro, que tem 8 m de altura. Sem atrito, nada se perde.',
+ obj:'Escolha uma altura inicial para o vagão passar pelo morro de 8 m.',prog:function(){var s=st();return'Altura de saída: '+GAME.f(s.h0,1)+' m · '+(pass(s.h0,0)?'passa':'não passa')},
+ ok:function(){return pass(GAME.v('h0'),0)&&GAME.v('h0')>=8.5},d:['Para passar, o vagão precisa chegar ao topo com energia cinética sobrando.','Sem atrito, a altura de saída deve ser maior que 8 m.'],
+ q:{p:'Sem atrito, a velocidade do vagão no topo do morro de 8 m depende…',o:['só da diferença entre a altura de saída e 8 m','da massa do vagão','do formato da pista'],c:0,ex:'mgh₀ = mgh + mv²/2, então v² = 2g(h₀ − h). A massa se cancela e o formato do caminho não importa.'}},
+{t:'Velocidade na base da rampa',tag:'Segurança do Trabalho',rot:'v = √(2gh)',v:{cena:'pista',h0:5,mu:0},ed:['h0'],
+ ctx:'Um carrinho de obra desce uma rampa sem atrito. Na base, a energia potencial virou energia cinética.',
+ obj:'Escolha a altura para o carrinho chegar à base com cerca de 20 m/s (72 km/h).',prog:function(){return'Velocidade na base: '+GAME.f(vb(GAME.v('h0'),0),1)+' m/s'},
+ ok:function(){return Math.abs(vb(GAME.v('h0'),0)-20)<=0.6},d:['mgh = mv²/2, então h = v² ÷ 2g.','h = 400 ÷ 20 = 20 m.'],
+ q:{p:'Se a altura dobrar, a velocidade na base…',o:['multiplica-se por √2 (cerca de 1,4)','dobra','fica igual'],c:0,ex:'v = √(2gh). Dobrando h, o produto dentro da raiz dobra, e v cresce √2 vezes.'}},
+{t:'Quanto atrito a pista aguenta?',tag:'Mecânica',rot:'energia dissipada',v:{cena:'pista',h0:12,mu:0},ed:['mu'],
+ ctx:'A pista real tem atrito. Em 40 m de percurso até o topo do morro, o atrito dissipa energia: a perda por kg é μ·g·40.',
+ obj:'Com saída em 12 m, escolha um atrito de pelo menos 0,05 em que o vagão ainda passe.',prog:function(){var s=st();return'μ = '+GAME.f(s.mu,2)+' · '+(pass(12,s.mu)?'passa':'não passa')},
+ ok:function(){var m=GAME.v('mu');return m>=0.05&&pass(12,m)},d:['Energia que sobra no topo por kg: 10·(12 − 8) − μ·10·40.','Precisa ser positiva: μ < 0,10.'],
+ q:{p:'Para onde vai a energia mecânica perdida pelo atrito?',o:['Vira energia térmica (aquece pista e rodas)','Desaparece','Vira energia potencial'],c:0,ex:'A energia total se conserva. O que sai da forma mecânica vira calor, e por isso o sistema "perde" energia mecânica.'}},
+{t:'O guincho da obra',tag:'Edificações',rot:'potência e rendimento',v:{cena:'guincho',t:40},ed:['t'],
+ ctx:'Um guincho de 5 kW eleva uma carga de 500 kg a 20 m de altura. O trabalho útil é mgh = 100 kJ. O rendimento é η = trabalho útil ÷ (P·t).',
+ obj:'Ajuste o tempo de subida para um rendimento realista, entre 70% e 100%.',prog:function(){var e=eta(GAME.v('t'));return'Rendimento: '+(e>1?'impossível (> 100%)':GAME.f(e*100,0)+'%')},
+ ok:function(){var t=GAME.v('t');return t>=21&&t<=28},d:['η = 100 000 ÷ (5 000 · t) = 20 ÷ t.','Para η entre 0,7 e 1, o tempo fica entre 20 e 28,5 s.'],
+ q:{p:'Subindo mais devagar com o mesmo guincho, o rendimento…',o:['diminui, pois o motor gasta mais energia pelo mesmo trabalho útil','aumenta','não muda'],c:0,ex:'O trabalho útil é o mesmo (mgh), mas a energia fornecida P·t cresce com o tempo. Logo, η = mgh ÷ (P·t) diminui.'}},
+{t:'A mola que lança o bloco',tag:'Eletromecânica',rot:'energia elástica',v:{cena:'mola',x:5},ed:['x'],
+ ctx:'Uma mola de k = 200 N/m lança um bloco de 0,5 kg. A energia elástica kx²/2 vira energia cinética mv²/2, então v = x·√(k/m).',
+ obj:'Comprima a mola para o bloco sair com 2 m/s.',prog:function(){return'Velocidade de saída: '+GAME.f(vm(GAME.v('x')),2)+' m/s'},
+ ok:function(){return Math.abs(vm(GAME.v('x'))-2)<=0.1},d:['x em metros: v = x · 20 (pois √(200 ÷ 0,5) = 20).','x = 2 ÷ 20 = 0,10 m = 10 cm.'],
+ q:{p:'Se a compressão da mola dobrar, a energia armazenada…',o:['quadruplica','dobra','não muda'],c:0,ex:'E = kx²/2 depende do quadrado de x. Dobrando x, a energia vai a 4 vezes, e v dobra.'}}];
+GAME.init({key:'ceetip_lab_energia_v1',fases:FASES,medalhas:['🥉 Aprendiz de energia','🥈 Técnico(a) em mecânica','🥇 Mestre da conservação'],livreDesc:'Altere altura, atrito, tempo e compressão e observe as energias.',
+ onStart:function(i,F){GAME.set(F.v);GAME.lock(F.ed);GAME.show(['cena'].concat(F.ed).filter(function(c){return c!=='cena'}));reset()},
+ onLivre:function(){GAME.set({cena:'pista',h0:12,mu:0});GAME.lock(null);GAME.show(null);reset()},
+ livre:'<div class="ctx"><span class="tag f">Laboratório livre</span></div><h3>Experimente as três situações</h3><p>Escolha a situação e mude os controles. Na montanha-russa, qual é a menor altura de saída que passa pelo morro com μ = 0,05?</p><div class="obj"><span class="ck">?</span><span>Desafio extra: com μ = 0,05, qual altura inicial mínima faz o vagão passar pelo morro de 8 m?</span></div><button class="sec" data-rev="lv">Ver resposta</button><div class="revela" id="lv" hidden>g(h₀ − 8) − μ·g·40 > 0, então h₀ > 8 + 0,05·40 = 10 m.</div>'});
+GAME.loop(function(cx,dt,t){var s=st(),T=GAME.tx,R=GAME.rr,c=s.cena;
+ var key=[c,s.h0,s.mu,s.t,s.x].join('|');if(key!==S.key){S.key=key;reset()}
+ if(c==='pista'){
+  var X=function(x){return 30+x*10.5},Y=function(h){return 300-h*9};
+  cx.beginPath();cx.moveTo(X(0),300);for(var x=0;x<=55;x+=1)cx.lineTo(X(x),Y(hf(x,s.h0)));cx.lineTo(X(55),300);cx.closePath();cx.fillStyle='#4a2a1e';cx.fill();
+  cx.beginPath();for(var x=0;x<=55;x+=1)x?cx.lineTo(X(x),Y(hf(x,s.h0))):cx.moveTo(X(x),Y(hf(x,s.h0)));cx.strokeStyle='#c9a227';cx.lineWidth=3;cx.stroke();
+  S.tt+=dt;if(S.tt>1){var n=4,h=dt/n;for(var i=0;i<n;i++){var a=-G*hd(S.x,s.h0)-s.mu*G*(S.v>0?1:S.v<0?-1:0)*1;var vn=S.v+a*h*1.4;if(S.v!==0&&vn*S.v<0&&hd(S.x,s.h0)*0===0&&Math.abs(a+G*hd(S.x,s.h0))>Math.abs(G*hd(S.x,s.h0)))vn=0;S.v=vn;S.x+=S.v*h*1.4;if(S.x<0){S.x=0;S.v=0}}
+   if(S.x>=55||S.tt>16){reset();S.tt=0.2}}
+  var px=X(S.x),py=Y(hf(S.x,s.h0));cx.fillStyle='#ff6a3d';R(cx,px-9,py-16,18,12,4);cx.fill();cx.fillStyle='#fff';cx.beginPath();cx.arc(px-5,py-3,3,0,7);cx.arc(px+5,py-3,3,0,7);cx.fill();
+  T(cx,'h₀ = '+GAME.f(s.h0,1)+' m',X(0)+6,Y(s.h0)-8,'#fff',13,'left',800);
+  cx.setLineDash([5,5]);cx.strokeStyle='#ffffff66';cx.beginPath();cx.moveTo(X(30),Y(8));cx.lineTo(X(50),Y(8));cx.stroke();cx.setLineDash([]);T(cx,'8 m',X(46),Y(8)-6,'#d9c48a',12,'center');
+  var hh=hf(S.x,s.h0),ec=Math.max(0,G*(s.h0-hh)-s.mu*G*S.x);var vv=Math.sqrt(2*ec),ep=G*hh,tot=G*s.h0;
+  GAME.reads([['Altura h',GAME.f(hh,1)+' m'],['Velocidade v',GAME.f(Math.abs(S.v)*1.4*0+vv,1)+' m/s'],['Energia dissipada',GAME.f(100*Math.min(1,s.mu*G*S.x/tot),0)+'% de mgh₀']]);
+  var bw=96;R(cx,440,14,180,60,8);cx.fillStyle='#ffffff10';cx.fill();var f=function(v,col,y,l){T(cx,l,450,y+9,'#d9c48a',11);cx.fillStyle=col;cx.fillRect(520,y,bw*Math.max(0,Math.min(1,v/tot)),10)};f(ep,'#4fb3ff',22,'potencial');f(ec,'#ff6a3d',46,'cinética');
+ }else if(c==='guincho'){
+  var e=eta(s.t),prog=Math.min(1,(t%(s.t/6+2))/(s.t/6)),y0=290,y1=70;
+  cx.fillStyle='#4a2a1e';cx.fillRect(60,50,12,250);cx.fillRect(60,50,160,10);
+  var cy=y0-(y0-y1-30)*prog;cx.strokeStyle='#c9a227';cx.lineWidth=3;cx.beginPath();cx.moveTo(200,60);cx.lineTo(200,cy);cx.stroke();
+  cx.fillStyle='#ff6a3d';cx.fillRect(176,cy,48,40);T(cx,'500 kg',200,cy+26,'#fff',12,'center',800);
+  cx.setLineDash([4,4]);cx.strokeStyle='#ffffff66';cx.beginPath();cx.moveTo(250,y1+30);cx.lineTo(250,y0);cx.stroke();cx.setLineDash([]);T(cx,'20 m',262,190,'#d9c48a',13,'left');
+  R(cx,330,70,280,190,12);cx.fillStyle='#ffffff10';cx.fill();
+  T(cx,'Energia útil: mgh = 100 kJ',346,104,'#fff',15,'left',700);T(cx,'Energia do motor: P·t = '+GAME.f(5*s.t,0)+' kJ',346,134,'#fff',15,'left',700);
+  cx.fillStyle='#ffffff22';cx.fillRect(346,160,248,22);cx.fillStyle=e>1?'#b3261e':e>=0.7?'#1e9b5c':'#c9a227';cx.fillRect(346,160,248*Math.min(1,e),22);T(cx,e>1?'impossível':'η = '+GAME.f(e*100,0)+'%',470,176,'#fff',14,'center',900);
+  T(cx,'Faixa realista: 70% a 100%',346,214,'#d9c48a',13,'left');T(cx,e>1?'Nenhum motor entrega mais energia útil do que recebe.':'O restante vira calor nas engrenagens e no cabo.',346,240,'#d9c48a',12,'left');
+  GAME.reads([['Tempo de subida',GAME.f(s.t,0)+' s'],['Potência útil',GAME.f(100/s.t,1)+' kW'],['Rendimento',e>1?'> 100%':GAME.f(e*100,0)+'%']]);
+ }else{
+  var xm=s.x/100,v=vm(s.x),per=1.5,ph=(t%per)/per;var bx;
+  cx.fillStyle='#4a2a1e';cx.fillRect(30,200,580,20);cx.fillStyle='#c9a227';cx.fillRect(40,150,10,50);
+  var L=Math.min(0.3,xm)*600;var pos;if(ph<0.4){pos=90+(1-ph/0.4)*0+0;bx=110+(L*(1-ph/0.4))*0;}
+  var comp=ph<0.35?(1-ph/0.35):0;var blk=ph<0.35?110+(1-comp)*0:110+((ph-0.35)/0.65)*400;
+  var sx=50,ex=blk;cx.strokeStyle='#e8e8e8';cx.lineWidth=4;cx.beginPath();cx.moveTo(sx,175);for(var i=0;i<=12;i++)cx.lineTo(sx+(ex-sx)*i/12,175+(i%2?10:-10)*(i>0&&i<12?1:0));cx.stroke();
+  cx.fillStyle='#ff6a3d';cx.fillRect(blk,150,50,50);T(cx,'0,5 kg',blk+25,181,'#fff',12,'center',800);
+  T(cx,'x = '+GAME.f(s.x,1)+' cm',60,130,'#fff',14,'left',800);T(cx,ph<0.35?'comprimida':'liberada',320,60,'#d9c48a',14,'center');
+  R(cx,330,236,280,84,12);cx.fillStyle='#ffffff10';cx.fill();T(cx,'kx²/2 = '+GAME.f(0.5*K*xm*xm,2)+' J',346,268,'#fff',15,'left',700);T(cx,'mv²/2 = '+GAME.f(0.5*MM*v*v,2)+' J',346,296,'#fff',15,'left',700);
+  GAME.reads([['Compressão x',GAME.f(s.x,1)+' cm'],['Energia elástica',GAME.f(0.5*K*xm*xm,2)+' J'],['Velocidade de saída',GAME.f(v,2)+' m/s']]);
+ }});
+window.LABX={vb:vb,pass:pass,eta:eta,vm:vm,FASES:FASES};
+
+})();
+</script></body></html>

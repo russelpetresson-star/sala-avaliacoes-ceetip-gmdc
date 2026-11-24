@@ -1,0 +1,394 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Laboratório · Circuitos em série e em paralelo — CEETIP</title><style>:root{--v:#6d1a2e;--v2:#8e2a43;--v3:#fbeef1;--d:#c9a227;--d2:#f3e2a6;--d3:#fff7de;--dtx:#8a6a0c;--a:#1f4e79;--a2:#dbe7f3;--ok:#1e7a4c;--ok2:#dff3e8;--no:#b3261e;--no2:#fde4e1;--ink:#1d1d24;--mut:#5b5b66;--line:#6d1a2e22;--paper:#fbf8f3;--card:#fff;--soft:#f4f1ec}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:17px;line-height:1.4;padding-bottom:84px}
+header{background:linear-gradient(100deg,var(--v) 0%,var(--v2) 72%,#a83a55 100%);color:#fff;padding:16px 24px;border-bottom:5px solid var(--d)}
+header .k{font-size:13px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--d2)}
+header h1{margin:4px 0 0;font-size:clamp(22px,3.4vw,34px);line-height:1.1;font-weight:800}
+header h1 em{font-style:normal;color:var(--d)}
+main{max-width:1280px;margin:0 auto;padding:18px 20px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px 18px;box-shadow:0 4px 18px #6d1a2e12}
+.card h2{margin:0 0 10px;font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--v)}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.mut{color:var(--mut)}.small{font-size:14px}
+label.ctl{display:grid;grid-template-columns:78px 1fr 84px;gap:10px;align-items:center;font-weight:700;margin:6px 0}
+label.ctl output{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;color:var(--v)}
+input[type=range]{width:100%;height:36px;accent-color:var(--v);touch-action:pan-y}
+button,.btn,select,input[type=number]{font:inherit}
+button,.btn{border:0;border-radius:12px;padding:12px 18px;min-height:46px;font-weight:800;background:var(--v);color:#fff;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+button.sec,.btn.sec{background:var(--soft);color:var(--v);border:1.5px solid var(--line)}
+button.on{background:var(--d);color:#3d2f00}
+select,input[type=number]{min-height:44px;border-radius:10px;border:1.5px solid var(--line);background:#fff;padding:6px 10px;color:var(--ink)}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.read div{background:var(--soft);border-radius:12px;padding:10px 12px}
+.read b{display:block;font-size:24px;font-variant-numeric:tabular-nums;color:var(--v)}
+.read span{font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.aviso{border-radius:12px;padding:12px 14px;font-weight:700}
+.aviso.ok{background:var(--ok2);color:#0f4a2d}.aviso.no{background:var(--no2);color:#7a1810}.aviso.info{background:var(--d3);color:#4b3a06;border:1.5px solid var(--d2)}
+.missao{border-left:8px solid var(--d);background:var(--d3);border-radius:12px;padding:12px 14px;margin:10px 0}
+.missao b.n{display:inline-flex;width:30px;height:30px;border-radius:50%;background:var(--v);color:#fff;align-items:center;justify-content:center;margin-right:8px}
+.revela{margin-top:8px;background:var(--a2);color:#163a5c;border-radius:10px;padding:10px 12px}
+.revela[hidden]{display:none}
+svg text{font-family:inherit}
+.rod{position:fixed;left:0;right:0;bottom:0;background:#fffffff2;border-top:2px solid var(--d);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.rod .mut{font-size:13px}
+table{border-collapse:collapse;width:100%}th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+
+[hidden]{display:none!important}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.hudr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:7px 14px;font-weight:800;font-size:15px;background:#ffffff1f;color:#fff;border:1.5px solid #ffffff40}
+.chip.au{background:var(--d);color:#3d2f00;border-color:var(--d)}
+.chip button{all:unset;cursor:pointer}
+.tabs{max-width:1280px;margin:14px auto 0;padding:0 20px;display:flex;gap:8px}
+.tabs button{background:#fff;color:var(--v);border:2px solid var(--v)}.tabs button.on{background:var(--v);color:#fff}
+.wrap{max-width:1280px;margin:0 auto;padding:14px 20px}
+#jogo{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:940px){#jogo{grid-template-columns:1fr}}
+.palco{background:radial-gradient(120% 90% at 30% 20%,#3a1622 0%,#1d0b12 60%,#140810 100%);border-radius:20px;padding:12px;box-shadow:0 10px 30px #6d1a2e40,inset 0 0 0 2px #c9a22755;position:relative}
+.palco canvas{display:block;width:100%;height:auto;border-radius:12px;touch-action:manipulation;cursor:pointer}
+.inst{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
+.g{background:#ffffff0d;border:1px solid #c9a22740;border-radius:14px;padding:6px 8px 8px;text-align:center;color:#f3e2a6}
+.g svg{width:100%;max-width:200px;height:auto}
+.g .dv{font-size:22px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums}
+.g .lb{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#d9c48a}
+.nd{transition:transform .45s cubic-bezier(.3,1.5,.5,1);transform-origin:100px 100px}
+.lrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.lrow button{background:#ffffff14;color:#fff;border:1.5px solid #ffffff38;min-height:42px;padding:8px 12px;font-size:15px}
+.lrow button.off{background:#00000055;color:#bbb;border-style:dashed}.lrow button.qm{background:#b3261e;border-color:#ff8a80}
+.lrow button.rearm{background:var(--d);color:#3d2f00;border-color:var(--d)}
+.nota{color:#cbb98a;font-size:13px;margin-top:8px}
+.ctx{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.tag{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:4px 10px;background:var(--a2);color:var(--a)}
+.tag.f{background:var(--v);color:#fff}
+.mis h3{margin:2px 0 6px;font-size:22px;color:var(--v)}
+.obj{display:flex;gap:10px;align-items:flex-start;background:var(--d3);border:2px solid var(--d2);border-radius:14px;padding:12px;margin:10px 0;font-weight:700}
+.obj .ck{flex:0 0 30px;height:30px;border-radius:50%;border:3px solid var(--d);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;transition:all .3s}
+.obj.feito{background:var(--ok2);border-color:#9fd8b8}.obj.feito .ck{background:var(--ok);border-color:var(--ok)}
+.dica{background:var(--a2);color:#163a5c;border-radius:12px;padding:10px 12px;margin-top:8px;animation:in .35s}
+.qz{margin-top:10px;border:2px solid var(--v);border-radius:14px;padding:12px;animation:in .35s}
+.qz p{margin:0 0 8px;font-weight:800}
+.qz button{display:block;width:100%;text-align:left;margin:6px 0;background:#fff;color:var(--ink);border:2px solid var(--line)}
+.qz button.cer{background:var(--ok2);border-color:var(--ok)}.qz button.err{background:var(--no2);border-color:var(--no);animation:tr .4s}
+.fb{margin-top:6px;font-weight:700}
+.tm{font-variant-numeric:tabular-nums;font-weight:800;color:var(--v);font-size:20px}
+.ctlx label.ctl{grid-template-columns:70px 1fr 80px}
+.ctlx label.lk{opacity:.45}
+.ctlx label.lk output::after{content:" 🔒"}
+input[type=range]{height:40px}
+.seg{display:inline-flex;border:2px solid var(--v);border-radius:12px;overflow:hidden}.seg button{border-radius:0;background:#fff;color:var(--v)}.seg button.on{background:var(--v);color:#fff}
+td.st{font-size:13px;font-weight:800}
+#mapa .topo{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+.barra{height:14px;border-radius:999px;background:var(--soft);overflow:hidden;border:1px solid var(--line)}.barra i{display:block;height:100%;background:linear-gradient(90deg,var(--d),#e9c552);transition:width .6s}
+.fases{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:14px}
+.fc{all:unset;cursor:pointer;background:#fff;border:2px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 14px #6d1a2e12;transition:transform .15s}
+.fc:hover,.fc:focus-visible{transform:translateY(-3px);border-color:var(--d)}
+.fc .n{font-size:13px;font-weight:800;color:var(--dtx);letter-spacing:.08em;text-transform:uppercase}
+.fc b{font-size:18px;color:var(--v)}.fc .es{font-size:22px;letter-spacing:2px;color:#d8d2c6}.fc .es .on{color:var(--d)}
+.fc.prox{border-color:var(--d);box-shadow:0 0 0 4px #c9a22740}
+.fc.livre{background:linear-gradient(135deg,var(--v),var(--v2));color:#fff}.fc.livre b{color:#fff}.fc.livre .n{color:var(--d2)}
+.med{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}.med span{border-radius:12px;padding:8px 12px;font-weight:800;background:var(--soft);color:#9a948a;border:1.5px dashed #cfc8bb}.med span.on{background:var(--d3);color:var(--dtx);border:1.5px solid var(--d)}
+.modal{position:fixed;inset:0;background:#140810cc;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal[hidden]{display:none}
+.mc{background:#fff;border-radius:22px;max-width:520px;width:100%;padding:22px;text-align:center;border-top:8px solid var(--d);animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+.mc h2{margin:0;color:var(--v);font-size:26px}
+.big{font-size:54px;letter-spacing:6px;margin:8px 0}.big span{display:inline-block;color:#ddd5c6}.big span.on{color:var(--d);animation:st .5s both}
+.big span:nth-child(2){animation-delay:.25s}.big span:nth-child(3){animation-delay:.5s}
+.mc .ex{background:var(--a2);color:#163a5c;border-radius:12px;padding:10px 12px;text-align:left;margin:10px 0}
+.mc .row{justify-content:center}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}@keyframes pop{from{transform:scale(.7);opacity:0}}
+@keyframes st{0%{transform:scale(0) rotate(-40deg)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
+@keyframes tr{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style></head><body>
+<header><div><div class="k">Laboratório · Física · 3ª série · Eletrodinâmica</div><h1>Circuitos em <em>série</em> e em <em>paralelo</em></h1></div>
+<div class="hudr"><span class="chip au" id="hS" title="Estrelas conquistadas">★ 0/21</span><span class="chip" id="hM">Sem medalha</span><span class="chip"><button id="som" aria-label="Som">🔇 Som</button></span></div></header>
+<div class="tabs"><button id="tF" class="on">🎮 Fases</button><button id="tL">🔧 Laboratório livre</button></div>
+
+<div class="wrap" id="mapa">
+ <div class="card"><div class="topo"><div><h2>Sua jornada</h2><div class="barra"><i id="pb" style="width:0"></i></div></div><b id="pt" style="color:var(--v);font-size:20px">0/21 ★</b></div>
+ <div class="med"><span id="m1">🥉 Aprendiz de eletricista · 7★</span><span id="m2">🥈 Técnico(a) de circuitos · 14★</span><span id="m3">🥇 Mestre dos circuitos · 21★</span></div></div>
+ <div class="fases" id="fs"></div>
+</div>
+
+<div class="wrap" id="jogo" hidden>
+ <div class="col">
+  <div class="palco">
+   <canvas id="cv" width="1280" height="680" aria-label="Circuito animado: toque numa lâmpada para ligar ou desligar"></canvas>
+   <div class="lrow" id="lr"></div>
+   <div class="inst">
+    <div class="g"><div class="lb">Voltímetro · fonte</div><svg viewBox="0 0 200 118" id="gV"></svg><div class="dv" id="rU">—</div></div>
+    <div class="g"><div class="lb">Amperímetro</div><svg viewBox="0 0 200 118" id="gA"></svg><div class="dv" id="rI">—</div><div class="lb" id="esc" style="text-transform:none;letter-spacing:0">escala 0–1 A</div></div>
+    <div class="g"><div class="lb">Potência total</div><svg viewBox="0 0 200 118" id="gP"></svg><div class="dv" id="rP">—</div></div>
+   </div>
+   <div class="nota">Pontos azuis: elétrons, saindo do polo − e voltando ao +. A rapidez na tela mostra a intensidade da corrente; na fiação real, os elétrons avançam frações de milímetro por segundo. Lâmpadas queimam acima de 60 W; o disjuntor desarma acima de 10 A.</div>
+  </div>
+  <div class="card"><h2>Medidas</h2>
+   <div class="read"><div><span>Resistência equivalente</span><b id="rReq">—</b></div><div><span>Corrente total</span><b id="rI2">—</b></div></div>
+   <table style="margin-top:10px"><thead><tr><th></th><th>R (Ω)</th><th>U (V)</th><th>i (A)</th><th>P (W)</th><th>Estado</th></tr></thead><tbody id="tb"></tbody></table>
+   <div id="dj" class="aviso no" style="margin-top:8px" hidden></div></div>
+ </div>
+ <div class="col">
+  <div class="card mis" id="mis"></div>
+  <div class="card ctlx"><h2>Controles</h2>
+   <div class="row" id="segw" style="margin-bottom:6px"><div class="seg" role="group" aria-label="Tipo de associação"><button id="bS" class="on">Série</button><button id="bP">Paralelo</button></div></div>
+   <label class="ctl" id="cU">Fonte<input type="range" id="U" min="1" max="24" step="0.5" value="12"><output id="oU"></output></label>
+   <label class="ctl" id="cR1">R1<input type="range" id="R1" min="5" max="100" step="1" value="10"><output id="oR1"></output></label>
+   <label class="ctl" id="cR2">R2<input type="range" id="R2" min="5" max="100" step="1" value="20"><output id="oR2"></output></label>
+   <label class="ctl" id="cR3">R3<input type="range" id="R3" min="5" max="100" step="1" value="30"><output id="oR3"></output></label>
+  </div>
+ </div>
+</div>
+
+<div class="modal" id="mo" hidden><div class="mc" role="dialog" aria-modal="true" aria-labelledby="moT"><h2 id="moT">Fase concluída!</h2><div class="big" id="moS"></div><div id="moM" style="font-weight:700"></div><div class="ex" id="moE"></div>
+<div class="row"><button id="moN">Próxima fase ›</button><button class="sec" id="moR">Jogar de novo</button><button class="sec" id="moMa">Mapa</button></div></div></div>
+
+<div class="rod"><a class="btn" id="voltar" href="index.html">‹ Todos os laboratórios</a><span class="mut">Funciona sem internet depois de aberto. As estrelas ficam salvas só neste aparelho.</span></div>
+<script>(function(){
+ var q=new URLSearchParams(location.search),aula=q.get('aula'),t=q.get('t');
+ var back=document.getElementById('voltar');
+ if(back){
+  if(aula&&/^[\w-]+$/.test(aula)){back.href='../aulas/'+aula+'.html'+(t&&/^\d+$/.test(t)?'#t'+t:'');back.firstChild.nodeValue='‹ Voltar à aula';}
+  else{back.href='index.html';back.firstChild.nodeValue='‹ Todos os laboratórios';}
+ }
+ document.querySelectorAll('[data-rev]').forEach(function(b){b.addEventListener('click',function(){
+  var el=document.getElementById(b.dataset.rev);el.hidden=!el.hidden;b.textContent=el.hidden?'Ver resposta':'Esconder resposta';});});
+ window.LAB={q:q,fmt:function(x,d){return x.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d})}};
+})();
+
+(function(){
+var $=function(i){return document.getElementById(i)},fmt=LAB.fmt;
+var PMAX=60,IMAX=10,W=640,H=340;
+// ---------- estado
+var S={modo:'serie',U:12,R:[10,20,30],on:[true,true,true],q:[false,false,false],trip:false,heat:[0,0,0],tt:0};
+var jogo={f:-1,livre:false,dic:0,err:0,pen:0,ok:false,fim:false,t0:0,lat:false};
+// ---------- física
+function solve(st,ignTrip){
+ var at=[0,1,2].map(function(k){return st.on[k]&&!st.q[k]}),Ii=[0,0,0],Ui=[0,0,0],Pi=[0,0,0],Req=Infinity,I=0,U=st.U,R=st.R;
+ if(st.modo==='serie'){
+  if(at[0]&&at[1]&&at[2]){Req=R[0]+R[1]+R[2];I=U/Req;for(var k=0;k<3;k++){Ii[k]=I;Ui[k]=I*R[k];Pi[k]=I*I*R[k]}}
+ }else{
+  var s=0;for(var k=0;k<3;k++)if(at[k]){s+=1/R[k];Ii[k]=U/R[k];Ui[k]=U;Pi[k]=U*U/R[k];I+=Ii[k]}
+  if(s>0)Req=1/s;
+ }
+ if(st.trip&&!ignTrip){Ii=[0,0,0];Ui=[0,0,0];Pi=[0,0,0];I=0}
+ return{U:U,R:R.slice(),at:at,Ii:Ii,Ui:Ui,Pi:Pi,Req:Req,I:I,P:Pi[0]+Pi[1]+Pi[2]}}
+function bright(P){return Math.max(0,Math.min(1,Math.log10(1+P/0.05)/Math.log10(1+30/0.05)))}
+// ---------- som (desligado por padrão)
+var som=false,ac=null;
+function bip(f,d,tp,v){if(!som)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();var o=ac.createOscillator(),g=ac.createGain();o.type=tp||'sine';o.frequency.value=f;g.gain.value=v||.08;o.connect(g);g.connect(ac.destination);var t=ac.currentTime;g.gain.exponentialRampToValueAtTime(.0001,t+d);o.start(t);o.stop(t+d)}catch(e){}}
+function sfx(n){if(n==='ok'){bip(660,.15);setTimeout(function(){bip(880,.25)},140)}else if(n==='err')bip(180,.25,'square',.05);else if(n==='boom'){bip(90,.35,'sawtooth',.12)}else if(n==='clk')bip(1200,.05,'square',.04);else if(n==='fim'){[523,659,784,1046].forEach(function(f,i){setTimeout(function(){bip(f,.2)},i*120)})}}
+$('som').onclick=function(){som=!som;this.textContent=som?'🔊 Som':'🔇 Som';sfx('clk')};
+// ---------- fases
+var FASES=[
+{t:'Luz na quadrilha',tag:'São João em Carmópolis',modo:'serie',ini:{U:6,R:[10,20,30]},lk:{U:0,R:[1,1,1]},
+ ctx:'O varal de lâmpadas da quadrilha da escola foi ligado em série a uma fonte. Ele precisa de 0,20 A para funcionar bem.',
+ obj:'Ajuste a fonte para que a corrente no varal seja 0,20 A.',ok:function(c){return Math.abs(c.I-0.2)<0.004},
+ d:['Use i = U ÷ Req. Em série, Req = R1 + R2 + R3.','Req = 10 + 20 + 30 = 60 Ω. A fonte precisa de 0,20 × 60 volts.'],
+ q:{p:'Se a fonte dobrar para 24 V, a corrente no varal…',o:['dobra, para 0,40 A','continua 0,20 A','cai pela metade, para 0,10 A'],c:0,ex:'i = U ÷ Req. Com a mesma resistência, a corrente é proporcional à tensão: é a lei de Ohm.'}},
+{t:'Uma lâmpada apagou',tag:'São João em Carmópolis',modo:'serie',ini:{U:12,R:[10,20,30]},lk:{U:1,R:[1,1,1]},
+ ctx:'No meio da dança, uma lâmpada do varal se soltou do bocal. Veja o que acontece com as outras.',
+ obj:'Toque em uma lâmpada do circuito para desligá-la.',ok:function(c,s){return s.on.indexOf(false)>=0},
+ d:['Toque numa lâmpada no desenho ou use os botões logo abaixo do circuito.','Olhe os elétrons depois de desligar: eles ainda andam?'],
+ q:{p:'Por que todas as lâmpadas apagaram?',o:['Em série há um só caminho: aberto em um ponto, a corrente para no circuito inteiro','A lâmpada desligada recebia toda a energia da fonte','A tensão da fonte caiu para zero'],c:0,ex:'Na ligação em série a corrente passa por uma lâmpada depois da outra. Interrompeu um ponto, a corrente cai a zero em todo o circuito. A fonte continua com 12 V.'}},
+{t:'Quem brilha mais?',tag:'São João em Carmópolis',modo:'serie',ini:{U:12,R:[10,20,30]},lk:{U:1,R:[0,1,1]},
+ ctx:'As lâmpadas do varal são diferentes: 10, 20 e 30 Ω. Compare as potências na tabela.',
+ obj:'Mude só R1 até a lâmpada 1 brilhar igual à lâmpada 3 (mesma potência).',ok:function(c){return c.I>0&&Math.abs(c.R[0]-c.R[2])<0.5},
+ d:['Em série a corrente é a mesma em todas, então P = R · i² depende só de R.','Para ter a mesma potência que a lâmpada 3, a lâmpada 1 precisa da mesma resistência dela.'],
+ q:{p:'Em série, qual lâmpada brilha mais?',o:['A de maior resistência','A de menor resistência','Todas brilham igual'],c:0,ex:'Em série a corrente é igual em todas. Com P = R · i², quem tem mais resistência dissipa mais potência e brilha mais.'}},
+{t:'A instalação da casa',tag:'Eletromecânica',modo:'paralelo',ini:{U:12,R:[10,20,30]},lk:{U:1,R:[1,1,1]},
+ ctx:'Na oficina, você monta o modelo da instalação de uma casa: as lâmpadas ficam em paralelo, cada uma com seu interruptor.',
+ obj:'Desligue uma lâmpada e observe as outras.',ok:function(c,s){return s.on.indexOf(false)>=0&&c.I>0},
+ d:['Toque numa lâmpada para desligá-la.','Repare que cada lâmpada tem o próprio ramo, ligado aos dois fios da fonte.'],
+ q:{p:'Por que as outras lâmpadas continuam acesas?',o:['Cada uma tem seu próprio caminho até a fonte, com a mesma tensão','A fonte aumenta a tensão quando uma lâmpada desliga','A corrente da lâmpada desligada fica guardada no fio'],c:0,ex:'Em paralelo, cada ramo é ligado diretamente aos polos da fonte. Abrir um ramo não interrompe os outros: por isso a instalação de casa é em paralelo.'}},
+{t:'A ordem se inverte',tag:'Eletromecânica',modo:'paralelo',ini:{U:12,R:[10,20,30]},lk:{U:1,R:[1,1,0]},
+ ctx:'Mesmas lâmpadas da quadrilha (10, 20 e 30 Ω), agora em paralelo. Compare as potências de novo.',
+ obj:'Mude só R3 até a lâmpada 3 brilhar igual à lâmpada 1.',ok:function(c){return c.at[0]&&c.at[2]&&c.I>0&&Math.abs(c.R[2]-c.R[0])<0.5},
+ d:['Em paralelo todas recebem a mesma tensão: P = U² ÷ R.','Para brilhar como a lâmpada 1, a lâmpada 3 precisa da mesma resistência: 10 Ω.'],
+ q:{p:'Em paralelo, qual lâmpada brilha mais?',o:['A de menor resistência','A de maior resistência','Todas brilham igual'],c:0,ex:'Com a mesma tensão, P = U² ÷ R: quem tem menos resistência puxa mais corrente e dissipa mais. Em casa, o chuveiro tem resistência pequena e é o que mais consome.'}},
+{t:'O benjamim da oficina',tag:'Segurança do Trabalho',modo:'paralelo',ini:{U:8,R:[5,5,5]},lk:{U:0,R:[1,1,1]},trip:true,
+ ctx:'Três máquinas de 5 Ω ligadas no mesmo benjamim. O disjuntor do quadro é de 10 A.',
+ obj:'Suba a tensão aos poucos até o disjuntor desarmar. Observe o fio esquentar antes.',ok:function(c,s){return s.trip},
+ d:['Acompanhe o amperímetro enquanto sobe a fonte.','Cada ramo puxa i = U ÷ 5. Some as três correntes: quando passar de 10 A, o disjuntor corta.'],
+ q:{p:'Por que o disjuntor desarmou?',o:['As correntes dos ramos se somaram no fio principal e passaram de 10 A','A tensão ficou alta demais para as lâmpadas','Uma das máquinas queimou'],c:0,ex:'Em paralelo, cada aparelho a mais soma corrente no fio principal. Muita corrente aquece a fiação: o disjuntor corta antes que vire incêndio. Ele protege a fiação, não o aparelho.'}},
+{t:'Plantão na plataforma',tag:'Petróleo e Gás',modo:'paralelo',ini:{U:12,R:[50,50,50]},lk:{U:1,R:[0,0,0]},cron:true,
+ ctx:'O módulo de alojamento da plataforma está escuro. O sistema de emergência é de 12 V e a iluminação precisa de 25 a 30 W, com as três lâmpadas acesas. Contra o relógio!',
+ obj:'Deixe a potência total entre 25 W e 30 W, com as três lâmpadas acesas.',ok:function(c){return c.at[0]&&c.at[1]&&c.at[2]&&c.P>=25&&c.P<=30},
+ d:['P total = U² ÷ Req. Com 12 V, Req precisa ficar entre 4,8 Ω e 5,76 Ω.','Três resistências iguais em paralelo: Req = R ÷ 3. Teste R = 15 Ω nas três.'],
+ fim:'Você usou P = U² ÷ Req: para mais potência com a mesma tensão, é preciso menos resistência equivalente.'}
+];
+var NF=FASES.length,KEY='ceetip_lab_circuitos_v2',best=[];
+try{best=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){best=[]}
+function salva(){try{localStorage.setItem(KEY,JSON.stringify(best))}catch(e){}}
+function tot(){var t=0;for(var i=0;i<NF;i++)t+=best[i]||0;return t}
+function estr(n,on){var s='';for(var i=0;i<3;i++)s+='<span class="'+(i<on?'on':'')+'">★</span>';return s}
+function hud(){var t=tot(),m=t>=21?'🥇 Mestre dos circuitos':t>=14?'🥈 Técnico(a)':t>=7?'🥉 Aprendiz':'Sem medalha';
+ $('hS').textContent='★ '+t+'/21';$('hM').textContent=m;$('pt').textContent=t+'/21 ★';$('pb').style.width=(t/21*100)+'%';
+ $('m1').className=t>=7?'on':'';$('m2').className=t>=14?'on':'';$('m3').className=t>=21?'on':''}
+function mapa(){var h='',px=-1;for(var i=0;i<NF;i++)if(!best[i]){px=i;break}
+ FASES.forEach(function(F,i){h+='<button class="fc'+(i===px?' prox':'')+'" data-f="'+i+'"><span class="n">Fase '+(i+1)+' · '+(F.modo==='serie'?'série':'paralelo')+'</span><b>'+F.t+'</b><span class="mut small">'+F.tag+(F.cron?' · ⏱ contra o relógio':'')+'</span><span class="es">'+estr(0,best[i]||0)+'</span></button>'});
+ h+='<button class="fc livre" data-f="L"><span class="n">Sem regras</span><b>🔧 Laboratório livre</b><span class="small">Monte, troque, queime lâmpadas e desarme o disjuntor à vontade.</span></button>';
+ $('fs').innerHTML=h;$('fs').querySelectorAll('.fc').forEach(function(b){b.onclick=function(){var f=b.dataset.f;f==='L'?livre():fase(+f)}});hud()}
+function aba(j){$('mapa').hidden=j;$('jogo').hidden=!j;$('tF').classList.toggle('on',!jogo.livre||!j);$('tL').classList.toggle('on',jogo.livre&&j);if(j)resize()}
+$('tF').onclick=function(){jogo.livre=false;jogo.f=-1;aba(false);mapa()};$('tL').onclick=function(){livre()};
+// ---------- controles
+var CT=['U','R1','R2','R3'];
+function setCtl(){$('U').value=S.U;$('R1').value=S.R[0];$('R2').value=S.R[1];$('R3').value=S.R[2];
+ $('bS').classList.toggle('on',S.modo==='serie');$('bP').classList.toggle('on',S.modo==='paralelo');outs()}
+function outs(){$('oU').textContent=fmt(S.U,1)+' V';for(var k=0;k<3;k++)$('oR'+(k+1)).textContent=S.R[k]+' Ω'}
+CT.forEach(function(id){$(id).addEventListener('input',function(){var v=+this.value;if(id==='U')S.U=v;else S.R[+id[1]-1]=v;outs();geo()})});
+function setModo(m){S.modo=m;S.trip=false;$('bS').classList.toggle('on',m==='serie');$('bP').classList.toggle('on',m==='paralelo');geo();upd(true)}
+$('bS').onclick=function(){setModo('serie')};$('bP').onclick=function(){setModo('paralelo')};
+function lock(lk){var a=lk?[lk.U].concat(lk.R):[0,0,0,0];CT.forEach(function(id,i){$(id).disabled=!!a[i];$('c'+id).classList.toggle('lk',!!a[i])})}
+function toque(k){if(S.q[k]){S.q[k]=false;S.heat[k]=0;S.on[k]=true;sfx('clk')}else{S.on[k]=!S.on[k];sfx('clk')}upd(true)}
+function rearm(){S.trip=false;S.tt=0;sfx('clk');upd(true)}
+function lrow(c){var h='';for(var k=0;k<3;k++){var st=S.q[k]?'qm':(!S.on[k]?'off':'');h+='<button class="'+st+'" data-k="'+k+'">'+(S.q[k]?'💥 Trocar lâmpada '+(k+1):(S.on[k]?'💡 Desligar ':'⭘ Ligar ')+'L'+(k+1))+'</button>'}
+ if(S.trip)h+='<button class="rearm" id="rea">⚡ Rearmar disjuntor</button>';
+ if(h!==lrow.h){lrow.h=h;$('lr').innerHTML=h;$('lr').querySelectorAll('[data-k]').forEach(function(b){b.onclick=function(){toque(+b.dataset.k)}});if($('rea'))$('rea').onclick=rearm}}
+// ---------- missão
+function fase(i){var F=FASES[i];jogo={f:i,livre:false,dic:0,err:0,pen:0,ok:false,fim:false,t0:performance.now(),lat:false};
+ S.modo=F.modo;S.U=F.ini.U;S.R=F.ini.R.slice();S.on=[true,true,true];S.q=[false,false,false];S.trip=false;S.heat=[0,0,0];S.tt=0;
+ setCtl();lock(F.lk);$('segw').hidden=true;geo();missao();aba(true);upd(true)}
+function livre(){jogo={f:-1,livre:true};S.on=[true,true,true];S.q=[false,false,false];S.trip=false;S.heat=[0,0,0];setCtl();lock(null);$('segw').hidden=false;
+ $('mis').innerHTML='<div class="ctx"><span class="tag f">Laboratório livre</span></div><h3>Monte do seu jeito</h3><p>Troque entre série e paralelo, mude a fonte e as resistências, ligue e desligue lâmpadas. Tente prever antes de mexer: a corrente vai subir ou descer? Qual lâmpada vai brilhar mais?</p><div class="obj"><span class="ck">?</span><span>Desafio extra: em paralelo, qual é a maior tensão que você consegue usar com R1 = R2 = R3 = 10 Ω sem desarmar o disjuntor?</span></div><button class="sec" data-rev="lv">Ver resposta</button><div class="revela" id="lv" hidden>Cada ramo puxa U ÷ 10. Três ramos: 3U ÷ 10 ≤ 10 A, então U ≤ 33 V. Como a fonte vai só até 24 V (7,2 A), o disjuntor não desarma com 10 Ω.</div>';
+ $('mis').querySelector('[data-rev]').onclick=function(){var e=$('lv');e.hidden=!e.hidden};geo();aba(true);upd(true)}
+function missao(){var F=FASES[jogo.f],h='<div class="ctx"><span class="tag f">Fase '+(jogo.f+1)+' de '+NF+'</span><span class="tag">'+F.tag+'</span></div><h3>'+F.t+'</h3><p>'+F.ctx+'</p>';
+ h+='<div class="obj'+(jogo.ok?' feito':'')+'" id="ob"><span class="ck">'+(jogo.ok?'✓':'')+'</span><span>'+F.obj+'</span></div>';
+ if(F.cron)h+='<p>Tempo: <span class="tm" id="tm">0 s</span> <span class="mut small">(até 30 s: ★★★ · até 60 s: ★★)</span></p>';
+ for(var i=0;i<jogo.dic;i++)h+='<div class="dica">💡 '+F.d[i]+'</div>';
+ h+='<div class="row" style="margin-top:10px">'+(jogo.dic<F.d.length&&!jogo.fim?'<button class="sec" id="bd">💡 Dica ('+(F.d.length-jogo.dic)+')</button>':'')+'<button class="sec" id="br">↺ Recomeçar</button><button class="sec" id="bm">Mapa</button></div>';
+ if(jogo.ok&&F.q){h+='<div class="qz" id="qz"><p>⚡ Pergunta relâmpago: '+F.q.p+'</p>';var ord=jogo.ord||(jogo.ord=emb(F.q.o.length));ord.forEach(function(j){h+='<button data-o="'+j+'">'+F.q.o[j]+'</button>'});h+='<div class="fb" id="fbk"></div></div>'}
+ $('mis').innerHTML=h;
+ if($('bd'))$('bd').onclick=function(){jogo.dic++;missao()};$('br').onclick=function(){fase(jogo.f)};$('bm').onclick=function(){$('tF').onclick()};
+ if($('qz'))$('qz').querySelectorAll('[data-o]').forEach(function(b){b.onclick=function(){if(jogo.fim)return;var j=+b.dataset.o;
+  if(j===F.q.c){b.classList.add('cer');sfx('ok');jogo.fim=true;setTimeout(conclui,650)}else{b.classList.add('err');b.disabled=true;jogo.err++;sfx('err');$('fbk').textContent='Ainda não. Olhe de novo o circuito e tente outra.'}}})}
+function emb(n){var a=[];for(var i=0;i<n;i++)a.push(i);for(i=n-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}return a}
+function conclui(){var F=FASES[jogo.f],e;
+ if(F.cron){var s=(performance.now()-jogo.t0)/1000;e=s<=30?3:s<=60?2:1;e-=jogo.dic;}else e=3-jogo.dic-jogo.err-jogo.pen;
+ e=Math.max(1,Math.min(3,e));var nv=e>(best[jogo.f]||0);if(nv){best[jogo.f]=e;salva()}hud();
+ $('moS').innerHTML=estr(0,e);var m=e===3?'Perfeito!':e===2?'Muito bem!':'Concluída! Tente de novo sem dicas para mais estrelas.';
+ if(F.cron)m+=' Tempo: '+Math.round((performance.now()-jogo.t0)/1000)+' s.';
+ if(jogo.pen)m+=' (−1 ★: lâmpada queimada ou disjuntor desarmado sem querer)';
+ $('moM').textContent=m;$('moE').innerHTML='<b>Por quê?</b> '+(F.q?F.q.ex:F.fim);
+ $('moT').textContent=FASES.every(function(_,i){return best[i]})?'Jornada completa! 🏆':'Fase concluída!';
+ $('moN').hidden=jogo.f>=NF-1;$('mo').hidden=false;sfx('fim');confete()}
+$('moN').onclick=function(){$('mo').hidden=true;fase(jogo.f+1)};$('moR').onclick=function(){$('mo').hidden=true;fase(jogo.f)};$('moMa').onclick=function(){$('mo').hidden=true;$('tF').onclick()};
+// ---------- geometria do circuito (coordenadas lógicas 640 × 340)
+var G={};
+function geo(){var g={lamps:[],paths:[],sw:[]};
+ if(S.modo==='serie'){var T=92,B=300,X=[220,370,520];
+  X.forEach(function(x,k){g.lamps.push({x:x,y:T,lx:x,ly:T+44,al:'center'});g.sw.push({x:x-62,y:T,v:false})});
+  g.wires=[[[60,150],[60,T],[600,T],[600,B],[60,B],[60,226]]];
+  g.paths.push({k:-1,pts:[[60,226],[60,B],[600,B],[600,T],[60,T],[60,150]]});
+  g.amp=[170,B];g.dj=[340,B];
+ }else{var T=78,B=306,X=[250,390,530];
+  g.wires=[[[60,150],[60,T],[X[2],T]],[[60,226],[60,B],[X[2],B]]];
+  X.forEach(function(x,k){g.wires.push([[x,T],[x,B]]);g.lamps.push({x:x,y:206,lx:x+30,ly:200,al:'left'});g.sw.push({x:x,y:128,v:true});
+   g.paths.push({k:k,pts:[[60,226],[60,B],[x,B],[x,T],[60,T],[60,150]]})});
+  g.amp=[150,T];g.dj=[150,B];
+ }
+ g.paths.forEach(function(p){var L=0,c=[0];for(var i=1;i<p.pts.length;i++){L+=Math.hypot(p.pts[i][0]-p.pts[i-1][0],p.pts[i][1]-p.pts[i-1][1]);c.push(L)}p.L=L;p.c=c;p.off=Math.random()*20});
+ G=g}
+function at(p,s){for(var i=1;i<p.c.length;i++)if(s<=p.c[i]){var a=p.pts[i-1],b=p.pts[i],t=(s-p.c[i-1])/(p.c[i]-p.c[i-1]||1);return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]}return p.pts[p.pts.length-1]}
+// ---------- desenho
+var cv=$('cv'),cx=cv.getContext('2d'),dpr=1,PT=[];
+function resize(){var w=cv.clientWidth||640;dpr=Math.min(2,window.devicePixelRatio||1);cv.width=Math.round(w*dpr);cv.height=Math.round(w*H/W*dpr)}
+window.addEventListener('resize',resize);
+function lerpc(a,b,t){return'rgb('+[0,1,2].map(function(i){return Math.round(a[i]+(b[i]-a[i])*t)}).join(',')+')'}
+function draw(c,dt,tm){var sc=cv.width/W;cx.setTransform(sc,0,0,sc,0,0);cx.clearRect(0,0,W,H);
+ // grade da bancada
+ cx.fillStyle='#ffffff0a';for(var x=10;x<W;x+=20)for(var y=10;y<H;y+=20)cx.fillRect(x,y,1.4,1.4);
+ // fios (esquentam com a corrente)
+ var hot=Math.max(0,Math.min(1,(c.I-5)/5)),wc=lerpc([232,220,192],[255,110,40],hot);
+ cx.lineCap='round';cx.lineJoin='round';
+ if(hot>0.2){cx.strokeStyle='rgba(255,90,30,'+(0.25*hot)+')';cx.lineWidth=16;G.wires.forEach(function(w){cx.beginPath();w.forEach(function(p,i){i?cx.lineTo(p[0],p[1]):cx.moveTo(p[0],p[1])});cx.stroke()})}
+ cx.strokeStyle=wc;cx.lineWidth=5;G.wires.forEach(function(w){cx.beginPath();w.forEach(function(p,i){i?cx.lineTo(p[0],p[1]):cx.moveTo(p[0],p[1])});cx.stroke()});
+ // elétrons
+  G.paths.forEach(function(p){var i=p.k<0?c.I:c.Ii[p.k],v=i>0?Math.min(300,95*Math.pow(i,0.6)):0;p.off=(p.off+v*dt)%22;
+  for(var s=p.off;s<p.L;s+=22){var q=at(p,s);cx.fillStyle='rgba(111,227,255,.22)';cx.beginPath();cx.arc(q[0],q[1],6,0,7);cx.fill();cx.fillStyle='#8eeaff';cx.beginPath();cx.arc(q[0],q[1],2.6,0,7);cx.fill()}});
+ // bateria
+ cx.fillStyle='#1d0b12';cx.fillRect(34,146,52,84);
+ cx.strokeStyle='#f3e2a6';cx.lineWidth=4;[[150,40],[176,22],[200,40],[226,22]].forEach(function(b,i){cx.lineWidth=i%2?10:4;cx.beginPath();cx.moveTo(60-b[1]/2*(i%2?1:1),b[0]);cx.lineTo(60+b[1]/2,b[0]);cx.stroke()});
+ cx.fillStyle='#c9a227';cx.font='800 15px system-ui';cx.textAlign='left';cx.fillText('+',92,158);cx.fillText('−',92,232);
+ cx.font='800 20px system-ui';cx.fillStyle='#fff';cx.fillText(fmt(c.U,1)+' V',92,196);
+ // amperímetro e disjuntor
+ var a=G.amp;cx.fillStyle='#140810';cx.beginPath();cx.arc(a[0],a[1],17,0,7);cx.fill();cx.strokeStyle='#6fe3ff';cx.lineWidth=3;cx.stroke();cx.fillStyle='#6fe3ff';cx.font='800 17px system-ui';cx.textAlign='center';cx.fillText('A',a[0],a[1]+6);
+ var d=G.dj;cx.fillStyle=S.trip?'#b3261e':'#2b2b33';cx.strokeStyle=S.trip?'#ff8a80':'#c9a227';cx.lineWidth=2.5;rr(d[0]-38,d[1]-19,76,38,8);cx.fill();cx.stroke();
+ cx.fillStyle='#fff';cx.font='800 '+(S.trip?10:12)+'px system-ui';cx.fillText(S.trip?'DESARMOU':'10 A',d[0]-7,d[1]+5);
+ cx.fillStyle=S.trip?'#ffd0cc':'#f3e2a6';cx.fillRect(d[0]+24,S.trip?d[1]+2:d[1]-14,8,12);
+ cx.font='700 12px system-ui';cx.fillStyle='#d9c48a';cx.fillText('disjuntor',d[0],d[1]+(S.modo==='serie'?36:-26));
+ // chaves
+ G.sw.forEach(function(s,k){var on=S.on[k];cx.save();cx.translate(s.x,s.y);if(s.v)cx.rotate(Math.PI/2);
+  cx.fillStyle=lerpc([30,12,18],[30,12,18],0);cx.fillRect(-16,-6,32,12);cx.strokeStyle=on?wc:'#f3e2a6';cx.lineWidth=4;
+  cx.beginPath();cx.moveTo(-16,0);cx.lineTo(on?16:12,on?0:-14);cx.stroke();cx.fillStyle='#f3e2a6';[-16,16].forEach(function(x){cx.beginPath();cx.arc(x,0,4,0,7);cx.fill()});cx.restore()});
+ // lâmpadas
+ G.lamps.forEach(function(L,k){var b=S.q[k]?0:bright(c.Pi[k]),fl=S.heat[k]>0?(0.75+0.25*Math.sin(tm/30)):1;b*=fl;
+  if(b>0.02){var gr=cx.createRadialGradient(L.x,L.y,4,L.x,L.y,30+60*b);gr.addColorStop(0,'rgba(255,224,110,'+(0.9*b)+')');gr.addColorStop(1,'rgba(255,200,60,0)');cx.fillStyle=gr;cx.beginPath();cx.arc(L.x,L.y,30+60*b,0,7);cx.fill()}
+  cx.fillStyle='#5b5b66';cx.fillRect(L.x-11,L.y+18,22,10);
+  cx.fillStyle=S.q[k]?'#3a3a40':lerpc([70,60,64],[255,246,200],b);cx.strokeStyle=S.heat[k]>0?'#ff5a3a':'#f3e2a6';cx.lineWidth=2.5;cx.beginPath();cx.arc(L.x,L.y,22,0,7);cx.fill();cx.stroke();
+  cx.strokeStyle=S.q[k]?'#777':lerpc([120,110,110],[255,150,0],b);cx.lineWidth=2.5;cx.beginPath();
+  if(S.q[k]){cx.moveTo(L.x-11,L.y+8);cx.lineTo(L.x-4,L.y-8);cx.moveTo(L.x+4,L.y-8);cx.lineTo(L.x+11,L.y+8);cx.stroke();cx.strokeStyle='#bbb';cx.lineWidth=1.5;cx.beginPath();cx.moveTo(L.x-8,L.y-16);cx.lineTo(L.x+2,L.y-2);cx.lineTo(L.x-3,L.y+6);}
+  else{cx.moveTo(L.x-11,L.y+8);cx.lineTo(L.x-5,L.y-8);cx.lineTo(L.x,L.y+8);cx.lineTo(L.x+5,L.y-8);cx.lineTo(L.x+11,L.y+8)}cx.stroke();
+  cx.textAlign=L.al;cx.font='800 14px system-ui';cx.fillStyle='#fff';cx.fillText('L'+(k+1)+' · '+c.R[k]+' Ω',L.lx,L.ly+(L.al==='center'?0:0));
+  cx.font='700 13px system-ui';cx.fillStyle=S.q[k]?'#ff8a80':(!S.on[k]?'#aaa':'#f3e2a6');cx.fillText(S.q[k]?'queimou!':(!S.on[k]?'desligada':fmt(c.Pi[k],2)+' W'),L.lx,L.ly+17);
+  if(S.q[k]&&Math.random()<0.25)PT.push({x:L.x+(Math.random()-.5)*10,y:L.y-20,vx:(Math.random()-.5)*10,vy:-18-Math.random()*12,l:1.6,t:'f',c:'#888'})});
+ // rótulo
+ cx.textAlign='center';cx.font='700 13px system-ui';cx.fillStyle='#d9c48a';
+ cx.fillText(S.modo==='serie'?'Série: um só caminho para a corrente':'Paralelo: cada lâmpada tem seu caminho',S.modo==='serie'?400:390,S.modo==='serie'?250:30);
+ // partículas
+ for(var i=PT.length-1;i>=0;i--){var p=PT[i];p.l-=dt;if(p.l<=0){PT.splice(i,1);continue}p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.t!=='f')p.vy+=260*dt;
+  cx.globalAlpha=Math.min(1,p.l*(p.t==='f'?0.35:1));cx.fillStyle=p.c;if(p.t==='q')cx.fillRect(p.x,p.y,6,9);else{cx.beginPath();cx.arc(p.x,p.y,p.t==='f'?5+(1.6-p.l)*6:2.5,0,7);cx.fill()}}
+ cx.globalAlpha=1}
+function rr(x,y,w,h,r){cx.beginPath();cx.moveTo(x+r,y);cx.arcTo(x+w,y,x+w,y+h,r);cx.arcTo(x+w,y+h,x,y+h,r);cx.arcTo(x,y+h,x,y,r);cx.arcTo(x,y,x+w,y,r);cx.closePath()}
+function faisca(x,y,n,cor){for(var i=0;i<n;i++){var a=Math.random()*6.28,v=60+Math.random()*160;PT.push({x:x,y:y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-60,l:.5+Math.random()*.6,c:cor||(Math.random()<.5?'#ffd54a':'#ff7a2a')})}}
+function confete(){var cs=['#c9a227','#6d1a2e','#ffffff','#1f4e79','#f3e2a6'];for(var i=0;i<90;i++)PT.push({x:Math.random()*W,y:-10-Math.random()*60,vx:(Math.random()-.5)*60,vy:20+Math.random()*80,l:2.5,t:'q',c:cs[i%5]})}
+cv.addEventListener('click',function(e){var r=cv.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;
+ G.lamps.forEach(function(L,k){if(Math.hypot(x-L.x,y-L.y)<36)toque(k)});G.sw.forEach(function(s,k){if(Math.hypot(x-s.x,y-s.y)<24)toque(k)});
+ if(S.trip&&Math.abs(x-G.dj[0])<36&&Math.abs(y-G.dj[1])<26)rearm()});
+// ---------- instrumentos de ponteiro
+function gauge(id,max,un,ticks){var s='<path d="M20,100 A80,80 0 0 1 180,100" fill="none" stroke="#ffffff30" stroke-width="10" stroke-linecap="round"/>';
+ s+='<path id="'+id+'z" d="M157,44 A80,80 0 0 1 180,100" fill="none" stroke="#b3261e" stroke-width="10" stroke-linecap="round" opacity="0"/>';
+ for(var i=0;i<=ticks;i++){var a=Math.PI*(1-i/ticks),x1=100+Math.cos(a)*68,y1=100-Math.sin(a)*68,x2=100+Math.cos(a)*80,y2=100-Math.sin(a)*80;
+  s+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#f3e2a6" stroke-width="2"/><text id="'+id+'t'+i+'" x="'+(100+Math.cos(a)*54).toFixed(1)+'" y="'+(104-Math.sin(a)*54).toFixed(1)+'" font-size="11" fill="#d9c48a" text-anchor="middle"></text>'}
+ s+='<g class="nd" id="'+id+'n"><line x1="100" y1="100" x2="100" y2="30" stroke="#ff5a3a" stroke-width="4" stroke-linecap="round"/></g><circle cx="100" cy="100" r="8" fill="#c9a227"/><text x="100" y="116" font-size="11" fill="#d9c48a" text-anchor="middle">'+un+'</text>';
+ $(id).innerHTML=s;gscale(id,max,ticks)}
+function gscale(id,max,ticks){for(var i=0;i<=ticks;i++){var v=max*i/ticks;$(id+'t'+i).textContent=fmt(v,v%1?(Math.abs(v*10-Math.round(v*10))<1e-9?1:2):0)}$(id).dataset.max=max}
+function gset(id,v){var m=+$(id).dataset.max,f=Math.max(0,Math.min(1.04,v/m));$(id+'n').style.transform='rotate('+(-90+180*f)+'deg)'}
+gauge('gV',24,'volts',4);gauge('gA',1,'ampères',4);gauge('gP',120,'watts',4);
+var ESC=[0.4,1,2,4,12];
+// ---------- laço
+var last=performance.now(),acc=0;
+function upd(force){var c=solve(S);
+ var tx=[fmt(c.U,1)+' V',isFinite(c.Req)?fmt(c.Req,2)+' Ω':'∞ (aberto)',fmt(c.I,2)+' A',fmt(c.P,1)+' W'];
+ $('rU').textContent=tx[0];$('rReq').textContent=tx[1];$('rI').textContent=tx[2];$('rI2').textContent=fmt(c.I,3)+' A';$('rP').textContent=tx[3];
+ var e=ESC.filter(function(x){return x>=c.I})[0]||12;if(+$('gA').dataset.max!==e){gscale('gA',e,4);$('esc').textContent='escala 0–'+fmt(e,e<1?1:0)+' A'}
+ gset('gV',c.U);gset('gA',c.I);gset('gP',c.P);$('gAz').setAttribute('opacity',c.I>8?1:0);$('gPz').setAttribute('opacity',c.P>100?1:0);
+ var h='';for(var k=0;k<3;k++){var est=S.q[k]?'<span style="color:var(--no)">queimada</span>':!S.on[k]?'desligada':S.trip?'sem corrente':c.Ii[k]>0?'<span style="color:var(--ok)">acesa</span>':'apagada';
+  h+='<tr><th>L'+(k+1)+'</th><td>'+c.R[k]+'</td><td>'+fmt(c.Ui[k],2)+'</td><td>'+fmt(c.Ii[k],3)+'</td><td>'+fmt(c.Pi[k],2)+'</td><td class="st">'+est+'</td></tr>'}
+ if(h!==upd.h){upd.h=h;$('tb').innerHTML=h}
+ var dj=$('dj');if(S.trip){dj.hidden=false;dj.textContent='O disjuntor desarmou: a corrente passou de 10 A. Diminua a carga ou a tensão e toque em “Rearmar”.'}else dj.hidden=true;
+ lrow(c);
+ if(jogo.f>=0&&!jogo.livre){var F=FASES[jogo.f];
+  if(F.cron&&!jogo.ok&&$('tm'))$('tm').textContent=Math.round((performance.now()-jogo.t0)/1000)+' s';
+  if(!jogo.ok&&F.ok(c,S)){jogo.ok=true;sfx('ok');faisca(320,170,30,'#c9a227');if(F.q)missao();else{missao();jogo.fim=true;setTimeout(conclui,700)}}}
+ return c}
+function evento(tp,k){if(jogo.f>=0&&!jogo.livre&&!jogo.ok){var F=FASES[jogo.f];if(!(tp==='trip'&&F.trip))jogo.pen=1}}
+function loop(t){var dt=Math.min(0.05,(t-last)/1000);last=t;
+ if(!$('jogo').hidden){
+  var c0=solve(S,true);
+  if(!S.trip&&c0.I>IMAX){S.tt+=dt;if(S.tt>0.25){S.trip=true;S.tt=0;sfx('boom');faisca(G.dj[0],G.dj[1],40,'#ff8a80');evento('trip');upd(true)}}else S.tt=0;
+  var c1=solve(S);for(var k=0;k<3;k++){if(c1.Pi[k]>PMAX&&!S.q[k]){S.heat[k]+=dt;if(S.heat[k]>0.8){S.q[k]=true;S.heat[k]=0;sfx('boom');faisca(G.lamps[k].x,G.lamps[k].y,45);evento('burn',k);upd(true)}}else S.heat[k]=0}
+  acc+=dt;var c=solve(S);if(acc>0.1){acc=0;c=upd()}
+  draw(c,dt,t)}
+ requestAnimationFrame(loop)}
+// ---------- início (links das aulas)
+var q=LAB.q,mf=q.get('fase'),md=q.get('modo');
+geo();resize();mapa();
+if(q.get('livre')){livre();if(md==='paralelo')setModo('paralelo')}
+else if(mf&&/^[1-7]$/.test(mf))fase(+mf-1);else if(md==='serie')fase(0);else if(md==='paralelo')fase(3);
+requestAnimationFrame(loop);
+window.CIRC={S:S,solve:solve,fase:fase,livre:livre,setModo:setModo,toque:toque,rearm:rearm,jogo:function(){return jogo},best:function(){return best},FASES:FASES};
+})();
+</script></body></html>

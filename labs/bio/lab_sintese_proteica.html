@@ -1,0 +1,279 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Laboratório · Transcrição, tradução e mutações — CEETIP</title><style>:root{--v:#6d1a2e;--v2:#8e2a43;--v3:#fbeef1;--d:#c9a227;--d2:#f3e2a6;--d3:#fff7de;--dtx:#8a6a0c;--a:#1f4e79;--a2:#dbe7f3;--ok:#1e7a4c;--ok2:#dff3e8;--no:#b3261e;--no2:#fde4e1;--ink:#1d1d24;--mut:#5b5b66;--line:#6d1a2e22;--paper:#fbf8f3;--card:#fff;--soft:#f4f1ec}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:17px;line-height:1.4;padding-bottom:84px}
+header{background:linear-gradient(100deg,var(--v) 0%,var(--v2) 72%,#a83a55 100%);color:#fff;padding:16px 24px;border-bottom:5px solid var(--d)}
+header .k{font-size:13px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--d2)}
+header h1{margin:4px 0 0;font-size:clamp(22px,3.4vw,34px);line-height:1.1;font-weight:800}
+header h1 em{font-style:normal;color:var(--d)}
+main{max-width:1280px;margin:0 auto;padding:18px 20px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1.5px solid var(--line);border-radius:18px;padding:16px 18px;box-shadow:0 4px 18px #6d1a2e12}
+.card h2{margin:0 0 10px;font-size:15px;letter-spacing:.12em;text-transform:uppercase;color:var(--v)}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.mut{color:var(--mut)}.small{font-size:14px}
+label.ctl{display:grid;grid-template-columns:78px 1fr 84px;gap:10px;align-items:center;font-weight:700;margin:6px 0}
+label.ctl output{text-align:right;font-variant-numeric:tabular-nums;font-weight:800;color:var(--v)}
+input[type=range]{width:100%;height:36px;accent-color:var(--v);touch-action:pan-y}
+button,.btn,select,input[type=number]{font:inherit}
+button,.btn{border:0;border-radius:12px;padding:12px 18px;min-height:46px;font-weight:800;background:var(--v);color:#fff;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+button.sec,.btn.sec{background:var(--soft);color:var(--v);border:1.5px solid var(--line)}
+button.on{background:var(--d);color:#3d2f00}
+select,input[type=number]{min-height:44px;border-radius:10px;border:1.5px solid var(--line);background:#fff;padding:6px 10px;color:var(--ink)}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px}
+.read div{background:var(--soft);border-radius:12px;padding:10px 12px}
+.read b{display:block;font-size:24px;font-variant-numeric:tabular-nums;color:var(--v)}
+.read span{font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.aviso{border-radius:12px;padding:12px 14px;font-weight:700}
+.aviso.ok{background:var(--ok2);color:#0f4a2d}.aviso.no{background:var(--no2);color:#7a1810}.aviso.info{background:var(--d3);color:#4b3a06;border:1.5px solid var(--d2)}
+.missao{border-left:8px solid var(--d);background:var(--d3);border-radius:12px;padding:12px 14px;margin:10px 0}
+.missao b.n{display:inline-flex;width:30px;height:30px;border-radius:50%;background:var(--v);color:#fff;align-items:center;justify-content:center;margin-right:8px}
+.revela{margin-top:8px;background:var(--a2);color:#163a5c;border-radius:10px;padding:10px 12px}
+.revela[hidden]{display:none}
+svg text{font-family:inherit}
+.rod{position:fixed;left:0;right:0;bottom:0;background:#fffffff2;border-top:2px solid var(--d);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.rod .mut{font-size:13px}
+table{border-collapse:collapse;width:100%}th,td{padding:8px 6px;text-align:left;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}
+
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.hudr{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:7px 14px;font-weight:800;font-size:15px;background:#ffffff1f;color:#fff;border:1.5px solid #ffffff40}
+.chip.au{background:var(--d);color:#3d2f00;border-color:var(--d)}
+.chip button{all:unset;cursor:pointer}
+.tabs{max-width:1280px;margin:14px auto 0;padding:0 20px;display:flex;gap:8px}
+.tabs button{background:#fff;color:var(--v);border:2px solid var(--v)}.tabs button.on{background:var(--v);color:#fff}
+.wrap{max-width:1280px;margin:0 auto;padding:14px 20px}
+#jogo{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:940px){#jogo{grid-template-columns:1fr}}
+.palco{background:radial-gradient(120% 90% at 30% 20%,#3a1622 0%,#1d0b12 60%,#140810 100%);border-radius:20px;padding:12px;box-shadow:0 10px 30px #6d1a2e40,inset 0 0 0 2px #c9a22755;position:relative}
+.palco canvas{display:block;width:100%;height:auto;border-radius:12px;touch-action:manipulation;cursor:pointer}
+.inst{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
+.g{background:#ffffff0d;border:1px solid #c9a22740;border-radius:14px;padding:6px 8px 8px;text-align:center;color:#f3e2a6}
+.g svg{width:100%;max-width:200px;height:auto}
+.g .dv{font-size:22px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums}
+.g .lb{font-size:12px;letter-spacing:.04em;font-weight:700;color:#d9c48a}
+.nd{transition:transform .45s cubic-bezier(.3,1.5,.5,1);transform-origin:100px 100px}
+.nota{color:#cbb98a;font-size:13px;margin-top:8px}
+.ctx{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.tag{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:999px;padding:4px 10px;background:var(--a2);color:var(--a)}
+.tag.f{background:var(--v);color:#fff}
+.mis h3{margin:2px 0 6px;font-size:22px;color:var(--v)}
+.obj{display:flex;gap:10px;align-items:flex-start;background:var(--d3);border:2px solid var(--d2);border-radius:14px;padding:12px;margin:10px 0;font-weight:700}
+.obj .ck{flex:0 0 30px;height:30px;border-radius:50%;border:3px solid var(--d);display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;transition:all .3s}
+.obj.feito{background:var(--ok2);border-color:#9fd8b8}.obj.feito .ck{background:var(--ok);border-color:var(--ok)}
+.dica{background:var(--a2);color:#163a5c;border-radius:12px;padding:10px 12px;margin-top:8px;animation:in .35s}
+.qz{margin-top:10px;border:2px solid var(--v);border-radius:14px;padding:12px;animation:in .35s}
+.qz p{margin:0 0 8px;font-weight:800}
+.qz button{display:block;width:100%;text-align:left;margin:6px 0;background:#fff;color:var(--ink);border:2px solid var(--line)}
+.qz button.cer{background:var(--ok2);border-color:var(--ok)}.qz button.err{background:var(--no2);border-color:var(--no);animation:tr .4s}
+.fb{margin-top:6px;font-weight:700}
+.tm{font-variant-numeric:tabular-nums;font-weight:800;color:var(--v);font-size:20px}
+.ctlx label.ctl{grid-template-columns:70px 1fr 80px}
+.ctlx label.lk{opacity:.45}
+.ctlx label.lk output::after{content:" 🔒"}
+input[type=range]{height:40px}
+#mapa .topo{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+.barra{height:14px;border-radius:999px;background:var(--soft);overflow:hidden;border:1px solid var(--line)}.barra i{display:block;height:100%;background:linear-gradient(90deg,var(--d),#e9c552);transition:width .6s}
+.fases{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:14px}
+.fc{all:unset;cursor:pointer;background:#fff;border:2px solid var(--line);border-radius:18px;padding:14px;display:flex;flex-direction:column;gap:6px;box-shadow:0 4px 14px #6d1a2e12;transition:transform .15s}
+.fc:hover,.fc:focus-visible{transform:translateY(-3px);border-color:var(--d)}
+.fc .n{font-size:13px;font-weight:800;color:var(--dtx);letter-spacing:.08em;text-transform:uppercase}
+.fc b{font-size:18px;color:var(--v)}.fc .es{font-size:22px;letter-spacing:2px;color:#d8d2c6}.fc .es .on{color:var(--d)}
+.fc.prox{border-color:var(--d);box-shadow:0 0 0 4px #c9a22740}
+.fc.livre{background:linear-gradient(135deg,var(--v),var(--v2));color:#fff}.fc.livre b{color:#fff}.fc.livre .n{color:var(--d2)}
+.med{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}.med span{border-radius:12px;padding:8px 12px;font-weight:800;background:var(--soft);color:#9a948a;border:1.5px dashed #cfc8bb}.med span.on{background:var(--d3);color:var(--dtx);border:1.5px solid var(--d)}
+.modal{position:fixed;inset:0;background:#140810cc;display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal[hidden]{display:none}
+.mc{background:#fff;border-radius:22px;max-width:520px;width:100%;padding:22px;text-align:center;border-top:8px solid var(--d);animation:pop .45s cubic-bezier(.3,1.6,.5,1)}
+.mc h2{margin:0;color:var(--v);font-size:26px}
+.big{font-size:54px;letter-spacing:6px;margin:8px 0}.big span{display:inline-block;color:#ddd5c6}.big span.on{color:var(--d);animation:st .5s both}
+.big span:nth-child(2){animation-delay:.25s}.big span:nth-child(3){animation-delay:.5s}
+.mc .ex{background:var(--a2);color:#163a5c;border-radius:12px;padding:10px 12px;text-align:left;margin:10px 0}
+.mc .row{justify-content:center}
+@keyframes in{from{opacity:0;transform:translateY(6px)}}@keyframes pop{from{transform:scale(.7);opacity:0}}
+@keyframes st{0%{transform:scale(0) rotate(-40deg)}70%{transform:scale(1.3)}100%{transform:scale(1)}}
+@keyframes tr{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+label.ctl select{grid-column:2/4;width:100%}
+.ctl[hidden]{display:none}
+.mut2{color:#d9c48a}
+label.ctl{grid-template-columns:96px 1fr 84px}
+
+</style></head><body>
+<header><div><div class="k">Laboratório · Biologia · Síntese de proteínas</div><h1><em>Do gene à proteína</em>: transcrição e tradução</h1></div></header>
+<div class="wrap" id="jogo" hidden></div>
+<div class="rod"><a class="btn" id="voltar" href="index.html">‹ Todos os laboratórios</a><span class="mut">Funciona sem internet depois de aberto. As estrelas ficam salvas só neste aparelho. Aulas 58, 61, 65 e 68 (1ª série) e 47 e 48 (3ª série).</span></div>
+<script>(function(){
+ var q=new URLSearchParams(location.search),aula=q.get('aula'),t=q.get('t');
+ var back=document.getElementById('voltar');
+ if(back){
+  if(aula&&/^[\w-]+$/.test(aula)){back.href='../aulas/'+aula+'.html'+(t&&/^\d+$/.test(t)?'#t'+t:'');back.firstChild.nodeValue='‹ Voltar à aula';}
+  else{back.href='index.html';back.firstChild.nodeValue='‹ Todos os laboratórios';}
+ }
+ document.querySelectorAll('[data-rev]').forEach(function(b){b.addEventListener('click',function(){
+  var el=document.getElementById(b.dataset.rev);el.hidden=!el.hidden;b.textContent=el.hidden?'Ver resposta':'Esconder resposta';});});
+ window.LAB={q:q,fmt:function(x,d){return x.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d})}};
+})();
+
+(function(){
+var $=function(i){return document.getElementById(i)},G=window.GAME={},cfg,NF,MAXS,best=[],jogo={f:-1,livre:false},som=false,ac=null;
+function bip(f,d,tp,v){if(!som)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();var o=ac.createOscillator(),g=ac.createGain();o.type=tp||'sine';o.frequency.value=f;g.gain.value=v||.08;o.connect(g);g.connect(ac.destination);var t=ac.currentTime;g.gain.exponentialRampToValueAtTime(.0001,t+d);o.start(t);o.stop(t+d)}catch(e){}}
+G.sfx=function(n){if(n==='ok'){bip(660,.15);setTimeout(function(){bip(880,.25)},140)}else if(n==='err')bip(180,.25,'square',.05);else if(n==='boom')bip(90,.35,'sawtooth',.12);else if(n==='clk')bip(1200,.05,'square',.04);else if(n==='geiger')bip(2600+Math.random()*600,.02,'square',.03);else if(n==='fim'){[523,659,784,1046].forEach(function(f,i){setTimeout(function(){bip(f,.2)},i*120)})}};
+G.estr=function(on){var s='';for(var i=0;i<3;i++)s+='<span class="'+(i<on?'on':'')+'">★</span>';return s};
+function tot(){var t=0;for(var i=0;i<NF;i++)t+=best[i]||0;return t}
+function salva(){try{localStorage.setItem(cfg.key,JSON.stringify(best))}catch(e){}}
+function lim(){return[Math.ceil(MAXS/3),Math.ceil(MAXS*2/3),MAXS]}
+function hud(){var t=tot(),l=lim(),M=cfg.medalhas,m=t>=l[2]?M[2]:t>=l[1]?M[1]:t>=l[0]?M[0]:'Sem medalha';
+ $('hS').textContent='★ '+t+'/'+MAXS;$('hM').textContent=m;$('pt').textContent=t+'/'+MAXS+' ★';$('pb').style.width=(t/MAXS*100)+'%';
+ for(var i=0;i<3;i++){$('m'+(i+1)).textContent=M[i]+' · '+l[i]+'★';$('m'+(i+1)).className=t>=l[i]?'on':''}}
+function mapa(){var h='',px=-1,i;for(i=0;i<NF;i++)if(!best[i]){px=i;break}
+ cfg.fases.forEach(function(F,i){h+='<button class="fc'+(i===px?' prox':'')+'" data-f="'+i+'"><span class="n">Fase '+(i+1)+(F.rot?' · '+F.rot:'')+'</span><b>'+F.t+'</b><span class="mut small">'+F.tag+(F.cron?' · ⏱ contra o relógio':'')+'</span><span class="es">'+G.estr(best[i]||0)+'</span></button>'});
+ h+='<button class="fc livre" data-f="L"><span class="n">Sem regras</span><b>🔧 Laboratório livre</b><span class="small">'+cfg.livreDesc+'</span></button>';
+ $('fs').innerHTML=h;$('fs').querySelectorAll('.fc').forEach(function(b){b.onclick=function(){var f=b.dataset.f;f==='L'?G.livre():G.fase(+f)}});hud()}
+function aba(j){$('mapa').hidden=j;$('jogo').hidden=!j;$('tF').classList.toggle('on',!(jogo.livre&&j));$('tL').classList.toggle('on',jogo.livre&&j);if(cfg.onShow)cfg.onShow(j)}
+function emb(n){var a=[],i;for(i=0;i<n;i++)a.push(i);for(i=n-1;i>0;i--){var j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}return a}
+function missao(){var F=cfg.fases[jogo.f],h='<div class="ctx"><span class="tag f">Fase '+(jogo.f+1)+' de '+NF+'</span><span class="tag">'+F.tag+'</span></div><h3>'+F.t+'</h3><p>'+F.ctx+'</p>';
+ h+='<div class="obj'+(jogo.ok?' feito':'')+'" id="ob"><span class="ck">'+(jogo.ok?'✓':'')+'</span><span>'+F.obj+'</span></div><div class="mut small" id="prog">'+(jogo.prog||'')+'</div>';
+ if(F.cron)h+='<p>Tempo: <span class="tm" id="tm">0 s</span> <span class="mut small">(até '+F.cron[0]+' s: ★★★ · até '+F.cron[1]+' s: ★★)</span></p>';
+ for(var i=0;i<jogo.dic;i++)h+='<div class="dica">💡 '+F.d[i]+'</div>';
+ h+='<div class="row" style="margin-top:10px">'+(jogo.dic<F.d.length&&!jogo.fim?'<button class="sec" id="bd">💡 Dica ('+(F.d.length-jogo.dic)+')</button>':'')+'<button class="sec" id="br">↺ Recomeçar</button><button class="sec" id="bm">Mapa</button></div>';
+ if(jogo.ok&&F.q){h+='<div class="qz" id="qz"><p>⚡ Pergunta relâmpago: '+F.q.p+'</p>';var ord=jogo.ord||(jogo.ord=emb(F.q.o.length));ord.forEach(function(j){h+='<button data-o="'+j+'">'+F.q.o[j]+'</button>'});h+='<div class="fb" id="fbk"></div></div>'}
+ $('mis').innerHTML=h;
+ if($('bd'))$('bd').onclick=function(){jogo.dic++;missao()};$('br').onclick=function(){G.fase(jogo.f)};$('bm').onclick=function(){$('tF').onclick()};
+ if($('qz'))$('qz').querySelectorAll('[data-o]').forEach(function(b){b.onclick=function(){if(jogo.fim)return;var j=+b.dataset.o;
+  if(j===F.q.c){b.classList.add('cer');G.sfx('ok');jogo.fim=true;setTimeout(conclui,650)}else{b.classList.add('err');b.disabled=true;jogo.err++;G.sfx('err');$('fbk').textContent='Ainda não. Olhe de novo o experimento e tente outra.'}}})}
+function conclui(){var F=cfg.fases[jogo.f],e;
+ if(F.cron){var s=(performance.now()-jogo.t0)/1000;e=s<=F.cron[0]?3:s<=F.cron[1]?2:1;e-=jogo.dic}else e=3-jogo.dic-jogo.err-jogo.pen;
+ e=Math.max(1,Math.min(3,e));if(e>(best[jogo.f]||0)){best[jogo.f]=e;salva()}hud();
+ $('moS').innerHTML=G.estr(e);var m=e===3?'Perfeito!':e===2?'Muito bem!':'Concluída! Tente de novo sem dicas para mais estrelas.';
+ if(F.cron)m+=' Tempo: '+Math.round((performance.now()-jogo.t0)/1000)+' s.';
+ if(jogo.pen)m+=' ('+(cfg.penTxt||'−1 ★ por tentativa errada')+')';
+ $('moM').textContent=m;$('moE').innerHTML='<b>Por quê?</b> '+(F.q?F.q.ex:F.fim);
+ $('moT').textContent=cfg.fases.every(function(_,i){return best[i]})?'Jornada completa! 🏆':'Fase concluída!';
+ $('moN').hidden=jogo.f>=NF-1;$('mo').hidden=false;G.sfx('fim');G.confete()}
+G.confete=function(){var c=$('gkc'),x=c.getContext('2d'),W=c.width=innerWidth,H=c.height=innerHeight,cs=['#c9a227','#6d1a2e','#ffffff','#1f4e79','#f3e2a6'],P=[],i,t0=performance.now(),last=t0;
+ if(matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches)return;
+ for(i=0;i<110;i++)P.push({x:Math.random()*W,y:-20-Math.random()*H*.4,vx:(Math.random()-.5)*90,vy:60+Math.random()*180,c:cs[i%5],r:Math.random()*6});
+ (function f(t){var dt=Math.min(.05,(t-last)/1000);last=t;x.clearRect(0,0,W,H);P.forEach(function(p){p.x+=p.vx*dt;p.y+=p.vy*dt;p.r+=dt*5;x.fillStyle=p.c;x.fillRect(p.x,p.y,6,9*Math.abs(Math.cos(p.r)))});if(t-t0<2800)requestAnimationFrame(f);else x.clearRect(0,0,W,H)})(t0)};
+G.fase=function(i){jogo={f:i,livre:false,dic:0,err:0,pen:0,ok:false,fim:false,prog:'',t0:performance.now()};cfg.onStart(i,cfg.fases[i]);missao();aba(true);if(cfg.after)cfg.after()};
+G.livre=function(){jogo={f:-1,livre:true};cfg.onLivre();$('mis').innerHTML=cfg.livre;$('mis').querySelectorAll('[data-rev]').forEach(function(b){b.onclick=function(){var e=$(b.dataset.rev);e.hidden=!e.hidden}});aba(true);if(cfg.after)cfg.after()};
+G.check=function(){if(jogo.f<0||jogo.livre||jogo.ok)return false;var F=cfg.fases[jogo.f];
+ if(F.ok()){jogo.ok=true;G.sfx('ok');if(F.q)missao();else{missao();jogo.fim=true;setTimeout(conclui,700)}return true}return false};
+G.erro=function(){if(jogo.f>=0&&!jogo.livre&&!jogo.ok){jogo.err++;G.sfx('err')}};
+G.pen=function(){if(jogo.f>=0&&!jogo.livre&&!jogo.ok)jogo.pen=1};
+G.prog=function(t){jogo.prog=t;if($('prog'))$('prog').textContent=t};
+G.cur=function(){return jogo.f>=0&&!jogo.livre?cfg.fases[jogo.f]:null};
+G.state=function(){return jogo};G.best=function(){return best};G.estado=function(){return{ok:jogo.ok,fim:jogo.fim}};
+G.tempo=function(){var e=$('tm');if(e&&!jogo.ok)e.textContent=Math.round((performance.now()-jogo.t0)/1000)+' s'};
+// instrumentos de ponteiro (svg 200 × 118)
+G.gauge=function(id,max,un,ticks){var s='<path d="M20,100 A80,80 0 0 1 180,100" fill="none" stroke="#ffffff30" stroke-width="10" stroke-linecap="round"/><path id="'+id+'z" d="M157,44 A80,80 0 0 1 180,100" fill="none" stroke="#b3261e" stroke-width="10" stroke-linecap="round" opacity="0"/>';
+ for(var i=0;i<=ticks;i++){var a=Math.PI*(1-i/ticks),x1=100+Math.cos(a)*68,y1=100-Math.sin(a)*68,x2=100+Math.cos(a)*80,y2=100-Math.sin(a)*80;
+  s+='<line x1="'+x1.toFixed(1)+'" y1="'+y1.toFixed(1)+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" stroke="#f3e2a6" stroke-width="2"/><text id="'+id+'t'+i+'" x="'+(100+Math.cos(a)*54).toFixed(1)+'" y="'+(104-Math.sin(a)*54).toFixed(1)+'" font-size="11" fill="#d9c48a" text-anchor="middle"></text>'}
+ s+='<g class="nd" id="'+id+'n"><line x1="100" y1="100" x2="100" y2="30" stroke="#ff5a3a" stroke-width="4" stroke-linecap="round"/></g><circle cx="100" cy="100" r="8" fill="#c9a227"/><text x="100" y="116" font-size="11" fill="#d9c48a" text-anchor="middle">'+un+'</text>';
+ $(id).innerHTML=s;G.gscale(id,max,ticks)};
+G.gscale=function(id,max,ticks){for(var i=0;i<=ticks;i++){var v=max*i/ticks;$(id+'t'+i).textContent=LAB.fmt(v,v%1?1:0)}$(id).dataset.max=max};
+G.gset=function(id,v){var m=+$(id).dataset.max,f=Math.max(0,Math.min(1.04,v/m));$(id+'n').style.transform='rotate('+(-90+180*f)+'deg)'};
+G.init=function(c){cfg=c;NF=c.fases.length;MAXS=NF*3;
+ try{best=JSON.parse(localStorage.getItem(c.key)||'[]')}catch(e){best=[]}
+ var hd=document.querySelector('header'),hr=document.createElement('div');hr.className='hudr';
+ hr.innerHTML='<span class="chip au" id="hS"></span><span class="chip" id="hM"></span><span class="chip"><button id="som" aria-label="Som">🔇 Som</button></span>';hd.appendChild(hr);
+ var tp=document.createElement('div');
+ tp.innerHTML='<div class="tabs"><button id="tF" class="on">🎮 Fases</button><button id="tL">🔧 Laboratório livre</button></div><div class="wrap" id="mapa"><div class="card"><div class="topo"><div><h2>Sua jornada</h2><div class="barra"><i id="pb" style="width:0"></i></div></div><b id="pt" style="color:var(--v);font-size:20px"></b></div><div class="med"><span id="m1"></span><span id="m2"></span><span id="m3"></span></div></div><div class="fases" id="fs"></div></div>';
+ var j=$('jogo');while(tp.firstChild)j.parentNode.insertBefore(tp.firstChild,j);
+ var md=document.createElement('div');md.innerHTML='<div class="modal" id="mo" hidden><div class="mc" role="dialog" aria-modal="true" aria-labelledby="moT"><h2 id="moT"></h2><div class="big" id="moS"></div><div id="moM" style="font-weight:700"></div><div class="ex" id="moE"></div><div class="row"><button id="moN">Próxima fase ›</button><button class="sec" id="moR">Jogar de novo</button><button class="sec" id="moMa">Mapa</button></div></div></div><canvas id="gkc" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60" aria-hidden="true"></canvas>';
+ while(md.firstChild)document.body.appendChild(md.firstChild);
+ $('moN').onclick=function(){$('mo').hidden=true;G.fase(jogo.f+1)};$('moR').onclick=function(){$('mo').hidden=true;G.fase(jogo.f)};$('moMa').onclick=function(){$('mo').hidden=true;$('tF').onclick()};
+ $('tF').onclick=function(){jogo={f:-1,livre:false};if(cfg.onHide)cfg.onHide();aba(false);mapa()};$('tL').onclick=function(){G.livre()};
+ $('som').onclick=function(){som=!som;this.textContent=som?'🔊 Som':'🔇 Som';G.sfx('clk')};
+ mapa();var mf=LAB.q.get('fase');
+ if(LAB.q.get('livre'))G.livre();else if(mf&&/^\d+$/.test(mf)&&+mf>=1&&+mf<=NF)G.fase(+mf-1)};
+
+// ---------- kit de simulação: layout, controles, laço de desenho (usado pelos laboratórios novos)
+var CT=[],SH=null,EN=null,RD=[],cvx=null,lastCk=0;
+G.f=function(x,d){return LAB.fmt(x,d==null?1:d)};
+G.rr=function(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath()};
+G.tx=function(c,s,x,y,col,sz,al,wt){c.fillStyle=col||'#fff';c.font=(wt||700)+' '+(sz||14)+'px system-ui';c.textAlign=al||'left';c.fillText(s,x,y)};
+G.build=function(o){CT=o.controls||[];G.W=o.W||640;G.H=o.H||340;
+ var h='<div class="col"><div class="palco"><canvas id="cv" width="'+G.W*2+'" height="'+G.H*2+'" aria-label="'+(o.aria||'Simulação')+'"></canvas><div class="inst" id="inst"></div>'+(o.nota?'<div class="nota">'+o.nota+'</div>':'')+'</div>'+(o.left||'')+'</div>';
+ h+='<div class="col"><div class="card mis" id="mis"></div><div class="card ctlx"><h2>Controles</h2><div id="ctl"></div></div>'+(o.right||'')+'</div>';
+ $('jogo').innerHTML=h;
+ var c='';CT.forEach(function(k){
+  if(k.type==='sel'){c+='<label class="ctl" id="c_'+k.id+'">'+k.l+'<select id="'+k.id+'">'+k.opts.map(function(p){return'<option value="'+p[0]+'"'+(String(p[0])===String(k.val)?' selected':'')+'>'+p[1]+'</option>'}).join('')+'</select><span></span></label>'}
+  else c+='<label class="ctl" id="c_'+k.id+'">'+k.l+'<input type="range" id="'+k.id+'" min="'+k.min+'" max="'+k.max+'" step="'+k.step+'" value="'+k.val+'"><output id="o_'+k.id+'"></output></label>'});
+ $('ctl').innerHTML=c;
+ $('ctl').addEventListener('input',function(e){var id=e.target.id;outs();if(o.onInput)o.onInput(id);G.check()});
+ outs();cvx=$('cv').getContext('2d');
+ var rs=function(){var cv=$('cv'),w=cv.clientWidth,d=Math.min(2,window.devicePixelRatio||1.5),nw=Math.round(w*d);if(w&&cv.width!==nw){cv.width=nw;cv.height=Math.round(w*G.H/G.W*d)}};
+ G.rs=rs};
+function outs(){CT.forEach(function(k){if(k.type!=='sel'){var e=$('o_'+k.id);if(e)e.textContent=LAB.fmt(+$(k.id).value,k.d==null?0:k.d)+(k.u||'')}})}
+G.v=function(id){var e=$(id),v=e.value;return e.tagName==='SELECT'&&isNaN(+v)?v:+v};
+G.set=function(o){for(var k in o){var e=$(k);if(e)e.value=o[k]}outs()};
+G.lock=function(a){CT.forEach(function(k){var e=$(k.id);e.disabled=a?a.indexOf(k.id)<0:false;$('c_'+k.id).classList.toggle('lk',!!e.disabled)})};
+G.show=function(a){CT.forEach(function(k){$('c_'+k.id).hidden=a?a.indexOf(k.id)<0:false})};
+G.reads=function(a){var el=$('inst');if(RD.length!==a.length){RD=a.map(function(){return[]});el.innerHTML=a.map(function(_,i){return'<div class="g"><div class="lb" id="rl'+i+'"></div><div class="dv" id="rv'+i+'" style="margin-top:8px"></div></div>'}).join('');RD=a.map(function(x){return[null,null]})}
+ a.forEach(function(r,i){if(RD[i][0]!==r[0]){RD[i][0]=r[0];$('rl'+i).textContent=r[0]}if(RD[i][1]!==r[1]){RD[i][1]=r[1];$('rv'+i).innerHTML=r[1]}})};
+G.loop=function(fn){var last=performance.now(),ck=0;
+ (function f(t){var dt=Math.min(.05,(t-last)/1000);last=t;
+  if(!$('jogo').hidden&&cvx){G.rs&&G.rs();var cv=$('cv'),sc=cv.width/G.W;cvx.setTransform(sc,0,0,sc,0,0);cvx.clearRect(0,0,G.W,G.H);
+   cvx.fillStyle='#ffffff0a';for(var x=10;x<G.W;x+=20)for(var y=10;y<G.H;y+=20)cvx.fillRect(x,y,1.4,1.4);
+   fn(cvx,dt,t);ck+=dt;if(ck>.12){ck=0;G.check()}}
+  requestAnimationFrame(f)})(last)};
+})();
+
+(function(){
+var DNA='TACCGGCTTAAAATT'.split(''),MR=[];
+GAME.build({W:640,H:340,aria:'Síntese de proteínas',nota:'Transcrição: o DNA serve de molde para o RNA mensageiro (A pareia com U, T com A, C com G). Tradução: no ribossomo, cada códon (3 bases) do mRNA codifica um aminoácido. AUG inicia e UAA, UAG, UGA terminam. Mutação silenciosa troca o códon sem mudar o aminoácido.',controls:[
+ {id:'cena',type:'sel',l:'Etapa',opts:[['trans','Transcrição'],['trad','Tradução'],['mut','Mutação no códon 3']],val:'trans'},
+ {id:'n',l:'Bases lidas',min:0,max:15,step:1,val:0,u:'',d:0},
+ {id:'b2',type:'sel',l:'2ª base do códon 3',opts:[['A','A'],['U','U'],['C','C'],['G','G']],val:'A'},
+ {id:'b3',type:'sel',l:'3ª base do códon 3',opts:[['A','A'],['G','G'],['U','U'],['C','C']],val:'A'}]});
+var PAR={T:'A',A:'U',C:'G',G:'C'};
+function st(){return{cena:GAME.v('cena'),n:GAME.v('n'),b2:GAME.v('b2'),b3:GAME.v('b3')}}
+function mrna(s){var m=[];for(var i=0;i<15;i++)m.push(PAR[DNA[i]]);m[7]=s.b2;m[8]=s.b3;return m}
+var TAB={AUG:'Met',GCC:'Ala',GAA:'Glu',GAG:'Glu',GAU:'Asp',GAC:'Asp',GUA:'Val',GUG:'Val',GUU:'Val',GUC:'Val',GCA:'Ala',GCG:'Ala',GCU:'Ala',GGA:'Gly',GGG:'Gly',GGU:'Gly',GGC:'Gly',GAA2:'Glu',UUU:'Phe',UUC:'Phe',UAA:'Pare',UAG:'Pare',UGA:'Pare'};
+function aa(c){return TAB[c]||'?'}
+function cod(m,k){return m[k*3]+m[k*3+1]+m[k*3+2]}
+function prot(s){var m=mrna(s),out=[],n=Math.floor(s.n/3);for(var k=0;k<n;k++){var a=aa(cod(m,k));if(a==='Pare')break;out.push(a)}return out}
+var FASES=[
+{t:'Do DNA ao RNA',tag:'Biologia molecular',rot:'transcrição',v:{cena:'trans',n:0,b2:'A',b3:'A'},ed:['n'],
+ ctx:'No núcleo, a enzima RNA polimerase copia a fita molde do DNA e monta o mRNA. Cada base do DNA pareia com a do RNA: A com U, T com A, C com G.',
+ obj:'Transcreva as 15 bases do gene.',prog:function(){return'Bases transcritas: '+st().n+' de 15'},
+ ok:function(){var s=st();return s.cena==='trans'&&s.n===15},d:['Aumente o valor de bases lidas.','Leve até 15.'],
+ q:{p:'O RNA mensageiro tem a base uracila (U) no lugar de…',o:['timina (T)','citosina (C)','guanina (G)'],c:0,ex:'No RNA a uracila pareia com a adenina e ocupa o lugar da timina.'}},
+{t:'Os dois primeiros aminoácidos',tag:'Biologia molecular',rot:'tradução',v:{cena:'trad',n:0,b2:'A',b3:'A'},ed:['n'],
+ ctx:'No ribossomo, o mRNA é lido de 3 em 3 bases. O primeiro códon (AUG) codifica metionina e inicia a proteína.',
+ obj:'Leia 6 bases e forme os dois primeiros aminoácidos.',prog:function(){return'Cadeia: '+(prot(st()).join(' - ')||'vazia')},
+ ok:function(){var s=st();return s.cena==='trad'&&s.n===6},d:['Cada aminoácido usa 3 bases.','Use 6 bases lidas.'],
+ q:{p:'Quantas bases formam um códon?',o:['3','2','4'],c:0,ex:'Um códon são três nucleotídeos consecutivos, que especificam um aminoácido.'}},
+{t:'Códon de parada',tag:'Biologia molecular',rot:'término',v:{cena:'trad',n:6,b2:'A',b3:'A'},ed:['n'],
+ ctx:'A tradução termina quando o ribossomo encontra um códon de parada (UAA, UAG ou UGA). Nenhum aminoácido é adicionado.',
+ obj:'Leia todo o mRNA até o códon de parada (15 bases).',prog:function(){return'Cadeia: '+prot(st()).join(' - ')+(st().n>=15?' | parada':'')},
+ ok:function(){var s=st();return s.cena==='trad'&&s.n===15},d:['O último códon é UAA.','Leve as bases lidas a 15.'],
+ q:{p:'O códon UAA indica…',o:['o fim da tradução','o início da tradução','o aminoácido leucina'],c:0,ex:'UAA é um dos três códons de parada, e a proteína é liberada.'}},
+{t:'Mutação silenciosa',tag:'Genética',rot:'código redundante',v:{cena:'mut',n:15,b2:'A',b3:'A'},ed:['b3'],
+ ctx:'O código genético é redundante: vários códons dão o mesmo aminoácido. O códon 3 é GAA (ácido glutâmico). Mude só a 3ª base para obter outro códon do mesmo aminoácido.',
+ obj:'Mude a 3ª base de modo que o aminoácido continue sendo Glu.',prog:function(){var s=st(),m=mrna(s);return'Códon 3: '+cod(m,2)+' = '+aa(cod(m,2))},
+ ok:function(){var s=st(),c=cod(mrna(s),2);return s.b3!=='A'&&aa(c)==='Glu'},d:['GAA e GAG codificam o mesmo aminoácido.','Escolha G na 3ª base.'],
+ q:{p:'Uma mutação silenciosa…',o:['não altera o aminoácido da proteína','sempre causa doença','muda o fim da tradução'],c:0,ex:'Por causa da redundância, o códon muda mas o aminoácido é o mesmo.'}},
+{t:'Anemia falciforme',tag:'Saúde',rot:'mutação de ponto',v:{cena:'mut',n:15,b2:'A',b3:'A'},ed:['b2','b3'],
+ ctx:'Na anemia falciforme, uma troca de uma base no gene da hemoglobina muda o códon GAA para GUA: o ácido glutâmico (Glu) vira valina (Val) e a hemácia assume a forma de foice.',
+ obj:'Faça a mutação que troca Glu por Val no códon 3.',prog:function(){var s=st(),m=mrna(s);return'Códon 3: '+cod(m,2)+' = '+aa(cod(m,2))},
+ ok:function(){var c=cod(mrna(st()),2);return aa(c)==='Val'},d:['Mude a 2ª base do códon.','GUA: coloque U na 2ª base.'],
+ q:{p:'Uma troca de uma única base pode…',o:['mudar um aminoácido e alterar a proteína','nunca ter efeito','apagar o gene inteiro'],c:0,ex:'A troca GAA para GUA altera um aminoácido da hemoglobina e causa a doença.'}}];
+GAME.init({key:'ceetip_lab_sintese_v1',fases:FASES,medalhas:['🥉 Aprendiz de genes','🥈 Técnico(a) em síntese proteica','🥇 Mestre do código genético'],livreDesc:'Transcreva, traduza e teste mutações no códon 3.',
+ onStart:function(i,F){GAME.set(F.v);GAME.lock(F.ed);GAME.show(F.ed.concat(['cena']).filter(function(x,k,a){return a.indexOf(x)===k&&(x!=='cena'||false)}))},
+ onLivre:function(){GAME.set({cena:'trad',n:15,b2:'A',b3:'A'});GAME.lock(null);GAME.show(['cena','n','b2','b3'])},
+ livre:'<div class="ctx"><span class="tag f">Laboratório livre</span></div><h3>Do gene à proteína</h3><p>Experimente trocas de base no códon 3. Quais mudam o aminoácido?</p><div class="obj"><span class="ck"></span><span>Sem regras: explore à vontade.</span></div>'});
+var COR={A:'#ff6a6a',U:'#ffe27a',G:'#6aff9a',C:'#6aa8ff',T:'#ffa86a'};
+function base(cx,x,y,b,w){cx.fillStyle=COR[b]||'#fff';GAME.rr(cx,x,y,w,26,5);cx.fill();GAME.tx(cx,b,x+w/2,y+19,'#1a1a1a',15,'center',900)}
+GAME.loop(function(cx,dt,t){var s=st(),T=GAME.tx,m=mrna(s),n=s.n,w=34,x0=50;
+ T(cx,s.cena==='trans'?'Transcrição no núcleo':s.cena==='trad'?'Tradução no ribossomo':'Mutação no códon 3',320,30,'#ffe27a',17,'center',900);
+ T(cx,'DNA molde',x0,84,'#d9c48a',12,'left');for(var i=0;i<15;i++)base(cx,x0+i*w,92,DNA[i],w-3);
+ T(cx,'mRNA',x0,130,'#d9c48a',12,'left');for(var j=0;j<Math.min(n,15);j++){if(s.cena==='mut'&&(j===7||j===8)){cx.strokeStyle='#fff';cx.lineWidth=2;cx.strokeRect(x0+j*w-2,134,w-1,32)}base(cx,x0+j*w,136,m[j],w-3)}
+ if(s.cena!=='trans'){var k=Math.floor(n/3);T(cx,'proteína',x0,214,'#d9c48a',12,'left');var P=[];for(var q=0;q<k;q++){var a=aa(cod(m,q));if(a==='Pare'){T(cx,'PARE',x0+q*100+40,262,'#ff6a6a',15,'center',900);break}P.push(a);cx.fillStyle=a==='Val'?'#ff9a6a':'#7aff9a';cx.beginPath();cx.arc(x0+q*100+40,252,26,0,7);cx.fill();T(cx,a,x0+q*100+40,258,'#1a1a1a',15,'center',900);if(q>0){cx.strokeStyle='#ffffff88';cx.lineWidth=3;cx.beginPath();cx.moveTo(x0+q*100+14,252);cx.lineTo(x0+q*100-34,252);cx.stroke()}T(cx,cod(m,q),x0+q*100+40,298,'#d9c48a',12,'center')}}
+ GAME.reads([['Bases lidas',n+' de 15'],['Códons',Math.floor(n/3)],['Proteína',prot(s).length+' aa']]);});
+window.LABX={aa:aa,mrna:mrna,FASES:FASES};
+
+})();
+</script></body></html>
